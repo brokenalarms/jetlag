@@ -42,52 +42,50 @@ minutes_to_add=$(( (offset_sec % 3600) / 60 ))
 seconds_to_add=$((offset_sec % 60))
 
 echo "---------------------------------------------------"
-echo "Correction preview for Insta360 .insv filename/time"
+echo "Correction preview for Insta360 .insv/.lrv filename/time"
 echo "Base file:     $base_file"
 echo "Correct time:  $correct_str"
 echo "Filter prefix: $filter_prefix"
-if [[ "$apply_changes" -eq 1 ]]; then
-  echo "Mode:          APPLYING changes"
-else
-  echo "Mode:          DRY RUN (no files will be changed)"
-fi
+echo "Mode:          $([[ "$apply_changes" -eq 1 ]] && echo APPLYING changes || echo DRY RUN (no files will be changed))"
 echo "Offset:        $days_to_add d, $hours_to_add h, $minutes_to_add m, $seconds_to_add s"
 echo "---------------------------------------------------"
 
-for file in *.insv; do
-  [[ $file == VID_${filter_prefix}* ]] || continue
+for ext in insv lrv; do
+  for file in *.$ext; do
+    [[ $file == VID_${filter_prefix}* ]] || continue
 
-  echo "Checking: $file"
-  match_count=$((match_count + 1))
+    echo "Checking: $file"
+    match_count=$((match_count + 1))
 
-  IFS='_.' read -r _ orig_date orig_time _ sequence _ <<< "$file"
+    IFS='_.' read -r _ orig_date orig_time _ sequence _ <<< "$file"
 
-  if [[ -z "$orig_date" || -z "$orig_time" || -z "$sequence" ]]; then
-    echo "Failed to parse filename: $file"
-    continue
-  fi
+    if [[ -z "$orig_date" || -z "$orig_time" || -z "$sequence" ]]; then
+      echo "Failed to parse filename: $file"
+      continue
+    fi
 
-  timestamp_input="${orig_date}${orig_time}"
-  epoch=$(TZ=UTC date -j -f "%Y%m%d%H%M%S" "$timestamp_input" +%s) || {
-    echo "Date parse failed for $file"
-    continue
-  }
+    timestamp_input="${orig_date}${orig_time}"
+    epoch=$(TZ=UTC date -j -f "%Y%m%d%H%M%S" "$timestamp_input" +%s) || {
+      echo "Date parse failed for $file"
+      continue
+    }
 
-  corrected_epoch=$((epoch + offset_sec))
-  new_date=$(TZ=UTC date -j -r "$corrected_epoch" "+%Y%m%d")
-  new_time=$(TZ=UTC date -j -r "$corrected_epoch" "+%H%M%S")
-  new_name="VID_${new_date}_${new_time}_00_${sequence}.insv"
-  dest_path="corrected/$new_name"
+    corrected_epoch=$((epoch + offset_sec))
+    new_date=$(TZ=UTC date -j -r "$corrected_epoch" "+%Y%m%d")
+    new_time=$(TZ=UTC date -j -r "$corrected_epoch" "+%H%M%S")
+    new_name="VID_${new_date}_${new_time}_00_${sequence}.${ext}"
+    dest_path="corrected/$new_name"
 
-  if [[ "$apply_changes" -eq 1 ]]; then
-    echo "Copying to: $dest_path"
-    cp "$file" "$dest_path"
-    touch -t "$(TZ=UTC date -j -r "$corrected_epoch" "+%Y%m%d%H%M.%S")" "$dest_path"
-  else
-    echo "Would copy to: $dest_path"
-  fi
+    if [[ "$apply_changes" -eq 1 ]]; then
+      echo "Copying to: $dest_path"
+      cp "$file" "$dest_path"
+      touch -t "$(TZ=UTC date -j -r "$corrected_epoch" "+%Y%m%d%H%M.%S")" "$dest_path"
+    else
+      echo "Would copy to: $dest_path"
+    fi
 
-  echo "---"
+    echo "---"
+  done
 done
 
 echo "✅ Total files matched and processed: $match_count"
