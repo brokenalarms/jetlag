@@ -63,12 +63,12 @@ echo "---------------------------------------------------"
 
 for ext in insv lrv; do
   for file in *.$ext; do
-    [[ $file == VID_${filter_prefix}* ]] || continue
+    [[ $file == VID_${filter_prefix}* || $file == LRV_${filter_prefix}* ]] || continue
 
     echo "Checking: $file"
     match_count=$((match_count + 1))
 
-    IFS='_.' read -r _ orig_date orig_time _ sequence _ <<< "$file"
+    IFS='_.' read -r prefix orig_date orig_time _ sequence _ <<< "$file"
 
     if [[ -z "$orig_date" || -z "$orig_time" || -z "$sequence" ]]; then
       echo "Failed to parse filename: $file"
@@ -84,7 +84,7 @@ for ext in insv lrv; do
     corrected_epoch=$((epoch + offset_sec))
     new_date=$(TZ=UTC date -j -r "$corrected_epoch" "+%Y%m%d")
     new_time=$(TZ=UTC date -j -r "$corrected_epoch" "+%H%M%S")
-    new_name="VID_${new_date}_${new_time}_00_${sequence}.${ext}"
+    new_name="${prefix}_${new_date}_${new_time}_00_${sequence}.${ext}"
 
     if [[ "$apply_changes" -eq 1 ]]; then
       if [[ "$overwrite_in_place" -eq 1 ]]; then
