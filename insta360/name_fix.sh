@@ -1,9 +1,10 @@
 #!/bin/bash
 
 # Usage:
-# ./name_fix.sh --base <misdated_file> --correct <YYYYMMDD_HHMMSS> --filter <prefix> [--apply]
+# ./name_fix.sh --base <misdated_file> --correct <YYYYMMDD_HHMMSS> --filter <prefix> [--apply] [--overwrite]
 
 apply_changes=0
+overwrite_in_place=0
 match_count=0
 
 while [[ $# -gt 0 ]]; do
@@ -12,17 +13,19 @@ while [[ $# -gt 0 ]]; do
     --correct) correct_str="$2"; shift 2 ;;
     --filter) filter_prefix="$2"; shift 2 ;;
     --apply) apply_changes=1; shift ;;
+    --overwrite) overwrite_in_place=1; shift ;;
     *) echo "Unknown argument: $1"; exit 1 ;;
   esac
 done
 
 if [[ -z "$base_file" || -z "$correct_str" || -z "$filter_prefix" ]]; then
-  echo "Usage: $0 --base <misdated_file> --correct <YYYYMMDD_HHMMSS> --filter <prefix> [--apply]"
+  echo "Usage: $0 --base <misdated_file> --correct <YYYYMMDD_HHMMSS> --filter <prefix> [--apply] [--overwrite]"
   exit 1
 fi
 
-# Create output directory
-mkdir -p corrected
+if [[ "$overwrite_in_place" -eq 0 ]]; then
+  mkdir -p corrected
+fi
 
 # Parse base and correct timestamps
 base_full=$(echo "$base_file" | grep -oE '[0-9]{8}_[0-9]{6}')
@@ -46,7 +49,15 @@ echo "Correction preview for Insta360 .insv/.lrv filename/time"
 echo "Base file:     $base_file"
 echo "Correct time:  $correct_str"
 echo "Filter prefix: $filter_prefix"
-echo "Mode:          $([[ "$apply_changes" -eq 1 ]] && echo APPLYING changes || echo DRY RUN (no files will be changed))"
+if [[ "$apply_changes" -eq 1 ]]; then
+  if [[ "$overwrite_in_place" -eq 1 ]]; then
+    echo "Mode:          APPLYING changes (rename in place)"
+  else
+    echo "Mode:          APPLYING changes (copy to ./corrected)"
+  fi
+else
+  echo "Mode:          DRY RUN (no files will be changed)"
+fi
 echo "Offset:        $days_to_add d, $hours_to_add h, $minutes_to_add m, $seconds_to_add s"
 echo "---------------------------------------------------"
 
@@ -74,14 +85,24 @@ for ext in insv lrv; do
     new_date=$(TZ=UTC date -j -r "$corrected_epoch" "+%Y%m%d")
     new_time=$(TZ=UTC date -j -r "$corrected_epoch" "+%H%M%S")
     new_name="VID_${new_date}_${new_time}_00_${sequence}.${ext}"
-    dest_path="corrected/$new_name"
 
     if [[ "$apply_changes" -eq 1 ]]; then
-      echo "Copying to: $dest_path"
-      cp "$file" "$dest_path"
-      touch -t "$(TZ=UTC date -j -r "$corrected_epoch" "+%Y%m%d%H%M.%S")" "$dest_path"
+      if [[ "$overwrite_in_place" -eq 1 ]]; then
+        echo "Renaming in place to: $new_name"
+        mv "$file" "$new_name"
+        touch -t "$(TZ=UTC date -j -r "$corrected_epoch" "+%Y%m%d%H%M.%S")" "$new_name"
+      else
+        dest_path="corrected/$new_name"
+        echo "Copying to: $dest_path"
+        cp "$file" "$dest_path"
+        touch -t "$(TZ=UTC date -j -r "$corrected_epoch" "+%Y%m%d%H%M.%S")" "$dest_path"
+      fi
     else
-      echo "Would copy to: $dest_path"
+      if [[ "$overwrite_in_place" -eq 1 ]]; then
+        echo "Would rename in place to: $new_name"
+      else
+        echo "Would copy to: corrected/$new_name"
+      fi
     fi
 
     echo "---"
