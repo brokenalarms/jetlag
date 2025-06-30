@@ -1,112 +1,77 @@
 #!/bin/bash
 
 # Usage:
-# ./name_fix.sh --base <misdated_file> --correct <YYYYMMDD_HHMMSS> --filter <prefix> [--apply] [--overwrite]
+# ./name_fix.sh --timezone +0200 --filter <prefix> [--apply]
 
 apply_changes=0
-overwrite_in_place=0
+timezone_offset=""
+filter_prefix=""
 match_count=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --base) base_file="$2"; shift 2 ;;
-    --correct) correct_str="$2"; shift 2 ;;
+    --timezone) timezone_offset="$2"; shift 2 ;;
     --filter) filter_prefix="$2"; shift 2 ;;
     --apply) apply_changes=1; shift ;;
-    --overwrite) overwrite_in_place=1; shift ;;
     *) echo "Unknown argument: $1"; exit 1 ;;
   esac
 done
 
-if [[ -z "$base_file" || -z "$correct_str" || -z "$filter_prefix" ]]; then
-  echo "Usage: $0 --base <misdated_file> --correct <YYYYMMDD_HHMMSS> --filter <prefix> [--apply] [--overwrite]"
+if [[ -z "$timezone_offset" || -z "$filter_prefix" ]]; then
+  echo "Usage: $0 --timezone <+HHMM/-HHMM> --filter <prefix> [--apply]"
   exit 1
 fi
 
-if [[ "$overwrite_in_place" -eq 0 ]]; then
-  mkdir -p corrected
-fi
-
-# Parse base and correct timestamps
-base_full=$(echo "$base_file" | grep -oE '[0-9]{8}_[0-9]{6}')
-base_date="${base_full%_*}"
-base_time="${base_full#*_}"
-
-correct_date="${correct_str%_*}"
-correct_time="${correct_str#*_}"
-
-base_epoch=$(TZ=UTC date -j -f "%Y%m%d%H%M%S" "${base_date}${base_time}" +%s)
-correct_epoch=$(TZ=UTC date -j -f "%Y%m%d%H%M%S" "${correct_date}${correct_time}" +%s)
-offset_sec=$((correct_epoch - base_epoch))
-
-days_to_add=$((offset_sec / 86400))
-hours_to_add=$(( (offset_sec % 86400) / 3600 ))
-minutes_to_add=$(( (offset_sec % 3600) / 60 ))
-seconds_to_add=$((offset_sec % 60))
-
-echo "---------------------------------------------------"
-echo "Correction preview for Insta360 .insv/.lrv filename/time"
-echo "Base file:     $base_file"
-echo "Correct time:  $correct_str"
-echo "Filter prefix: $filter_prefix"
+echo "----------------------------------------------------"
+echo "Filename UTC Correction for Insta360"
+echo "Timezone offset: $timezone_offset"
+echo "Filter prefix:   $filter_prefix"
 if [[ "$apply_changes" -eq 1 ]]; then
-  if [[ "$overwrite_in_place" -eq 1 ]]; then
-    echo "Mode:          APPLYING changes (rename in place)"
-  else
-    echo "Mode:          APPLYING changes (copy to ./corrected)"
-  fi
+  echo "Mode:            APPLYING changes"
 else
-  echo "Mode:          DRY RUN (no files will be changed)"
+  echo "Mode:            DRY RUN (no files will be changed)"
 fi
-echo "Offset:        $days_to_add d, $hours_to_add h, $minutes_to_add m, $seconds_to_add s"
-echo "---------------------------------------------------"
+echo "----------------------------------------------------"
 
-for ext in insv lrv; do
-  for file in *.$ext; do
-    [[ $file == VID_${filter_prefix}* || $file == LRV_${filter_prefix}* ]] || continue
+for file in VID_"$filter_prefix"*.*; do
+  [[ -f "$file" ]] || continue
 
-    echo "Checking: $file"
-    match_count=$((match_count + 1))
+  ext="${file##*.}"
+  name_part="${file%.*}"
 
-    IFS='_.' read -r prefix orig_date orig_time _ sequence _ <<< "$file"
+  if [[ ! "$name_part" =~ VID_([0-9]{8})_([0-9]{6})_00_([0-9]+) ]]; then
+    echo "Skipping: $file (unrecognized format)"
+    continue
+  fi
 
-    if [[ -z "$orig_date" || -z "$orig_time" || -z "$sequence" ]]; then
-      echo "Failed to parse filename: $file"
-      continue
-    fi
+  match_count=$((match_count + 1))
+  orig_date="${BASH_REMATCH[1]}"
+  orig_time="${BASH_REMATCH[2]}"
+  sequence="${BASH_REMATCH[3]}"
+  datetime_local="${orig_date}${orig_time}"
 
-    timestamp_input="${orig_date}${orig_time}"
-    epoch=$(TZ=UTC date -j -f "%Y%m%d%H%M%S" "$timestamp_input" +%s) || {
-      echo "Date parse failed for $file"
-      continue
-    }
+  # Convert to UTC
+  utc_epoch=$(TZ="UTC" date -j -f "%Y%m%d%H%M%S %z" "${datetime_local} ${timezone_offset}" +%s 2>/dev/null)
+  if [[ -z "$utc_epoch" ]]; then
+    echo "❌ Failed to convert: $file"
+    continue
+  fi
 
-    corrected_epoch=$((epoch + offset_sec))
-    new_date=$(TZ=UTC date -j -r "$corrected_epoch" "+%Y%m%d")
-    new_time=$(TZ=UTC date -j -r "$corrected_epoch" "+%H%M%S")
-    new_name="${prefix}_${new_date}_${new_time}_00_${sequence}.${ext}"
+  utc_date=$(date -u -r "$utc_epoch" "+%Y%m%d")
+  utc_time=$(date -u -r "$utc_epoch" "+%H%M%S")
+  new_name="VID_${utc_date}_${utc_time}_00_${sequence}.${ext}"
 
-    if [[ "$apply_changes" -eq 1 ]]; then
-      if [[ "$overwrite_in_place" -eq 1 ]]; then
-        echo "Renaming in place to: $new_name"
-        mv "$file" "$new_name"
-        touch -t "$(TZ=UTC date -j -r "$corrected_epoch" "+%Y%m%d%H%M.%S")" "$new_name"
-      else
-        dest_path="corrected/$new_name"
-        echo "Copying to: $dest_path"
-        cp "$file" "$dest_path"
-        touch -t "$(TZ=UTC date -j -r "$corrected_epoch" "+%Y%m%d%H%M.%S")" "$dest_path"
-      fi
-    else
-      if [[ "$overwrite_in_place" -eq 1 ]]; then
-        echo "Would rename in place to: $new_name"
-      else
-        echo "Would copy to: corrected/$new_name"
-      fi
-    fi
+  if [[ "$file" == "$new_name" ]]; then
+    echo "✅ $file is already correct"
+    continue
+  fi
 
-    echo "---"
-  done
+  if [[ "$apply_changes" -eq 1 ]]; then
+    mv "$file" "$new_name"
+    echo "✅ Renamed to: $new_name"
+  else
+    echo "DRY RUN: Would rename $file -> $new_name"
+  fi
 done
 
-echo "✅ Total files matched and processed: $match_count"
+echo "✅ Total matched: $match_count"
