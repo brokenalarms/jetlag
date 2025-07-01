@@ -84,6 +84,19 @@ process_file() {
   local media_create
   media_create="$(exiftool -s3 -QuickTime:MediaCreateDate "$file" 2>/dev/null)"
 
+  # *** PRIORITIZE filename+timezone.txt if both present, even if DateTimeOriginal exists ***
+  if parse_filename_datetime "$base" >/dev/null && [[ "$tz_source" == "timezone.txt" ]]; then
+    local local_dt
+    local_dt="$(parse_filename_datetime "$base")"
+    local local_time="$local_dt$timezone"
+    local utc_time; utc_time="$(to_utc "$local_time")"
+    print_file_info "$base" "datetime from VID_ filename, timezone from timezone.txt, TZ=${timezone}" "$local_time" "$utc_time"
+    if [[ "$apply" -eq 1 ]]; then
+      update_metadata "$file" "$local_time" "$utc_time"
+    fi
+    return
+  fi
+
   # Method 1: DateTimeOriginal (with TZ)
   if [[ "$tz_source" == "DateTimeOriginal" ]]; then
     local local_time="$dto"
@@ -95,24 +108,11 @@ process_file() {
     return
   fi
 
-  # Method 2: Filename + timezone.txt
-  if parse_filename_datetime "$base" >/dev/null; then
-    local local_dt
-    local_dt="$(parse_filename_datetime "$base")"
-    local local_time="$local_dt$timezone"
-    local utc_time; utc_time="$(to_utc "$local_time")"
-    print_file_info "$base" "datetime from VID_ filename, timezone from timezone.txt, TZ=${local_time:19}" "$local_time" "$utc_time"
-    if [[ "$apply" -eq 1 ]]; then
-      update_metadata "$file" "$local_time" "$utc_time"
-    fi
-    return
-  fi
-
   # Method 3: MediaCreateDate + timezone.txt
   if [[ -n "$media_create" && -n "$timezone" ]]; then
     local local_time="$media_create$timezone"
     local utc_time; utc_time="$(to_utc "$local_time")"
-    print_file_info "$base" "datetime from MediaCreateDate, timezone from timezone.txt, TZ=${local_time:19}" "$local_time" "$utc_time"
+    print_file_info "$base" "datetime from MediaCreateDate, timezone from timezone.txt, TZ=${timezone}" "$local_time" "$utc_time"
     if [[ "$apply" -eq 1 ]]; then
       update_metadata "$file" "$local_time" "$utc_time"
     fi
@@ -132,10 +132,14 @@ find . -type d | while read -r dir; do
   [[ ${#files[@]} -eq 0 ]] && continue
 
   for file in "${files[@]}"; do
-    dto="$(exiftool -s3 -DateTimeOriginal "$file" 2>/dev/null)"
     base="$(basename "$file")"
+    dto="$(exiftool -s3 -DateTimeOriginal "$file" 2>/dev/null)"
 
-    if [[ "$dto" =~ [+-][0-9]{2}(:?[0-9]{2})$ ]]; then
+    # *** Patch: always use filename+timezone.txt if filename matches and file present ***
+    if parse_filename_datetime "$base" >/dev/null && [[ -f "$dir/timezone.txt" ]]; then
+      timezone=$(fix_colon_tz "$(head -n1 "$dir/timezone.txt")")
+      tz_source="timezone.txt"
+    elif [[ "$dto" =~ [+-][0-9]{2}(:?[0-9]{2})$ ]]; then
       timezone="${dto:19}"
       tz_source="DateTimeOriginal"
     elif [[ -f "$dir/timezone.txt" ]]; then
