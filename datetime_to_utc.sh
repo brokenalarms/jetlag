@@ -44,15 +44,19 @@ print(dt.astimezone(timezone.utc).strftime('%Y:%m:%d %H:%M:%S'))
 
 update_metadata() {
   local file="$1"
-  local local_time="$2"
+  local local_time="$2"      # e.g. 2025:05:06 12:07:43+0100
   local utc_time="$3"
+
   exiftool -overwrite_original \
     "-DateTimeOriginal=$local_time" \
     "-QuickTime:CreateDate=$utc_time" \
     "-QuickTime:ModifyDate=$utc_time" \
     "-FileModifyDate=$utc_time" "$file" >/dev/null 2>&1
 
-  SetFile -d "$(date -j -f "%Y:%m:%d %H:%M:%S" "$utc_time" "+%m/%d/%Y %H:%M:%S")" "$file"
+  # Strip timezone from local_time for SetFile
+  local local_time_no_tz="${local_time:0:19}" # Only the "YYYY:MM:DD HH:MM:SS" part
+
+  SetFile -d "$(date -j -f "%Y:%m:%d %H:%M:%S" "$local_time_no_tz" "+%m/%d/%Y %H:%M:%S")" "$file"
 }
 
 print_file_info() {
@@ -135,6 +139,7 @@ find . -type d | while read -r dir; do
       timezone="${dto:19}"
       tz_source="DateTimeOriginal"
     elif [[ -f "$dir/timezone.txt" ]]; then
+      chflags hidden "$dir/timezone.txt"
       timezone=$(fix_colon_tz "$(head -n1 "$dir/timezone.txt")")
       tz_source="timezone.txt"
     else
