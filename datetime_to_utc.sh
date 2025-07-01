@@ -55,6 +55,19 @@ update_metadata() {
   SetFile -d "$(date -j -f "%Y:%m:%d %H:%M:%S" "$utc_time" "+%m/%d/%Y %H:%M:%S")" "$file"
 }
 
+print_file_info() {
+  local filename="$1"
+  local description="$2"
+  local local_time="$3"
+  local utc_time="$4"
+  local cyan="\033[36m"
+  local reset="\033[0m"
+  # Cyan for filename, rest plain
+  printf "${cyan}🔍 %s${reset} [%s]\n" "$filename" "$description"
+  printf "⏱️ Local time : %s\n" "$local_time"
+  printf "🌐 UTC time   : %s UTC\n\n" "$utc_time"
+}
+
 process_file() {
   local file="$1"
   local timezone="$2"
@@ -71,8 +84,7 @@ process_file() {
   if [[ "$tz_source" == "DateTimeOriginal" ]]; then
     local local_time="$dto"
     local utc_time; utc_time="$(to_utc "$local_time")"
-    printf "\n🔍 %s\n⏱️  Local time [from DateTimeOriginal, TZ=%s]: %s\n🌐 UTC time  : %s UTC\n" \
-      "$base" "${local_time:19}" "$local_time" "$utc_time"
+    print_file_info "$base" "datetime and zone from DateTimeOriginal, TZ=${local_time:19}" "$local_time" "$utc_time"
     if [[ "$apply" -eq 1 ]]; then
       update_metadata "$file" "$local_time" "$utc_time"
     fi
@@ -85,8 +97,7 @@ process_file() {
     local_dt="$(parse_filename_datetime "$base")"
     local local_time="$local_dt$timezone"
     local utc_time; utc_time="$(to_utc "$local_time")"
-    printf "\n🔍 %s\n⏱️  Local time [from filename + timezone.txt, TZ=%s]: %s\n🌐 UTC time  : %s UTC\n" \
-      "$base" "$timezone" "$local_time" "$utc_time"
+    print_file_info "$base" "datetime from VID_ filename, timezone from timezone.txt, TZ=${local_time:19}" "$local_time" "$utc_time"
     if [[ "$apply" -eq 1 ]]; then
       update_metadata "$file" "$local_time" "$utc_time"
     fi
@@ -97,8 +108,7 @@ process_file() {
   if [[ -n "$media_create" && -n "$timezone" ]]; then
     local local_time="$media_create$timezone"
     local utc_time; utc_time="$(to_utc "$local_time")"
-    printf "\n🔍 %s\n⏱️  Local time [from MediaCreateDate + timezone.txt, TZ=%s]: %s\n🌐 UTC time  : %s UTC\n" \
-      "$base" "$timezone" "$local_time" "$utc_time"
+    print_file_info "$base" "datetime from MediaCreateDate, timezone from timezone.txt, TZ=${local_time:19}" "$local_time" "$utc_time"
     if [[ "$apply" -eq 1 ]]; then
       update_metadata "$file" "$local_time" "$utc_time"
     fi
