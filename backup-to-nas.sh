@@ -17,9 +17,9 @@ else
 fi
 
 # Validate required environment variables
-if [[ -z "${NAS_USER:-}" || -z "${NAS_HOST:-}" || -z "${NAS_PATH:-}" || -z "${SOURCE_PATH:-}" ]]; then
+if [[ -z "${NAS_USER:-}" || -z "${NAS_HOST:-}" || -z "${NAS_BACKUP_PATH:-}" || -z "${SOURCE_PATH:-}" ]]; then
     echo "ERROR: Missing required environment variables"
-    echo "Required: NAS_USER, NAS_HOST, NAS_PATH, SOURCE_PATH"
+    echo "Required: NAS_USER, NAS_HOST, NAS_BACKUP_PATH, SOURCE_PATH"
     echo "Check your .env.local file"
     exit 1
 fi
@@ -29,7 +29,7 @@ EXCLUSIONS_FILE="${EXCLUSIONS_FILE:-${HOME}/.exclusions.txt}"
 
 echo "🔄 Starting backup to NAS..."
 echo "Source: $SOURCE_PATH"
-echo "Destination: $NAS_USER@$NAS_HOST:$NAS_PATH"
+echo "Destination: $NAS_USER@$NAS_HOST:$NAS_BACKUP_PATH"
 echo "Exclusions: $EXCLUSIONS_FILE"
 echo
 
@@ -43,8 +43,6 @@ else
 fi
 
 # Run rsync with environment variables
-set -x
-rsync -avz --delete --no-perms --no-owner --no-group --no-links --omit-dir-times --progress --stats $EXCLUDE_ARG "$SOURCE_PATH" "$NAS_USER@$NAS_HOST:$NAS_PATH"
-set +x
+rsync -avz --delete --no-perms --no-owner --no-group --no-links --omit-dir-times --progress --stats $EXCLUDE_ARG "$SOURCE_PATH" "$NAS_USER@$NAS_HOST:$NAS_BACKUP_PATH"
 
 echo "✅ Backup completed successfully"
