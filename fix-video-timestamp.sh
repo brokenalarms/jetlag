@@ -100,7 +100,16 @@ done
 # Convert country to timezone if provided
 if [[ -n "$cli_country" && -z "$cli_tz" ]]; then
   if cli_tz=$(get_timezone_for_country "$cli_country"); then
-    echo "🌍 Country: $cli_country → Timezone: $cli_tz"
+    # If it's a 2-letter code, show both code and full name
+    if [[ ${#cli_country} -eq 2 ]]; then
+      # Look up the full country name from the CSV
+      country_code="$(echo "$cli_country" | tr '[:lower:]' '[:upper:]')"
+      # Handle CSV with potential quotes and commas in country names
+      country_name="$(grep "^$country_code," "$TIMEZONE_DIR/country.csv" 2>/dev/null | sed "s/^$country_code,//" | sed 's/^"//;s/"$//' || echo "$cli_country")"
+      echo "🌍 Country: $country_code ($country_name) → Timezone: $cli_tz"
+    else
+      echo "🌍 Country: $cli_country → Timezone: $cli_tz"
+    fi
   else
     echo "ERROR: Unknown country '$cli_country'." >&2
     echo "Supported formats:" >&2
@@ -189,12 +198,15 @@ get_datetime_local() {
 
 update_metadata() {
   local file="$1" local_time="$2" utc_time="$3"
+  # Extract just the datetime without timezone for file system timestamps
+  local local_time_no_tz="${local_time:0:19}"
+  
   exiftool -overwrite_original \
     "-DateTimeOriginal=$local_time" \
     "-QuickTime:CreateDate=$utc_time" \
     "-QuickTime:ModifyDate=$utc_time" \
-    "-FileModifyDate=$utc_time" "$file" >/dev/null 2>&1
-  SetFile -d "$(date -j -f "%Y:%m:%d %H:%M:%S" "${local_time:0:19}" "+%m/%d/%Y %H:%M:%S")" "$file"
+    "-FileModifyDate=$local_time_no_tz" "$file" >/dev/null 2>&1
+  SetFile -d "$(date -j -f "%Y:%m:%d %H:%M:%S" "$local_time_no_tz" "+%m/%d/%Y %H:%M:%S")" "$file"
 }
 
 # ---------- logging helpers ----------
@@ -242,13 +254,68 @@ calculate_time_difference() {
   if [[ "$original" =~ [+-][0-9]{2}:?[0-9]{2}$ ]]; then
     orig_utc="$(to_utc "$original" 2>/dev/null || echo "")"
   else
-    # No timezone in original - we're adding timezone
-    # Extract just the corrected timezone for display
-    if [[ "$corrected" =~ ([+-][0-9]{2}:?[0-9]{2})$ ]]; then
-      echo "Adding timezone ${BASH_REMATCH[1]}"
+    # No timezone in original - need to determine what the original represents
+    # If the original time matches the filename time, it's likely already in local time
+    # Otherwise assume it's UTC
+    local orig_time_only="$(echo "$original" | sed -E 's/ \(.*\)$//')"  # Remove (file mtime) suffix
+    
+    # Extract just the time portion from corrected (local time from filename)
+    local corrected_time_only="$(echo "$corrected" | sed -E 's/[+-][0-9]{2}:?[0-9]{2}$//')"
+    
+    if [[ "$orig_time_only" == "$corrected_time_only" ]]; then
+      # Original already shows local time, no change needed
+      echo "No change"
+      return 0
     else
-      echo "Adding timezone"
+      # Original is different from filename time, likely UTC
+      orig_utc="$orig_time_only"
     fi
+    
+    # Get corrected UTC 
+    corr_utc="$(to_utc "$corrected" 2>/dev/null || echo "")"
+    
+    if [[ -n "$orig_utc" && -n "$corr_utc" ]]; then
+      # Calculate the difference
+      local orig_epoch=$(date -j -f "%Y:%m:%d %H:%M:%S" "$orig_utc" "+%s" 2>/dev/null || echo "0")
+      local corr_epoch=$(date -j -f "%Y:%m:%d %H:%M:%S" "$corr_utc" "+%s" 2>/dev/null || echo "0")
+      
+      if [[ "$orig_epoch" -ne 0 && "$corr_epoch" -ne 0 ]]; then
+        local diff=$((corr_epoch - orig_epoch))
+        local abs_diff=$((diff < 0 ? -diff : diff))
+        
+        if [[ $abs_diff -eq 0 ]]; then
+          echo "No change (same UTC time)"
+          return 0
+        fi
+        
+        local hours=$((abs_diff / 3600))
+        local minutes=$(((abs_diff % 3600) / 60))
+        local sign=$([[ $diff -lt 0 ]] && echo "-" || echo "+")
+        
+        local change_desc=""
+        if [[ $hours -gt 0 && $minutes -gt 0 ]]; then
+          change_desc="${sign}${hours}h ${minutes}m"
+        elif [[ $hours -gt 0 ]]; then
+          change_desc="${sign}${hours}h"
+        elif [[ $minutes -gt 0 ]]; then
+          change_desc="${sign}${minutes}m"
+        else
+          change_desc="${sign}<1m"
+        fi
+        
+        # Extract timezone for context and explain the change
+        if [[ "$corrected" =~ ([+-][0-9]{2}:?[0-9]{2})$ ]]; then
+          local tz_display="${BASH_REMATCH[1]}"
+          echo "$change_desc"
+        else
+          echo "$change_desc (setting timezone)"
+        fi
+        return 0
+      fi
+    fi
+    
+    # Fallback if calculation fails
+    echo "Setting timezone"
     return 0
   fi
   
