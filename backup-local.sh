@@ -18,7 +18,6 @@ fi
 
 # Default to dry run unless --apply is specified
 DRY_RUN=1
-VERBOSE=0
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -26,16 +25,12 @@ while [[ $# -gt 0 ]]; do
     --apply) 
       DRY_RUN=0
       shift ;;
-    --verbose|-v) 
-      VERBOSE=1
-      shift ;;
     --help|-h)
       echo "Usage: backup-local.sh [OPTIONS]"
       echo "Local backup using paths configured in .env.local"
       echo ""
       echo "Options:"
       echo "  --apply         Actually perform the backup (default: dry run)"
-      echo "  --verbose, -v   Show verbose output"
       echo "  --help, -h      Show this help"
       echo ""
       echo "Configuration:"
@@ -90,7 +85,7 @@ else
 fi
 
 # Build rsync command
-RSYNC_ARGS="-avz --delete-during --force-delete --ignore-errors --no-perms --no-owner --no-group --no-links --omit-dir-times --stats"
+RSYNC_ARGS="-avz --delete-during --force-delete --ignore-errors --no-perms --no-owner --no-group --no-links --omit-dir-times --info=name,stats2 --human-readable"
 
 if [[ $DRY_RUN -eq 1 ]]; then
   echo "Mode:        DRY RUN (no changes will be made)"
@@ -101,13 +96,6 @@ else
 fi
 
 echo ""
-
-# Add verbosity
-if [[ $VERBOSE -eq 1 ]]; then
-  RSYNC_ARGS="$RSYNC_ARGS --info=name"
-else
-  RSYNC_ARGS="$RSYNC_ARGS --info=progress2"
-fi
 
 # Run rsync
 echo "🔄 Starting backup..."
