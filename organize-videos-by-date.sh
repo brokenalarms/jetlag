@@ -48,15 +48,21 @@ done
 # Validate required arguments
 [[ -n "$DIR" ]] || { echo "ERROR: --dir DIRNAME is required" >&2; exit 1; }
 
+# If no --country was provided but --dir looks like a country, use it
+if [[ ! " ${NORMALIZE_ARGS[@]+"${NORMALIZE_ARGS[@]}"} " =~ " --country " ]]; then
+  # Try using DIR as country
+  NORMALIZE_ARGS+=("--country" "$DIR")
+fi
+
 echo "→ Root:    $ROOT"
 echo "→ Exports: $EXPORTS"
 echo "→ Ready:   $READY"
 echo "→ Dir:     $DIR"
 echo "→ Mode:    $([[ $APPLY -eq 1 ]] && echo APPLY || echo 'DRY RUN (no changes)')"
-echo "→ Running normalizer with args: ${NORMALIZE_ARGS[*]}"
+echo "→ Running normalizer with args: ${NORMALIZE_ARGS[*]:-}"
 ORIG_PWD="$PWD"
 cd "$EXPORTS"
-fix-video-timestamps.sh "${NORMALIZE_ARGS[@]}" || {
+fix-video-timestamps.sh ${NORMALIZE_ARGS[@]+"${NORMALIZE_ARGS[@]}"} || {
   echo "⚠️  Normalizer completed with warnings/errors, continuing with file moves..."
 }
 cd "$ORIG_PWD"

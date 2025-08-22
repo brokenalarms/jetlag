@@ -12,6 +12,8 @@ apply=0
 verbose=0
 cli_tz=""
 cli_country=""
+TZ_SOURCE=""  # Global variable to track timezone source  
+DT_SOURCE=""  # Global variable to track datetime source
 
 # Get script directory for timezone CSV files
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -115,26 +117,32 @@ print(dt.astimezone(timezone.utc).strftime('%Y:%m:%d %H:%M:%S'))
 PY
 }
 
-# A) TIMEZONE picking (CLI → timezone.txt → DateTimeOriginal)
+# A) TIMEZONE picking (timezone.txt → existing metadata → CLI/country)
 get_timezone() {
   local file="$1" dir tz dto
   dir="$(dirname "$file")"
 
-  if [[ -n "$cli_tz" ]]; then
-    echo "$(fix_colon_tz "$cli_tz")"
-    return 0
-  fi
-
+  # 1. Check for local timezone.txt file (explicit override)
   if [[ -f "$dir/timezone.txt" ]]; then
     tz="$(head -n1 "$dir/timezone.txt")"
     chflags hidden "$dir/timezone.txt" 2>/dev/null || true
     echo "$(fix_colon_tz "$tz")"
+    TZ_SOURCE="timezone.txt"
     return 0
   fi
 
+  # 2. Check if file already has timezone in DateTimeOriginal (respect existing - don't modify)
   dto="$(exiftool -s3 -DateTimeOriginal "$file" 2>/dev/null || true)"
   if [[ "$dto" =~ [+-][0-9]{2}(:?[0-9]{2})$ ]]; then
     echo "$(fix_colon_tz "${dto:19}")"
+    TZ_SOURCE="existing metadata"
+    return 0
+  fi
+
+  # 3. Apply CLI/country timezone (when no existing timezone set)
+  if [[ -n "$cli_tz" ]]; then
+    echo "$(fix_colon_tz "$cli_tz")"
+    TZ_SOURCE="CLI/country"
     return 0
   fi
 
@@ -148,22 +156,26 @@ get_datetime_local() {
 
   if [[ "$base" =~ ^VID_([0-9]{8})_([0-9]{6}) ]]; then
     local d="${BASH_REMATCH[1]}" t="${BASH_REMATCH[2]}"
+    DT_SOURCE="filename"
     echo "${d:0:4}:${d:4:2}:${d:6:2} ${t:0:2}:${t:2:2}:${t:4:2}"
     return 0
   fi
 
   dto="$(exiftool -s3 -DateTimeOriginal "$file" 2>/dev/null || true)"
   if [[ "$dto" =~ ^([0-9]{4}):([0-9]{2}):([0-9]{2})[[:space:]]([0-9]{2}):([0-9]{2}):([0-9]{2}) ]]; then
+    DT_SOURCE="DateTimeOriginal"
     echo "${BASH_REMATCH[1]}:${BASH_REMATCH[2]}:${BASH_REMATCH[3]} ${BASH_REMATCH[4]}:${BASH_REMATCH[5]}:${BASH_REMATCH[6]}"
     return 0
   fi
 
   mcd="$(exiftool -s3 -QuickTime:MediaCreateDate "$file" 2>/dev/null || true)"
   if [[ "$mcd" =~ ^([0-9]{4}):([0-9]{2}):([0-9]{2})[[:space:]]([0-9]{2}):([0-9]{2}):([0-9]{2}) ]]; then
+    DT_SOURCE="MediaCreateDate"
     echo "${BASH_REMATCH[1]}:${BASH_REMATCH[2]}:${BASH_REMATCH[3]} ${BASH_REMATCH[4]}:${BASH_REMATCH[5]}:${BASH_REMATCH[6]}"
     return 0
   fi
 
+  DT_SOURCE="file mtime"
   date -r "$file" +%Y:%m:%d\ %H:%M:%S
 }
 
@@ -222,9 +234,14 @@ calculate_time_difference() {
   if [[ "$original" =~ [+-][0-9]{2}:?[0-9]{2}$ ]]; then
     orig_utc="$(to_utc "$original" 2>/dev/null || echo "")"
   else
-    # No timezone info, can't compare accurately
-    echo "No timezone in original"
-    return 1
+    # No timezone in original - we're adding timezone
+    # Extract just the corrected timezone for display
+    if [[ "$corrected" =~ ([+-][0-9]{2}:?[0-9]{2})$ ]]; then
+      echo "Adding timezone ${BASH_REMATCH[1]}"
+    else
+      echo "Adding timezone"
+    fi
+    return 0
   fi
   
   # Convert corrected to UTC
@@ -279,15 +296,36 @@ process_single_file() {
   log_verbose "Processing: $file"
   
   # Get timezone for this file
-  if ! tz="$(get_timezone "$file")"; then
+  local tz_result
+  if ! tz_result="$(get_timezone "$file")"; then
     echo "❌ $base: No timezone (use --timezone or timezone.txt). Aborting." >&2
     return 1
   fi
-  log_verbose "  Timezone: $tz"
+  tz="$tz_result"
+  # Set TZ_SOURCE based on timezone logic (will fix this properly)
+  if [[ -f "$(dirname "$file")/timezone.txt" ]]; then
+    TZ_SOURCE="timezone.txt"
+  elif exiftool -s3 -DateTimeOriginal "$file" 2>/dev/null | grep -q '[+-][0-9][0-9]'; then
+    TZ_SOURCE="existing metadata"
+  else
+    TZ_SOURCE="CLI/country"
+  fi
+  log_verbose "  Timezone: $tz (source: $TZ_SOURCE)"
 
   # Get local datetime
   local_dt="$(get_datetime_local "$file")"
-  log_verbose "  Local datetime: $local_dt"
+  # Set DT_SOURCE based on file type
+  base="$(basename "$file")"
+  if [[ "$base" =~ ^VID_([0-9]{8})_([0-9]{6}) ]]; then
+    DT_SOURCE="filename"
+  elif exiftool -s3 -DateTimeOriginal "$file" 2>/dev/null | grep -q '^[0-9][0-9][0-9][0-9]:[0-9][0-9]:[0-9][0-9]'; then
+    DT_SOURCE="DateTimeOriginal"
+  elif exiftool -s3 -QuickTime:MediaCreateDate "$file" 2>/dev/null | grep -q '^[0-9][0-9][0-9][0-9]:[0-9][0-9]:[0-9][0-9]'; then
+    DT_SOURCE="MediaCreateDate"
+  else
+    DT_SOURCE="file mtime"
+  fi
+  log_verbose "  Local datetime: $local_dt (source: $DT_SOURCE)"
   
   local_with_tz="${local_dt}${tz}"
   log_verbose "  Local with TZ: $local_with_tz"
@@ -308,7 +346,7 @@ process_single_file() {
 
   # Display enhanced comparison info
   printf "\033[36m🔍 %s\033[0m\n" "$base"
-  printf "📅 Original : %s\n" "$original_meta"
+  printf "📅 Original : %s (from %s, tz: %s)\n" "$original_meta" "$DT_SOURCE" "$TZ_SOURCE"
   printf "⏱️ Corrected: %s\n" "$local_with_tz"
   printf "🌐 UTC      : %s UTC\n" "$utc_time"
   printf "📊 Change   : %s\n" "$time_diff"
