@@ -182,6 +182,95 @@ log_verbose() {
   [[ $verbose -eq 1 ]] && echo "$@" >&2
 }
 
+# ---------- original metadata helpers ----------
+get_original_metadata() {
+  local file="$1"
+  
+  # Try to get DateTimeOriginal with timezone
+  local dto="$(exiftool -s3 -DateTimeOriginal "$file" 2>/dev/null || true)"
+  if [[ -n "$dto" ]]; then
+    echo "$dto"
+    return 0
+  fi
+  
+  # Try MediaCreateDate
+  local mcd="$(exiftool -s3 -QuickTime:MediaCreateDate "$file" 2>/dev/null || true)"
+  if [[ -n "$mcd" ]]; then
+    echo "$mcd"
+    return 0
+  fi
+  
+  # Fallback to file modification time
+  local mtime="$(date -r "$file" '+%Y:%m:%d %H:%M:%S' 2>/dev/null || true)"
+  if [[ -n "$mtime" ]]; then
+    echo "$mtime (file mtime)"
+    return 0
+  fi
+  
+  return 1
+}
+
+calculate_time_difference() {
+  local original="$1"
+  local corrected="$2"
+  
+  # Convert both timestamps to UTC for comparison
+  local orig_utc=""
+  local corr_utc=""
+  
+  # Convert original to UTC if it has timezone info
+  if [[ "$original" =~ [+-][0-9]{2}:?[0-9]{2}$ ]]; then
+    orig_utc="$(to_utc "$original" 2>/dev/null || echo "")"
+  else
+    # No timezone info, can't compare accurately
+    echo "No timezone in original"
+    return 1
+  fi
+  
+  # Convert corrected to UTC
+  corr_utc="$(to_utc "$corrected" 2>/dev/null || echo "")"
+  
+  if [[ -z "$orig_utc" || -z "$corr_utc" ]]; then
+    echo "Unable to calculate"
+    return 1
+  fi
+  
+  # Parse UTC timestamps for epoch conversion
+  local orig_clean="$(echo "$orig_utc" | sed -E 's/([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*/\1/')"
+  local corr_clean="$(echo "$corr_utc" | sed -E 's/([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*/\1/')"
+  
+  # Convert to epoch seconds
+  local orig_epoch=$(date -j -f "%Y:%m:%d %H:%M:%S" "$orig_clean" "+%s" 2>/dev/null || echo "0")
+  local corr_epoch=$(date -j -f "%Y:%m:%d %H:%M:%S" "$corr_clean" "+%s" 2>/dev/null || echo "0")
+  
+  if [[ "$orig_epoch" -eq 0 || "$corr_epoch" -eq 0 ]]; then
+    echo "Unable to calculate"
+    return 1
+  fi
+  
+  local diff=$((corr_epoch - orig_epoch))
+  local abs_diff=$((diff < 0 ? -diff : diff))
+  
+  if [[ $abs_diff -eq 0 ]]; then
+    echo "No change"
+    return 0
+  fi
+  
+  local hours=$((abs_diff / 3600))
+  local minutes=$(((abs_diff % 3600) / 60))
+  local sign=$([[ $diff -lt 0 ]] && echo "-" || echo "+")
+  
+  if [[ $hours -gt 0 && $minutes -gt 0 ]]; then
+    echo "${sign}${hours}h ${minutes}m"
+  elif [[ $hours -gt 0 ]]; then
+    echo "${sign}${hours}h"
+  elif [[ $minutes -gt 0 ]]; then
+    echo "${sign}${minutes}m"
+  else
+    echo "${sign}<1m"
+  fi
+}
+
 # ---------- single file processing ----------
 process_single_file() {
   local file="$1"
@@ -207,10 +296,22 @@ process_single_file() {
   utc_time="$(to_utc "$local_with_tz")"
   log_verbose "  UTC time: $utc_time"
 
-  # Display file processing info
+  # Get original metadata for comparison
+  if original_meta="$(get_original_metadata "$file")"; then
+    log_verbose "  Original metadata: $original_meta"
+    time_diff="$(calculate_time_difference "$original_meta" "$local_with_tz")"
+    log_verbose "  Time difference: $time_diff"
+  else
+    original_meta="No original metadata"
+    time_diff="N/A"
+  fi
+
+  # Display enhanced comparison info
   printf "\033[36m🔍 %s\033[0m\n" "$base"
-  printf "⏱️ Local : %s\n" "$local_with_tz"
-  printf "🌐 UTC   : %s UTC\n" "$utc_time"
+  printf "📅 Original : %s\n" "$original_meta"
+  printf "⏱️ Corrected: %s\n" "$local_with_tz"
+  printf "🌐 UTC      : %s UTC\n" "$utc_time"
+  printf "📊 Change   : %s\n" "$time_diff"
 
   # Update metadata if in apply mode
   if [[ $apply -eq 1 ]]; then
@@ -228,8 +329,21 @@ process_single_file() {
 # ---------- main ----------
 echo "🕓 Scanning video files..."
 
+file_count=0
+processed_count=0
+
 find . -type f \( -iname '*.mp4' -o -iname '*.mov' \) -print0 | while IFS= read -r -d '' file; do
-  process_single_file "$file" || exit 1
+  file_count=$((file_count + 1))
+  if process_single_file "$file"; then
+    processed_count=$((processed_count + 1))
+  else
+    exit 1
+  fi
 done
 
-echo "✅ Timestamp normalization complete."
+if [[ $apply -eq 1 ]]; then
+  echo "✅ Timestamp normalization complete - changes applied to all files."
+else  
+  echo "✅ Timestamp normalization complete - DRY RUN (no changes made)."
+  echo "   Use --apply to actually update the files."
+fi
