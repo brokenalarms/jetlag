@@ -16,8 +16,8 @@ READY="$ROOT/Ready"
 [[ -d "$EXPORTS" ]] || { echo "ERROR: Exports/ not found in $ROOT" >&2; exit 1; }
 mkdir -p "$READY"
 
-command -v fix-video-timestamps.sh >/dev/null || {
-  echo "fix-video-timestamps.sh not in PATH" >&2; exit 1; }
+command -v batch-fix-video-timestamps.sh >/dev/null || {
+  echo "batch-fix-video-timestamps.sh not in PATH" >&2; exit 1; }
 
 # Parse arguments
 APPLY=0
@@ -62,7 +62,7 @@ echo "→ Mode:    $([[ $APPLY -eq 1 ]] && echo APPLY || echo 'DRY RUN (no chang
 echo "→ Running normalizer with args: ${NORMALIZE_ARGS[*]:-}"
 ORIG_PWD="$PWD"
 cd "$EXPORTS"
-fix-video-timestamps.sh ${NORMALIZE_ARGS[@]+"${NORMALIZE_ARGS[@]}"} || {
+batch-fix-video-timestamps.sh ${NORMALIZE_ARGS[@]+"${NORMALIZE_ARGS[@]}"} || {
   echo "⚠️  Normalizer completed with warnings/errors, continuing with file moves..."
 }
 cd "$ORIG_PWD"

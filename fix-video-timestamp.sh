@@ -1,9 +1,8 @@
 #!/bin/bash
-# fix-video-timestamps.sh
-# Fixes video file timestamps using filename patterns or EXIF data
+# fix-video-timestamp.sh
+# Fixes a single video file timestamp using filename patterns or EXIF data
 # Requires: exiftool, SetFile, python3
-# Usage: ./fix-video-timestamps.sh [--apply] [--country COUNTRY | --timezone +HHMM] [--verbose]
-# Scans current directory for *.mp4/*.mov files and normalizes their timestamps
+# Usage: ./fix-video-timestamp.sh VIDEO_FILE [--apply] [--country COUNTRY | --timezone +HHMM] [--verbose]
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -14,6 +13,7 @@ cli_tz=""
 cli_country=""
 TZ_SOURCE=""  # Global variable to track timezone source  
 DT_SOURCE=""  # Global variable to track datetime source
+video_file=""
 
 # Get script directory for timezone CSV files
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -77,7 +77,7 @@ while [[ $# -gt 0 ]]; do
       [[ $# -gt 0 ]] || { echo "ERROR: --country requires a country name/code"; exit 1; }
       cli_country="$1"; shift ;;
     --help|-h) 
-      echo "Usage: normalize_insta360_timestamps.sh [OPTIONS]"
+      echo "Usage: fix-video-timestamp.sh VIDEO_FILE [OPTIONS]"
       echo "Options:"
       echo "  --apply         Apply changes (default: dry run)"
       echo "  --verbose, -v   Show detailed processing info"  
@@ -85,9 +85,17 @@ while [[ $# -gt 0 ]]; do
       echo "  --country NAME  Use country name/code for timezone lookup"
       echo "  --help, -h      Show this help"
       exit 0 ;;
-    *) shift ;;
+    -*) echo "ERROR: Unknown option $1" >&2; exit 1 ;;
+    *) 
+      [[ -z "$video_file" ]] || { echo "ERROR: Only one video file allowed" >&2; exit 1; }
+      video_file="$1"
+      shift ;;
   esac
 done
+
+# Validate required arguments
+[[ -n "$video_file" ]] || { echo "ERROR: VIDEO_FILE is required" >&2; exit 1; }
+[[ -f "$video_file" ]] || { echo "ERROR: File not found: $video_file" >&2; exit 1; }
 
 # Convert country to timezone if provided
 if [[ -n "$cli_country" && -z "$cli_tz" ]]; then
@@ -288,44 +296,57 @@ calculate_time_difference() {
   fi
 }
 
-# ---------- single file processing ----------
-process_single_file() {
+# ---------- main processing ----------
+process_video_file() {
   local file="$1"
   local base="$(basename "$file")"
   
   log_verbose "Processing: $file"
   
-  # Get timezone for this file
-  local tz_result
-  if ! tz_result="$(get_timezone "$file")"; then
-    echo "❌ $base: No timezone (use --timezone or timezone.txt). Aborting." >&2
-    return 1
-  fi
-  tz="$tz_result"
-  # Set TZ_SOURCE based on timezone logic (will fix this properly)
-  if [[ -f "$(dirname "$file")/timezone.txt" ]]; then
-    TZ_SOURCE="timezone.txt"
-  elif exiftool -s3 -DateTimeOriginal "$file" 2>/dev/null | grep -q '[+-][0-9][0-9]'; then
+  # Check if metadata already has timezone - if so, use metadata time too
+  local dto_with_tz="$(exiftool -s3 -DateTimeOriginal "$file" 2>/dev/null || true)"
+  if [[ "$dto_with_tz" =~ ^([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2})([+-][0-9]{2}:?[0-9]{2})$ ]]; then
+    # Metadata already has complete time+timezone, use it as-is
+    local_dt="${BASH_REMATCH[1]}"
+    tz="$(fix_colon_tz "${BASH_REMATCH[2]}")"
     TZ_SOURCE="existing metadata"
+    DT_SOURCE="existing metadata" 
+    log_verbose "  Using existing metadata: $local_dt with timezone $tz"
   else
-    TZ_SOURCE="CLI/country"
-  fi
-  log_verbose "  Timezone: $tz (source: $TZ_SOURCE)"
+    # No existing timezone in metadata, proceed with normal logic
+    
+    # Get timezone for this file
+    local tz_result
+    if ! tz_result="$(get_timezone "$file")"; then
+      echo "❌ $base: No timezone (use --timezone or timezone.txt). Aborting." >&2
+      return 1
+    fi
+    tz="$tz_result"
+    # Set TZ_SOURCE based on timezone logic
+    if [[ -f "$(dirname "$file")/timezone.txt" ]]; then
+      TZ_SOURCE="timezone.txt"
+    elif exiftool -s3 -DateTimeOriginal "$file" 2>/dev/null | grep -q '[+-][0-9][0-9]'; then
+      TZ_SOURCE="existing metadata"
+    else
+      TZ_SOURCE="CLI/country"
+    fi
+    log_verbose "  Timezone: $tz (source: $TZ_SOURCE)"
 
-  # Get local datetime
-  local_dt="$(get_datetime_local "$file")"
-  # Set DT_SOURCE based on file type
-  base="$(basename "$file")"
-  if [[ "$base" =~ ^VID_([0-9]{8})_([0-9]{6}) ]]; then
-    DT_SOURCE="filename"
-  elif exiftool -s3 -DateTimeOriginal "$file" 2>/dev/null | grep -q '^[0-9][0-9][0-9][0-9]:[0-9][0-9]:[0-9][0-9]'; then
-    DT_SOURCE="DateTimeOriginal"
-  elif exiftool -s3 -QuickTime:MediaCreateDate "$file" 2>/dev/null | grep -q '^[0-9][0-9][0-9][0-9]:[0-9][0-9]:[0-9][0-9]'; then
-    DT_SOURCE="MediaCreateDate"
-  else
-    DT_SOURCE="file mtime"
+    # Get local datetime - prioritize filename for VID files
+    local_dt="$(get_datetime_local "$file")"
+    # Set DT_SOURCE based on file type
+    base="$(basename "$file")"
+    if [[ "$base" =~ ^VID_([0-9]{8})_([0-9]{6}) ]]; then
+      DT_SOURCE="filename"
+    elif exiftool -s3 -DateTimeOriginal "$file" 2>/dev/null | grep -q '^[0-9][0-9][0-9][0-9]:[0-9][0-9]:[0-9][0-9]'; then
+      DT_SOURCE="DateTimeOriginal"
+    elif exiftool -s3 -QuickTime:MediaCreateDate "$file" 2>/dev/null | grep -q '^[0-9][0-9][0-9][0-9]:[0-9][0-9]:[0-9][0-9]'; then
+      DT_SOURCE="MediaCreateDate"
+    else
+      DT_SOURCE="file mtime"
+    fi
+    log_verbose "  Local datetime: $local_dt (source: $DT_SOURCE)"
   fi
-  log_verbose "  Local datetime: $local_dt (source: $DT_SOURCE)"
   
   local_with_tz="${local_dt}${tz}"
   log_verbose "  Local with TZ: $local_with_tz"
@@ -356,8 +377,10 @@ process_single_file() {
     log_verbose "  Updating metadata..."
     update_metadata "$file" "$local_with_tz" "$utc_time"
     log_verbose "  ✅ Metadata updated"
+    echo "✅ Applied changes to $base"
   else
     log_verbose "  [DRY RUN] Would update metadata"
+    echo "🧪 DRY RUN - use --apply to update metadata"
   fi
   
   echo  # Empty line for readability
@@ -365,23 +388,16 @@ process_single_file() {
 }
 
 # ---------- main ----------
-echo "🕓 Scanning video files..."
+echo "🕓 Processing video file: $(basename "$video_file")"
+echo
 
-file_count=0
-processed_count=0
-
-find . -type f \( -iname '*.mp4' -o -iname '*.mov' \) -print0 | while IFS= read -r -d '' file; do
-  file_count=$((file_count + 1))
-  if process_single_file "$file"; then
-    processed_count=$((processed_count + 1))
-  else
-    exit 1
+if process_video_file "$video_file"; then
+  if [[ $apply -eq 1 ]]; then
+    echo "✅ Video timestamp processing complete - changes applied."
+  else  
+    echo "✅ Video timestamp processing complete - DRY RUN (no changes made)."
   fi
-done
-
-if [[ $apply -eq 1 ]]; then
-  echo "✅ Timestamp normalization complete - changes applied to all files."
-else  
-  echo "✅ Timestamp normalization complete - DRY RUN (no changes made)."
-  echo "   Use --apply to actually update the files."
+else
+  echo "❌ Video timestamp processing failed."
+  exit 1
 fi
