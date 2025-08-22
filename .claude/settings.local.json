@@ -5,7 +5,8 @@
       "Bash(process_exports.sh:*)",
       "Bash(bash:*)",
       "Bash(normalize_insta360_timestamps.sh:*)",
-      "Bash(echo \"Exit code: $?\")"
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(organize-videos-by-date.sh:*)"
     ],
     "additionalDirectories": [
       "/Volumes/Extreme GRN/Videos/Source Video/Insta360"
