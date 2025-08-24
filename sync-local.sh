@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
       echo "Configuration:"
       echo "  Backup paths are configured in .env.local:"
       echo "    SOURCE_PATH      - Source directory to backup"
-      echo "    LOCAL_BACKUP_PATH - Local destination directory"
+      echo "    LOCAL_SYNC_PATH - Local destination directory"
       echo "    EXCLUSIONS_FILE  - File containing rsync exclusions"
       exit 0 ;;
     *)
@@ -47,16 +47,16 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate required environment variables
-if [[ -z "${SOURCE_PATH:-}" || -z "${LOCAL_BACKUP_PATH:-}" ]]; then
+if [[ -z "${SOURCE_PATH:-}" || -z "${LOCAL_SYNC_PATH:-}" ]]; then
     echo "ERROR: Missing required environment variables"
-    echo "Required: SOURCE_PATH, LOCAL_BACKUP_PATH"
+    echo "Required: SOURCE_PATH, LOCAL_SYNC_PATH"
     echo "Check your .env.local file"
     exit 1
 fi
 
 # Set paths from environment
 SOURCE="$SOURCE_PATH"
-DEST="$LOCAL_BACKUP_PATH"
+DEST="$LOCAL_SYNC_PATH"
 EXCLUSIONS="${EXCLUSIONS_FILE:-${HOME}/.exclusions.txt}"
 
 # Check if volumes are mounted
