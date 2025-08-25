@@ -9,8 +9,10 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# Load environment variables if available
+# Get script directory for loading environment
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load environment variables if available
 if [[ -f "${SCRIPT_DIR}/.env.local" ]]; then
   source "${SCRIPT_DIR}/.env.local"
 elif [[ -f "./.env.local" ]]; then
@@ -112,63 +114,12 @@ echo "→ Destination: $DEST/"
 echo "→ Mode:        $([[ $APPLY -eq 1 ]] && echo APPLY || echo 'DRY RUN (no changes)')"
 echo
 
-# Helper: extract YYYY-MM-DD from various filename patterns
-derive_date_from_filename() {
-  local base="$1"
-  
-  # Pattern 1: VID_YYYYMMDD_HHMMSS (Insta360)
-  if [[ "$base" =~ VID_([0-9]{4})([0-9]{2})([0-9]{2})_ ]]; then
-    echo "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
-    return 0
-  fi
-  
-  # Pattern 2: IMG_YYYYMMDD_HHMMSS (Insta360)
-  if [[ "$base" =~ IMG_([0-9]{4})([0-9]{2})([0-9]{2})_ ]]; then
-    echo "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
-    return 0
-  fi
-  
-  # Pattern 3: LRV_YYYYMMDD_HHMMSS (Insta360 Low res video)
-  if [[ "$base" =~ LRV_([0-9]{4})([0-9]{2})([0-9]{2})_ ]]; then
-    echo "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
-    return 0
-  fi
-  
-  # Pattern 4: DJI_YYYYMMDDHHMMSS_* (DJI Mavic 3 and newer)
-  if [[ "$base" =~ DJI_([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{6})_ ]]; then
-    echo "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
-    return 0
-  fi
-  
-  # Pattern 5: DSC_YYYYMMDD_HHMMSS (Sony cameras)
-  if [[ "$base" =~ DSC_([0-9]{4})([0-9]{2})([0-9]{2})_ ]]; then
-    echo "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
-    return 0
-  fi
-  
-  # Pattern 6: GOPR#### or GP###### (GoPro) - no date in filename
-  # Pattern 7: DJI_0001 format (older DJI) - no date in filename
-  
-  # Pattern 8: Generic YYYYMMDD anywhere in filename
-  if [[ "$base" =~ ([0-9]{4})([0-9]{2})([0-9]{2}) ]]; then
-    local year="${BASH_REMATCH[1]}"
-    local month="${BASH_REMATCH[2]}"
-    local day="${BASH_REMATCH[3]}"
-    # Basic validation: year should be 2000-2099, month 01-12, day 01-31
-    if [[ $year -ge 2000 && $year -le 2099 && $month -ge 1 && $month -le 12 && $day -ge 1 && $day -le 31 ]]; then
-      echo "${year}-${month}-${day}"
-      return 0
-    fi
-  fi
-  
-  return 1
-}
+# Date extraction is handled by organize-by-date.sh after import
 
 # Process files
 copied=0
 skipped=0
 planned=0
-dates_used=()
 current_date=$(date +%Y-%m-%d)
 renamed_dir=""
 
@@ -188,47 +139,10 @@ while IFS= read -r file; do
   [[ "$base" == ".DS_Store" ]] && continue
   [[ "$base" == "Thumbs.db" ]] && continue
   
-  # Try to extract date from filename
-  if date_str=$(derive_date_from_filename "$base"); then
-    dest_date="$date_str"
-    date_source="filename"
-  else
-    # Fallback to file creation time (birth time)
-    if [[ "$(uname)" == "Darwin" ]]; then
-      # macOS: Use birth time (creation time)
-      dest_date=$(stat -f "%SB" -t "%Y-%m-%d" "$file")
-      date_source="created"
-    else
-      # Linux: Try birth time if available, otherwise use mtime
-      if stat --version 2>/dev/null | grep -q GNU; then
-        # GNU stat (most Linux)
-        birth_time=$(stat -c "%W" "$file" 2>/dev/null)
-        if [[ "$birth_time" != "-" && "$birth_time" != "0" ]]; then
-          dest_date=$(date -d "@$birth_time" +%Y-%m-%d)
-          date_source="created"
-        else
-          # Fall back to mtime if birth time not available
-          dest_date=$(date -r "$file" +%Y-%m-%d)
-          date_source="modified"
-        fi
-      else
-        # Other Unix, use mtime
-        dest_date=$(date -r "$file" +%Y-%m-%d)
-        date_source="modified"
-      fi
-    fi
-  fi
-  
-  # Track dates for renaming
-  if [[ ! " ${dates_used[@]+"${dates_used[@]}"} " =~ " ${dest_date} " ]]; then
-    dates_used+=("$dest_date")
-  fi
-  
-  destdir="$DEST/$dest_date"
-  destfile="$destdir/$base"
+  destfile="$DEST/$base"
   
   if [[ $APPLY -eq 1 ]]; then
-    mkdir -p "$destdir"
+    mkdir -p "$DEST"
     
     if [[ -e "$destfile" ]]; then
       # File exists, check if same size first (faster than full compare)
@@ -242,7 +156,7 @@ while IFS= read -r file; do
         echo "[$processed/$total_files] ⚠️  Different size file exists, keeping source: $base"
       fi
     else
-      echo "[$processed/$total_files] Copying $base → $destdir/ (date from $date_source)"
+      echo "[$processed/$total_files] Copying $base → $DEST/"
       cp -p "$file" "$destfile"
       # Verify copy was successful before moving source to renamed folder
       if cmp -s "$file" "$destfile" 2>/dev/null; then
@@ -260,7 +174,7 @@ while IFS= read -r file; do
       fi
     fi
   else
-    echo "[DRY] Would copy $base → $destdir/ (date from $date_source)"
+    echo "[DRY] Would copy $base → $DEST/"
     planned=$((planned+1))
   fi
 done < <(find "$DIR" -type f ! -name ".*")
@@ -280,10 +194,17 @@ if [[ $APPLY -eq 1 ]]; then
   
   if [[ $copied -gt 0 || $skipped -gt 0 ]]; then
     echo
-    echo "✅ Summary:"
+    echo "✅ Import Summary:"
     [[ $copied -gt 0 ]] && echo "   - Copied: $copied file(s)"
     [[ $skipped -gt 0 ]] && echo "   - Skipped: $skipped file(s) (already exist with same size)"
     [[ -n "$renamed_dir" ]] && echo "   - Archived to: $renamed_dir"
+    
+    # Now organize the copied files into date subfolders
+    if [[ $copied -gt 0 ]]; then
+      echo
+      echo "📁 Organizing imported files by date..."
+      "$SCRIPT_DIR/organize-by-date.sh" --dir "$DEST" --apply
+    fi
   else
     echo "✅ No new files to copy"
   fi
@@ -293,12 +214,9 @@ else
   
   echo "🧪 Dry run complete. Would copy $planned file(s)"
   if [[ $planned -gt 0 ]]; then
-    echo "   Would organize into these date folders:"
-    printf '%s\n' "${dates_used[@]}" | sort -u | while read -r date; do
-      echo "   - $date/"
-    done
     echo "   Would create archive: '$new_name'"
     echo "   Would remove original: '$DIR'"
+    echo "   Files would then be organized into date folders"
   fi
   echo
   echo "   Re-run with --apply to execute"

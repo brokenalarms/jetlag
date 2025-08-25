@@ -9,6 +9,9 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# Get script directory for calling organize-by-date.sh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 ROOT="$PWD"
 EXPORTS="$ROOT/Exports"
 READY="$ROOT/Ready"
@@ -67,17 +70,6 @@ batch-fix-video-timestamps.sh ${NORMALIZE_ARGS[@]+"${NORMALIZE_ARGS[@]}"} || {
 }
 cd "$ORIG_PWD"
 
-# --- helper: extract YYYY MM DD from filename (VID_YYYYMMDD pattern) ---
-derive_date_from_filename() {
-  local base="$1"
-  if [[ "$base" =~ VID_([0-9]{4})([0-9]{2})([0-9]{2}) ]]; then
-    echo "${BASH_REMATCH[1]}"
-    echo "${BASH_REMATCH[2]}"
-    echo "${BASH_REMATCH[3]}"
-    return 0
-  fi
-  return 1
-}
 
 # --- move or plan using simple globs (Bash 3.2 safe) ---
 moved=0
@@ -89,12 +81,11 @@ for f in "$EXPORTS"/*.mp4 "$EXPORTS"/*.MP4 "$EXPORTS"/*.mov "$EXPORTS"/*.MOV; do
   [[ -e "$f" ]] || continue
   base="$(basename "$f")"
 
-  if derive_date_from_filename "$base" >/dev/null; then
-    {
-      read -r y
-      read -r m
-      read -r d
-    } < <(derive_date_from_filename "$base")
+  if date_str=$(derive_date_from_filename "$base"); then
+    # Extract year, month, day from YYYY-MM-DD format
+    y="${date_str:0:4}"
+    m="${date_str:5:2}"
+    d="${date_str:8:2}"
   else
     # fallback: file mtime (rare)
     y=$(date -r "$f" +%Y); m=$(date -r "$f" +%m); d=$(date -r "$f" +%d)
@@ -120,7 +111,14 @@ for f in "$EXPORTS"/*.mp4 "$EXPORTS"/*.MP4 "$EXPORTS"/*.mov "$EXPORTS"/*.MOV; do
 done
 
 if [[ $APPLY -eq 1 ]]; then
-  echo "✅ Moved $moved file(s) into Ready/YYYY/MM/DD"
+  echo "✅ Moved $moved file(s) into Ready/$y/$DIR/"
+  
+  # Now organize the moved files into date subfolders
+  if [[ $moved -gt 0 ]]; then
+    echo
+    echo "📁 Organizing files by date..."
+    "$SCRIPT_DIR/organize-by-date.sh" --dir "$READY/$y/$DIR" --apply
+  fi
 else
   echo "🧪 Dry run complete. Planned $planned file(s). Re-run with --apply to execute."
   if (( planned > 0 )); then
@@ -129,6 +127,8 @@ else
     sort "$TMP_SUMMARY" | cut -d'|' -f1 | uniq -c | while read count key; do
       echo "$key: $count file(s)"
     done
+    echo
+    echo "After moving, files would be organized into date subfolders."
   fi
 fi
 
