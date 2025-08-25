@@ -121,11 +121,50 @@ derive_date_from_filename() {
     local month="${BASH_REMATCH[2]}"
     local day="${BASH_REMATCH[3]}"
     # Basic validation: year should be 2000-2099, month 01-12, day 01-31
-    if [[ $year -ge 2000 && $year -le 2099 && $month -ge 1 && $month -le 12 && $day -ge 1 && $day -le 31 ]]; then
+    # Use 10# prefix to force base-10 interpretation (avoid octal issues with 08, 09)
+    if [[ 10#$year -ge 2000 && 10#$year -le 2099 && 10#$month -ge 1 && 10#$month -le 12 && 10#$day -ge 1 && 10#$day -le 31 ]]; then
       echo "${year}-${month}-${day}"
       return 0
     fi
   fi
+  
+  return 1
+}
+
+# Extract date from EXIF data using sips (macOS built-in)
+extract_metadata_date() {
+  local file="$1"
+  local ext="${file##*.}"
+  ext="${ext,,}" # lowercase
+  
+  # Only works on macOS
+  if [[ "$(uname)" != "Darwin" ]]; then
+    return 1
+  fi
+  
+  # Only try for image files that sips can handle
+  case "$ext" in
+    jpg|jpeg|png|gif|bmp|tiff|tif|heic|heif)
+      # Try DateTimeOriginal from EXIF using sips
+      local metadata_date=$(sips -g exif:DateTimeOriginal "$file" 2>/dev/null | grep -o '[0-9]\{4\}:[0-9]\{2\}:[0-9]\{2\} [0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}')
+      if [[ -n "$metadata_date" ]]; then
+        # Convert EXIF format (YYYY:MM:DD HH:MM:SS) to YYYY-MM-DD
+        local date_part="${metadata_date%% *}"  # Remove time portion
+        date_part="${date_part//:/-}"           # Replace colons with hyphens
+        echo "$date_part"
+        return 0
+      fi
+      
+      # Try CreateDate from EXIF using sips
+      metadata_date=$(sips -g exif:CreateDate "$file" 2>/dev/null | grep -o '[0-9]\{4\}:[0-9]\{2\}:[0-9]\{2\} [0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}')
+      if [[ -n "$metadata_date" ]]; then
+        local date_part="${metadata_date%% *}"
+        date_part="${date_part//:/-}"
+        echo "$date_part"
+        return 0
+      fi
+      ;;
+  esac
   
   return 1
 }
@@ -158,12 +197,16 @@ while IFS= read -r file; do
   [[ "$base" == "Thumbs.db" ]] && continue
   [[ "$base" == "desktop.ini" ]] && continue
   
-  # Try to extract date from filename
+  # Priority 1: Try to extract date from filename
   if date_str=$(derive_date_from_filename "$base"); then
     dest_date="$date_str"
     date_source="filename"
+  # Priority 2: Try to extract date from EXIF/metadata
+  elif date_str=$(extract_metadata_date "$file"); then
+    dest_date="$date_str"
+    date_source="metadata"
+  # Priority 3: Fallback to file creation time (birth time)
   else
-    # Fallback to file creation time (birth time)
     if [[ "$(uname)" == "Darwin" ]]; then
       # macOS: Use birth time (creation time)
       dest_date=$(stat -f "%SB" -t "%Y-%m-%d" "$file")

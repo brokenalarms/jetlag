@@ -9,18 +9,20 @@ source "$SCRIPT_DIR/rsync-common.sh"
 
 # Function to show help
 show_help() {
-    echo "Usage: sync-local.sh [OPTIONS]"
-    echo "Local backup using paths configured in .env.local"
+    echo "Usage: insta360-sync-to-nas.sh [OPTIONS]"
+    echo "Sync Insta360 raw footage to NAS using paths configured in .env.local"
     echo ""
     echo "Options:"
-    echo "  --apply         Actually perform the backup (default: dry run)"
+    echo "  --apply         Actually perform the sync (default: dry run)"
     echo "  --help, -h      Show this help"
     echo ""
     echo "Configuration:"
-    echo "  Backup paths are configured in .env.local:"
-    echo "    SOURCE_PATH      - Source directory to backup"
-    echo "    LOCAL_SYNC_PATH  - Local destination directory"
-    echo "    EXCLUSIONS_FILE  - File containing rsync exclusions"
+    echo "  Sync paths are configured in .env.local:"
+    echo "    INSTA360_RAW_FOLDER     - Local Insta360 raw folder"
+    echo "    NAS_INSTA360_RAW_FOLDER - NAS destination folder"
+    echo "    NAS_USER                - NAS username"
+    echo "    NAS_HOST                - NAS hostname"
+    echo "    EXCLUSIONS_FILE         - File containing rsync exclusions (optional)"
 }
 
 # Parse arguments
@@ -46,29 +48,32 @@ DRY_RUN="${DRY_RUN:-1}"
 load_env "$SCRIPT_DIR" || exit 1
 
 # Validate required environment variables
-if [[ -z "${SOURCE_PATH:-}" || -z "${LOCAL_SYNC_PATH:-}" ]]; then
+if [[ -z "${INSTA360_RAW_FOLDER:-}" || -z "${NAS_INSTA360_RAW_FOLDER:-}" || -z "${NAS_USER:-}" || -z "${NAS_HOST:-}" ]]; then
     echo "ERROR: Missing required environment variables"
-    echo "Required: SOURCE_PATH, LOCAL_SYNC_PATH"
+    echo "Required: INSTA360_RAW_FOLDER, NAS_INSTA360_RAW_FOLDER, NAS_USER, NAS_HOST"
     echo "Check your .env.local file"
     exit 1
 fi
 
 # Set paths from environment
-SOURCE="$SOURCE_PATH"
-DEST="$LOCAL_SYNC_PATH"
+SOURCE="$INSTA360_RAW_FOLDER"
+DEST="${NAS_USER}@${NAS_HOST}:${NAS_INSTA360_RAW_FOLDER}"
 EXCLUSIONS="${EXCLUSIONS_FILE:-${HOME}/.exclusions.txt}"
 
-# Validate paths exist
-validate_paths "$SOURCE" "$DEST" || exit 1
+# Validate source path exists
+if [[ ! -d "$SOURCE" ]]; then
+    echo "ERROR: Source folder not found: $SOURCE" >&2
+    exit 1
+fi
 
-echo "📁 Local Backup"
+echo "📹 Insta360 to NAS Sync"
 echo "Source:      $SOURCE"
 echo "Destination: $DEST"
 echo "Exclusions:  $EXCLUSIONS"
 
 if [[ $DRY_RUN -eq 1 ]]; then
     echo "Mode:        DRY RUN (no changes will be made)"
-    echo "Use --apply to perform actual backup"
+    echo "Use --apply to perform actual sync"
 else
     echo "Mode:        APPLYING CHANGES"
 fi
