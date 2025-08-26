@@ -12,6 +12,9 @@ IFS=$'\n\t'
 # Get script directory for calling organize-by-date.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Source library files
+source "$SCRIPT_DIR/lib/lib-file-ops.sh"
+
 ROOT="$PWD"
 EXPORTS="$ROOT/Exports"
 READY="$ROOT/Ready"

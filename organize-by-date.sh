@@ -8,44 +8,45 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# Get script directory and source libraries
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/lib-common.sh"
+source "$SCRIPT_DIR/lib/lib-output.sh"
+source "$SCRIPT_DIR/lib/lib-file-ops.sh"
+
 # Parse arguments
-APPLY=0
 TARGET_DIR="."
 
+# Parse common arguments first
+remaining_args=()
 while [[ $# -gt 0 ]]; do
-  case $1 in
-    --apply)
-      APPLY=1
-      shift
-      ;;
+  case "$1" in
     --dir)
       shift
-      [[ $# -gt 0 ]] || { echo "ERROR: --dir requires a directory path" >&2; exit 1; }
+      [[ $# -gt 0 ]] || { print_error "--dir requires a directory path"; exit 1; }
       TARGET_DIR="$1"
       shift
       ;;
     --help|-h)
-      echo "Usage: $0 [--apply] [--dir PATH]"
-      echo ""
-      echo "Organizes files into YYYY-MM-DD subdirectories based on date"
-      echo ""
-      echo "Options:"
-      echo "  --dir PATH   Directory to organize (default: current directory)"
-      echo "  --apply      Execute the organization (default is dry-run)"
-      echo "  --help, -h   Show this help message"
-      echo ""
-      echo "Date extraction:"
-      echo "  1. From filename patterns (VID_, IMG_, DJI_, etc.)"
-      echo "  2. Fallback to file creation time"
+      show_standard_help "$0" "Organizes files into YYYY-MM-DD subdirectories based on date" "  --dir PATH   Directory to organize (default: current directory)
+
+Date extraction:
+  1. From filename patterns (VID_, IMG_, DJI_, etc.)
+  2. Fallback to file creation time"
       exit 0
       ;;
     *)
-      echo "ERROR: Unknown option $1" >&2
-      echo "Use --help for usage information" >&2
-      exit 1
+      remaining_args+=("$1")
+      shift
       ;;
   esac
 done
+
+# Parse common args (--apply, --verbose)
+if ! parse_common_args "${remaining_args[@]}"; then
+  print_error "Unknown option: ${remaining_args[*]}"
+  exit 1
+fi
 
 # Validate directory exists
 if [[ ! -d "$TARGET_DIR" ]]; then
@@ -53,121 +54,14 @@ if [[ ! -d "$TARGET_DIR" ]]; then
   exit 1
 fi
 
-echo "→ Directory: $TARGET_DIR"
-echo "→ Mode:      $([[ $APPLY -eq 1 ]] && echo APPLY || echo 'DRY RUN (no changes)')"
+print_info "Directory: $TARGET_DIR"
+print_mode_status $APPLY
 echo
 
-# Helper: extract YYYY-MM-DD from various filename patterns
-derive_date_from_filename() {
-  local base="$1"
-  
-  # Pattern 1: VID_YYYYMMDD_HHMMSS (Insta360)
-  if [[ "$base" =~ VID_([0-9]{4})([0-9]{2})([0-9]{2})_ ]]; then
-    echo "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
-    return 0
-  fi
-  
-  # Pattern 2: IMG_YYYYMMDD_HHMMSS (Insta360/phones)
-  if [[ "$base" =~ IMG_([0-9]{4})([0-9]{2})([0-9]{2})_ ]]; then
-    echo "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
-    return 0
-  fi
-  
-  # Pattern 3: LRV_YYYYMMDD_HHMMSS (Insta360 Low res video)
-  if [[ "$base" =~ LRV_([0-9]{4})([0-9]{2})([0-9]{2})_ ]]; then
-    echo "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
-    return 0
-  fi
-  
-  # Pattern 4: DJI_YYYYMMDDHHMMSS_* (DJI Mavic 3 and newer)
-  if [[ "$base" =~ DJI_([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{6})_ ]]; then
-    echo "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
-    return 0
-  fi
-  
-  # Pattern 5: DSC_YYYYMMDD_HHMMSS (Sony cameras)
-  if [[ "$base" =~ DSC_([0-9]{4})([0-9]{2})([0-9]{2})_ ]]; then
-    echo "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
-    return 0
-  fi
-  
-  # Pattern 6: Screenshot YYYY-MM-DD at HH.MM.SS (macOS screenshots)
-  if [[ "$base" =~ Screenshot[[:space:]]([0-9]{4})-([0-9]{2})-([0-9]{2})[[:space:]]at ]]; then
-    echo "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
-    return 0
-  fi
-  
-  # Pattern 7: Photo YYYY-MM-DD (various formats)
-  if [[ "$base" =~ Photo[[:space:]]([0-9]{4})-([0-9]{2})-([0-9]{2}) ]]; then
-    echo "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]}"
-    return 0
-  fi
-  
-  # Pattern 8: YYYY-MM-DD in filename
-  if [[ "$base" =~ ([0-9]{4})-([0-9]{2})-([0-9]{2}) ]]; then
-    local year="${BASH_REMATCH[1]}"
-    local month="${BASH_REMATCH[2]}"
-    local day="${BASH_REMATCH[3]}"
-    # Basic validation
-    if [[ $year -ge 2000 && $year -le 2099 && $month -ge 1 && $month -le 12 && $day -ge 1 && $day -le 31 ]]; then
-      echo "${year}-${month}-${day}"
-      return 0
-    fi
-  fi
-  
-  # Pattern 9: Generic YYYYMMDD anywhere in filename
-  if [[ "$base" =~ ([0-9]{4})([0-9]{2})([0-9]{2}) ]]; then
-    local year="${BASH_REMATCH[1]}"
-    local month="${BASH_REMATCH[2]}"
-    local day="${BASH_REMATCH[3]}"
-    # Basic validation: year should be 2000-2099, month 01-12, day 01-31
-    # Use 10# prefix to force base-10 interpretation (avoid octal issues with 08, 09)
-    if [[ 10#$year -ge 2000 && 10#$year -le 2099 && 10#$month -ge 1 && 10#$month -le 12 && 10#$day -ge 1 && 10#$day -le 31 ]]; then
-      echo "${year}-${month}-${day}"
-      return 0
-    fi
-  fi
-  
-  return 1
-}
-
-# Extract date from EXIF data using sips (macOS built-in)
-extract_metadata_date() {
-  local file="$1"
-  local ext="${file##*.}"
-  ext="${ext,,}" # lowercase
-  
-  # Only works on macOS
-  if [[ "$(uname)" != "Darwin" ]]; then
-    return 1
-  fi
-  
-  # Only try for image files that sips can handle
-  case "$ext" in
-    jpg|jpeg|png|gif|bmp|tiff|tif|heic|heif)
-      # Try DateTimeOriginal from EXIF using sips
-      local metadata_date=$(sips -g exif:DateTimeOriginal "$file" 2>/dev/null | grep -o '[0-9]\{4\}:[0-9]\{2\}:[0-9]\{2\} [0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}')
-      if [[ -n "$metadata_date" ]]; then
-        # Convert EXIF format (YYYY:MM:DD HH:MM:SS) to YYYY-MM-DD
-        local date_part="${metadata_date%% *}"  # Remove time portion
-        date_part="${date_part//:/-}"           # Replace colons with hyphens
-        echo "$date_part"
-        return 0
-      fi
-      
-      # Try CreateDate from EXIF using sips
-      metadata_date=$(sips -g exif:CreateDate "$file" 2>/dev/null | grep -o '[0-9]\{4\}:[0-9]\{2\}:[0-9]\{2\} [0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}')
-      if [[ -n "$metadata_date" ]]; then
-        local date_part="${metadata_date%% *}"
-        date_part="${date_part//:/-}"
-        echo "$date_part"
-        return 0
-      fi
-      ;;
-  esac
-  
-  return 1
-}
+# Functions are now imported from lib-file-ops.sh:
+# - derive_date_from_filename()
+# - extract_metadata_date()
+# - get_file_date()
 
 # Process files
 moved=0
@@ -197,39 +91,16 @@ while IFS= read -r file; do
   [[ "$base" == "Thumbs.db" ]] && continue
   [[ "$base" == "desktop.ini" ]] && continue
   
-  # Priority 1: Try to extract date from filename
+  # Get date for file using the library function
+  dest_date=$(get_file_date "$file")
+  
+  # Determine source for display
   if date_str=$(derive_date_from_filename "$base"); then
-    dest_date="$date_str"
     date_source="filename"
-  # Priority 2: Try to extract date from EXIF/metadata
   elif date_str=$(extract_metadata_date "$file"); then
-    dest_date="$date_str"
     date_source="metadata"
-  # Priority 3: Fallback to file creation time (birth time)
   else
-    if [[ "$(uname)" == "Darwin" ]]; then
-      # macOS: Use birth time (creation time)
-      dest_date=$(stat -f "%SB" -t "%Y-%m-%d" "$file")
-      date_source="created"
-    else
-      # Linux: Try birth time if available, otherwise use mtime
-      if stat --version 2>/dev/null | grep -q GNU; then
-        # GNU stat (most Linux)
-        birth_time=$(stat -c "%W" "$file" 2>/dev/null)
-        if [[ "$birth_time" != "-" && "$birth_time" != "0" ]]; then
-          dest_date=$(date -d "@$birth_time" +%Y-%m-%d)
-          date_source="created"
-        else
-          # Fall back to mtime if birth time not available
-          dest_date=$(date -r "$file" +%Y-%m-%d)
-          date_source="modified"
-        fi
-      else
-        # Other Unix, use mtime
-        dest_date=$(date -r "$file" +%Y-%m-%d)
-        date_source="modified"
-      fi
-    fi
+    date_source="created"
   fi
   
   # Track dates for summary
@@ -255,16 +126,16 @@ while IFS= read -r file; do
       src_size=$(stat -f "%z" "$file" 2>/dev/null || stat -c "%s" "$file" 2>/dev/null)
       dst_size=$(stat -f "%z" "$destfile" 2>/dev/null || stat -c "%s" "$destfile" 2>/dev/null)
       
-      if [[ "$src_size" == "$dst_size" ]]; then
-        echo "[$processed/$total_files] ✓ Same file exists in $dest_date/, removing duplicate"
+      if compare_file_sizes "$file" "$destfile"; then
+        print_progress $processed $total_files "✓ Same file exists in $dest_date/, removing duplicate"
         rm "$file"
         skipped=$((skipped+1))
       else
-        echo "[$processed/$total_files] ⚠️  Different file exists with same name in $dest_date/, skipping: $base"
+        print_progress $processed $total_files "⚠️  Different file exists with same name in $dest_date/, skipping: $base"
         skipped=$((skipped+1))
       fi
     else
-      echo "[$processed/$total_files] Moving $base → $dest_date/ (date from $date_source)"
+      print_progress $processed $total_files "Moving $base → $dest_date/ (date from $date_source)"
       mv "$file" "$destfile"
       moved=$((moved+1))
     fi
@@ -273,7 +144,7 @@ while IFS= read -r file; do
       src_size=$(stat -f "%z" "$file" 2>/dev/null || stat -c "%s" "$file" 2>/dev/null)
       dst_size=$(stat -f "%z" "$destfile" 2>/dev/null || stat -c "%s" "$destfile" 2>/dev/null)
       
-      if [[ "$src_size" == "$dst_size" ]]; then
+      if compare_file_sizes "$file" "$destfile"; then
         echo "[DRY] Would remove duplicate: $base (same file exists in $dest_date/)"
       else
         echo "[DRY] Would skip: $base (different file exists in $dest_date/)"
@@ -301,7 +172,7 @@ if [[ $APPLY -eq 1 ]]; then
     done
   fi
 else
-  echo "🧪 Dry run complete."
+  print_success "Dry run complete."
   [[ $planned -gt 0 ]] && echo "   Would move $planned file(s)"
   [[ $skipped -gt 0 ]] && echo "   Would skip $skipped file(s)"
   

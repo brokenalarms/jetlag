@@ -4,8 +4,9 @@ set -euo pipefail
 # Get script directory for loading environment
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Source common rsync functions
-source "$SCRIPT_DIR/rsync-common.sh"
+# Source common libraries
+source "$SCRIPT_DIR/lib/lib-common.sh"
+source "$SCRIPT_DIR/lib/lib-sync.sh"
 
 # Function to show help
 show_help() {

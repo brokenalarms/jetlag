@@ -1,6 +1,7 @@
 #!/bin/bash
 # batch-fix-video-timestamps.sh  
 # Batch processes video files in current directory using fix-video-timestamp.sh
+# Supports: MP4, MOV, INSV (Insta360 raw), LRV (low-res video) files
 # Usage: ./batch-fix-video-timestamps.sh [--apply] [--only-insta] [--country COUNTRY | --timezone +HHMM] [--verbose]
 
 set -euo pipefail
@@ -47,6 +48,9 @@ while [[ $# -gt 0 ]]; do
       [[ $# -gt 0 ]] || { echo "ERROR: --country requires a country name/code"; exit 1; }
       args+=("$1")
       shift ;;
+    --force-timezone)
+      args+=("$1")
+      shift ;;
     --help|-h) 
       echo "Usage: batch-fix-video-timestamps.sh [OPTIONS]"
       echo "Options:"
@@ -55,6 +59,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --verbose, -v   Show detailed processing info"  
       echo "  --timezone TZ   Use specific timezone (+HHMM format)"
       echo "  --country NAME  Use country name/code for timezone lookup"
+      echo "  --force-timezone Override existing timezone metadata"
       echo "  --help, -h      Show this help"
       exit 0 ;;
     *) 
@@ -70,48 +75,99 @@ echo "🕓 Scanning video files..."
 file_count=0
 processed_count=0
 failed_count=0
+skipped_count=0
 
 # Build find pattern based on --only-insta flag
 if [[ $only_insta -eq 1 ]]; then
   echo "📹 Looking for Insta360 videos (VID_* files only)"
-  file_pattern="-name 'VID_*.mp4' -o -name 'VID_*.MP4' -o -name 'VID_*.mov' -o -name 'VID_*.MOV'"
+  file_pattern="-name 'VID_*.mp4' -o -name 'VID_*.MP4' -o -name 'VID_*.mov' -o -name 'VID_*.MOV' -o -name 'VID_*.insv' -o -name 'VID_*.INSV' -o -name 'VID_*.lrv' -o -name 'VID_*.LRV'"
 else
-  echo "📹 Looking for all video files (*.mp4, *.mov)"
-  file_pattern="-name '*.mp4' -o -name '*.MP4' -o -name '*.mov' -o -name '*.MOV'"
+  echo "📹 Looking for all video files (*.mp4, *.mov, *.insv, *.lrv)"
+  file_pattern="-name '*.mp4' -o -name '*.MP4' -o -name '*.mov' -o -name '*.MOV' -o -name '*.insv' -o -name '*.INSV' -o -name '*.lrv' -o -name '*.LRV'"
 fi
 
+# Show timezone info once if using country
+country_shown=0
+for arg in "${args[@]}"; do
+  if [[ "$arg" == "--country" ]]; then
+    # Just show a simple message - the actual country line will be shown with first file
+    country_shown=1
+    break
+  fi
+done
+
 # Process files
+export BATCH_MODE=1
+
 while IFS= read -r -d '' file; do
   file_count=$((file_count + 1))
   
-  echo "Processing file $file_count: $(basename "$file")"
-  echo "----------------------------------------"
+  # Run single script and capture full output
+  full_output=$(BATCH_MODE=1 "$SINGLE_SCRIPT" "$file" "${args[@]}" 2>&1)
+  exit_code=$?
   
-  if "$SINGLE_SCRIPT" "$file" "${args[@]}"; then
+  # Extract country line if present and not yet shown
+  if [[ $country_shown -eq 1 ]]; then
+    country_line=$(echo "$full_output" | grep "^🌍" | head -1)
+    if [[ -n "$country_line" ]]; then
+      echo "$country_line"
+      echo ""
+      country_shown=2  # Mark as shown
+    fi
+  fi
+  
+  # Get output without country line
+  output=$(echo "$full_output" | grep -v "^🌍")
+  
+  # Check if it's a "No change" case
+  if [[ "$output" =~ "Change   : No change" ]]; then
+    skipped_count=$((skipped_count + 1))
+  fi
+  
+  # Always show the 3-line output
+  if [[ -n "$output" && ! "$output" =~ ^[[:space:]]*$ ]]; then
+    echo "$output"
+    echo  # Add spacing between files
+  fi
+  
+  if [[ $exit_code -eq 0 ]]; then
     processed_count=$((processed_count + 1))
   else
     failed_count=$((failed_count + 1))
     echo "⚠️ Failed to process: $(basename "$file")"
   fi
-  
-  echo
 done < <(eval "find . -type f \\( $file_pattern \\) -print0")
 
+# Always show summary even if no files processed
+if [[ $file_count -eq 0 ]]; then
+  echo "No matching files found."
+  exit 0
+fi
+
 # Summary
+echo ""
 echo "=========================================="
 echo "📊 BATCH PROCESSING SUMMARY"
 echo "----------------------------------------"
 echo "Total files found: $file_count"
-echo "Successfully processed: $processed_count"
+if [[ $skipped_count -gt 0 ]]; then
+  echo "Already correct: $skipped_count"
+fi
+needs_changes=$((processed_count - skipped_count))
+if [[ $needs_changes -gt 0 ]]; then
+  echo "Needs changes: $needs_changes"
+fi
 if [[ $failed_count -gt 0 ]]; then
   echo "Failed: $failed_count"
 fi
 
-if [[ $apply -eq 1 ]]; then
-  echo "✅ Batch timestamp processing complete - changes applied to $processed_count file(s)."
+if [[ $needs_changes -eq 0 ]]; then
+  echo "✅ All files already have correct timestamps."
+elif [[ $apply -eq 1 ]]; then
+  echo "✅ Batch timestamp processing complete - changes applied to $needs_changes file(s)."
 else  
-  echo "✅ Batch timestamp processing complete - DRY RUN (no changes made)."
-  echo "   Use --apply to actually update the files."
+  echo "✅ Batch timestamp processing complete - DRY RUN."
+  echo "   Use --apply to update $needs_changes file(s)."
 fi
 
 # Exit with error if any files failed
