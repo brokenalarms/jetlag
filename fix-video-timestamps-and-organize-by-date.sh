@@ -22,8 +22,10 @@ READY="$ROOT/Ready"
 [[ -d "$EXPORTS" ]] || { echo "ERROR: Exports/ not found in $ROOT" >&2; exit 1; }
 mkdir -p "$READY"
 
-command -v batch-fix-video-timestamps.sh >/dev/null || {
-  echo "batch-fix-video-timestamps.sh not in PATH" >&2; exit 1; }
+command -v fix-video-timestamp.sh >/dev/null || {
+  echo "fix-video-timestamp.sh not in PATH" >&2; exit 1; }
+command -v organize-by-date.sh >/dev/null || {
+  echo "organize-by-date.sh not in PATH" >&2; exit 1; }
 
 # Parse arguments
 APPLY=0
@@ -65,73 +67,95 @@ echo "→ Exports: $EXPORTS"
 echo "→ Ready:   $READY"
 echo "→ Dir:     $DIR"
 echo "→ Mode:    $([[ $APPLY -eq 1 ]] && echo APPLY || echo 'DRY RUN (no changes)')"
-echo "→ Running normalizer with args: ${NORMALIZE_ARGS[*]:-}"
-ORIG_PWD="$PWD"
-cd "$EXPORTS"
-batch-fix-video-timestamps.sh ${NORMALIZE_ARGS[@]+"${NORMALIZE_ARGS[@]}"} || {
-  echo "⚠️  Normalizer completed with warnings/errors, continuing with file moves..."
-}
-cd "$ORIG_PWD"
+echo "→ Processing files with args: ${NORMALIZE_ARGS[*]:-}"
+echo
 
+# Count total files for progress tracking
+total_files=0
+for f in "$EXPORTS"/*.mp4 "$EXPORTS"/*.MP4 "$EXPORTS"/*.mov "$EXPORTS"/*.MOV; do
+  [[ -e "$f" ]] && total_files=$((total_files + 1))
+done
 
-# --- move or plan using simple globs (Bash 3.2 safe) ---
+if [[ $total_files -eq 0 ]]; then
+  echo "No video files found in $EXPORTS"
+  exit 0
+fi
+
+echo "📹 Found $total_files video file(s) to process"
+echo
+
+# Process each file individually: fix timestamp → organize file
 moved=0
 planned=0
+processed=0
 TMP_SUMMARY="$(mktemp)"
 
-# Use globs instead of find/pipes
 for f in "$EXPORTS"/*.mp4 "$EXPORTS"/*.MP4 "$EXPORTS"/*.mov "$EXPORTS"/*.MOV; do
   [[ -e "$f" ]] || continue
+  processed=$((processed + 1))
   base="$(basename "$f")"
-
-  if date_str=$(derive_date_from_filename "$base"); then
-    # Extract year, month, day from YYYY-MM-DD format
-    y="${date_str:0:4}"
-    m="${date_str:5:2}"
-    d="${date_str:8:2}"
-  else
-    # fallback: file mtime (rare)
-    y=$(date -r "$f" +%Y); m=$(date -r "$f" +%m); d=$(date -r "$f" +%d)
-  fi
-
-  destdir="$READY/$y/${DIR}/$y-$m-$d"
-
+  
+  echo "[$processed/$total_files] Processing: $base"
+  
+  # Step 1: Fix timestamp for this file
+  ORIG_PWD="$PWD"
+  cd "$EXPORTS"
+  fix-video-timestamp.sh "$f" ${NORMALIZE_ARGS[@]+"${NORMALIZE_ARGS[@]}"} || {
+    echo "⚠️  Timestamp processing failed for $base, skipping..."
+    cd "$ORIG_PWD"
+    continue
+  }
+  cd "$ORIG_PWD"
+  
+  # Step 2: Organize this file using the modular organize script
+  # Move to Ready directory first
+  ready_dir="$READY/$y/$DIR"
+  mkdir -p "$ready_dir"
+  
   if [[ $APPLY -eq 1 ]]; then
-    mkdir -p "$destdir"
-    echo "Moving $base → $destdir/"
-    # Use cp -p to preserve timestamps, then remove original (only if target doesn't exist)
-    if [[ ! -e "$destdir/$base" ]]; then
-      cp -p "$f" "$destdir/$base" && rm "$f"
+    # Move file to Ready directory, then organize by date
+    if [[ ! -e "$ready_dir/$base" ]]; then
+      echo "📄 Moving $base → Ready/$y/$DIR/"
+      cp -p "$f" "$ready_dir/$base" && rm "$f"
+      
+      # Now organize by date within the Ready directory
+      organize-by-date.sh --dir "$ready_dir" --apply || {
+        echo "⚠️  Organization failed for $base"
+      }
+      moved=$((moved+1))
     else
-      echo "⚠️  Target file already exists, skipping: $destdir/$base"
+      echo "⚠️  Target file already exists, skipping: $ready_dir/$base"
     fi
-    moved=$((moved+1))
   else
-    echo "[DRY] Would move $base → $destdir/"
-    printf '%s|%s\n' "$y/${DIR}/$y-$m-$d" "$base" >> "$TMP_SUMMARY"
+    # Dry run - show what would happen
+    echo "📄 [DRY] Would move $base → Ready/$y/$DIR/"
+    echo "📄 [DRY] Would organize by date in Ready/$y/$DIR/"
+    # For summary, determine what the final path would be
+    if date_str=$(derive_date_from_filename "$base"); then
+      final_path="$y/${DIR}/${date_str}"
+    else
+      final_date=$(date -r "$f" +%Y-%m-%d)
+      final_path="$y/${DIR}/${final_date}"
+    fi
+    printf '%s|%s\n' "$final_path" "$base" >> "$TMP_SUMMARY"
     planned=$((planned+1))
   fi
+  
+  echo  # Empty line between files
 done
 
 if [[ $APPLY -eq 1 ]]; then
-  echo "✅ Moved $moved file(s) into Ready/$y/$DIR/"
-  
-  # Now organize the moved files into date subfolders
-  if [[ $moved -gt 0 ]]; then
-    echo
-    echo "📁 Organizing files by date..."
-    "$SCRIPT_DIR/organize-by-date.sh" --dir "$READY/$y/$DIR" --apply
-  fi
+  echo "✅ Processing complete: $moved file(s) processed and organized into date folders"
 else
-  echo "🧪 Dry run complete. Planned $planned file(s). Re-run with --apply to execute."
+  echo "🧪 DRY RUN complete - would process and organize $planned file(s):"
   if (( planned > 0 )); then
     echo
-    echo "── Dry-run summary (grouped by date) ──"
+    echo "── Target structure under Ready/$y/$DIR/ ──"
     sort "$TMP_SUMMARY" | cut -d'|' -f1 | uniq -c | while read count key; do
       echo "$key: $count file(s)"
     done
     echo
-    echo "After moving, files would be organized into date subfolders."
+    echo "Use --apply to execute timestamp fixes and file organization."
   fi
 fi
 
