@@ -16,7 +16,7 @@ run_rsync() {
     local EXTRA_ARGS="${7:-}"
     
     # Build rsync command (no compression by default - can be added via EXTRA_ARGS if needed)
-    local RSYNC_ARGS="-avi --no-perms --no-owner --no-group --no-links --omit-dir-times --human-readable"
+    local RSYNC_ARGS="-aviz --no-perms --no-owner --no-group --no-links --omit-dir-times --human-readable"
     
     # Add delete options if requested
     if [[ "$DELETE_FLAG" == "delete" ]]; then

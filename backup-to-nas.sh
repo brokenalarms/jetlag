@@ -78,4 +78,4 @@ echo
 # Run rsync using the common function
 # No delete by default (incremental backup)  
 # Exclude multiple folders (path relative to SOURCE_PATH, separated by |)
-run_rsync "$SOURCE" "$DEST" "$DRY_RUN" "$EXCLUSIONS" "" "Videos/Final Cut Pro Projects/|Videos/Source Video/Insta360/Ready/"
+run_rsync "$SOURCE" "$DEST" "$DRY_RUN" "$EXCLUSIONS" "" "Videos/Source Video/"
