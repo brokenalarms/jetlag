@@ -14,6 +14,7 @@ args=()
 
 # Get script directory 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/lib-timestamp.sh"
 
 # Check if fix-video-timestamp.sh exists
 SINGLE_SCRIPT="$SCRIPT_DIR/fix-video-timestamp.sh"
@@ -42,8 +43,15 @@ while [[ $# -gt 0 ]]; do
       [[ $# -gt 0 ]] || { echo "ERROR: --timezone needs +HHMM or +HH:MM"; exit 1; }
       args+=("$1")
       shift ;;
-    --country)
+    --location)
       args+=("$1")
+      shift
+      [[ $# -gt 0 ]] || { echo "ERROR: --location requires a location name/code"; exit 1; }
+      args+=("$1")
+      shift ;;
+    --country)
+      # Legacy support - map to --location
+      args+=("--location")
       shift
       [[ $# -gt 0 ]] || { echo "ERROR: --country requires a country name/code"; exit 1; }
       args+=("$1")
@@ -58,7 +66,8 @@ while [[ $# -gt 0 ]]; do
       echo "  --only-insta    Only process VID_* files (Insta360 videos)"
       echo "  --verbose, -v   Show detailed processing info"  
       echo "  --timezone TZ   Use specific timezone (+HHMM format)"
-      echo "  --country NAME  Use country name/code for timezone lookup"
+      echo "  --location NAME Use location name/code for timezone lookup"
+      echo "  --country NAME  [DEPRECATED] Use --location instead"
       echo "  --force-timezone Override existing timezone metadata"
       echo "  --help, -h      Show this help"
       exit 0 ;;
@@ -70,6 +79,21 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ---------- main ----------
+# Show timezone info if location/timezone args are provided
+for (( i=0; i<${#args[@]}; i++ )); do
+  if [[ "${args[i]}" == "--location" && $((i+1)) < ${#args[@]} ]]; then
+    location_code="${args[$((i+1))]}"
+    if timezone=$(get_timezone_for_country "$location_code" 2>/dev/null); then
+      location_display=$(get_location_display "$location_code")
+      echo "🌍 Using location: $location_display → Timezone: $timezone"
+    fi
+    break
+  elif [[ "${args[i]}" == "--timezone" && $((i+1)) < ${#args[@]} ]]; then
+    echo "🕐 Using timezone: ${args[$((i+1))]}"
+    break
+  fi
+done
+
 echo "🕓 Scanning video files..."
 
 file_count=0
@@ -86,48 +110,18 @@ else
   file_pattern="-name '*.mp4' -o -name '*.MP4' -o -name '*.mov' -o -name '*.MOV' -o -name '*.insv' -o -name '*.INSV' -o -name '*.lrv' -o -name '*.LRV'"
 fi
 
-# Show timezone info once if using country
-country_shown=0
-for arg in "${args[@]}"; do
-  if [[ "$arg" == "--country" ]]; then
-    # Just show a simple message - the actual country line will be shown with first file
-    country_shown=1
-    break
-  fi
-done
-
 # Process files
-export BATCH_MODE=1
 
 while IFS= read -r -d '' file; do
   file_count=$((file_count + 1))
   
-  # Run single script and capture full output
-  full_output=$(BATCH_MODE=1 "$SINGLE_SCRIPT" "$file" "${args[@]}" 2>&1)
-  exit_code=$?
-  
-  # Extract country line if present and not yet shown
-  if [[ $country_shown -eq 1 ]]; then
-    country_line=$(echo "$full_output" | grep "^🌍" | head -1)
-    if [[ -n "$country_line" ]]; then
-      echo "$country_line"
-      echo ""
-      country_shown=2  # Mark as shown
-    fi
-  fi
-  
-  # Get output without country line
-  output=$(echo "$full_output" | grep -v "^🌍")
-  
-  # Check if it's a "No change" case
-  if [[ "$output" =~ "Change   : No change" ]]; then
-    skipped_count=$((skipped_count + 1))
-  fi
-  
-  # Always show the 3-line output
-  if [[ -n "$output" && ! "$output" =~ ^[[:space:]]*$ ]]; then
-    echo "$output"
-    echo  # Add spacing between files
+  # Run single script directly - let it handle its own output
+  if [[ ${#args[@]} -gt 0 ]]; then
+    "$SINGLE_SCRIPT" "$file" "${args[@]}"
+    exit_code=$?
+  else
+    "$SINGLE_SCRIPT" "$file"
+    exit_code=$?
   fi
   
   if [[ $exit_code -eq 0 ]]; then

@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# batch-organize-by-date.sh
+# Organizes all files in a directory into date-based subdirectories
+# Usage: batch-organize-by-date.sh --source-dir SOURCE_DIR --target-dir TARGET_DIR [--apply]
+# Uses filename date patterns first, falls back to creation time
+# DRY-RUN by default; moves files only when --apply is present.
+
+set -euo pipefail
+IFS=$'\n\t'
+
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Initialize variables
+apply=0
+verbose=0
+source_dir=""
+target_dir=""
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --apply) apply=1; shift ;;
+    --verbose|-v) verbose=1; shift ;;
+    --source-dir)
+      shift
+      [[ $# -gt 0 ]] || { echo "ERROR: --source-dir requires a directory path"; exit 1; }
+      source_dir="$1"; shift ;;
+    --target-dir)
+      shift
+      [[ $# -gt 0 ]] || { echo "ERROR: --target-dir requires a directory path"; exit 1; }
+      target_dir="$1"; shift ;;
+    --help|-h)
+      echo "Usage: batch-organize-by-date.sh --source-dir SOURCE_DIR --target-dir TARGET_DIR [OPTIONS]"
+      echo "Options:"
+      echo "  --source-dir DIR   Directory containing files to organize"
+      echo "  --target-dir DIR   Target directory for organized files"
+      echo "  --apply           Apply changes (default: dry run)"
+      echo "  --verbose, -v     Show detailed processing info"
+      echo "  --help, -h        Show this help"
+      echo ""
+      echo "Date extraction:"
+      echo "  1. From filename patterns (VID_, IMG_, DJI_, etc.)"
+      echo "  2. Fallback to file creation time"
+      exit 0 ;;
+    -*) echo "ERROR: Unknown option $1" >&2; exit 1 ;;
+    *) echo "ERROR: Unexpected argument $1" >&2; exit 1 ;;
+  esac
+done
+
+# Validate arguments
+[[ -n "$source_dir" ]] || { echo "ERROR: --source-dir is required" >&2; exit 1; }
+[[ -d "$source_dir" ]] || { echo "ERROR: Source directory not found: $source_dir" >&2; exit 1; }
+[[ -n "$target_dir" ]] || { echo "ERROR: --target-dir is required" >&2; exit 1; }
+
+# Helper functions
+log_verbose() {
+  [[ $verbose -eq 1 ]] && echo "$@" >&2
+}
+
+# Display configuration
+echo "→ Source:  $source_dir"
+echo "→ Target:  $target_dir"
+echo "→ Mode:    $([[ $apply -eq 1 ]] && echo "APPLY (files will be moved)" || echo "DRY RUN (no changes)")"
+echo
+
+# Create target directory if it doesn't exist (for apply mode)
+[[ $apply -eq 1 ]] && mkdir -p "$target_dir"
+
+# Find all files to organize
+files=()
+while IFS= read -r -d '' file; do
+  files+=("$file")
+done < <(find "$source_dir" -maxdepth 1 -type f ! -name ".*" -print0)
+
+total_files=${#files[@]}
+
+if [[ $total_files -eq 0 ]]; then
+  echo "No files to organize in $source_dir"
+  exit 0
+fi
+
+echo "Found $total_files file(s) to organize"
+echo
+
+# Process each file using the single-file organize script
+processed=0
+succeeded=0
+failed=0
+
+for file in "${files[@]}"; do
+  processed=$((processed + 1))
+  base="$(basename "$file")"
+  
+  echo "[$processed/$total_files] Processing: $base"
+  
+  # Build arguments for single-file script
+  args=("--target-dir" "$target_dir")
+  [[ $apply -eq 1 ]] && args+=("--apply")
+  [[ $verbose -eq 1 ]] && args+=("--verbose")
+  
+  # Call the single-file organize script
+  if "$SCRIPT_DIR/organize-by-date.sh" "$file" "${args[@]}"; then
+    succeeded=$((succeeded + 1))
+  else
+    failed=$((failed + 1))
+    echo "   ❌ Failed to organize $base"
+  fi
+  echo  # Empty line between files
+done
+
+# Summary
+echo "=========================================="
+echo "📊 BATCH ORGANIZATION SUMMARY"
+echo "----------------------------------------"
+echo "Total files processed: $processed"
+echo "Successfully organized: $succeeded"
+if [[ $failed -gt 0 ]]; then
+  echo "Failed: $failed"
+fi
+
+if [[ $apply -eq 1 ]]; then
+  echo "✅ Batch organization complete - changes applied."
+else
+  echo "✅ Batch organization complete - DRY RUN."
+  echo "   Use --apply to execute the moves."
+fi
+
+# Exit with error if any files failed
+[[ $failed -eq 0 ]] || exit 1

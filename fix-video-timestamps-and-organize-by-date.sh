@@ -13,7 +13,7 @@ IFS=$'\n\t'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source library files
-source "$SCRIPT_DIR/lib/lib-file-ops.sh"
+source "$SCRIPT_DIR/lib/lib-timestamp.sh"
 
 ROOT="$PWD"
 EXPORTS="$ROOT/Exports"
@@ -131,7 +131,7 @@ for f in "$EXPORTS"/*.mp4 "$EXPORTS"/*.MP4 "$EXPORTS"/*.mov "$EXPORTS"/*.MOV; do
     echo "📄 [DRY] Would move $base → Ready/$y/$DIR/"
     echo "📄 [DRY] Would organize by date in Ready/$y/$DIR/"
     # For summary, determine what the final path would be
-    if date_str=$(derive_date_from_filename "$base"); then
+    if date_str=$(get_file_date_for_organization "$f"); then
       final_path="$y/${DIR}/${date_str}"
     else
       final_date=$(date -r "$f" +%Y-%m-%d)

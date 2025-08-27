@@ -10,8 +10,7 @@ IFS=$'\n\t'
 # Get script directory and source libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../lib/lib-common.sh"
-source "$SCRIPT_DIR/../lib/lib-timestamp.sh"
-source "$SCRIPT_DIR/../lib/lib-file-ops.sh"
+source "$SCRIPT_DIR/lib/lib-timestamp.sh"
 
 # Initialize variables
 apply_changes=0
@@ -209,7 +208,7 @@ for ext in insv lrv mp4 mov INSV LRV MP4 MOV; do
       local utc_time=$(to_utc "$corrected_with_tz" 2>/dev/null || echo "")
       
       if [[ -n "$utc_time" ]]; then
-        update_metadata "$dest_file" "$corrected_with_tz" "$utc_time"
+        set_file_timestamps "$dest_file" "$corrected_with_tz" "$utc_time"
       fi
       
       # Set file modification time
