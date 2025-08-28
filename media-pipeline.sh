@@ -82,13 +82,6 @@ done
 [[ -d "$source_dir" ]] || { echo "ERROR: Source directory not found: $source_dir" >&2; exit 1; }
 [[ -n "$target_dir" ]] || { echo "ERROR: --target is required" >&2; exit 1; }
 
-# Validate timezone/location provided
-if [[ ${#location_args[@]} -eq 0 ]]; then
-  echo "ERROR: --location or --timezone is required" >&2
-  echo "Use --location COUNTRY or --timezone +HHMM" >&2
-  exit 1
-fi
-
 # Validate label is provided
 [[ -n "$label" ]] || { echo "ERROR: --label is required" >&2; exit 1; }
 
@@ -103,6 +96,8 @@ echo "→ Target:  $target_dir"
 echo "→ Mode:    $([[ $apply -eq 1 ]] && echo "APPLY (files will be processed)" || echo "DRY RUN (no changes)")"
 if [[ ${#location_args[@]} -gt 0 ]]; then
   echo "→ Timezone: ${location_args[*]}"
+else
+  echo "→ Timezone: From video metadata (or will prompt if needed)"
 fi
 echo
 
@@ -150,7 +145,7 @@ for file in "${files[@]}" ; do
     fix_args+=("${location_args[@]}")
   fi
   
-  if ! "$SCRIPT_DIR/fix-video-timestamp.sh" "$file" "${fix_args[@]}"; then
+  if ! "$SCRIPT_DIR/fix-video-timestamp.sh" "$file" "${fix_args[@]+"${fix_args[@]}"}"; then
     echo "   ❌ Timestamp fix failed for $base"
     failed=$((failed + 1))
     echo  # Empty line between files
@@ -165,12 +160,16 @@ for file in "${files[@]}" ; do
   [[ $apply -eq 1 ]] && org_args+=("--apply")
   [[ $verbose -eq 1 ]] && org_args+=("--verbose")
   
-  # Build template with label substitution
-  local template="${MEDIA_PIPELINE_TEMPLATE:-{{YYYY-MM-DD}}}"
-  template="${template//\{\{label\}\}/$label}"
+  # Pass raw template and label separately
+  if [[ -n "$MEDIA_PIPELINE_TEMPLATE" ]]; then
+    template="$MEDIA_PIPELINE_TEMPLATE"
+  else
+    template="{{YYYY}}-{{MM}}-{{DD}}"
+  fi
   org_args+=("--template" "$template")
+  org_args+=("--label" "$label")
   
-  if ! "$SCRIPT_DIR/organize-by-date.sh" "$file" "${org_args[@]}"; then
+  if ! "$SCRIPT_DIR/organize-by-date.sh" "$file" "${org_args[@]+"${org_args[@]}"}"; then
     echo "   ❌ Organization failed for $base"
     failed=$((failed + 1))
   else

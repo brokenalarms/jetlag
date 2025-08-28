@@ -18,6 +18,7 @@ file=""
 target_dir=""
 template=""
 location=""
+label=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -36,13 +37,18 @@ while [[ $# -gt 0 ]]; do
       shift
       [[ $# -gt 0 ]] || { echo "ERROR: --location requires a location name"; exit 1; }
       location="$1"; shift ;;
+    --label)
+      shift
+      [[ $# -gt 0 ]] || { echo "ERROR: --label requires a label value"; exit 1; }
+      label="$1"; shift ;;
     --help|-h)
       echo "Usage: organize-by-date.sh FILE --target TARGET_DIR [OPTIONS]"
       echo "Options:"
       echo "  --target DIR    Target directory for organized files"
-      echo "  --template TMPL     Path template (default: {{date}})"
-      echo "                      Variables: {{year}}, {{date}}, {{location}}"
-      echo "  --location LOC      Location name for {{location}} template variable"
+      echo "  --template TMPL     Path template (default: {{YYYY-MM-DD}})"
+      echo "                      Variables: {{YYYY}}, {{MM}}, {{DD}}, {{YYYY-MM-DD}}, {{label}}"
+      echo "  --label LABEL       Label value for {{label}} template variable"
+      echo "  --location LOC      Location name for {{location}} template variable (deprecated)"
       echo "  --apply            Apply changes (default: dry run)"
       echo "  --verbose, -v      Show detailed processing info"
       echo "  --help, -h         Show this help"
@@ -88,10 +94,13 @@ process_file() {
   else
     template_path="{{YYYY-MM-DD}}"
   fi
-  local organized_path="$(expand_path_template "$template_path" "$file_date" "")"
+  local organized_path
+  if ! organized_path="$(expand_path_template "$template_path" "$file_date" "$label")"; then
+    return 1
+  fi
   
-  # Create target path
-  local target_path="$target_dir/$organized_path"
+  # Create target path (handle trailing/leading slashes)
+  local target_path="${target_dir%/}/${organized_path#/}"
   local target_file="$target_path/$base"
   
   # Check if file is already in correct location

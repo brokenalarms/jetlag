@@ -177,6 +177,12 @@ expand_path_template() {
   local file_date="$2"  # YYYY-MM-DD format
   local label="${3:-}"
   
+  # Check if template contains {{label}} but no label provided
+  if [[ "$template" =~ \{\{label\}\} && -z "$label" ]]; then
+    echo "ERROR: Template contains {{label}} but no label provided" >&2
+    return 1
+  fi
+  
   # Extract date components (YYYY-MM-DD)
   local year="${file_date:0:4}"
   local month="${file_date:5:2}"
