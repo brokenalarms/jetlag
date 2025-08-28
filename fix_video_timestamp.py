@@ -261,12 +261,17 @@ def format_original_timestamps(current_data: dict) -> str:
     """Format original timestamp display from raw data"""
     parts = []
     
-    # File timestamp
+    # DateTimeOriginal first (source of truth when present)
+    datetime_original = current_data["exif"].get("DateTimeOriginal", "")
+    if datetime_original:
+        parts.append(f"{datetime_original} (DateTimeOriginal)")
+    
+    # File timestamp as secondary (only if different from DateTimeOriginal or DateTimeOriginal not present)
     file_ts = current_data["file_system"].get("modify", "")
-    if file_ts:
+    if file_ts and not datetime_original:
         parts.append(f"{file_ts} (file)")
     
-    # MediaCreateDate as secondary info
+    # MediaCreateDate as tertiary info
     media_create = current_data["exif"].get("MediaCreateDate", "")
     if media_create:
         parts.append(f"{media_create} (MediaCreateDate)")
