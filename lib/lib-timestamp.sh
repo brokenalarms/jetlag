@@ -11,6 +11,7 @@ FILE_BIRTHTIME=""
 FILE_MTIME=""
 DATETIME_ORIGINAL=""
 MEDIA_CREATE_DATE=""
+MEDIA_MODIFY_DATE=""
 KEYS_CREATION_DATE=""
 FILENAME_DATE=""
 TIMESTAMP_SOURCE=""
@@ -28,6 +29,7 @@ get_file_timestamps() {
   FILE_MTIME=""
   DATETIME_ORIGINAL=""
   MEDIA_CREATE_DATE=""
+  MEDIA_MODIFY_DATE=""
   KEYS_CREATION_DATE=""
   FILENAME_DATE=""
   CREATE_DATE=""
@@ -66,7 +68,7 @@ get_file_timestamps() {
   # Use -s (not -s3) to get field names so we can identify which is which
   # Use -fast to skip some metadata parsing for better performance with large files
   local metadata_output
-  metadata_output=$(exiftool -fast2 -s -DateTimeOriginal -QuickTime:MediaCreateDate -Keys:CreationDate -CreateDate -ModifyDate "$file" 2>/dev/null || true)
+  metadata_output=$(exiftool -fast2 -s -DateTimeOriginal -QuickTime:MediaCreateDate -QuickTime:MediaModifyDate -Keys:CreationDate -CreateDate -ModifyDate "$file" 2>/dev/null || true)
   
   
   # Parse the metadata output
@@ -75,6 +77,9 @@ get_file_timestamps() {
   fi
   if [[ "$metadata_output" =~ MediaCreateDate[[:space:]]*:[[:space:]]*([-0-9: +:]+) ]]; then
     MEDIA_CREATE_DATE="${BASH_REMATCH[1]}"
+  fi
+  if [[ "$metadata_output" =~ MediaModifyDate[[:space:]]*:[[:space:]]*([-0-9: +:]+) ]]; then
+    MEDIA_MODIFY_DATE="${BASH_REMATCH[1]}"
   fi
   # Use more specific patterns to avoid conflicts  
   if [[ "$metadata_output" =~ ^CreateDate[[:space:]]*:[[:space:]]*([-0-9: +:]+)$ ]] || \
@@ -140,11 +145,11 @@ get_best_timestamp() {
 # Note: Uses global variables from get_file_timestamps() to determine what needs updating
 set_file_timestamps() {
   local file="$1"
-  local local_with_tz="$2"  # Local time with timezone (e.g., "2024:01:01 12:00:00+0100")
-  local utc_time="$3"        # UTC time (e.g., "2024:01:01 11:00:00")
+  local corrected_timestamp="$2"  # Corrected timestamp with timezone (e.g., "2024:01:01 12:00:00+0100")
+  local utc_time="$3"             # UTC time (e.g., "2024:01:01 11:00:00")
   
   # Extract just the datetime without timezone
-  local local_time_no_tz="${local_with_tz:0:19}"
+  local timestamp_no_tz="${corrected_timestamp:0:19}"
   
   # Build exiftool arguments array - only add changes that are needed
   local exiftool_args=()
@@ -152,27 +157,31 @@ set_file_timestamps() {
   
   # Set DateTimeOriginal if missing (preserves original shooting time with timezone)
   if [[ -z "$DATETIME_ORIGINAL" ]]; then
-    exiftool_args+=("-DateTimeOriginal=$local_with_tz")
+    exiftool_args+=("-DateTimeOriginal=$corrected_timestamp")
     has_metadata_changes=1
   fi
   
-  # Set CreateDate with timezone if missing timezone
-  if [[ -n "$CREATE_DATE" ]] && ! [[ "$CREATE_DATE" =~ [+-][0-9]{2}:?[0-9]{2}$ ]]; then
-    exiftool_args+=("-CreateDate=$local_with_tz")
-    has_metadata_changes=1
-  elif [[ -z "$CREATE_DATE" ]]; then
-    # CreateDate is completely missing, set it
-    exiftool_args+=("-CreateDate=$local_with_tz")
+  # Set CreateDate with timezone if it needs changing
+  if [[ -z "$CREATE_DATE" ]] || [[ "$CREATE_DATE" != "$corrected_timestamp" ]]; then
+    exiftool_args+=("-CreateDate=$corrected_timestamp")
     has_metadata_changes=1
   fi
   
-  # Set ModifyDate with timezone if missing timezone
-  if [[ -n "$MODIFY_DATE" ]] && ! [[ "$MODIFY_DATE" =~ [+-][0-9]{2}:?[0-9]{2}$ ]]; then
-    exiftool_args+=("-ModifyDate=$local_with_tz")
+  # Set ModifyDate with timezone if it needs changing
+  if [[ -z "$MODIFY_DATE" ]] || [[ "$MODIFY_DATE" != "$corrected_timestamp" ]]; then
+    exiftool_args+=("-ModifyDate=$corrected_timestamp")
     has_metadata_changes=1
-  elif [[ -z "$MODIFY_DATE" ]]; then
-    # ModifyDate is completely missing, set it
-    exiftool_args+=("-ModifyDate=$local_with_tz")
+  fi
+  
+  # Fix MediaCreateDate/MediaModifyDate if they need changing
+  # These should be UTC equivalent of shooting time (no timezone)
+  local utc_no_tz="${utc_time:0:19}"
+  if [[ -z "$MEDIA_CREATE_DATE" ]] || [[ "$MEDIA_CREATE_DATE" != "$utc_no_tz" ]]; then
+    exiftool_args+=("-QuickTime:MediaCreateDate=$utc_no_tz")
+    has_metadata_changes=1
+  fi
+  if [[ -z "$MEDIA_MODIFY_DATE" ]] || [[ "$MEDIA_MODIFY_DATE" != "$utc_no_tz" ]]; then
+    exiftool_args+=("-QuickTime:MediaModifyDate=$utc_no_tz")
     has_metadata_changes=1
   fi
   

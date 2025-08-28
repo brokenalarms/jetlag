@@ -127,15 +127,15 @@ process_video_file() {
   # Get the best timestamp to use (function knows the right priority for each file type)
   # Note: Can't use command substitution as it runs in subshell and loses global variables
   get_best_timestamp "$file" > /tmp/timestamp_result_$$
-  local local_dt="$(cat /tmp/timestamp_result_$$)"
+  local best_timestamp="$(cat /tmp/timestamp_result_$$)"
   rm -f /tmp/timestamp_result_$$
   local dt_source="$TIMESTAMP_SOURCE"
   
-  log_verbose "  Local datetime: $local_dt (source: $dt_source)"
+  log_verbose "  Best timestamp: $best_timestamp (source: $dt_source)"
   
   # Get timezone for this file
   local tz_info tz tz_source tz_abbrev
-  if ! tz_info="$(get_tz_for_file "$file" "$local_dt")"; then
+  if ! tz_info="$(get_tz_for_file "$file" "$best_timestamp")"; then
     echo "❌ $base: No timezone (use --timezone or --location). Aborting." >&2
     return 1
   fi
@@ -153,11 +153,11 @@ process_video_file() {
   
   log_verbose "  Timezone: $tz (source: $tz_source)"
   
-  local local_with_tz="${local_dt}${tz}"
-  log_verbose "  Local with TZ: $local_with_tz"
+  local corrected_timestamp="${best_timestamp}${tz}"
+  log_verbose "  Corrected timestamp: $corrected_timestamp"
   
   # Convert to UTC
-  local utc_time="$(to_utc "$local_with_tz")"
+  local utc_time="$(to_utc "$corrected_timestamp")"
   log_verbose "  UTC time: $utc_time"
   
   # Format original timestamps for display (using raw data from get_best_timestamp)
@@ -167,7 +167,7 @@ process_video_file() {
   # Determine what changes are needed using raw file timestamp
   local file_timestamp="$FILE_BIRTHTIME"
   [[ -z "$file_timestamp" && -n "$FILE_MTIME" ]] && file_timestamp="$FILE_MTIME"
-  local change_desc="$(determine_change_needed "$file_timestamp" "$local_with_tz")"
+  local change_desc="$(determine_change_needed "$file_timestamp" "$corrected_timestamp")"
   local needs_update=1
   [[ "$change_desc" == "No change" ]] && needs_update=0
   
@@ -207,7 +207,7 @@ process_video_file() {
   # Display comparison info
   printf "\033[36m🔍 %s\033[0m\n" "$base"
   printf "📅 Original : %s\n" "$original_display"
-  printf "⏱️ Corrected: %s (from %s, tz: %s)\n" "$local_with_tz" "$dt_source" "$tz_source"
+  printf "⏱️ Corrected: %s (from %s, tz: %s)\n" "$corrected_timestamp" "$dt_source" "$tz_source"
   printf "🌐 UTC      : %s UTC\n" "$utc_time"
   
   # Combine file timestamp and metadata changes
@@ -231,14 +231,31 @@ process_video_file() {
   # Update metadata and file timestamps if changes needed and in apply mode
   if [[ $needs_update -eq 1 && $apply -eq 1 ]]; then
     log_verbose "  Updating metadata..."
-    set_file_timestamps "$file" "$local_with_tz" "$utc_time"
+    set_file_timestamps "$file" "$corrected_timestamp" "$utc_time"
     
-    # Update file system timestamps only if they need changing
-    if [[ "$change_desc" != "No change" ]]; then
-      local local_time_no_tz="${local_with_tz:0:19}"
+    # Don't update file system timestamps - FCP reads metadata, not file timestamps
+    # Updating file timestamps can cause timezone confusion in FCP
+    if false && [[ "$change_desc" != "No change" ]]; then
       log_verbose "  Updating file system timestamps..."
-      SetFile -d "$(date -j -f "%Y:%m:%d %H:%M:%S" "$local_time_no_tz" "+%m/%d/%Y %H:%M:%S")" "$file" 2>/dev/null || true
-      touch -t "$(date -j -f "%Y:%m:%d %H:%M:%S" "$local_time_no_tz" "+%Y%m%d%H%M.%S")" "$file" 2>/dev/null || true
+      log_verbose "  Corrected timestamp for file system: $corrected_timestamp"
+      
+      # Convert timestamp for SetFile (MM/DD/YYYY HH:MM:SS format)
+      local setfile_time
+      if setfile_time="$(date -j -f "%Y:%m:%d %H:%M:%S %z" "$corrected_timestamp" "+%m/%d/%Y %H:%M:%S" 2>/dev/null)"; then
+        log_verbose "  SetFile timestamp: $setfile_time"
+        SetFile -d "$setfile_time" "$file" 2>/dev/null || true
+      else
+        log_verbose "  SetFile date conversion failed for: $corrected_timestamp"
+      fi
+      
+      # Convert timestamp for touch (YYYYMMDDHHMM.SS format)  
+      local touch_time
+      if touch_time="$(date -j -f "%Y:%m:%d %H:%M:%S %z" "$corrected_timestamp" "+%Y%m%d%H%M.%S" 2>/dev/null)"; then
+        log_verbose "  touch timestamp: $touch_time"
+        touch -t "$touch_time" "$file" 2>/dev/null || true
+      else
+        log_verbose "  touch date conversion failed for: $corrected_timestamp"
+      fi
     fi
     
     log_verbose "  ✅ Metadata updated"
