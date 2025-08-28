@@ -173,24 +173,13 @@ def apply_exif_changes(file_path: str, changes: Dict[str, Optional[str]]) -> boo
         return False
 
 def set_file_system_timestamps(file_path: str, datetime_original: datetime) -> bool:
-    """Set file system timestamps using epoch conversion"""
-    epoch_seconds = str(int(datetime_original.timestamp()))
-    
-    # Convert to required formats
+    """Set file system timestamps to display original capture time in FCP"""
     try:
         # For SetFile (MM/DD/YYYY HH:MM:SS)
-        setfile_result = subprocess.run(
-            ["date", "-j", "-f", "%s", epoch_seconds, "+%m/%d/%Y %H:%M:%S"],
-            capture_output=True, text=True, check=True
-        )
-        setfile_time = setfile_result.stdout.strip()
+        setfile_time = datetime_original.strftime('%m/%d/%Y %H:%M:%S')
         
         # For touch (YYYYMMDDHHMM.SS)
-        touch_result = subprocess.run(
-            ["date", "-j", "-f", "%s", epoch_seconds, "+%Y%m%d%H%M.%S"],
-            capture_output=True, text=True, check=True
-        )
-        touch_time = touch_result.stdout.strip()
+        touch_time = datetime_original.strftime('%Y%m%d%H%M.%S')
         
         # Apply file system timestamp changes
         subprocess.run(["SetFile", "-d", setfile_time, file_path], 
@@ -226,7 +215,7 @@ def calculate_expected_values(datetime_original: datetime) -> dict:
     for field, transform_func in FIELD_TRANSFORMS.items():
         expected[field] = transform_func(datetime_original)
     
-    # Add expected file system timestamps
+    # Add expected file system timestamps (original capture time for FCP display)
     expected["file_system_time"] = datetime_original.strftime('%Y:%m:%d %H:%M:%S')
     
     return expected
