@@ -54,12 +54,19 @@ done
 [[ -n "$video_file" ]] || { echo "ERROR: VIDEO_FILE is required" >&2; exit 1; }
 [[ -f "$video_file" ]] || { echo "ERROR: File not found: $video_file" >&2; exit 1; }
 
+# Variables for timezone info
+cli_tz_abbrev=""
+
 # Convert location to timezone if provided
 if [[ -n "$cli_location" && -z "$cli_tz" ]]; then
-  if cli_tz=$(get_timezone_for_country "$cli_location"); then
+  # We'll get the actual date later, for now just validate the location
+  if tz_info=$(get_timezone_for_country "$cli_location" ""); then
+    # Parse offset and abbreviation
+    cli_tz="$(echo "$tz_info" | cut -d'|' -f1)"
+    cli_tz_abbrev="$(echo "$tz_info" | cut -d'|' -f2)"
     # Get location display info from library
     location_display=$(get_location_display "$cli_location")
-    echo "🌍 Location: $location_display → Timezone: $cli_tz"
+    echo "🌍 Location: $location_display → Timezone: $cli_tz ($cli_tz_abbrev)"
   else
     echo "ERROR: Unknown location '$cli_location'." >&2
     exit 1
@@ -72,27 +79,38 @@ log_verbose() {
 }
 
 # Get timezone for this file
+# Returns: offset|source|abbreviation (e.g., "+0200|Keys:CreationDate metadata|CEST")
 get_tz_for_file() {
   local file="$1"
-  local dir="$(dirname "$file")"
+  local date_str="$2"  # The timestamp we're processing
   
-  # 1. Check for local timezone.txt file (explicit override)
-  if [[ -f "$dir/timezone.txt" ]]; then
-    local tz="$(head -n1 "$dir/timezone.txt")"
-    chflags hidden "$dir/timezone.txt" 2>/dev/null || true
-    echo "$(fix_colon_tz "$tz")"
+  # 1. Check Keys:CreationDate for timezone (iPhone videos)
+  if [[ -n "$KEYS_CREATION_DATE" ]] && [[ "$KEYS_CREATION_DATE" =~ [+-][0-9]{2}:?[0-9]{2}$ ]] && [[ $force_timezone -eq 0 ]]; then
+    local tz="$(fix_colon_tz "$(echo "$KEYS_CREATION_DATE" | grep -oE '[+-][0-9]{2}:?[0-9]{2}$')")"
+    echo "${tz}|Keys:CreationDate metadata|${tz}"
     return 0
   fi
   
-  # 2. Check if file already has timezone in metadata (respect existing unless forced)
+  # 2. Check DateTimeOriginal for timezone (Insta360 and other cameras)
   if [[ -n "$DATETIME_ORIGINAL" ]] && [[ "$DATETIME_ORIGINAL" =~ [+-][0-9]{2}:?[0-9]{2}$ ]] && [[ $force_timezone -eq 0 ]]; then
-    echo "$(fix_colon_tz "$(echo "$DATETIME_ORIGINAL" | grep -oE '[+-][0-9]{2}:?[0-9]{2}$')")"
+    local tz="$(fix_colon_tz "$(echo "$DATETIME_ORIGINAL" | grep -oE '[+-][0-9]{2}:?[0-9]{2}$')")"
+    echo "${tz}|DateTimeOriginal metadata|${tz}"
     return 0
   fi
   
-  # 3. Apply CLI/country timezone
-  if [[ -n "$cli_tz" ]]; then
-    echo "$(fix_colon_tz "$cli_tz")"
+  # 3. Apply CLI/country timezone with date-aware DST
+  if [[ -n "$cli_location" ]]; then
+    # Get timezone for specific date to handle DST correctly
+    if tz_info=$(get_timezone_for_country "$cli_location" "$date_str"); then
+      local tz="$(echo "$tz_info" | cut -d'|' -f1)"
+      local abbrev="$(echo "$tz_info" | cut -d'|' -f2)"
+      local location_display=$(get_location_display "$cli_location")
+      echo "${tz}|--location $cli_location ($location_display)|${abbrev}"
+      return 0
+    fi
+  elif [[ -n "$cli_tz" ]]; then
+    local tz="$(fix_colon_tz "$cli_tz")"
+    echo "${tz}|--timezone ${tz}|${tz}"
     return 0
   fi
   
@@ -116,29 +134,21 @@ process_video_file() {
   log_verbose "  Local datetime: $local_dt (source: $dt_source)"
   
   # Get timezone for this file
-  local tz tz_source
-  if ! tz="$(get_tz_for_file "$file")"; then
-    echo "❌ $base: No timezone (use --timezone or timezone.txt). Aborting." >&2
+  local tz_info tz tz_source tz_abbrev
+  if ! tz_info="$(get_tz_for_file "$file" "$local_dt")"; then
+    echo "❌ $base: No timezone (use --timezone or --location). Aborting." >&2
     return 1
   fi
   
-  # Determine timezone source for display
-  if [[ -f "$(dirname "$file")/timezone.txt" ]]; then
-    tz_source="timezone.txt"
-  elif [[ -n "$DATETIME_ORIGINAL" ]] && [[ "$DATETIME_ORIGINAL" =~ [+-][0-9]{2}:?[0-9]{2}$ ]] && [[ $force_timezone -eq 0 ]]; then
-    tz_source="existing metadata"
-  elif [[ $force_timezone -eq 1 ]]; then
-    if [[ -n "$cli_location" ]]; then
-      tz_source="--location $cli_location (forced)"
-    else
-      tz_source="--timezone $cli_tz (forced)"
-    fi
-  else
-    if [[ -n "$cli_location" ]]; then
-      tz_source="--location $cli_location"
-    else
-      tz_source="--timezone $cli_tz"
-    fi
+  # Parse the timezone info (offset|source|abbreviation)
+  IFS='|' read -r tz tz_source tz_abbrev <<< "$tz_info"
+  
+  # Format timezone source for display - only show abbreviation if it's meaningful (not same as offset)
+  if [[ -n "$tz_abbrev" && "$tz_abbrev" != "$tz" ]]; then
+    tz_source="${tz_source} (${tz_abbrev})"
+  elif [[ "$tz_source" =~ "metadata" ]]; then
+    # For metadata sources, show the offset in the source
+    tz_source="${tz_source} (${tz})"
   fi
   
   log_verbose "  Timezone: $tz (source: $tz_source)"
@@ -150,20 +160,14 @@ process_video_file() {
   local utc_time="$(to_utc "$local_with_tz")"
   log_verbose "  UTC time: $utc_time"
   
-  # Get original metadata for comparison
-  local comparison_data="$(get_timestamp_comparison "$file")"
-  local original_display
-  IFS='|' read -r file_ts meta_ts meta_src differs <<< "$comparison_data"
-  
-  if [[ "$differs" == "true" ]]; then
-    original_display="$file_ts (file) vs $meta_ts ($meta_src)"
-  else
-    original_display="${file_ts:-$meta_ts} (${meta_src:-file creation date})"
-  fi
+  # Format original timestamps for display (using raw data from get_best_timestamp)
+  local original_display="$(format_original_timestamps)"
   log_verbose "  Original: $original_display"
   
-  # Determine what changes are needed
-  local change_desc="$(determine_change_needed "$original_display" "$local_with_tz")"
+  # Determine what changes are needed using raw file timestamp
+  local file_timestamp="$FILE_BIRTHTIME"
+  [[ -z "$file_timestamp" && -n "$FILE_MTIME" ]] && file_timestamp="$FILE_MTIME"
+  local change_desc="$(determine_change_needed "$file_timestamp" "$local_with_tz")"
   local needs_update=1
   [[ "$change_desc" == "No change" ]] && needs_update=0
   

@@ -11,6 +11,7 @@ FILE_BIRTHTIME=""
 FILE_MTIME=""
 DATETIME_ORIGINAL=""
 MEDIA_CREATE_DATE=""
+KEYS_CREATION_DATE=""
 FILENAME_DATE=""
 TIMESTAMP_SOURCE=""
 
@@ -27,6 +28,7 @@ get_file_timestamps() {
   FILE_MTIME=""
   DATETIME_ORIGINAL=""
   MEDIA_CREATE_DATE=""
+  KEYS_CREATION_DATE=""
   FILENAME_DATE=""
   
   # Get file system timestamps
@@ -61,7 +63,7 @@ get_file_timestamps() {
   # Get metadata timestamps with a single exiftool call
   # Use -s (not -s3) to get field names so we can identify which is which
   local metadata_output
-  metadata_output=$(exiftool -s -DateTimeOriginal -QuickTime:MediaCreateDate "$file" 2>/dev/null || true)
+  metadata_output=$(exiftool -s -DateTimeOriginal -QuickTime:MediaCreateDate -Keys:CreationDate "$file" 2>/dev/null || true)
   
   # Parse the metadata output
   if [[ "$metadata_output" =~ DateTimeOriginal[[:space:]]*:[[:space:]]*([-0-9: +:]+) ]]; then
@@ -70,12 +72,16 @@ get_file_timestamps() {
   if [[ "$metadata_output" =~ MediaCreateDate[[:space:]]*:[[:space:]]*([-0-9: +:]+) ]]; then
     MEDIA_CREATE_DATE="${BASH_REMATCH[1]}"
   fi
+  if [[ "$metadata_output" =~ CreationDate[[:space:]]*:[[:space:]]*([-0-9: +:]+) ]]; then
+    KEYS_CREATION_DATE="${BASH_REMATCH[1]}"
+  fi
   
   return 0
 }
 
 # Get the best timestamp to use based on priority
-# Priority: 1. Filename (for VID/IMG/LRV), 2. DateTimeOriginal, 3. MediaCreateDate, 4. File birthtime
+# Priority: 1. Keys:CreationDate (with tz), 2. DateTimeOriginal (with tz), 3. Filename (VID/IMG/LRV), 
+#           4. DateTimeOriginal, 5. MediaCreateDate, 6. File timestamps
 # Returns: timestamp and sets global TIMESTAMP_SOURCE
 get_best_timestamp() {
   local file="$1"
@@ -87,17 +93,29 @@ get_best_timestamp() {
   local timestamp=""
   TIMESTAMP_SOURCE=""
   
-  # For VID/IMG/LRV files with parseable names, ALWAYS prioritize filename
-  if [[ -n "$FILENAME_DATE" ]] && [[ "$base" =~ ^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6} ]]; then
+  # Priority 1: Keys:CreationDate with timezone (iPhone videos from Google Photos)
+  if [[ -n "$KEYS_CREATION_DATE" ]] && [[ "$KEYS_CREATION_DATE" =~ [+-][0-9]{2}:?[0-9]{2}$ ]]; then
+    # Has timezone, extract just the datetime part
+    timestamp="$(echo "$KEYS_CREATION_DATE" | sed -E 's/([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*/\1/')"
+    TIMESTAMP_SOURCE="Keys:CreationDate"
+  # Priority 2: DateTimeOriginal with timezone (Insta360 and other cameras)
+  elif [[ -n "$DATETIME_ORIGINAL" ]] && [[ "$DATETIME_ORIGINAL" =~ [+-][0-9]{2}:?[0-9]{2}$ ]]; then
+    # Has timezone, extract just the datetime part
+    timestamp="$(echo "$DATETIME_ORIGINAL" | sed -E 's/([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*/\1/')"
+    TIMESTAMP_SOURCE="DateTimeOriginal with timezone"
+  # Priority 3: Filename for VID/IMG/LRV files with parseable names
+  elif [[ -n "$FILENAME_DATE" ]] && [[ "$base" =~ ^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6} ]]; then
     timestamp="$FILENAME_DATE"
     TIMESTAMP_SOURCE="filename"
+  # Priority 4: DateTimeOriginal without timezone
   elif [[ -n "$DATETIME_ORIGINAL" ]] && [[ "$DATETIME_ORIGINAL" =~ [0-9] ]]; then
-    # Extract just the datetime part (remove timezone if present)
     timestamp="$(echo "$DATETIME_ORIGINAL" | sed -E 's/([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*/\1/')"
     TIMESTAMP_SOURCE="DateTimeOriginal"
+  # Priority 5: MediaCreateDate (usually UTC)
   elif [[ -n "$MEDIA_CREATE_DATE" ]] && [[ "$MEDIA_CREATE_DATE" =~ [0-9] ]]; then
     timestamp="$(echo "$MEDIA_CREATE_DATE" | sed -E 's/([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*/\1/')"
     TIMESTAMP_SOURCE="MediaCreateDate"
+  # Priority 6: File timestamps
   elif [[ -n "$FILE_BIRTHTIME" ]]; then
     timestamp="$FILE_BIRTHTIME"
     TIMESTAMP_SOURCE="file birthtime"
@@ -184,47 +202,6 @@ expand_path_template() {
   echo "$expanded"
 }
 
-# Get timestamp comparison data for analysis
-# Returns structured data about file vs metadata timestamps
-get_timestamp_comparison() {
-  local file="$1"
-  
-  # Get all timestamps
-  get_file_timestamps "$file"
-  
-  local file_timestamp="$FILE_BIRTHTIME"
-  local metadata_timestamp=""
-  local metadata_source=""
-  local differs="false"
-  
-  # Determine which metadata has value
-  if [[ -n "$DATETIME_ORIGINAL" ]] && [[ "$DATETIME_ORIGINAL" =~ [0-9] ]]; then
-    metadata_timestamp="$(echo "$DATETIME_ORIGINAL" | sed -E 's/([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*/\1/')"
-    metadata_source="DateTimeOriginal"
-  elif [[ -n "$MEDIA_CREATE_DATE" ]] && [[ "$MEDIA_CREATE_DATE" =~ [0-9] ]]; then
-    metadata_timestamp="$(echo "$MEDIA_CREATE_DATE" | sed -E 's/([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*/\1/')"
-    metadata_source="MediaCreateDate"
-  fi
-  
-  # Check if file date and metadata differ significantly
-  if [[ -n "$file_timestamp" && -n "$metadata_timestamp" ]]; then
-    local file_date_only="${file_timestamp:0:10}"
-    local meta_date_only="${metadata_timestamp:0:10}"
-    
-    # Check if file date is 1980 (common reset date) or differs from metadata
-    if [[ "$file_date_only" == "1980:01:01" ]] || [[ "$file_date_only" != "$meta_date_only" ]]; then
-      differs="true"
-    fi
-  fi
-  
-  # Use file mtime as fallback if no birthtime
-  if [[ -z "$file_timestamp" && -n "$FILE_MTIME" ]]; then
-    file_timestamp="$FILE_MTIME"
-  fi
-  
-  # Output structured data (pipe-separated for easy parsing)
-  echo "${file_timestamp}|${metadata_timestamp}|${metadata_source}|${differs}"
-}
 
 # Calculate time difference between two timestamps in seconds
 # Returns: difference_in_seconds|status
@@ -301,33 +278,73 @@ calculate_timestamp_delta_seconds() {
   echo "$diff|calculated"
 }
 
-# Determine what changes are needed
-# Returns description of the change needed
+# Determine what changes are needed using raw timestamp data
+# Usage: determine_change_needed file_timestamp corrected_timestamp_with_tz
 determine_change_needed() {
-  local original="$1"       # Original timestamp display (may include "file vs metadata")
-  local corrected="$2"      # Corrected timestamp with timezone
+  local file_timestamp="$1"     # Raw file timestamp (from FILE_BIRTHTIME or FILE_MTIME)
+  local corrected="$2"          # Corrected timestamp with timezone
   
-  # Handle special case where original shows file vs metadata difference
-  if [[ "$original" =~ \(file\).*vs.*\((DateTimeOriginal|MediaCreateDate)\) ]]; then
-    # Extract the file date and metadata date
-    local file_date="$(echo "$original" | sed -E 's/ \(file\).*$//')"
-    local meta_date="$(echo "$original" | sed -E 's/.*vs //' | sed -E 's/ \(.*$//')"
-    
-    # Extract corrected date without timezone
-    local corrected_date="${corrected:0:19}"
-    
-    # Determine what's being fixed and calculate delta
-    if [[ "$meta_date" == "$corrected_date" ]]; then
-      # Metadata is already correct, just fixing file timestamps
-      format_delta_result "$(calculate_timestamp_delta_seconds "$file_date" "$corrected")"
+  # Extract corrected date without timezone for comparison
+  local corrected_date="${corrected:0:19}"
+  
+  # Check if file timestamp needs updating
+  local file_needs_update=false
+  if [[ -n "$file_timestamp" && "$file_timestamp" != "$corrected_date" ]]; then
+    file_needs_update=true
+  fi
+  
+  # For now, focus on file timestamps. Metadata is usually correct when it's the source
+  if [[ "$file_needs_update" == true ]]; then
+    local result="$(calculate_timestamp_delta_seconds "$file_timestamp" "$corrected")"
+    IFS='|' read -r delta_sec status <<< "$result"
+    if [[ "$status" == "calculated" ]]; then
+      echo "$(format_delta_result "$result" | sed 's/^/File timestamps: /')"
     else
-      # Both metadata and file timestamps need fixing (filename differs from metadata)
-      format_delta_result "$(calculate_timestamp_delta_seconds "$meta_date" "$corrected")"
+      format_delta_result "$result"
     fi
   else
-    # Standard comparison - calculate delta from file creation date
-    local orig_clean="$(echo "$original" | sed -E 's/ \(.*\)$//')"
-    format_delta_result "$(calculate_timestamp_delta_seconds "$orig_clean" "$corrected")"
+    echo "No change"
+  fi
+}
+
+# Format timestamp comparison for display
+# Uses global variables set by get_file_timestamps
+format_original_timestamps() {
+  local file_timestamp="$FILE_BIRTHTIME"
+  [[ -z "$file_timestamp" && -n "$FILE_MTIME" ]] && file_timestamp="$FILE_MTIME"
+  
+  # Determine which metadata to show for comparison (what video tools typically read)
+  local metadata_timestamp=""
+  local metadata_source=""
+  
+  if [[ -n "$MEDIA_CREATE_DATE" ]] && [[ "$MEDIA_CREATE_DATE" =~ [0-9] ]]; then
+    metadata_timestamp="$(echo "$MEDIA_CREATE_DATE" | sed -E 's/([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*/\1/')"
+    metadata_source="MediaCreateDate"
+  elif [[ -n "$DATETIME_ORIGINAL" ]] && [[ "$DATETIME_ORIGINAL" =~ [0-9] ]]; then
+    metadata_timestamp="$(echo "$DATETIME_ORIGINAL" | sed -E 's/([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*/\1/')"
+    metadata_source="DateTimeOriginal"
+  elif [[ -n "$KEYS_CREATION_DATE" ]] && [[ "$KEYS_CREATION_DATE" =~ [0-9] ]]; then
+    metadata_timestamp="$(echo "$KEYS_CREATION_DATE" | sed -E 's/([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*/\1/')"
+    metadata_source="Keys:CreationDate"
+  fi
+  
+  # Format for display
+  if [[ -n "$file_timestamp" && -n "$metadata_timestamp" ]]; then
+    local file_date_only="${file_timestamp:0:10}"
+    local meta_date_only="${metadata_timestamp:0:10}"
+    
+    # Show both if they differ significantly or file is 1980
+    if [[ "$file_date_only" == "1980:01:01" ]] || [[ "$file_date_only" != "$meta_date_only" ]]; then
+      echo "$file_timestamp (file), $metadata_timestamp ($metadata_source)"
+    else
+      echo "$file_timestamp (file and $metadata_source match)"
+    fi
+  elif [[ -n "$file_timestamp" ]]; then
+    echo "$file_timestamp (file)"
+  elif [[ -n "$metadata_timestamp" ]]; then
+    echo "$metadata_timestamp ($metadata_source)"
+  else
+    echo "No timestamps found"
   fi
 }
 
@@ -369,9 +386,11 @@ format_delta_result() {
 # Timezone and utility functions
 # ============================================================================
 
-# CSV-based timezone lookup
+# CSV-based timezone lookup with DST support
+# Returns: offset|abbreviation (e.g., "+0200|CEST")
 get_timezone_for_country() {
   local input="$1"
+  local date_str="$2"  # Optional: date in format "2025:05:24 12:04:08"
   local country_code=""
   local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   local TIMEZONE_DIR="$SCRIPT_DIR/timezones"
@@ -395,24 +414,48 @@ get_timezone_for_country() {
     [[ -n "$country_code" ]] || return 1  # Country not found
   fi
   
-  # Step 2: Find current timezone for country code
-  # Get the most recent timezone entry for this country
-  local timezone_line="$(grep ",$country_code," "$timezone_csv" | tail -1)"
+  # Step 2: Find appropriate timezone for country code and date
+  local timezone_line=""
+  
+  if [[ -n "$date_str" ]]; then
+    # Convert date to epoch timestamp for comparison
+    local date_epoch
+    # Handle both formats: "2025:05:24 12:04:08" and "2025-05-24 12:04:08"
+    local normalized_date="$(echo "$date_str" | sed 's/:/-/g' | cut -d' ' -f1)"
+    date_epoch=$(date -j -f "%Y-%m-%d" "$normalized_date" "+%s" 2>/dev/null || date -d "$normalized_date" "+%s" 2>/dev/null || echo "0")
+    
+    if [[ "$date_epoch" -ne 0 ]]; then
+      # Find the active timezone for this date
+      timezone_line="$(awk -F',' -v cc="$country_code" -v ts="$date_epoch" \
+        '$2 == cc && $4 <= ts {line=$0} END {print line}' "$timezone_csv")"
+    fi
+  fi
+  
+  # Fallback to most recent entry if no date or date parsing failed
+  if [[ -z "$timezone_line" ]]; then
+    timezone_line="$(grep ",$country_code," "$timezone_csv" | tail -1)"
+  fi
+  
   [[ -n "$timezone_line" ]] || return 1  # No timezone data for country
   
-  # Step 3: Extract offset and convert to +HHMM format
+  # Step 3: Extract abbreviation and offset
+  local tz_abbrev="$(echo "$timezone_line" | cut -d',' -f3)"
   local offset_seconds="$(echo "$timezone_line" | cut -d',' -f5)"
   
   # Convert seconds to +HHMM format
+  local offset_str
   if [[ "$offset_seconds" -eq 0 ]]; then
-    echo "+0000"
+    offset_str="+0000"
   else
     local abs_seconds=$((offset_seconds < 0 ? -offset_seconds : offset_seconds))
     local hours=$((abs_seconds / 3600))
     local minutes=$(((abs_seconds % 3600) / 60))
     local sign=$([[ offset_seconds -lt 0 ]] && echo "-" || echo "+")
-    printf "%s%02d%02d" "$sign" "$hours" "$minutes"
+    offset_str="$(printf "%s%02d%02d" "$sign" "$hours" "$minutes")"
   fi
+  
+  # Return both offset and abbreviation
+  echo "${offset_str}|${tz_abbrev}"
 }
 
 # Get display string for location (includes country name if it's a code)
