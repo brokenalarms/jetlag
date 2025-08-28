@@ -89,7 +89,9 @@ get_file_timestamps() {
   if [[ "$metadata_output" =~ CreationDate[[:space:]]*:[[:space:]]*([-0-9: +:]+) ]]; then
     KEYS_CREATION_DATE="${BASH_REMATCH[1]}"
   fi
-  if [[ "$metadata_output" =~ ModifyDate[[:space:]]*:[[:space:]]*([-0-9: +:]+) ]]; then
+  # Match ModifyDate but not MediaModifyDate (use word boundary or start of line)
+  if [[ "$metadata_output" =~ ^ModifyDate[[:space:]]*:[[:space:]]*([-0-9: +:]+)$ ]] || \
+     [[ "$metadata_output" =~ $'\n'ModifyDate[[:space:]]*:[[:space:]]*([-0-9: +:]+)($|$'\n') ]]; then
     MODIFY_DATE="${BASH_REMATCH[1]}"
   fi
   
@@ -185,6 +187,11 @@ set_file_timestamps() {
     has_metadata_changes=1
   fi
   
+  # Set FileModifyDate/FileAccessDate with timezone (EXIF metadata fields)
+  exiftool_args+=("-FileModifyDate=$corrected_timestamp")
+  exiftool_args+=("-FileAccessDate=$corrected_timestamp")
+  has_metadata_changes=1
+  
   # Remove CreationDate if it exists (FCP misinterprets this field)
   if [[ -n "$KEYS_CREATION_DATE" ]]; then
     exiftool_args+=("-Keys:CreationDate=")
@@ -195,6 +202,33 @@ set_file_timestamps() {
   if [[ $has_metadata_changes -eq 1 ]]; then
     exiftool_args=("-overwrite_original" "${exiftool_args[@]}")
     exiftool -fast2 "${exiftool_args[@]}" "$file" >/dev/null 2>&1
+  fi
+  
+  return 0
+}
+
+# Update file system timestamps only
+# Usage: set_file_system_timestamps "/path/to/file.mp4" "2024:01:01 12:00:00+01:00"
+set_file_system_timestamps() {
+  local file="$1"
+  local corrected_timestamp="$2"
+  
+  # Convert the corrected timestamp with timezone to epoch seconds
+  # This ensures file system timestamps represent the correct moment in time
+  # Format: "2025:05:14 16:38:07+02:00" -> epoch seconds
+  local timestamp_for_date="$(echo "$corrected_timestamp" | sed -E 's/([0-9])([+-])([0-9]{2}):([0-9]{2})$/\1 \2\3\4/')"
+  local epoch_seconds="$(date -j -f "%Y:%m:%d %H:%M:%S %z" "$timestamp_for_date" "+%s" 2>/dev/null || echo "")"
+  
+  if [[ -n "$epoch_seconds" ]]; then
+    # Set file creation date (birth time) using epoch seconds
+    if local setfile_time="$(date -j -f "%s" "$epoch_seconds" "+%m/%d/%Y %H:%M:%S" 2>&1)"; then
+      SetFile -d "$setfile_time" "$file" 2>/dev/null || true
+    fi
+    
+    # Set file modification date using epoch seconds  
+    if local touch_time="$(date -j -f "%s" "$epoch_seconds" "+%Y%m%d%H%M.%S" 2>&1)"; then
+      touch -t "$touch_time" "$file" 2>/dev/null || true
+    fi
   fi
   
   return 0
@@ -402,17 +436,10 @@ format_original_timestamps() {
     metadata_source="Keys:CreationDate"
   fi
   
-  # Format for display
+  # Format for display - just show the raw data without trying to compare
+  # File timestamp is local timezone, MediaCreateDate is UTC - can't compare directly
   if [[ -n "$file_timestamp" && -n "$metadata_timestamp" ]]; then
-    local file_date_only="${file_timestamp:0:10}"
-    local meta_date_only="${metadata_timestamp:0:10}"
-    
-    # Show both if they differ significantly or file is 1980
-    if [[ "$file_date_only" == "1980:01:01" ]] || [[ "$file_date_only" != "$meta_date_only" ]]; then
-      echo "$file_timestamp (file), $metadata_timestamp ($metadata_source)"
-    else
-      echo "$file_timestamp (file and $metadata_source match)"
-    fi
+    echo "$file_timestamp (file), $metadata_timestamp ($metadata_source)"
   elif [[ -n "$file_timestamp" ]]; then
     echo "$file_timestamp (file)"
   elif [[ -n "$metadata_timestamp" ]]; then
@@ -566,8 +593,9 @@ get_location_display() {
 }
 
 # Fix timezone format from +HH:MM to +HHMM
-fix_colon_tz() {
-  echo "$1" | sed -E 's/([+-][0-9]{2}):?([0-9]{2})$/\1\2/'
+# Ensure timezone has colon format (+0200 -> +02:00, +02:00 stays +02:00)
+ensure_colon_tz() {
+  echo "$1" | sed -E 's/([+-][0-9]{2}):?([0-9]{2})$/\1:\2/'
 }
 
 # Convert local time with timezone to UTC

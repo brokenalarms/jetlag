@@ -86,14 +86,14 @@ get_tz_for_file() {
   
   # 1. Check DateTimeOriginal for timezone (authoritative source)
   if [[ -n "$DATETIME_ORIGINAL" ]] && [[ "$DATETIME_ORIGINAL" =~ [+-][0-9]{2}:?[0-9]{2}$ ]] && [[ $force_timezone -eq 0 ]]; then
-    local tz="$(fix_colon_tz "$(echo "$DATETIME_ORIGINAL" | grep -oE '[+-][0-9]{2}:?[0-9]{2}$')")"
+    local tz="$(ensure_colon_tz "$(echo "$DATETIME_ORIGINAL" | grep -oE '[+-][0-9]{2}:?[0-9]{2}$')")"
     echo "${tz}|DateTimeOriginal metadata|${tz}"
     return 0
   fi
   
   # 2. Check Keys:CreationDate for timezone (only if DateTimeOriginal doesn't have timezone)
   if [[ -n "$KEYS_CREATION_DATE" ]] && [[ "$KEYS_CREATION_DATE" =~ [+-][0-9]{2}:?[0-9]{2}$ ]] && [[ $force_timezone -eq 0 ]]; then
-    local tz="$(fix_colon_tz "$(echo "$KEYS_CREATION_DATE" | grep -oE '[+-][0-9]{2}:?[0-9]{2}$')")"
+    local tz="$(ensure_colon_tz "$(echo "$KEYS_CREATION_DATE" | grep -oE '[+-][0-9]{2}:?[0-9]{2}$')")"
     echo "${tz}|Keys:CreationDate metadata|${tz}"
     return 0
   fi
@@ -109,7 +109,7 @@ get_tz_for_file() {
       return 0
     fi
   elif [[ -n "$cli_tz" ]]; then
-    local tz="$(fix_colon_tz "$cli_tz")"
+    local tz="$(ensure_colon_tz "$cli_tz")"
     echo "${tz}|--timezone ${tz}|${tz}"
     return 0
   fi
@@ -164,12 +164,42 @@ process_video_file() {
   local original_display="$(format_original_timestamps)"
   log_verbose "  Original: $original_display"
   
-  # Determine what changes are needed using raw file timestamp
+  # Determine what changes are needed
+  # For file timestamps, we need to check if they represent the same moment in time
+  # Convert file timestamp to UTC for comparison
   local file_timestamp="$FILE_BIRTHTIME"
   [[ -z "$file_timestamp" && -n "$FILE_MTIME" ]] && file_timestamp="$FILE_MTIME"
-  local change_desc="$(determine_change_needed "$file_timestamp" "$corrected_timestamp")"
-  local needs_update=1
-  [[ "$change_desc" == "No change" ]] && needs_update=0
+  
+  local change_desc="No change"
+  local needs_update=0
+  local file_timestamp_needs_update=0
+  
+  # Check if file timestamp needs updating
+  if [[ -n "$file_timestamp" ]]; then
+    # File timestamp is in local timezone, add current timezone for conversion
+    local current_tz="$(date '+%z' | sed -E 's/([+-][0-9]{2})([0-9]{2})/\1:\2/')"
+    local file_ts_with_tz="${file_timestamp}${current_tz}"
+    local file_utc="$(to_utc "$file_ts_with_tz" 2>/dev/null || echo "")"
+    
+    # Compare UTC times
+    if [[ -n "$file_utc" ]] && [[ "$file_utc" != "$utc_time" ]]; then
+      # Calculate difference for display
+      local file_epoch=$(date -j -f "%Y:%m:%d %H:%M:%S" "${file_utc:0:19}" "+%s" 2>/dev/null || echo "0")
+      local corr_epoch=$(date -j -f "%Y:%m:%d %H:%M:%S" "${utc_time:0:19}" "+%s" 2>/dev/null || echo "0")
+      if [[ "$file_epoch" -ne 0 && "$corr_epoch" -ne 0 ]]; then
+        local diff=$(( (corr_epoch - file_epoch) / 3600 ))
+        if [[ $diff -ne 0 ]]; then
+          change_desc="File timestamps: ${diff}h"
+          needs_update=1
+          file_timestamp_needs_update=1
+        fi
+      fi
+    fi
+  else
+    change_desc="File timestamps: Setting from metadata"
+    needs_update=1
+    file_timestamp_needs_update=1
+  fi
   
   # Check if CreationDate needs updating (either FCP fix or restoration)
   # Check if CreateDate/ModifyDate need timezone fixing or CreationDate needs removal
@@ -230,35 +260,19 @@ process_video_file() {
   
   # Update metadata and file timestamps if changes needed and in apply mode
   if [[ $needs_update -eq 1 && $apply -eq 1 ]]; then
-    log_verbose "  Updating metadata..."
-    set_file_timestamps "$file" "$corrected_timestamp" "$utc_time"
-    
-    # Don't update file system timestamps - FCP reads metadata, not file timestamps
-    # Updating file timestamps can cause timezone confusion in FCP
-    if false && [[ "$change_desc" != "No change" ]]; then
-      log_verbose "  Updating file system timestamps..."
-      log_verbose "  Corrected timestamp for file system: $corrected_timestamp"
-      
-      # Convert timestamp for SetFile (MM/DD/YYYY HH:MM:SS format)
-      local setfile_time
-      if setfile_time="$(date -j -f "%Y:%m:%d %H:%M:%S %z" "$corrected_timestamp" "+%m/%d/%Y %H:%M:%S" 2>/dev/null)"; then
-        log_verbose "  SetFile timestamp: $setfile_time"
-        SetFile -d "$setfile_time" "$file" 2>/dev/null || true
-      else
-        log_verbose "  SetFile date conversion failed for: $corrected_timestamp"
-      fi
-      
-      # Convert timestamp for touch (YYYYMMDDHHMM.SS format)  
-      local touch_time
-      if touch_time="$(date -j -f "%Y:%m:%d %H:%M:%S %z" "$corrected_timestamp" "+%Y%m%d%H%M.%S" 2>/dev/null)"; then
-        log_verbose "  touch timestamp: $touch_time"
-        touch -t "$touch_time" "$file" 2>/dev/null || true
-      else
-        log_verbose "  touch date conversion failed for: $corrected_timestamp"
-      fi
+    # Update metadata if needed
+    if [[ -n "$metadata_change" ]]; then
+      log_verbose "  Updating metadata..."
+      set_file_timestamps "$file" "$corrected_timestamp" "$utc_time"
     fi
     
-    log_verbose "  ✅ Metadata updated"
+    # Update file timestamps if needed
+    if [[ $file_timestamp_needs_update -eq 1 ]]; then
+      log_verbose "  Updating file system timestamps..."
+      set_file_system_timestamps "$file" "$corrected_timestamp"
+    fi
+    
+    log_verbose "  ✅ Updates applied"
     echo "   ✅ Applied"
   fi
   
