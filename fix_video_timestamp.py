@@ -25,6 +25,8 @@ def remove_field(dt_with_tz: datetime) -> None:
 
 def same_local_time_current_tz(dt_with_tz: datetime) -> str:
     """Keep same local time as DateTimeOriginal for FCP compatibility"""
+    # File system timestamps can't store timezone, so just use the local time
+    # FCP will interpret this as local time in whatever timezone it's running
     return dt_with_tz.strftime('%Y:%m:%d %H:%M:%S')
 
 # Declarative field mapping - each field knows how it should relate to DateTimeOriginal
