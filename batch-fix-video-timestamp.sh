@@ -2,13 +2,12 @@
 # batch-fix-video-timestamps.sh  
 # Batch processes video files in current directory using fix-video-timestamp.sh
 # Supports: MP4, MOV, INSV (Insta360 raw), LRV (low-res video) files
-# Usage: ./batch-fix-video-timestamps.sh [--apply] [--only-insta] [--country COUNTRY | --timezone +HHMM] [--verbose]
+# Usage: ./batch-fix-video-timestamps.sh [--apply] [--only-insta] [--country COUNTRY | --timezone +HHMM]
 
 set -euo pipefail
 IFS=$'\n\t'
 
 apply=0
-verbose=0
 only_insta=0
 args=()
 
@@ -24,39 +23,14 @@ SINGLE_SCRIPT="$SCRIPT_DIR/fix-video-timestamp.sh"
 }
 
 # ---------- args ----------
+# Parse arguments - pass most through, but handle batch-specific ones
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --apply) 
-      apply=1
-      args+=("$1")
-      shift ;;
-    --verbose|-v) 
-      verbose=1
-      args+=("$1")
-      shift ;;
     --only-insta)
       only_insta=1
       shift ;;
-    --timezone)
-      args+=("$1")
-      shift
-      [[ $# -gt 0 ]] || { echo "ERROR: --timezone needs +HHMM or +HH:MM"; exit 1; }
-      args+=("$1")
-      shift ;;
-    --location)
-      args+=("$1")
-      shift
-      [[ $# -gt 0 ]] || { echo "ERROR: --location requires a location name/code"; exit 1; }
-      args+=("$1")
-      shift ;;
-    --country)
-      # Legacy support - map to --location
-      args+=("--location")
-      shift
-      [[ $# -gt 0 ]] || { echo "ERROR: --country requires a country name/code"; exit 1; }
-      args+=("$1")
-      shift ;;
-    --force-timezone)
+    --apply) 
+      apply=1
       args+=("$1")
       shift ;;
     --help|-h) 
@@ -64,15 +38,26 @@ while [[ $# -gt 0 ]]; do
       echo "Options:"
       echo "  --apply         Apply changes to all files (default: dry run)"
       echo "  --only-insta    Only process VID_* files (Insta360 videos)"
-      echo "  --verbose, -v   Show detailed processing info"  
+      echo ""
+      echo "All other options are passed through to fix-video-timestamp.sh:"
       echo "  --timezone TZ   Use specific timezone (+HHMM format)"
       echo "  --location NAME Use location name/code for timezone lookup"
-      echo "  --country NAME  [DEPRECATED] Use --location instead"
       echo "  --force-timezone Override existing timezone metadata"
       echo "  --help, -h      Show this help"
       exit 0 ;;
+    --timezone|--location|--country)
+      # Arguments that need a value
+      args+=("$1")
+      shift
+      [[ $# -gt 0 ]] || { echo "ERROR: $1 requires a value"; exit 1; }
+      args+=("$1")
+      shift ;;
+    --*)
+      # Pass through all other options
+      args+=("$1")
+      shift ;;
     *) 
-      echo "ERROR: Unknown option $1" >&2
+      echo "ERROR: Unexpected argument $1" >&2
       echo "Use --help for usage information" >&2
       exit 1 ;;
   esac

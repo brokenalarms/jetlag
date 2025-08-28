@@ -84,17 +84,17 @@ get_tz_for_file() {
   local file="$1"
   local date_str="$2"  # The timestamp we're processing
   
-  # 1. Check Keys:CreationDate for timezone (iPhone videos)
-  if [[ -n "$KEYS_CREATION_DATE" ]] && [[ "$KEYS_CREATION_DATE" =~ [+-][0-9]{2}:?[0-9]{2}$ ]] && [[ $force_timezone -eq 0 ]]; then
-    local tz="$(fix_colon_tz "$(echo "$KEYS_CREATION_DATE" | grep -oE '[+-][0-9]{2}:?[0-9]{2}$')")"
-    echo "${tz}|Keys:CreationDate metadata|${tz}"
-    return 0
-  fi
-  
-  # 2. Check DateTimeOriginal for timezone (Insta360 and other cameras)
+  # 1. Check DateTimeOriginal for timezone (authoritative source)
   if [[ -n "$DATETIME_ORIGINAL" ]] && [[ "$DATETIME_ORIGINAL" =~ [+-][0-9]{2}:?[0-9]{2}$ ]] && [[ $force_timezone -eq 0 ]]; then
     local tz="$(fix_colon_tz "$(echo "$DATETIME_ORIGINAL" | grep -oE '[+-][0-9]{2}:?[0-9]{2}$')")"
     echo "${tz}|DateTimeOriginal metadata|${tz}"
+    return 0
+  fi
+  
+  # 2. Check Keys:CreationDate for timezone (only if DateTimeOriginal doesn't have timezone)
+  if [[ -n "$KEYS_CREATION_DATE" ]] && [[ "$KEYS_CREATION_DATE" =~ [+-][0-9]{2}:?[0-9]{2}$ ]] && [[ $force_timezone -eq 0 ]]; then
+    local tz="$(fix_colon_tz "$(echo "$KEYS_CREATION_DATE" | grep -oE '[+-][0-9]{2}:?[0-9]{2}$')")"
+    echo "${tz}|Keys:CreationDate metadata|${tz}"
     return 0
   fi
   
@@ -171,23 +171,76 @@ process_video_file() {
   local needs_update=1
   [[ "$change_desc" == "No change" ]] && needs_update=0
   
+  # Check if CreationDate needs updating (either FCP fix or restoration)
+  # Check if CreateDate/ModifyDate need timezone fixing or CreationDate needs removal
+  local metadata_change=""
+  local createdate_has_tz=0
+  local modifydate_has_tz=0
+  local creation_exists=0
+  
+  # Check if CreateDate has timezone
+  if [[ -n "$CREATE_DATE" ]] && [[ "$CREATE_DATE" =~ [+-][0-9]{2}:?[0-9]{2}$ ]]; then
+    createdate_has_tz=1
+  fi
+  
+  # Check if ModifyDate has timezone
+  if [[ -n "$MODIFY_DATE" ]] && [[ "$MODIFY_DATE" =~ [+-][0-9]{2}:?[0-9]{2}$ ]]; then
+    modifydate_has_tz=1
+  fi
+  
+  # Check if CreationDate exists
+  if [[ -n "$KEYS_CREATION_DATE" ]]; then
+    creation_exists=1
+  fi
+  
+  # Determine what metadata changes are needed
+  if [[ $createdate_has_tz -eq 0 || $modifydate_has_tz -eq 0 || $creation_exists -eq 1 ]]; then
+    local changes=()
+    [[ $createdate_has_tz -eq 0 ]] && changes+=("CreateDate timezone")
+    [[ $modifydate_has_tz -eq 0 ]] && changes+=("ModifyDate timezone")
+    [[ $creation_exists -eq 1 ]] && changes+=("Remove CreationDate")
+    
+    metadata_change="Metadata: $(IFS=', '; echo "${changes[*]}")"
+    needs_update=1
+  fi
+  
   # Display comparison info
   printf "\033[36m🔍 %s\033[0m\n" "$base"
   printf "📅 Original : %s\n" "$original_display"
   printf "⏱️ Corrected: %s (from %s, tz: %s)\n" "$local_with_tz" "$dt_source" "$tz_source"
   printf "🌐 UTC      : %s UTC\n" "$utc_time"
   
-  # Show change status with dry run indicator if not applying
-  if [[ $needs_update -eq 1 && $apply -eq 0 ]]; then
-    printf "📊 Change   : %s (DRY RUN)\n" "$change_desc"
-  else
-    printf "📊 Change   : %s\n" "$change_desc"
+  # Combine file timestamp and metadata changes
+  local combined_change="$change_desc"
+  if [[ -n "$metadata_change" ]]; then
+    if [[ "$change_desc" == "No change" ]]; then
+      combined_change="$metadata_change"
+    else
+      combined_change="$change_desc, $metadata_change"
+    fi
   fi
   
-  # Update metadata if changes needed and in apply mode
+  # Show change status with dry run indicator if not applying
+  if [[ $needs_update -eq 1 && $apply -eq 0 ]]; then
+    printf "📊 Change   : %s (DRY RUN)\n" "$combined_change"
+  else
+    printf "📊 Change   : %s\n" "$combined_change"
+  fi
+  
+  
+  # Update metadata and file timestamps if changes needed and in apply mode
   if [[ $needs_update -eq 1 && $apply -eq 1 ]]; then
     log_verbose "  Updating metadata..."
     set_file_timestamps "$file" "$local_with_tz" "$utc_time"
+    
+    # Update file system timestamps only if they need changing
+    if [[ "$change_desc" != "No change" ]]; then
+      local local_time_no_tz="${local_with_tz:0:19}"
+      log_verbose "  Updating file system timestamps..."
+      SetFile -d "$(date -j -f "%Y:%m:%d %H:%M:%S" "$local_time_no_tz" "+%m/%d/%Y %H:%M:%S")" "$file" 2>/dev/null || true
+      touch -t "$(date -j -f "%Y:%m:%d %H:%M:%S" "$local_time_no_tz" "+%Y%m%d%H%M.%S")" "$file" 2>/dev/null || true
+    fi
+    
     log_verbose "  ✅ Metadata updated"
     echo "   ✅ Applied"
   fi

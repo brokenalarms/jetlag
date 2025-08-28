@@ -13,7 +13,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Initialize variables
 apply=0
-verbose=0
 source_dir=""
 target_dir=""
 
@@ -21,7 +20,6 @@ target_dir=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --apply) apply=1; shift ;;
-    --verbose|-v) verbose=1; shift ;;
     --source)
       shift
       [[ $# -gt 0 ]] || { echo "ERROR: --source requires a directory path"; exit 1; }
@@ -36,7 +34,6 @@ while [[ $# -gt 0 ]]; do
       echo "  --source DIR   Directory containing files to organize"
       echo "  --target DIR   Target directory for organized files"
       echo "  --apply           Apply changes (default: dry run)"
-      echo "  --verbose, -v     Show detailed processing info"
       echo "  --help, -h        Show this help"
       echo ""
       echo "Date extraction:"
@@ -52,11 +49,6 @@ done
 [[ -n "$source_dir" ]] || { echo "ERROR: --source is required" >&2; exit 1; }
 [[ -d "$source_dir" ]] || { echo "ERROR: Source directory not found: $source_dir" >&2; exit 1; }
 [[ -n "$target_dir" ]] || { echo "ERROR: --target is required" >&2; exit 1; }
-
-# Helper functions
-log_verbose() {
-  [[ $verbose -eq 1 ]] && echo "$@" >&2
-}
 
 # Display configuration
 echo "→ Source:  $source_dir"
@@ -97,7 +89,6 @@ for file in "${files[@]}"; do
   # Build arguments for single-file script
   args=("--target" "$target_dir")
   [[ $apply -eq 1 ]] && args+=("--apply")
-  [[ $verbose -eq 1 ]] && args+=("--verbose")
   
   # Call the single-file organize script
   if "$SCRIPT_DIR/organize-by-date.sh" "$file" "${args[@]}"; then

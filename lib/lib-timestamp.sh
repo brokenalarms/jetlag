@@ -30,6 +30,8 @@ get_file_timestamps() {
   MEDIA_CREATE_DATE=""
   KEYS_CREATION_DATE=""
   FILENAME_DATE=""
+  CREATE_DATE=""
+  MODIFY_DATE=""
   
   # Get file system timestamps
   FILE_BIRTHTIME="$(stat -f "%SB" -t "%Y:%m:%d %H:%M:%S" "$file" 2>/dev/null || true)"
@@ -63,7 +65,8 @@ get_file_timestamps() {
   # Get metadata timestamps with a single exiftool call
   # Use -s (not -s3) to get field names so we can identify which is which
   local metadata_output
-  metadata_output=$(exiftool -s -DateTimeOriginal -QuickTime:MediaCreateDate -Keys:CreationDate "$file" 2>/dev/null || true)
+  metadata_output=$(exiftool -s -DateTimeOriginal -QuickTime:MediaCreateDate -Keys:CreationDate -CreateDate -ModifyDate "$file" 2>/dev/null || true)
+  
   
   # Parse the metadata output
   if [[ "$metadata_output" =~ DateTimeOriginal[[:space:]]*:[[:space:]]*([-0-9: +:]+) ]]; then
@@ -72,8 +75,16 @@ get_file_timestamps() {
   if [[ "$metadata_output" =~ MediaCreateDate[[:space:]]*:[[:space:]]*([-0-9: +:]+) ]]; then
     MEDIA_CREATE_DATE="${BASH_REMATCH[1]}"
   fi
+  # Use more specific patterns to avoid conflicts  
+  if [[ "$metadata_output" =~ ^CreateDate[[:space:]]*:[[:space:]]*([-0-9: +:]+)$ ]] || \
+     [[ "$metadata_output" =~ $'\n'CreateDate[[:space:]]*:[[:space:]]*([-0-9: +:]+)($|$'\n') ]]; then
+    CREATE_DATE="${BASH_REMATCH[1]}"
+  fi
   if [[ "$metadata_output" =~ CreationDate[[:space:]]*:[[:space:]]*([-0-9: +:]+) ]]; then
     KEYS_CREATION_DATE="${BASH_REMATCH[1]}"
+  fi
+  if [[ "$metadata_output" =~ ModifyDate[[:space:]]*:[[:space:]]*([-0-9: +:]+) ]]; then
+    MODIFY_DATE="${BASH_REMATCH[1]}"
   fi
   
   return 0
@@ -93,25 +104,20 @@ get_best_timestamp() {
   local timestamp=""
   TIMESTAMP_SOURCE=""
   
-  # Priority 1: Keys:CreationDate with timezone (iPhone videos from Google Photos)
-  if [[ -n "$KEYS_CREATION_DATE" ]] && [[ "$KEYS_CREATION_DATE" =~ [+-][0-9]{2}:?[0-9]{2}$ ]]; then
-    # Has timezone, extract just the datetime part
-    timestamp="$(echo "$KEYS_CREATION_DATE" | sed -E 's/([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*/\1/')"
-    TIMESTAMP_SOURCE="Keys:CreationDate"
-  # Priority 2: DateTimeOriginal with timezone (Insta360 and other cameras)
-  elif [[ -n "$DATETIME_ORIGINAL" ]] && [[ "$DATETIME_ORIGINAL" =~ [+-][0-9]{2}:?[0-9]{2}$ ]]; then
+  # Priority 1: DateTimeOriginal with timezone (authoritative source)
+  if [[ -n "$DATETIME_ORIGINAL" ]] && [[ "$DATETIME_ORIGINAL" =~ [+-][0-9]{2}:?[0-9]{2}$ ]]; then
     # Has timezone, extract just the datetime part
     timestamp="$(echo "$DATETIME_ORIGINAL" | sed -E 's/([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*/\1/')"
     TIMESTAMP_SOURCE="DateTimeOriginal with timezone"
-  # Priority 3: Filename for VID/IMG/LRV files with parseable names
+  # Priority 2: Filename for VID/IMG/LRV files with parseable names (Insta360, etc.)
   elif [[ -n "$FILENAME_DATE" ]] && [[ "$base" =~ ^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6} ]]; then
     timestamp="$FILENAME_DATE"
     TIMESTAMP_SOURCE="filename"
-  # Priority 4: DateTimeOriginal without timezone
+  # Priority 3: DateTimeOriginal without timezone
   elif [[ -n "$DATETIME_ORIGINAL" ]] && [[ "$DATETIME_ORIGINAL" =~ [0-9] ]]; then
     timestamp="$(echo "$DATETIME_ORIGINAL" | sed -E 's/([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*/\1/')"
     TIMESTAMP_SOURCE="DateTimeOriginal"
-  # Priority 5: MediaCreateDate (usually UTC)
+  # Priority 4: MediaCreateDate (usually UTC)
   elif [[ -n "$MEDIA_CREATE_DATE" ]] && [[ "$MEDIA_CREATE_DATE" =~ [0-9] ]]; then
     timestamp="$(echo "$MEDIA_CREATE_DATE" | sed -E 's/([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*/\1/')"
     TIMESTAMP_SOURCE="MediaCreateDate"
@@ -128,25 +134,58 @@ get_best_timestamp() {
   return 0
 }
 
-# Set all timestamps for a file (metadata and file system)
+# Set timestamps for a file (metadata and file system) based on what needs updating
 # Usage: set_file_timestamps "/path/to/file.mp4" "2024:01:01 12:00:00+0100" "2024:01:01 11:00:00"
+# Note: Uses global variables from get_file_timestamps() to determine what needs updating
 set_file_timestamps() {
   local file="$1"
   local local_with_tz="$2"  # Local time with timezone (e.g., "2024:01:01 12:00:00+0100")
   local utc_time="$3"        # UTC time (e.g., "2024:01:01 11:00:00")
   
-  # Extract just the datetime without timezone for file system timestamps
+  # Extract just the datetime without timezone
   local local_time_no_tz="${local_with_tz:0:19}"
   
-  # Update metadata with a single exiftool call
-  exiftool -overwrite_original \
-    "-DateTimeOriginal=$local_with_tz" \
-    "-QuickTime:CreateDate=$utc_time" \
-    "-QuickTime:ModifyDate=$utc_time" \
-    "-FileModifyDate=$local_time_no_tz" "$file" >/dev/null 2>&1
+  # Build exiftool arguments array - only add changes that are needed
+  local exiftool_args=()
+  local has_metadata_changes=0
   
-  # Update macOS file creation date
-  SetFile -d "$(date -j -f "%Y:%m:%d %H:%M:%S" "$local_time_no_tz" "+%m/%d/%Y %H:%M:%S")" "$file" 2>/dev/null || true
+  # Set DateTimeOriginal if missing (preserves original shooting time with timezone)
+  if [[ -z "$DATETIME_ORIGINAL" ]]; then
+    exiftool_args+=("-DateTimeOriginal=$local_with_tz")
+    has_metadata_changes=1
+  fi
+  
+  # Set CreateDate with timezone if missing timezone
+  if [[ -n "$CREATE_DATE" ]] && ! [[ "$CREATE_DATE" =~ [+-][0-9]{2}:?[0-9]{2}$ ]]; then
+    exiftool_args+=("-CreateDate=$local_with_tz")
+    has_metadata_changes=1
+  elif [[ -z "$CREATE_DATE" ]]; then
+    # CreateDate is completely missing, set it
+    exiftool_args+=("-CreateDate=$local_with_tz")
+    has_metadata_changes=1
+  fi
+  
+  # Set ModifyDate with timezone if missing timezone
+  if [[ -n "$MODIFY_DATE" ]] && ! [[ "$MODIFY_DATE" =~ [+-][0-9]{2}:?[0-9]{2}$ ]]; then
+    exiftool_args+=("-ModifyDate=$local_with_tz")
+    has_metadata_changes=1
+  elif [[ -z "$MODIFY_DATE" ]]; then
+    # ModifyDate is completely missing, set it
+    exiftool_args+=("-ModifyDate=$local_with_tz")
+    has_metadata_changes=1
+  fi
+  
+  # Remove CreationDate if it exists (FCP misinterprets this field)
+  if [[ -n "$KEYS_CREATION_DATE" ]]; then
+    exiftool_args+=("-Keys:CreationDate=")
+    has_metadata_changes=1
+  fi
+  
+  # Only call exiftool if there are metadata changes to make
+  if [[ $has_metadata_changes -eq 1 ]]; then
+    exiftool_args=("-overwrite_original" "${exiftool_args[@]}")
+    exiftool "${exiftool_args[@]}" "$file" >/dev/null 2>&1
+  fi
   
   return 0
 }
@@ -224,18 +263,13 @@ calculate_timestamp_delta_seconds() {
   if [[ "$original" =~ [+-][0-9]{2}:?[0-9]{2}$ ]]; then
     orig_utc="$(to_utc "$original" 2>/dev/null || echo "")"
   else
-    # No timezone in original - extract just the datetime part
+    # No timezone in original - assume it's in current system timezone
     local orig_time_only="$(echo "$original" | sed -E 's/ \(.*\)$//')"
     
-    # Extract just the time portion from corrected (local time from filename)
-    local corrected_time_only="$(echo "$corrected" | sed -E 's/[+-][0-9]{2}:?[0-9]{2}$//')"
-    
-    if [[ "$orig_time_only" == "$corrected_time_only" ]]; then
-      # Original already shows local time, no change needed
-      echo "0|no_change"
-      return 0
-    else
-      # Original is different from filename time, likely UTC
+    # Convert original from current system timezone to UTC for proper comparison
+    orig_utc="$(to_utc "${orig_time_only}$(date +%z)" 2>/dev/null || echo "")"
+    if [[ -z "$orig_utc" ]]; then
+      # Fallback: assume original is already UTC if conversion fails
       orig_utc="$orig_time_only"
     fi
     
@@ -290,23 +324,47 @@ determine_change_needed() {
   local file_timestamp="$1"     # Raw file timestamp (from FILE_BIRTHTIME or FILE_MTIME)
   local corrected="$2"          # Corrected timestamp with timezone
   
-  # Extract corrected date without timezone for comparison
-  local corrected_date="${corrected:0:19}"
-  
-  # Check if file timestamp needs updating
-  local file_needs_update=false
-  if [[ -n "$file_timestamp" && "$file_timestamp" != "$corrected_date" ]]; then
-    file_needs_update=true
+  # Skip if no file timestamp available
+  if [[ -z "$file_timestamp" ]]; then
+    echo "File timestamps: Setting from metadata"
+    return 0
   fi
   
-  # For now, focus on file timestamps. Metadata is usually correct when it's the source
-  if [[ "$file_needs_update" == true ]]; then
-    local result="$(calculate_timestamp_delta_seconds "$file_timestamp" "$corrected")"
-    IFS='|' read -r delta_sec status <<< "$result"
-    if [[ "$status" == "calculated" ]]; then
-      echo "$(format_delta_result "$result" | sed 's/^/File timestamps: /')"
+  # Extract just the datetime part from the corrected timestamp for comparison
+  local corrected_local="${corrected:0:19}"
+  
+  # Extract datetime from file timestamp (remove timezone if present)
+  local file_time_clean="${file_timestamp:0:19}"
+  
+  # Simple comparison - if they differ by more than a minute, show the change
+  local file_epoch=$(date -j -f "%Y:%m:%d %H:%M:%S" "$file_time_clean" "+%s" 2>/dev/null || echo "0")
+  local corr_epoch=$(date -j -f "%Y:%m:%d %H:%M:%S" "$corrected_local" "+%s" 2>/dev/null || echo "0")
+  
+  if [[ "$file_epoch" -eq 0 || "$corr_epoch" -eq 0 ]]; then
+    echo "File timestamps: Setting from metadata"
+    return 0
+  fi
+  
+  local diff=$((corr_epoch - file_epoch))
+  local abs_diff=$((diff < 0 ? -diff : diff))
+  
+  # If difference is more than 60 seconds, show change needed
+  if [[ $abs_diff -gt 60 ]]; then
+    local hours=$((abs_diff / 3600))
+    local minutes=$(((abs_diff % 3600) / 60))
+    
+    if [[ $hours -gt 0 ]]; then
+      if [[ $diff -gt 0 ]]; then
+        echo "File timestamps: +${hours}h"
+      else
+        echo "File timestamps: -${hours}h"
+      fi
     else
-      format_delta_result "$result"
+      if [[ $diff -gt 0 ]]; then
+        echo "File timestamps: +${minutes}m"
+      else  
+        echo "File timestamps: -${minutes}m"
+      fi
     fi
   else
     echo "No change"

@@ -8,6 +8,7 @@
 4. **Template processing must validate required parameters and fail fast**
 5. **Path construction must handle trailing/leading slashes intelligently**
 6. **Separate data from presentation**: Pass raw data between functions, format only for display
+7. **exiftool** should be called once for get and once for set, caching data and then building back with variables - no multiple calls
 
 ## fix-video-timestamp.sh Business Logic
 
