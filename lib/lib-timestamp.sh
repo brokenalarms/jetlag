@@ -64,8 +64,9 @@ get_file_timestamps() {
   
   # Get metadata timestamps with a single exiftool call
   # Use -s (not -s3) to get field names so we can identify which is which
+  # Use -fast to skip some metadata parsing for better performance with large files
   local metadata_output
-  metadata_output=$(exiftool -s -DateTimeOriginal -QuickTime:MediaCreateDate -Keys:CreationDate -CreateDate -ModifyDate "$file" 2>/dev/null || true)
+  metadata_output=$(exiftool -fast2 -s -DateTimeOriginal -QuickTime:MediaCreateDate -Keys:CreationDate -CreateDate -ModifyDate "$file" 2>/dev/null || true)
   
   
   # Parse the metadata output
@@ -184,7 +185,7 @@ set_file_timestamps() {
   # Only call exiftool if there are metadata changes to make
   if [[ $has_metadata_changes -eq 1 ]]; then
     exiftool_args=("-overwrite_original" "${exiftool_args[@]}")
-    exiftool "${exiftool_args[@]}" "$file" >/dev/null 2>&1
+    exiftool -fast2 "${exiftool_args[@]}" "$file" >/dev/null 2>&1
   fi
   
   return 0
