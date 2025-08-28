@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # media-pipeline.sh
 # Orchestrates video timestamp fixing and organization into date-based folders
-# Usage: media-pipeline.sh --source-dir SOURCE --target-dir TARGET [--location LOCATION | --timezone +HHMM] [--apply]
+# Usage: media-pipeline.sh --source SOURCE --target TARGET [--location LOCATION | --timezone +HHMM] [--apply]
 # Processes all video files in SOURCE, fixes timestamps, then organizes by date into TARGET
 
 set -euo pipefail
@@ -9,6 +9,7 @@ IFS=$'\n\t'
 
 # Get script directory and load environment
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/lib-common.sh"
 source "$SCRIPT_DIR/lib/lib-timestamp.sh"
 load_env "$SCRIPT_DIR"
 
@@ -17,25 +18,23 @@ apply=0
 verbose=0
 source_dir="${MEDIA_PIPELINE_SOURCE:-}"
 target_dir="${MEDIA_PIPELINE_TARGET:-}"
+label=""
 location_args=()
 
-# Set default location if configured and no timezone args provided later
-if [[ -n "${MEDIA_PIPELINE_DEFAULT_LOCATION:-}" ]]; then
-  location_args=("--location" "$MEDIA_PIPELINE_DEFAULT_LOCATION")
-fi
+# No default location - always require CLI argument
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --apply) apply=1; shift ;;
     --verbose|-v) verbose=1; shift ;;
-    --source-dir)
+    --source)
       shift
-      [[ $# -gt 0 ]] || { echo "ERROR: --source-dir requires a directory path"; exit 1; }
+      [[ $# -gt 0 ]] || { echo "ERROR: --source requires a directory path"; exit 1; }
       source_dir="$1"; shift ;;
-    --target-dir)
+    --target)
       shift
-      [[ $# -gt 0 ]] || { echo "ERROR: --target-dir requires a directory path"; exit 1; }
+      [[ $# -gt 0 ]] || { echo "ERROR: --target requires a directory path"; exit 1; }
       target_dir="$1"; shift ;;
     --location)
       shift
@@ -45,16 +44,20 @@ while [[ $# -gt 0 ]]; do
       shift
       [[ $# -gt 0 ]] || { echo "ERROR: --timezone requires +HHMM format"; exit 1; }
       location_args=("--timezone" "$1"); shift ;;
+    --label)
+      shift
+      [[ $# -gt 0 ]] || { echo "ERROR: --label requires a label value"; exit 1; }
+      label="$1"; shift ;;
     --help|-h)
-      echo "Usage: media-pipeline.sh [--source-dir SOURCE] [--target-dir TARGET] [OPTIONS]"
+      echo "Usage: media-pipeline.sh [--source SOURCE] [--target TARGET] [OPTIONS]"
       echo "Options:"
-      echo "  --source-dir DIR   Directory containing video files to process"
+      echo "  --source DIR   Directory containing video files to process"
       echo "                     (default: \$MEDIA_PIPELINE_SOURCE)"
-      echo "  --target-dir DIR   Target directory for organized files"  
+      echo "  --target DIR   Target directory for organized files"  
       echo "                     (default: \$MEDIA_PIPELINE_TARGET)"
       echo "  --location NAME    Use location name/code for timezone lookup"
-      echo "                     (default: \$MEDIA_PIPELINE_DEFAULT_LOCATION)"
       echo "  --timezone TZ      Use specific timezone (+HHMM format)"
+      echo "  --label LABEL      Label for template substitution (required)"
       echo "  --apply           Apply changes (default: dry run)"
       echo "  --verbose, -v     Show detailed processing info"
       echo "  --help, -h        Show this help"
@@ -75,9 +78,19 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate arguments
-[[ -n "$source_dir" ]] || { echo "ERROR: --source-dir is required" >&2; exit 1; }
+[[ -n "$source_dir" ]] || { echo "ERROR: --source is required" >&2; exit 1; }
 [[ -d "$source_dir" ]] || { echo "ERROR: Source directory not found: $source_dir" >&2; exit 1; }
-[[ -n "$target_dir" ]] || { echo "ERROR: --target-dir is required" >&2; exit 1; }
+[[ -n "$target_dir" ]] || { echo "ERROR: --target is required" >&2; exit 1; }
+
+# Validate timezone/location provided
+if [[ ${#location_args[@]} -eq 0 ]]; then
+  echo "ERROR: --location or --timezone is required" >&2
+  echo "Use --location COUNTRY or --timezone +HHMM" >&2
+  exit 1
+fi
+
+# Validate label is provided
+[[ -n "$label" ]] || { echo "ERROR: --label is required" >&2; exit 1; }
 
 # Helper functions
 log_verbose() {
@@ -99,7 +112,7 @@ echo
 # Find all video files to process
 files=()
 while IFS= read -r -d '' file; do
-  files+=(\"$file\")
+  files+=("$file")
 done < <(find "$source_dir" -maxdepth 1 -type f \( -iname "*.mp4" -o -iname "*.mov" -o -iname "*.insv" -o -iname "*.lrv" \) -print0)
 
 total_files=${#files[@]}
@@ -148,19 +161,14 @@ for file in "${files[@]}" ; do
   echo "  📁 Organizing by date..."
   
   # Build arguments for organize-by-date.sh
-  org_args=("--target-dir" "$target_dir")
+  org_args=("--target" "$target_dir")
   [[ $apply -eq 1 ]] && org_args+=("--apply")
   [[ $verbose -eq 1 ]] && org_args+=("--verbose")
   
-  # Add template if configured
-  if [[ -n "${MEDIA_PIPELINE_TEMPLATE:-}" ]]; then
-    org_args+=("--template" "$MEDIA_PIPELINE_TEMPLATE")
-  fi
-  
-  # Add location from either CLI args or environment default
-  if [[ ${#location_args[@]} -gt 0 ]] && [[ "${location_args[0]}" == "--location" ]]; then
-    org_args+=("--location" "${location_args[1]}")
-  fi
+  # Build template with label substitution
+  local template="${MEDIA_PIPELINE_TEMPLATE:-{{YYYY-MM-DD}}}"
+  template="${template//\{\{label\}\}/$label}"
+  org_args+=("--template" "$template")
   
   if ! "$SCRIPT_DIR/organize-by-date.sh" "$file" "${org_args[@]}"; then
     echo "   ❌ Organization failed for $base"

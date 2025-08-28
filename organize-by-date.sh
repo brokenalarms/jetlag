@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # organize-by-date.sh
 # Organizes a single file into date-based directory structure
-# Usage: organize-by-date.sh FILE --target-dir TARGET_DIR [--apply]
+# Usage: organize-by-date.sh FILE --target TARGET_DIR [--apply]
 # Uses filename date patterns first, falls back to file timestamps
 
 set -euo pipefail
@@ -24,9 +24,9 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --apply) apply=1; shift ;;
     --verbose|-v) verbose=1; shift ;;
-    --target-dir)
+    --target)
       shift
-      [[ $# -gt 0 ]] || { echo "ERROR: --target-dir requires a directory path"; exit 1; }
+      [[ $# -gt 0 ]] || { echo "ERROR: --target requires a directory path"; exit 1; }
       target_dir="$1"; shift ;;
     --template)
       shift
@@ -37,9 +37,9 @@ while [[ $# -gt 0 ]]; do
       [[ $# -gt 0 ]] || { echo "ERROR: --location requires a location name"; exit 1; }
       location="$1"; shift ;;
     --help|-h)
-      echo "Usage: organize-by-date.sh FILE --target-dir TARGET_DIR [OPTIONS]"
+      echo "Usage: organize-by-date.sh FILE --target TARGET_DIR [OPTIONS]"
       echo "Options:"
-      echo "  --target-dir DIR    Target directory for organized files"
+      echo "  --target DIR    Target directory for organized files"
       echo "  --template TMPL     Path template (default: {{date}})"
       echo "                      Variables: {{year}}, {{date}}, {{location}}"
       echo "  --location LOC      Location name for {{location}} template variable"
@@ -57,7 +57,7 @@ done
 # Validate arguments
 [[ -n "$file" ]] || { echo "ERROR: FILE is required" >&2; exit 1; }
 [[ -f "$file" ]] || { echo "ERROR: File not found: $file" >&2; exit 1; }
-[[ -n "$target_dir" ]] || { echo "ERROR: --target-dir is required" >&2; exit 1; }
+[[ -n "$target_dir" ]] || { echo "ERROR: --target is required" >&2; exit 1; }
 
 # Helper functions
 log_verbose() {
@@ -82,8 +82,13 @@ process_file() {
   log_verbose "  Date: $file_date"
   
   # Apply template to create organized path
-  local template_path="${template:-{{date}}}"
-  local organized_path="$(expand_path_template "$template_path" "$file_date" "$location")"
+  local template_path
+  if [[ -n "$template" ]]; then
+    template_path="$template"
+  else
+    template_path="{{YYYY-MM-DD}}"
+  fi
+  local organized_path="$(expand_path_template "$template_path" "$file_date" "")"
   
   # Create target path
   local target_path="$target_dir/$organized_path"

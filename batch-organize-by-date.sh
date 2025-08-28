@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # batch-organize-by-date.sh
 # Organizes all files in a directory into date-based subdirectories
-# Usage: batch-organize-by-date.sh --source-dir SOURCE_DIR --target-dir TARGET_DIR [--apply]
+# Usage: batch-organize-by-date.sh --source SOURCE_DIR --target TARGET_DIR [--apply]
 # Uses filename date patterns first, falls back to creation time
 # DRY-RUN by default; moves files only when --apply is present.
 
@@ -22,19 +22,19 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --apply) apply=1; shift ;;
     --verbose|-v) verbose=1; shift ;;
-    --source-dir)
+    --source)
       shift
-      [[ $# -gt 0 ]] || { echo "ERROR: --source-dir requires a directory path"; exit 1; }
+      [[ $# -gt 0 ]] || { echo "ERROR: --source requires a directory path"; exit 1; }
       source_dir="$1"; shift ;;
-    --target-dir)
+    --target)
       shift
-      [[ $# -gt 0 ]] || { echo "ERROR: --target-dir requires a directory path"; exit 1; }
+      [[ $# -gt 0 ]] || { echo "ERROR: --target requires a directory path"; exit 1; }
       target_dir="$1"; shift ;;
     --help|-h)
-      echo "Usage: batch-organize-by-date.sh --source-dir SOURCE_DIR --target-dir TARGET_DIR [OPTIONS]"
+      echo "Usage: batch-organize-by-date.sh --source SOURCE_DIR --target TARGET_DIR [OPTIONS]"
       echo "Options:"
-      echo "  --source-dir DIR   Directory containing files to organize"
-      echo "  --target-dir DIR   Target directory for organized files"
+      echo "  --source DIR   Directory containing files to organize"
+      echo "  --target DIR   Target directory for organized files"
       echo "  --apply           Apply changes (default: dry run)"
       echo "  --verbose, -v     Show detailed processing info"
       echo "  --help, -h        Show this help"
@@ -49,9 +49,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate arguments
-[[ -n "$source_dir" ]] || { echo "ERROR: --source-dir is required" >&2; exit 1; }
+[[ -n "$source_dir" ]] || { echo "ERROR: --source is required" >&2; exit 1; }
 [[ -d "$source_dir" ]] || { echo "ERROR: Source directory not found: $source_dir" >&2; exit 1; }
-[[ -n "$target_dir" ]] || { echo "ERROR: --target-dir is required" >&2; exit 1; }
+[[ -n "$target_dir" ]] || { echo "ERROR: --target is required" >&2; exit 1; }
 
 # Helper functions
 log_verbose() {
@@ -95,7 +95,7 @@ for file in "${files[@]}"; do
   echo "[$processed/$total_files] Processing: $base"
   
   # Build arguments for single-file script
-  args=("--target-dir" "$target_dir")
+  args=("--target" "$target_dir")
   [[ $apply -eq 1 ]] && args+=("--apply")
   [[ $verbose -eq 1 ]] && args+=("--verbose")
   

@@ -152,23 +152,32 @@ get_file_date_for_organization() {
 }
 
 # Expand path template with file and location context
-# Usage: expand_path_template TEMPLATE FILE_DATE [LOCATION]
-# Template variables: {{year}}, {{date}}, {{location}}
+# Usage: expand_path_template TEMPLATE FILE_DATE [LABEL]
+# Template variables: {{YYYY}}, {{MM}}, {{MMM}}, {{DD}}, {{YYYY-MM-DD}}, {{label}}
 expand_path_template() {
   local template="$1"
   local file_date="$2"  # YYYY-MM-DD format
-  local location="${3:-}"
+  local label="${3:-}"
   
-  # Extract year from date (YYYY-MM-DD -> YYYY)
+  # Extract date components (YYYY-MM-DD)
   local year="${file_date:0:4}"
+  local month="${file_date:5:2}"
+  local day="${file_date:8:2}"
+  
+  # Month abbreviations array (1-based indexing)
+  local months=("" "Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec")
+  local month_abbr="${months[${month#0}]}"  # Remove leading zero for array index
   
   # Replace template variables
   local expanded="$template"
-  expanded="${expanded//\{\{year\}\}/$year}"
-  expanded="${expanded//\{\{date\}\}/$file_date}"
-  expanded="${expanded//\{\{location\}\}/$location}"
+  expanded="${expanded//\{\{YYYY\}\}/$year}"
+  expanded="${expanded//\{\{MM\}\}/$month}"
+  expanded="${expanded//\{\{MMM\}\}/$month_abbr}"
+  expanded="${expanded//\{\{DD\}\}/$day}"
+  expanded="${expanded//\{\{YYYY-MM-DD\}\}/$file_date}"
+  expanded="${expanded//\{\{label\}\}/$label}"
   
-  # Clean up any remaining empty location placeholders
+  # Clean up any remaining empty label placeholders
   expanded="${expanded//\/\//_}"
   expanded="${expanded%/}"
   
@@ -407,6 +416,22 @@ get_timezone_for_country() {
 }
 
 # Get display string for location (includes country name if it's a code)
+# Get country name for templating (full name only)
+get_country_name() {
+  local input="$1"
+  local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local TIMEZONE_DIR="$SCRIPT_DIR/timezones"
+  local country_csv="$TIMEZONE_DIR/country.csv"
+  
+  # If it's a 2-letter code, return full name
+  if [[ ${#input} -eq 2 ]]; then
+    local country_code="$(echo "$input" | tr '[:lower:]' '[:upper:]')"
+    grep "^$country_code," "$country_csv" 2>/dev/null | sed "s/^$country_code,//" | sed 's/^"//;s/"$//' || echo "$input"
+  else
+    echo "$input"
+  fi
+}
+
 get_location_display() {
   local input="$1"
   local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
