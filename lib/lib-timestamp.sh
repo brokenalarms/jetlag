@@ -239,17 +239,50 @@ set_file_system_timestamps() {
 get_file_date_for_organization() {
   local file="$1"
   
-  # Use get_best_timestamp to get the best timestamp, then extract date
-  local timestamp
-  if ! timestamp="$(get_best_timestamp "$file")"; then
+  # Use Python implementation to get DateTimeOriginal, then extract date
+  local datetime_original
+  datetime_original="$(python3 -c "
+import sys, subprocess, re
+from datetime import datetime, timezone
+
+file_path = sys.argv[1]
+
+# Read DateTimeOriginal using same logic as fix_video_timestamp.py
+try:
+    result = subprocess.run(['exiftool', '-fast2', '-s', '-DateTimeOriginal', file_path], 
+                          capture_output=True, text=True, check=True)
+    for line in result.stdout.strip().split('\n'):
+        if ':' in line:
+            key, value = line.split(':', 1)
+            if key.strip() == 'DateTimeOriginal':
+                dt_str = value.strip()
+                # Extract just the date part and convert format
+                if dt_str:
+                    date_part = dt_str.split(' ')[0]  # Get YYYY:MM:DD part
+                    print(date_part.replace(':', '-'))  # Convert to YYYY-MM-DD
+                    sys.exit(0)
+except:
+    pass
+
+# Fallback: try filename patterns
+import os
+base = os.path.basename(file_path)
+if re.match(r'^(VID|LRV|IMG)_([0-9]{8})_([0-9]{6})', base):
+    match = re.match(r'^(VID|LRV|IMG)_([0-9]{8})_([0-9]{6})', base)
+    date_str = match.group(2)
+    formatted_date = f'{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}'
+    print(formatted_date)
+    sys.exit(0)
+
+sys.exit(1)
+" "$file" 2>/dev/null)"
+  
+  if [[ -n "$datetime_original" ]]; then
+    echo "$datetime_original"
+    return 0
+  else
     return 1
   fi
-  
-  # Extract date portion (YYYY:MM:DD) and convert to YYYY-MM-DD
-  local date_str="${timestamp:0:4}-${timestamp:5:2}-${timestamp:8:2}"
-  
-  echo "$date_str"
-  return 0
 }
 
 # Expand path template with file and location context

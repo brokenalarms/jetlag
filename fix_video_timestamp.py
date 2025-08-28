@@ -23,6 +23,10 @@ def remove_field(dt_with_tz: datetime) -> None:
     """Mark field for removal"""
     return None
 
+def same_local_time_current_tz(dt_with_tz: datetime) -> str:
+    """Keep same local time as DateTimeOriginal for FCP compatibility"""
+    return dt_with_tz.strftime('%Y:%m:%d %H:%M:%S')
+
 # Declarative field mapping - each field knows how it should relate to DateTimeOriginal
 FIELD_TRANSFORMS: Dict[str, Callable[[datetime], Optional[str]]] = {
     "CreateDate": same_as_original,
@@ -30,6 +34,9 @@ FIELD_TRANSFORMS: Dict[str, Callable[[datetime], Optional[str]]] = {
     "MediaCreateDate": utc_from_date,
     "MediaModifyDate": utc_from_date,
     "Keys:CreationDate": remove_field,
+    # File system timestamps - show same local time as DateTimeOriginal for FCP compatibility
+    "FileModifyDate": same_local_time_current_tz,
+    "FileAccessDate": same_local_time_current_tz,
 }
 
 # FileModifyDate and FileAccessDate are file system timestamps, not EXIF metadata
@@ -172,14 +179,18 @@ def apply_exif_changes(file_path: str, changes: Dict[str, Optional[str]]) -> boo
         print(f"Error applying EXIF changes: {e}", file=sys.stderr)
         return False
 
-def set_file_system_timestamps(file_path: str, datetime_original: datetime) -> bool:
-    """Set file system timestamps to display original capture time in FCP"""
+def set_file_system_timestamps(file_path: str, expected_timestamp: str) -> bool:
+    """Set file system timestamps using pre-computed value"""
+    # Expected timestamp is already in the correct local time format: YYYY:MM:DD HH:MM:SS
     try:
+        # Parse the expected timestamp
+        dt = datetime.strptime(expected_timestamp, '%Y:%m:%d %H:%M:%S')
+        
         # For SetFile (MM/DD/YYYY HH:MM:SS)
-        setfile_time = datetime_original.strftime('%m/%d/%Y %H:%M:%S')
+        setfile_time = dt.strftime('%m/%d/%Y %H:%M:%S')
         
         # For touch (YYYYMMDDHHMM.SS)
-        touch_time = datetime_original.strftime('%Y%m%d%H%M.%S')
+        touch_time = dt.strftime('%Y%m%d%H%M.%S')
         
         # Apply file system timestamp changes
         subprocess.run(["SetFile", "-d", setfile_time, file_path], 
@@ -211,12 +222,9 @@ def calculate_expected_values(datetime_original: datetime) -> dict:
     """Calculate what all timestamp values should be"""
     expected = {}
     
-    # Apply field transforms
+    # Apply field transforms (includes both metadata and file system timestamps)
     for field, transform_func in FIELD_TRANSFORMS.items():
         expected[field] = transform_func(datetime_original)
-    
-    # Add expected file system timestamps (original capture time for FCP display)
-    expected["file_system_time"] = datetime_original.strftime('%Y:%m:%d %H:%M:%S')
     
     return expected
 
@@ -227,24 +235,25 @@ def determine_needed_changes(current_data: dict, expected_values: dict) -> dict:
         "file_timestamps": False
     }
     
-    # Check metadata fields
-    for field, expected in expected_values.items():
-        if field == "file_system_time":
-            continue
-            
-        current = current_data["exif"].get(field, "")
-        current_norm = normalize_exif_value(current)
-        expected_norm = normalize_exif_value(expected) if expected else ""
-        
-        if current_norm != expected_norm:
-            changes["metadata"][field] = expected
+    # File system timestamp fields
+    file_system_fields = {"FileModifyDate", "FileAccessDate"}
     
-    # Check file system timestamps
-    expected_fs_time = expected_values["file_system_time"]
-    current_fs = current_data["file_system"]
-    if (current_fs.get("birth", "") != expected_fs_time or 
-        current_fs.get("modify", "") != expected_fs_time):
-        changes["file_timestamps"] = True
+    # Check all fields declaratively
+    for field, expected in expected_values.items():
+        if field in file_system_fields:
+            # Check file system timestamps
+            current_fs = current_data["file_system"]
+            current_modify = current_fs.get("modify", "")
+            if current_modify != expected:
+                changes["file_timestamps"] = True
+        else:
+            # Check metadata fields
+            current = current_data["exif"].get(field, "")
+            current_norm = normalize_exif_value(current)
+            expected_norm = normalize_exif_value(expected) if expected else ""
+            
+            if current_norm != expected_norm:
+                changes["metadata"][field] = expected
     
     return changes
 
@@ -335,7 +344,8 @@ def fix_video_timestamps(file_path: str, dry_run: bool = False, verbose: bool = 
         success = apply_exif_changes(file_path, changes["metadata"])
     
     if success and changes["file_timestamps"]:
-        success = set_file_system_timestamps(file_path, datetime_original)
+        expected_file_timestamp = expected_values["FileModifyDate"]
+        success = set_file_system_timestamps(file_path, expected_file_timestamp)
     
     if success:
         print("   ✅ Applied")
