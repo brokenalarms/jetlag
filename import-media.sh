@@ -119,6 +119,7 @@ echo
 # Process files
 copied=0
 skipped=0
+failed=0
 planned=0
 current_date=$(date +%Y-%m-%d)
 renamed_dir=""
@@ -130,7 +131,7 @@ processed=0
 echo "Found $total_files file(s) to process"
 echo
 
-# Find all files in the directory
+# Process all files in the directory
 while IFS= read -r file; do
   base="$(basename "$file")"
   processed=$((processed+1))
@@ -139,27 +140,15 @@ while IFS= read -r file; do
   [[ "$base" == ".DS_Store" ]] && continue
   [[ "$base" == "Thumbs.db" ]] && continue
   
-  destfile="$DEST/$base"
-  
   if [[ $APPLY -eq 1 ]]; then
-    mkdir -p "$DEST"
+    echo "[$processed/$total_files] Processing: $base"
     
-    if [[ -e "$destfile" ]]; then
-      # File exists, check if same size first (faster than full compare)
-      src_size=$(stat -f "%z" "$file" 2>/dev/null || stat -c "%s" "$file" 2>/dev/null)
-      dst_size=$(stat -f "%z" "$destfile" 2>/dev/null || stat -c "%s" "$destfile" 2>/dev/null)
+    # Use organize-by-date.sh with --copy flag to handle copy + organization
+    if "$SCRIPT_DIR/organize-by-date.sh" "$file" --target "$DEST" --copy --apply; then
+      copy_result=$?
       
-      if [[ "$src_size" == "$dst_size" ]]; then
-        echo "[$processed/$total_files] ✓ Same size file exists at destination, skipping: $base"
-        skipped=$((skipped+1))
-      else
-        echo "[$processed/$total_files] ⚠️  Different size file exists, keeping source: $base"
-      fi
-    else
-      echo "[$processed/$total_files] Copying $base → $DEST/"
-      cp -p "$file" "$destfile"
-      # Verify copy was successful before moving source to renamed folder
-      if cmp -s "$file" "$destfile" 2>/dev/null; then
+      # If successfully copied (not skipped), move source to archive folder
+      if [[ $copy_result -ne 2 ]]; then
         # Create renamed directory after first successful copy if not exists
         if [[ -z "$renamed_dir" ]]; then
           # Use today's date for the renamed folder
@@ -170,11 +159,15 @@ while IFS= read -r file; do
         mv "$file" "$renamed_dir/$(basename "$file")"
         copied=$((copied+1))
       else
-        echo "  ⚠️  Copy verification failed, keeping source file in place"
+        # File was skipped (already exists with same size)
+        skipped=$((skipped+1))
       fi
+    else
+      echo "  ⚠️  Processing failed for: $base"
+      failed=$((failed+1))
     fi
   else
-    echo "[DRY] Would copy $base → $DEST/"
+    echo "[DRY] Would process and copy $base → $DEST/"
     planned=$((planned+1))
   fi
 done < <(find "$DIR" -type f ! -name ".*")
@@ -192,19 +185,16 @@ if [[ $APPLY -eq 1 ]]; then
     fi
   fi
   
-  if [[ $copied -gt 0 || $skipped -gt 0 ]]; then
+  if [[ $copied -gt 0 || $skipped -gt 0 || $failed -gt 0 ]]; then
     echo
     echo "✅ Import Summary:"
     [[ $copied -gt 0 ]] && echo "   - Copied: $copied file(s)"
     [[ $skipped -gt 0 ]] && echo "   - Skipped: $skipped file(s) (already exist with same size)"
+    [[ $failed -gt 0 ]] && echo "   - Failed: $failed file(s)"
     [[ -n "$renamed_dir" ]] && echo "   - Archived to: $renamed_dir"
     
-    # Now organize the copied files into date subfolders
-    if [[ $copied -gt 0 ]]; then
-      echo
-      echo "📁 Organizing imported files by date..."
-      "$SCRIPT_DIR/organize-by-date.sh" --dir "$DEST" --apply
-    fi
+    # Files are already organized by date via organize-by-date.sh --copy
+    echo "📁 Files have been organized by date during import."
   else
     echo "✅ No new files to copy"
   fi

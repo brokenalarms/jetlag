@@ -274,6 +274,17 @@ if re.match(r'^(VID|LRV|IMG)_([0-9]{8})_([0-9]{6})', base):
     print(formatted_date)
     sys.exit(0)
 
+# Final fallback: use file modification time for files without date patterns (like DJI_NNNN.MOV)
+try:
+    import os
+    mtime = os.path.getmtime(file_path)
+    file_date = datetime.fromtimestamp(mtime)
+    formatted_date = file_date.strftime('%Y-%m-%d')
+    print(formatted_date)
+    sys.exit(0)
+except:
+    pass
+
 sys.exit(1)
 " "$file" 2>/dev/null)"
   

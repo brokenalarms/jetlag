@@ -19,11 +19,13 @@ target_dir=""
 template=""
 location=""
 label=""
+copy_mode=0
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --apply) apply=1; shift ;;
+    --copy) copy_mode=1; shift ;;
     --verbose|-v) verbose=1; shift ;;
     --target)
       shift
@@ -45,6 +47,7 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: organize-by-date.sh FILE --target TARGET_DIR [OPTIONS]"
       echo "Options:"
       echo "  --target DIR    Target directory for organized files"
+      echo "  --copy          Copy file instead of moving (for import operations)"
       echo "  --template TMPL     Path template (default: {{YYYY-MM-DD}})"
       echo "                      Variables: {{YYYY}}, {{MM}}, {{DD}}, {{YYYY-MM-DD}}, {{label}}"
       echo "  --label LABEL       Label value for {{label}} template variable"
@@ -117,26 +120,56 @@ process_file() {
     dst_size=$(stat -f "%z" "$target_file" 2>/dev/null || stat -c "%s" "$target_file" 2>/dev/null)
     
     if [[ "$src_size" -eq "$dst_size" ]]; then
-      echo "✓ Duplicate file exists, removing source: $base → $organized_path/"
-      if [[ $apply -eq 1 ]]; then
-        rm "$file"
-        echo "   ✅ Source removed"
+      if [[ $copy_mode -eq 1 ]]; then
+        echo "✓ Same size file exists at destination, skipping: $base → $organized_path/"
+        return 2  # Special return code for "already exists, skipped"
       else
-        echo "   [DRY RUN] Would remove source"
+        echo "✓ Duplicate file exists, removing source: $base → $organized_path/"
+        if [[ $apply -eq 1 ]]; then
+          rm "$file"
+          echo "   ✅ Source removed"
+        else
+          echo "   [DRY RUN] Would remove source"
+        fi
+      fi
+    elif [[ "$dst_size" -lt "$src_size" ]]; then
+      echo "⚠️  Destination smaller than source, overwriting: $base → $organized_path/"
+      if [[ $apply -eq 1 ]]; then
+        mkdir -p "$target_path"
+        if [[ $copy_mode -eq 1 ]]; then
+          cp -p "$file" "$target_file"
+          echo "   ✅ Copied (overwrite)"
+        else
+          mv "$file" "$target_file"
+          echo "   ✅ Moved (overwrite)"
+        fi
+      else
+        echo "   [DRY RUN] Would overwrite smaller file"
       fi
     else
-      echo "⚠️  Target file exists with different size: $base → $organized_path/"
+      echo "⚠️  Destination larger than source, keeping destination: $base → $organized_path/"
       return 1
     fi
   else
-    # Move file to target
-    echo "📁 Moving: $base → $organized_path/"
-    if [[ $apply -eq 1 ]]; then
-      mkdir -p "$target_path"
-      mv "$file" "$target_file"
-      echo "   ✅ Moved"
+    # Copy or move file to target
+    if [[ $copy_mode -eq 1 ]]; then
+      echo "📁 Copying: $base → $organized_path/"
+      if [[ $apply -eq 1 ]]; then
+        mkdir -p "$target_path"
+        cp -p "$file" "$target_file"
+        echo "   ✅ Copied"
+      else
+        echo "   [DRY RUN] Would copy to $target_path/"
+      fi
     else
-      echo "   [DRY RUN] Would move to $target_path/"
+      echo "📁 Moving: $base → $organized_path/"
+      if [[ $apply -eq 1 ]]; then
+        mkdir -p "$target_path"
+        mv "$file" "$target_file"
+        echo "   ✅ Moved"
+      else
+        echo "   [DRY RUN] Would move to $target_path/"
+      fi
     fi
   fi
   
@@ -144,13 +177,31 @@ process_file() {
 }
 
 # Process the file
+result=0
 if process_file "$file"; then
+  result=$?
   if [[ $apply -eq 1 ]]; then
-    echo "✅ File organization complete - changes applied."
+    if [[ $copy_mode -eq 1 ]]; then
+      if [[ $result -eq 2 ]]; then
+        echo "✅ File already exists with same size - no copy needed."
+      else
+        echo "✅ File copy and organization complete - changes applied."
+      fi
+    else
+      echo "✅ File organization complete - changes applied."
+    fi
   else
-    echo "✅ File organization complete - DRY RUN (no changes made)."
+    if [[ $copy_mode -eq 1 ]]; then
+      echo "✅ File copy and organization complete - DRY RUN (no changes made)."
+    else
+      echo "✅ File organization complete - DRY RUN (no changes made)."
+    fi
   fi
 else
-  echo "❌ File organization failed."
+  if [[ $copy_mode -eq 1 ]]; then
+    echo "❌ File copy and organization failed."
+  else
+    echo "❌ File organization failed."
+  fi
   exit 1
 fi
