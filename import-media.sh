@@ -167,7 +167,8 @@ while IFS= read -r file; do
       failed=$((failed+1))
     fi
   else
-    echo "[DRY] Would process and copy $base → $DEST/"
+    # Run organize-by-date in dry run mode to show where file would go
+    "$SCRIPT_DIR/organize-by-date.sh" "$file" --target "$DEST" --copy
     planned=$((planned+1))
   fi
 done < <(find "$DIR" -type f ! -name ".*")

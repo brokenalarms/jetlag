@@ -121,30 +121,28 @@ process_file() {
     
     if [[ "$src_size" -eq "$dst_size" ]]; then
       if [[ $copy_mode -eq 1 ]]; then
-        echo "✓ Same size file exists at destination, skipping: $base → $organized_path/"
-        return 2  # Special return code for "already exists, skipped"
+        echo "✓ Skipped (already exists): $base → $organized_path/"
+        return 0
       else
-        echo "✓ Duplicate file exists, removing source: $base → $organized_path/"
         if [[ $apply -eq 1 ]]; then
           rm "$file"
-          echo "   ✅ Source removed"
+          echo "✅ Removed duplicate source: $base (exists at $organized_path/)"
         else
-          echo "   [DRY RUN] Would remove source"
+          echo "[DRY RUN] Would remove duplicate: $base (exists at $organized_path/)"
         fi
       fi
     elif [[ "$dst_size" -lt "$src_size" ]]; then
-      echo "⚠️  Destination smaller than source, overwriting: $base → $organized_path/"
       if [[ $apply -eq 1 ]]; then
         mkdir -p "$target_path"
         if [[ $copy_mode -eq 1 ]]; then
           cp -p "$file" "$target_file"
-          echo "   ✅ Copied (overwrite)"
+          echo "✅ Copied (replaced smaller): $base → $organized_path/"
         else
           mv "$file" "$target_file"
-          echo "   ✅ Moved (overwrite)"
+          echo "✅ Moved (replaced smaller): $base → $organized_path/"
         fi
       else
-        echo "   [DRY RUN] Would overwrite smaller file"
+        echo "[DRY RUN] Would overwrite smaller: $base → $target_path/"
       fi
     else
       echo "⚠️  Destination larger than source, keeping destination: $base → $organized_path/"
@@ -152,23 +150,20 @@ process_file() {
     fi
   else
     # Copy or move file to target
-    if [[ $copy_mode -eq 1 ]]; then
-      echo "📁 Copying: $base → $organized_path/"
-      if [[ $apply -eq 1 ]]; then
-        mkdir -p "$target_path"
+    if [[ $apply -eq 1 ]]; then
+      mkdir -p "$target_path"
+      if [[ $copy_mode -eq 1 ]]; then
         cp -p "$file" "$target_file"
-        echo "   ✅ Copied"
+        echo "✅ Copied: $base → $organized_path/"
       else
-        echo "   [DRY RUN] Would copy to $target_path/"
+        mv "$file" "$target_file"
+        echo "✅ Moved: $base → $organized_path/"
       fi
     else
-      echo "📁 Moving: $base → $organized_path/"
-      if [[ $apply -eq 1 ]]; then
-        mkdir -p "$target_path"
-        mv "$file" "$target_file"
-        echo "   ✅ Moved"
+      if [[ $copy_mode -eq 1 ]]; then
+        echo "[DRY RUN] Would copy: $base → $target_path/"
       else
-        echo "   [DRY RUN] Would move to $target_path/"
+        echo "[DRY RUN] Would move: $base → $target_path/"
       fi
     fi
   fi
@@ -177,31 +172,7 @@ process_file() {
 }
 
 # Process the file
-result=0
-if process_file "$file"; then
-  result=$?
-  if [[ $apply -eq 1 ]]; then
-    if [[ $copy_mode -eq 1 ]]; then
-      if [[ $result -eq 2 ]]; then
-        echo "✅ File already exists with same size - no copy needed."
-      else
-        echo "✅ File copy and organization complete - changes applied."
-      fi
-    else
-      echo "✅ File organization complete - changes applied."
-    fi
-  else
-    if [[ $copy_mode -eq 1 ]]; then
-      echo "✅ File copy and organization complete - DRY RUN (no changes made)."
-    else
-      echo "✅ File organization complete - DRY RUN (no changes made)."
-    fi
-  fi
-else
-  if [[ $copy_mode -eq 1 ]]; then
-    echo "❌ File copy and organization failed."
-  else
-    echo "❌ File organization failed."
-  fi
+if ! process_file "$file"; then
+  echo "❌ Processing failed."
   exit 1
 fi
