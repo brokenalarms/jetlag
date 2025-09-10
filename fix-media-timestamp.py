@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Video timestamp fixing script - Python implementation
-Declaratively fixes video metadata timestamps for Final Cut Pro compatibility
+Media timestamp fixing script - Python implementation
+Declaratively fixes photo and video metadata timestamps
+Ensures file system timestamps match EXIF data for both photos and videos
 """
 
 import subprocess
@@ -302,8 +303,8 @@ def format_change_description(changes: dict) -> str:
     
     return ", ".join(parts)
 
-def fix_video_timestamps(file_path: str, dry_run: bool = False, verbose: bool = False) -> bool:
-    """Main function to fix video timestamps"""
+def fix_media_timestamps(file_path: str, dry_run: bool = False, verbose: bool = False) -> bool:
+    """Main function to fix media (photo/video) timestamps"""
     
     # Get all data
     current_data = get_all_timestamp_data(file_path)
@@ -365,22 +366,22 @@ def main():
     """Command line interface"""
     import argparse
     
-    parser = argparse.ArgumentParser(description='Fix video timestamps for Final Cut Pro')
-    parser.add_argument('file', help='Video file to process')
+    parser = argparse.ArgumentParser(description='Fix media timestamps - ensures file system timestamps match EXIF data')
+    parser.add_argument('file', help='Media file (photo or video) to process')
     parser.add_argument('--apply', action='store_true', help='Apply changes (default: dry run)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
     
     args = parser.parse_args()
     
-    success = fix_video_timestamps(args.file, dry_run=not args.apply, verbose=args.verbose)
+    success = fix_media_timestamps(args.file, dry_run=not args.apply, verbose=args.verbose)
     
     if success:
         if args.apply:
-            print("✅ Video timestamp processing complete - changes applied.")
+            print("✅ Media timestamp processing complete - changes applied.")
         else:
-            print("✅ Video timestamp processing complete - DRY RUN (no changes made).")
+            print("✅ Media timestamp processing complete - DRY RUN (no changes made).")
     else:
-        print("❌ Video timestamp processing failed.")
+        print("❌ Media timestamp processing failed.")
         return 1
     
     return 0
