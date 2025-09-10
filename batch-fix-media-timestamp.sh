@@ -1,8 +1,8 @@
 #!/bin/bash
-# batch-fix-video-timestamps.sh  
-# Batch processes video files in current directory using fix-video-timestamp.sh
-# Supports: MP4, MOV, INSV (Insta360 raw), LRV (low-res video) files
-# Usage: ./batch-fix-video-timestamps.sh [--apply] [--only-insta] [--country COUNTRY | --timezone +HHMM]
+# batch-fix-media-timestamps.sh  
+# Batch processes media files (photos and videos) in current directory using fix-media-timestamp.sh
+# Supports: Photos (JPG, JPEG, PNG, HEIC, RAW, etc.) and Videos (MP4, MOV, INSV, LRV, etc.)
+# Usage: ./batch-fix-media-timestamps.sh [--apply] [--only-insta] [--country COUNTRY | --timezone +HHMM]
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -15,8 +15,8 @@ args=()
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/lib-timestamp.sh"
 
-# Check if fix-video-timestamp.sh exists
-SINGLE_SCRIPT="$SCRIPT_DIR/fix-video-timestamp.sh"
+# Check if main file exists
+SINGLE_SCRIPT="$SCRIPT_DIR/fix-media-timestamp.sh"
 [[ -x "$SINGLE_SCRIPT" ]] || { 
   echo "ERROR: $SINGLE_SCRIPT not found or not executable" >&2
   exit 1
@@ -34,12 +34,12 @@ while [[ $# -gt 0 ]]; do
       args+=("$1")
       shift ;;
     --help|-h) 
-      echo "Usage: batch-fix-video-timestamps.sh [OPTIONS]"
+      echo "Usage: batch-fix-media-timestamps.sh [OPTIONS]"
       echo "Options:"
       echo "  --apply         Apply changes to all files (default: dry run)"
       echo "  --only-insta    Only process VID_* files (Insta360 videos)"
       echo ""
-      echo "All other options are passed through to fix-video-timestamp.sh:"
+      echo "All other options are passed through to fix-media-timestamp.sh:"
       echo "  --timezone TZ   Use specific timezone (+HHMM format)"
       echo "  --location NAME Use location name/code for timezone lookup"
       echo "  --force-timezone Override existing timezone metadata"
@@ -79,7 +79,7 @@ for (( i=0; i<${#args[@]}; i++ )); do
   fi
 done
 
-echo "🕓 Scanning video files..."
+echo "🕓 Scanning media files..."
 
 file_count=0
 processed_count=0
@@ -91,8 +91,16 @@ if [[ $only_insta -eq 1 ]]; then
   echo "📹 Looking for Insta360 videos (VID_* files only)"
   file_pattern="-name 'VID_*.mp4' -o -name 'VID_*.MP4' -o -name 'VID_*.mov' -o -name 'VID_*.MOV' -o -name 'VID_*.insv' -o -name 'VID_*.INSV' -o -name 'VID_*.lrv' -o -name 'VID_*.LRV'"
 else
-  echo "📹 Looking for all video files (*.mp4, *.mov, *.insv, *.lrv)"
-  file_pattern="-name '*.mp4' -o -name '*.MP4' -o -name '*.mov' -o -name '*.MOV' -o -name '*.insv' -o -name '*.INSV' -o -name '*.lrv' -o -name '*.LRV'"
+  echo "📹 Looking for all media files (photos and videos)"
+  # Common video extensions
+  file_pattern="-iname '*.mp4' -o -iname '*.mov' -o -iname '*.avi' -o -iname '*.mkv' -o -iname '*.m4v'"
+  file_pattern="$file_pattern -o -iname '*.insv' -o -iname '*.lrv'"
+  # Common photo extensions
+  file_pattern="$file_pattern -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png'"
+  file_pattern="$file_pattern -o -iname '*.heic' -o -iname '*.heif'"
+  # RAW photo formats
+  file_pattern="$file_pattern -o -iname '*.raw' -o -iname '*.arw' -o -iname '*.cr2' -o -iname '*.cr3'"
+  file_pattern="$file_pattern -o -iname '*.nef' -o -iname '*.dng' -o -iname '*.orf' -o -iname '*.rw2'"
 fi
 
 # Process files

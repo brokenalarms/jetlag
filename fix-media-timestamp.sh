@@ -7,7 +7,7 @@ set -euo pipefail
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_SCRIPT="$SCRIPT_DIR/fix_video_timestamp.py"
+PYTHON_SCRIPT="$SCRIPT_DIR/fix-media-timestamp.py"
 
 # Check if Python script exists
 if [[ ! -f "$PYTHON_SCRIPT" ]]; then
