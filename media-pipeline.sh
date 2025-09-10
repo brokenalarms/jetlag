@@ -108,7 +108,7 @@ echo
 files=()
 while IFS= read -r -d '' file; do
   files+=("$file")
-done < <(find "$source_dir" -maxdepth 1 -type f \( -iname "*.mp4" -o -iname "*.mov" -o -iname "*.insv" -o -iname "*.lrv" \) -print0)
+done < <(find "$source_dir" -type f \( -iname "*.mp4" -o -iname "*.mov" -o -iname "*.insv" -o -iname "*.lrv" \) -print0)
 
 total_files=${#files[@]}
 

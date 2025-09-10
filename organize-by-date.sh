@@ -48,8 +48,8 @@ while [[ $# -gt 0 ]]; do
       echo "Options:"
       echo "  --target DIR    Target directory for organized files"
       echo "  --copy          Copy file instead of moving (for import operations)"
-      echo "  --template TMPL     Path template (default: {{YYYY-MM-DD}})"
-      echo "                      Variables: {{YYYY}}, {{MM}}, {{DD}}, {{YYYY-MM-DD}}, {{label}}"
+      echo "  --template TMPL     Path template (default: {{YYYY}}/{{YYY}}-{{MM}}-{{DD}})"
+      echo "                      Variables: {{YYYY}}, {{MM}}, {{DD}}, {{label}}"
       echo "  --label LABEL       Label value for {{label}} template variable"
       echo "  --location LOC      Location name for {{location}} template variable (deprecated)"
       echo "  --apply            Apply changes (default: dry run)"
@@ -95,7 +95,7 @@ process_file() {
   if [[ -n "$template" ]]; then
     template_path="$template"
   else
-    template_path="{{YYYY-MM-DD}}"
+    template_path="{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
   fi
   local organized_path
   if ! organized_path="$(expand_path_template "$template_path" "$file_date" "$label")"; then
@@ -105,6 +105,12 @@ process_file() {
   # Create target path (handle trailing/leading slashes)
   local target_path="${target_dir%/}/${organized_path#/}"
   local target_file="$target_path/$base"
+  
+  # Debug: check for newlines
+  if [[ "$target_file" =~ $'\n' ]]; then
+    echo "DEBUG: target_file contains newline: [$target_file]" >&2
+    echo "DEBUG: target_dir=[$target_dir] organized_path=[$organized_path] base=[$base]" >&2
+  fi
   
   # Check if file is already in correct location
   if [[ "$(dirname "$(realpath "$file")")" == "$(realpath "$target_path" 2>/dev/null || echo "$target_path")" ]]; then
@@ -128,7 +134,7 @@ process_file() {
           rm "$file"
           echo "✅ Removed duplicate source: $base (exists at $organized_path/)"
         else
-          echo "[DRY RUN] Would remove duplicate: $base (exists at $organized_path/)"
+          echo "[DRY RUN] Would remove duplicate: $file (already at $target_file)"
         fi
       fi
     elif [[ "$dst_size" -lt "$src_size" ]]; then
@@ -142,7 +148,7 @@ process_file() {
           echo "✅ Moved (replaced smaller): $base → $organized_path/"
         fi
       else
-        echo "[DRY RUN] Would overwrite smaller: $base → $target_path/"
+        echo "[DRY RUN] Would overwrite smaller: $file → $target_file"
       fi
     else
       echo "⚠️  Destination larger than source, keeping destination: $base → $organized_path/"
@@ -161,9 +167,9 @@ process_file() {
       fi
     else
       if [[ $copy_mode -eq 1 ]]; then
-        echo "[DRY RUN] Would copy: $base → $target_path/"
+        printf "[DRY RUN] Would copy: %s → %s\n" "$file" "$target_file"
       else
-        echo "[DRY RUN] Would move: $base → $target_path/"
+        printf "[DRY RUN] Would move: %s → %s\n" "$file" "$target_file"
       fi
     fi
   fi

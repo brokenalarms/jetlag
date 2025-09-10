@@ -63,7 +63,7 @@ echo
 files=()
 while IFS= read -r -d '' file; do
   files+=("$file")
-done < <(find "$source_dir" -maxdepth 1 -type f ! -name ".*" -print0)
+done < <(find "$source_dir" -type f ! -name ".*" -print0)
 
 total_files=${#files[@]}
 
@@ -97,7 +97,6 @@ for file in "${files[@]}"; do
     failed=$((failed + 1))
     echo "   ❌ Failed to organize $base"
   fi
-  echo  # Empty line between files
 done
 
 # Summary
