@@ -110,7 +110,7 @@ if [[ "$DIR" =~ "- copied" ]]; then
 fi
 
 echo "→ Source:      $DIR/"
-echo "→ Destination: $DEST/"
+echo "→ Destination: ${DEST%/}/"
 echo "→ Mode:        $([[ $APPLY -eq 1 ]] && echo APPLY || echo 'DRY RUN (no changes)')"
 echo
 
