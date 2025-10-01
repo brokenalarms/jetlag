@@ -19,8 +19,8 @@ show_help() {
     echo ""
     echo "Configuration:"
     echo "  Sync paths are configured in .env.local:"
-    echo "    INSTA360_RAW_FOLDER     - Local Insta360 raw folder"
-    echo "    NAS_INSTA360_RAW_FOLDER - NAS destination folder"
+    echo "    INSTA360_IMPORT_FOLDER     - Local Insta360 raw folder"
+    echo "    NAS_INSTA360_IMPORT_FOLDER - NAS destination folder"
     echo "    NAS_USER                - NAS username"
     echo "    NAS_HOST                - NAS hostname"
     echo "    EXCLUSIONS_FILE         - File containing rsync exclusions (optional)"
@@ -49,16 +49,16 @@ DRY_RUN="${DRY_RUN:-1}"
 load_env "$SCRIPT_DIR" || exit 1
 
 # Validate required environment variables
-if [[ -z "${INSTA360_RAW_FOLDER:-}" || -z "${NAS_INSTA360_RAW_FOLDER:-}" || -z "${NAS_USER:-}" || -z "${NAS_HOST:-}" ]]; then
+if [[ -z "${INSTA360_IMPORT_FOLDER:-}" || -z "${NAS_INSTA360_IMPORT_FOLDER:-}" || -z "${NAS_USER:-}" || -z "${NAS_HOST:-}" ]]; then
     echo "ERROR: Missing required environment variables"
-    echo "Required: INSTA360_RAW_FOLDER, NAS_INSTA360_RAW_FOLDER, NAS_USER, NAS_HOST"
+    echo "Required: INSTA360_IMPORT_FOLDER, NAS_INSTA360_IMPORT_FOLDER, NAS_USER, NAS_HOST"
     echo "Check your .env.local file"
     exit 1
 fi
 
 # Set paths from environment
-SOURCE="$INSTA360_RAW_FOLDER"
-DEST="${NAS_USER}@${NAS_HOST}:${NAS_INSTA360_RAW_FOLDER}"
+SOURCE="$INSTA360_IMPORT_FOLDER"
+DEST="${NAS_USER}@${NAS_HOST}:${NAS_INSTA360_IMPORT_FOLDER}"
 EXCLUSIONS="${EXCLUSIONS_FILE:-${HOME}/.exclusions.txt}"
 
 # Validate source path exists

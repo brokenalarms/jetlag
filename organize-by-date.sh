@@ -68,6 +68,9 @@ done
 [[ -f "$file" ]] || { echo "ERROR: File not found: $file" >&2; exit 1; }
 [[ -n "$target_dir" ]] || { echo "ERROR: --target is required" >&2; exit 1; }
 
+# Expand tilde in target directory
+target_dir="${target_dir/#\~/$HOME}"
+
 # Helper functions
 log_verbose() {
   [[ $verbose -eq 1 ]] && echo "$@" >&2

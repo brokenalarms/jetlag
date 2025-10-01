@@ -15,6 +15,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 apply=0
 source_dir=""
 target_dir=""
+template=""
+label=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -28,11 +30,21 @@ while [[ $# -gt 0 ]]; do
       shift
       [[ $# -gt 0 ]] || { echo "ERROR: --target requires a directory path"; exit 1; }
       target_dir="$1"; shift ;;
+    --template)
+      shift
+      [[ $# -gt 0 ]] || { echo "ERROR: --template requires a template string"; exit 1; }
+      template="$1"; shift ;;
+    --label)
+      shift
+      [[ $# -gt 0 ]] || { echo "ERROR: --label requires a label value"; exit 1; }
+      label="$1"; shift ;;
     --help|-h)
       echo "Usage: batch-organize-by-date.sh --source SOURCE_DIR --target TARGET_DIR [OPTIONS]"
       echo "Options:"
-      echo "  --source DIR   Directory containing files to organize"
-      echo "  --target DIR   Target directory for organized files"
+      echo "  --source DIR      Directory containing files to organize"
+      echo "  --target DIR      Target directory for organized files"
+      echo "  --template TMPL   Path template (e.g., {{YYYY}}/{{label}}/{{YYYY}}-{{MM}}-{{DD}}/)"
+      echo "  --label LABEL     Label value for {{label}} template variable"
       echo "  --apply           Apply changes (default: dry run)"
       echo "  --help, -h        Show this help"
       echo ""
@@ -49,6 +61,10 @@ done
 [[ -n "$source_dir" ]] || { echo "ERROR: --source is required" >&2; exit 1; }
 [[ -d "$source_dir" ]] || { echo "ERROR: Source directory not found: $source_dir" >&2; exit 1; }
 [[ -n "$target_dir" ]] || { echo "ERROR: --target is required" >&2; exit 1; }
+
+# Expand tilde in paths
+source_dir="${source_dir/#\~/$HOME}"
+target_dir="${target_dir/#\~/$HOME}"
 
 # Display configuration
 echo "→ Source:  $source_dir"
@@ -88,6 +104,8 @@ for file in "${files[@]}"; do
   
   # Build arguments for single-file script
   args=("--target" "$target_dir")
+  [[ -n "$template" ]] && args+=("--template" "$template")
+  [[ -n "$label" ]] && args+=("--label" "$label")
   [[ $apply -eq 1 ]] && args+=("--apply")
   
   # Call the single-file organize script
