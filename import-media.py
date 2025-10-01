@@ -1,0 +1,419 @@
+#!/usr/bin/env python3
+"""
+Media import script with profile-based configuration and Finder tags
+Imports media files from source directories to organized destinations with date-based folders
+"""
+
+import subprocess
+import sys
+import os
+import json
+import yaml
+import shutil
+from pathlib import Path
+from datetime import datetime
+from typing import Dict, List, Optional, NamedTuple
+import argparse
+
+class ImportProfile(NamedTuple):
+    """Configuration profile for media import"""
+    destination: str
+    camera: str
+
+class ImportResult(NamedTuple):
+    """Result of importing a single file"""
+    success: bool
+    action: str  # "copied", "skipped", "failed"
+    source_path: str
+    dest_path: Optional[str] = None
+    error: Optional[str] = None
+
+def load_profiles(profile_path: str) -> Dict[str, ImportProfile]:
+    """Load import profiles from YAML or JSON file"""
+    try:
+        with open(profile_path, 'r') as f:
+            if profile_path.endswith('.yaml') or profile_path.endswith('.yml'):
+                data = yaml.safe_load(f)
+            else:
+                data = json.load(f)
+
+        profiles = {}
+        for name, config in data.get('profiles', data).items():
+            profiles[name] = ImportProfile(
+                destination=os.path.expandvars(config['destination']),
+                camera=config.get('camera', name)
+            )
+        return profiles
+    except Exception as e:
+        print(f"Error loading profiles from {profile_path}: {e}", file=sys.stderr)
+        return {}
+
+def get_default_profile_path() -> str:
+    """Get default profile file path"""
+    script_dir = Path(__file__).parent
+    for filename in ['media-profiles.yaml', 'media-profiles.yml', 'media-profiles.json']:
+        profile_path = script_dir / filename
+        if profile_path.exists():
+            return str(profile_path)
+    return str(script_dir / 'media-profiles.yaml')
+
+def apply_finder_tags(file_path: str, tags: List[str]) -> bool:
+    """Apply Finder tags to a file using macOS tag command"""
+    if not tags:
+        return True
+
+    try:
+        tag_list = ','.join(tags)
+        subprocess.run(['tag', '--add', tag_list, file_path],
+                      capture_output=True, check=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Failed to apply tags to {file_path}: {e}", file=sys.stderr)
+        return False
+
+def add_camera_to_exif(file_path: str, camera: str) -> bool:
+    """Add camera info to EXIF ImageDescription for Google Photos compatibility"""
+    if not camera:
+        return True
+
+    try:
+        subprocess.run([
+            'exiftool', '-overwrite_original',
+            f'-ImageDescription={camera}',
+            f'-UserComment={camera}',
+            file_path
+        ], capture_output=True, check=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Failed to add camera info to {file_path}: {e}", file=sys.stderr)
+        return False
+
+def organize_file(file_path: str, destination: str, copy_mode: bool = True, apply_changes: bool = False) -> ImportResult:
+    """Organize a single file using organize-by-date.sh"""
+    script_dir = Path(__file__).parent
+    organize_script = script_dir / 'organize-by-date.sh'
+
+    cmd = [str(organize_script), file_path, '--target', destination]
+    if copy_mode:
+        cmd.append('--copy')
+    if apply_changes:
+        cmd.append('--apply')
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+
+        # Parse the output to determine what happened
+        output = result.stdout.strip()
+        filename = os.path.basename(file_path)
+
+        if 'Skipped (already exists)' in output:
+            return ImportResult(True, "skipped", file_path)
+        elif 'Copied:' in output or 'Would copy:' in output:
+            # Extract destination path from output if possible
+            dest_path = None
+            for line in output.split('\n'):
+                if '→' in line and ('Copied:' in line or 'Would copy:' in line):
+                    # Try to extract the destination path
+                    parts = line.split('→')
+                    if len(parts) > 1:
+                        dest_part = parts[1].strip()
+                        if dest_part.endswith('/'):
+                            dest_path = os.path.join(dest_part, filename)
+                        else:
+                            dest_path = dest_part
+
+            action = "copied" if apply_changes else "would_copy"
+            return ImportResult(True, action, file_path, dest_path)
+        else:
+            return ImportResult(False, "failed", file_path, error="Unknown organize-by-date result")
+
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.decode() if e.stderr else str(e)
+        return ImportResult(False, "failed", file_path, error=error_msg)
+
+def find_source_directory(specified_dir: Optional[str]) -> str:
+    """Find source directory - either specified or auto-detect single unprocessed directory"""
+    if specified_dir:
+        if not os.path.isdir(specified_dir):
+            raise ValueError(f"Directory '{specified_dir}' not found")
+        return specified_dir
+
+    # Look for single unprocessed subdirectory
+    current_dir = Path.cwd()
+    candidates = []
+
+    for item in current_dir.iterdir():
+        if item.is_dir() and not item.name.startswith('.'):
+            # Skip already processed directories
+            if '- copied' not in item.name:
+                candidates.append(str(item))
+
+    if len(candidates) == 0:
+        raise ValueError("No unprocessed subdirectories found in current directory")
+    elif len(candidates) > 1:
+        raise ValueError(f"Multiple subdirectories found. Please specify which one:\n" +
+                        '\n'.join(f"  {os.path.basename(c)}" for c in candidates))
+
+    return candidates[0]
+
+def get_media_files(directory: str) -> List[str]:
+    """Get all media files from directory, excluding system files"""
+    media_files = []
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if file.startswith('.') or file in ['.DS_Store', 'Thumbs.db']:
+                continue
+            media_files.append(os.path.join(root, file))
+    return sorted(media_files)
+
+def create_archive_directory(original_dir: str, apply_changes: bool) -> Optional[str]:
+    """Create archive directory for processed files"""
+    if not apply_changes:
+        return None
+
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    archive_name = f"{os.path.basename(original_dir)} - copied {current_date}"
+    archive_path = os.path.join(os.path.dirname(original_dir), archive_name)
+
+    os.makedirs(archive_path, exist_ok=True)
+    return archive_path
+
+def archive_processed_file(file_path: str, archive_dir: Optional[str]) -> bool:
+    """Move processed file to archive directory"""
+    if not archive_dir:
+        return True
+
+    try:
+        filename = os.path.basename(file_path)
+        archive_file_path = os.path.join(archive_dir, filename)
+        shutil.move(file_path, archive_file_path)
+        return True
+    except Exception as e:
+        print(f"Warning: Failed to archive {file_path}: {e}", file=sys.stderr)
+        return False
+
+def cleanup_empty_directory(directory: str) -> None:
+    """Remove original directory if empty after processing"""
+    try:
+        # Check if directory is empty (ignoring hidden files)
+        remaining_files = get_media_files(directory)
+        if not remaining_files:
+            os.rmdir(directory)
+            print(f"Removed empty directory: {os.path.basename(directory)}")
+        else:
+            print(f"⚠️  Original folder '{os.path.basename(directory)}' still contains {len(remaining_files)} file(s)")
+    except OSError as e:
+        print(f"Note: Could not remove directory {directory}: {e}")
+
+def format_import_summary(results: List[ImportResult], archive_dir: Optional[str]) -> str:
+    """Format import summary from results"""
+    copied = sum(1 for r in results if r.action == "copied")
+    skipped = sum(1 for r in results if r.action == "skipped")
+    failed = sum(1 for r in results if r.action == "failed")
+
+    lines = []
+    if copied > 0:
+        lines.append(f"   - Copied: {copied} file(s)")
+    if skipped > 0:
+        lines.append(f"   - Skipped: {skipped} file(s) (already exist)")
+    if failed > 0:
+        lines.append(f"   - Failed: {failed} file(s)")
+    if archive_dir:
+        lines.append(f"   - Archived to: {os.path.basename(archive_dir)}")
+
+    return '\n'.join(lines)
+
+def import_media(source_dir: str, profile: ImportProfile, apply_changes: bool = False,
+                 additional_tags: Optional[List[str]] = None) -> List[ImportResult]:
+    """Main import function - processes all files in source directory"""
+
+    # Get all media files
+    media_files = get_media_files(source_dir)
+
+    if not media_files:
+        print("No media files found to process")
+        return []
+
+    print(f"Found {len(media_files)} file(s) to process")
+    print()
+
+    # Process files
+    results = []
+    archive_dir = None
+
+    for i, file_path in enumerate(media_files, 1):
+        filename = os.path.basename(file_path)
+
+        if apply_changes:
+            print(f"[{i}/{len(media_files)}] Processing: {filename}")
+
+        # Organize the file
+        result = organize_file(file_path, profile.destination, copy_mode=True, apply_changes=apply_changes)
+        results.append(result)
+
+        if not result.success:
+            if result.error:
+                print(f"  ⚠️  Processing failed: {result.error}")
+            continue
+
+        # Apply camera info to EXIF and tags if file was successfully copied
+        if apply_changes and result.action == "copied" and result.dest_path:
+            if profile.camera:
+                add_camera_to_exif(result.dest_path, profile.camera)
+            if additional_tags:
+                apply_finder_tags(result.dest_path, additional_tags)
+
+        # Archive source file if successfully copied
+        if apply_changes and result.action == "copied":
+            if not archive_dir:
+                archive_dir = create_archive_directory(source_dir, apply_changes)
+                if archive_dir:
+                    print(f"Created archive folder: {os.path.basename(archive_dir)}")
+
+            archive_processed_file(file_path, archive_dir)
+
+    return results
+
+def main():
+    """Command line interface"""
+    parser = argparse.ArgumentParser(
+        description='Import media files with profile-based configuration and Finder tags',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s --profile insta360 --apply
+  %(prog)s --profile gopro DCIM --apply
+  %(prog)s DJI_0001 --dest '/Volumes/Backup/DJI/Import' --camera 'dji-mini-4-pro' --tags 'Drone' --apply
+        """
+    )
+
+    parser.add_argument('source_dir', nargs='?',
+                       help='Source directory (auto-detected if only one subdirectory exists)')
+    parser.add_argument('--profile',
+                       help='Profile name from configuration file')
+    parser.add_argument('--dest', '--destination',
+                       help='Destination path (can use env variables)')
+    parser.add_argument('--camera',
+                       help='Camera identifier to add to EXIF ImageDescription')
+    parser.add_argument('--tags',
+                       help='Comma-separated Finder tags to apply (in addition to camera info)')
+    parser.add_argument('--profiles-file',
+                       help='Path to profiles configuration file')
+    parser.add_argument('--apply', action='store_true',
+                       help='Apply changes (default: dry run)')
+    parser.add_argument('--list-profiles', action='store_true',
+                       help='List available profiles and exit')
+
+    args = parser.parse_args()
+
+    # Load profiles
+    profiles_file = args.profiles_file or get_default_profile_path()
+    profiles = load_profiles(profiles_file)
+
+    if args.list_profiles:
+        if profiles:
+            print("Available profiles:")
+            for name, profile in profiles.items():
+                print(f"  {name:12} → {profile.destination}")
+                print(f"{'':14} camera: {profile.camera}")
+        else:
+            print("No profiles found")
+            print(f"Create a profiles file at: {profiles_file}")
+        return 0
+
+    # Determine profile or manual configuration
+    if args.profile:
+        if args.profile not in profiles:
+            print(f"Error: Profile '{args.profile}' not found", file=sys.stderr)
+            print(f"Available profiles: {', '.join(profiles.keys())}", file=sys.stderr)
+            return 1
+        profile = profiles[args.profile]
+    elif args.dest:
+        # Manual configuration
+        if not args.camera:
+            print("Error: --camera is required when using --dest", file=sys.stderr)
+            return 1
+        dest = os.path.expandvars(args.dest)
+        profile = ImportProfile(destination=dest, camera=args.camera)
+    else:
+        print("Error: Either --profile or --dest is required", file=sys.stderr)
+        print("Use --list-profiles to see available profiles", file=sys.stderr)
+        return 1
+
+    # Find source directory
+    try:
+        source_dir = find_source_directory(args.source_dir)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    # Check if already processed
+    if '- copied' in os.path.basename(source_dir):
+        response = input(f"Directory '{os.path.basename(source_dir)}' appears already processed. Continue? (y/N) ")
+        if not response.lower().startswith('y'):
+            return 0
+
+    # Parse additional tags
+    additional_tags = args.tags.split(',') if args.tags else None
+
+    # Display configuration
+    print(f"→ Source:      {source_dir}")
+    print(f"→ Destination: {profile.destination}")
+    if profile.camera:
+        print(f"→ Camera:      {profile.camera}")
+    if additional_tags:
+        print(f"→ Tags:        {', '.join(additional_tags)}")
+    print(f"→ Mode:        {'APPLY' if args.apply else 'DRY RUN (no changes)'}")
+    print()
+
+    # Import media
+    results = import_media(source_dir, profile, apply_changes=args.apply,
+                          additional_tags=additional_tags)
+
+    if not results:
+        return 0
+
+    print()
+
+    # Handle post-processing for apply mode
+    if args.apply:
+        archive_dir = None
+        copied_count = sum(1 for r in results if r.action == "copied")
+
+        if copied_count > 0:
+            # Find archive directory (should have been created during processing)
+            current_date = datetime.now().strftime('%Y-%m-%d')
+            expected_archive = f"{os.path.basename(source_dir)} - copied {current_date}"
+            archive_path = os.path.join(os.path.dirname(source_dir), expected_archive)
+            if os.path.exists(archive_path):
+                archive_dir = archive_path
+
+        # Clean up empty source directory
+        if archive_dir:
+            cleanup_empty_directory(source_dir)
+
+        # Display summary
+        if any(r.action in ["copied", "skipped"] for r in results):
+            print("✅ Import Summary:")
+            print(format_import_summary(results, archive_dir))
+            print("📁 Files have been organized by date during import.")
+        else:
+            print("✅ No new files to copy")
+    else:
+        # Dry run summary
+        would_copy = sum(1 for r in results if r.action == "would_copy")
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        new_name = f"{os.path.basename(source_dir)} - copied {current_date}"
+
+        print(f"🧪 Dry run complete. Would process {would_copy} file(s)")
+        if would_copy > 0:
+            print(f"   Would create archive: '{new_name}'")
+            print(f"   Would remove original: '{os.path.basename(source_dir)}'")
+            print("   Files would be organized into date folders")
+        print()
+        print("   Re-run with --apply to execute")
+
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

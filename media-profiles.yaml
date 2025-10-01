@@ -1,0 +1,16 @@
+profiles:
+  insta360:
+    destination: "/Volumes/Extreme GRN/Videos/Source Video/Insta360/Import/"
+    camera: "insta-360"
+
+  gopro:
+    destination: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Import"
+    camera: "gopro-hero-12"
+
+  dji:
+    destination: "/Volumes/Extreme GRN/Videos/Source Video/DJI/Import"
+    camera: "dji-mini-pro-4"
+
+  a7iv:
+    destination: "/Volumes/Photos/Import"
+    camera: "sony-a7iv"
