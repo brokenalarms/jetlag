@@ -12,6 +12,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/lib-common.sh"
 source "$SCRIPT_DIR/lib/lib-timestamp.sh"
 
+
 # Initialize variables
 apply_changes=0
 overwrite_in_place=0
@@ -136,110 +137,110 @@ needs_changes() {
 }
 
 # Process all matching files
-for ext in insv lrv mp4 mov INSV LRV MP4 MOV; do
-  while IFS= read -r -d '' file; do
-    # Check if file exists
-    [[ -f "$file" ]] || continue
-    
-    # Apply filter if specified
-    if [[ -n "$filter_prefix" ]]; then
-      [[ $file == *_${filter_prefix}* ]] || continue
-    fi
+while IFS= read -r -d '' file; do
+  # Check if file exists
+  [[ -f "$file" ]] || continue
 
-    # Parse filename components - support VID_, LRV_, IMG_ prefixes
-    prefix=""
-    orig_date=""
-    orig_time=""
-    sequence=""
-    base_name="$(basename "$file")"
-    
-    if [[ "$base_name" =~ ^(VID|LRV|IMG)_([0-9]{8})_([0-9]{6})_[0-9]{2}_([0-9]+)\. ]]; then
-      prefix="${BASH_REMATCH[1]}"
-      orig_date="${BASH_REMATCH[2]}"
-      orig_time="${BASH_REMATCH[3]}"
-      sequence="${BASH_REMATCH[4]}"
-    else
-      continue  # Skip files that don't match pattern
-    fi
+  # Apply filter if specified
+  if [[ -n "$filter_prefix" ]]; then
+    [[ $file == *_${filter_prefix}* ]] || continue
+  fi
+
+  # Parse filename components - support VID_, LRV_, IMG_ prefixes
+  prefix=""
+  orig_date=""
+  orig_time=""
+  sequence=""
+  file_ext=""
+  base_name="$(basename "$file")"
+
+  if [[ "$base_name" =~ ^(VID|LRV|IMG)_([0-9]{8})_([0-9]{6})_[0-9]{2}_([0-9]+)\.([a-zA-Z0-9]+)$ ]]; then
+    prefix="${BASH_REMATCH[1]}"
+    orig_date="${BASH_REMATCH[2]}"
+    orig_time="${BASH_REMATCH[3]}"
+    sequence="${BASH_REMATCH[4]}"
+    file_ext="${BASH_REMATCH[5]}"
+  else
+    continue  # Skip files that don't match pattern
+  fi
 
     # Calculate corrected timestamp
-    timestamp_input="${orig_date}${orig_time}"
-    epoch=$(date -j -f "%Y%m%d%H%M%S" "$timestamp_input" +%s 2>/dev/null) || {
-      echo "❌ Date parse failed: $file"
-      continue
-    }
+  timestamp_input="${orig_date}${orig_time}"
+  epoch=$(date -j -f "%Y%m%d%H%M%S" "$timestamp_input" +%s 2>/dev/null) || {
+    echo "❌ Date parse failed: $file"
+    continue
+  }
 
-    corrected_epoch=$((epoch + offset_sec))
-    new_date=$(date -j -r "$corrected_epoch" "+%Y%m%d")
-    new_time=$(date -j -r "$corrected_epoch" "+%H%M%S")
-    new_name="${prefix}_${new_date}_${new_time}_00_${sequence}.${ext}"
+  corrected_epoch=$((epoch + offset_sec))
+  new_date=$(date -j -r "$corrected_epoch" "+%Y%m%d")
+  new_time=$(date -j -r "$corrected_epoch" "+%H%M%S")
+  new_name="${prefix}_${new_date}_${new_time}_00_${sequence}.${file_ext}"
 
-    # Check if changes are needed
-    if ! needs_changes "$file" "$new_name"; then
-      if [[ $verbose -eq 1 ]]; then
-        echo "✅ $file (no changes needed)"
-      fi
-      skipped_count=$((skipped_count + 1))
-      continue
+  # Check if changes are needed
+  if ! needs_changes "$file" "$new_name"; then
+    if [[ $verbose -eq 1 ]]; then
+      echo "✅ $file (no changes needed)"
     fi
+    skipped_count=$((skipped_count + 1))
+    continue
+  fi
 
-    match_count=$((match_count + 1))
+  match_count=$((match_count + 1))
 
-    # Format for display
-    orig_display="${orig_date:0:4}-${orig_date:4:2}-${orig_date:6:2} ${orig_time:0:2}:${orig_time:2:2}:${orig_time:4:2}"
-    new_display="${new_date:0:4}-${new_date:4:2}-${new_date:6:2} ${new_time:0:2}:${new_time:2:2}:${new_time:4:2}"
+  # Format for display
+  orig_display="${orig_date:0:4}-${orig_date:4:2}-${orig_date:6:2} ${orig_time:0:2}:${orig_time:2:2}:${orig_time:4:2}"
+  new_display="${new_date:0:4}-${new_date:4:2}-${new_date:6:2} ${new_time:0:2}:${new_time:2:2}:${new_time:4:2}"
 
-    if [[ "$apply_changes" -eq 1 ]]; then
-      # Determine destination path
-      dest_file=""
-      if [[ "$overwrite_in_place" -eq 1 ]]; then
-        # Rename in the same directory as the original file
-        file_dir="$(dirname "$file")"
-        dest_file="$file_dir/$new_name"
-        echo "📄 $file → $dest_file"
-        mv "$file" "$dest_file"
-      else
-        # Preserve directory structure in corrected/
-        file_dir="$(dirname "$file")"
-        dest_dir="corrected/$file_dir"
-        mkdir -p "$dest_dir"
-        dest_file="$dest_dir/$new_name"
-        echo "📄 $file → $dest_file"
-        cp "$file" "$dest_file"
-      fi
-      
-      # Update all timestamps using the library functions
-      # First read existing timestamps to determine what needs updating
-      get_file_timestamps "$dest_file" || true
-
-      local_tz=$(date +%z)
-      corrected_with_tz="${new_date:0:4}:${new_date:4:2}:${new_date:6:2} ${new_time:0:2}:${new_time:2:2}:${new_time:4:2}${local_tz}"
-      utc_time=$(to_utc "$corrected_with_tz" || echo "")
-
-      if [[ -n "$utc_time" ]]; then
-        set_file_timestamps "$dest_file" "$corrected_with_tz" "$utc_time" || true
-      fi
-      
-      # Set file modification time
-      touch_timestamp="$(date -j -r "$corrected_epoch" "+%Y%m%d%H%M.%S")"
-      touch -t "$touch_timestamp" "$dest_file"
-      
-      # Set creation date using SetFile if available
-      if command -v SetFile >/dev/null 2>&1; then
-        SetFile -d "$(date -j -r "$corrected_epoch" "+%m/%d/%Y %H:%M:%S")" "$dest_file"
-      fi
+  if [[ "$apply_changes" -eq 1 ]]; then
+    # Determine destination path
+    dest_file=""
+    if [[ "$overwrite_in_place" -eq 1 ]]; then
+      # Rename in the same directory as the original file
+      file_dir="$(dirname "$file")"
+      dest_file="$file_dir/$new_name"
+      echo "📄 $file → $dest_file"
+      mv "$file" "$dest_file"
     else
-      # Dry run - show what would be done
-      if [[ "$overwrite_in_place" -eq 1 ]]; then
-        file_dir="$(dirname "$file")"
-        echo "📄 $file → $file_dir/$new_name (rename)"
-      else
-        file_dir="$(dirname "$file")"
-        echo "📄 $file → corrected/$file_dir/$new_name (copy)"
-      fi
+      # Preserve directory structure in corrected/
+      file_dir="$(dirname "$file")"
+      dest_dir="corrected/$file_dir"
+      mkdir -p "$dest_dir"
+      dest_file="$dest_dir/$new_name"
+      echo "📄 $file → $dest_file"
+      cp "$file" "$dest_file"
     fi
-  done < <(find . -name corrected -prune -o -name "*.$ext" -type f -print0)
-done
+
+    # Update all timestamps using the library functions
+    # First read existing timestamps to determine what needs updating
+    get_file_timestamps "$dest_file" || true
+
+    local_tz=$(date +%z)
+    corrected_with_tz="${new_date:0:4}:${new_date:4:2}:${new_date:6:2} ${new_time:0:2}:${new_time:2:2}:${new_time:4:2}${local_tz}"
+    utc_time=$(to_utc "$corrected_with_tz" || echo "")
+
+    if [[ -n "$utc_time" ]]; then
+      set_file_timestamps "$dest_file" "$corrected_with_tz" "$utc_time" || true
+    fi
+
+    # Set file modification time
+    touch_timestamp="$(date -j -r "$corrected_epoch" "+%Y%m%d%H%M.%S")"
+    touch -t "$touch_timestamp" "$dest_file"
+
+    # Set creation date using SetFile if available
+    if command -v SetFile >/dev/null 2>&1; then
+      SetFile -d "$(date -j -r "$corrected_epoch" "+%m/%d/%Y %H:%M:%S")" "$dest_file"
+    fi
+  else
+    # Dry run - show what would be done
+    if [[ "$overwrite_in_place" -eq 1 ]]; then
+      file_dir="$(dirname "$file")"
+      echo "📄 $file → $file_dir/$new_name (rename)"
+    else
+      file_dir="$(dirname "$file")"
+      echo "📄 $file → corrected/$file_dir/$new_name (copy)"
+    fi
+  fi
+done < <(find . -path ./corrected -prune -o \( -iname "VID_*.insv" -o -iname "VID_*.lrv" -o -iname "VID_*.mp4" -o -iname "VID_*.mov" -o -iname "LRV_*.insv" -o -iname "LRV_*.lrv" -o -iname "LRV_*.mp4" -o -iname "LRV_*.mov" -o -iname "IMG_*.insv" -o -iname "IMG_*.lrv" -o -iname "IMG_*.mp4" -o -iname "IMG_*.mov" \) -type f -print0 | sort -z)
 
 # Summary
 echo ""
