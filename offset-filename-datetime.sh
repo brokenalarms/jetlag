@@ -9,7 +9,7 @@ IFS=$'\n\t'
 
 # Get script directory and source libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../lib/lib-common.sh"
+source "$SCRIPT_DIR/lib/lib-common.sh"
 source "$SCRIPT_DIR/lib/lib-timestamp.sh"
 
 # Initialize variables
@@ -137,7 +137,7 @@ needs_changes() {
 
 # Process all matching files
 for ext in insv lrv mp4 mov INSV LRV MP4 MOV; do
-  for file in *.$ext; do
+  while IFS= read -r -d '' file; do
     # Check if file exists
     [[ -f "$file" ]] || continue
     
@@ -147,11 +147,11 @@ for ext in insv lrv mp4 mov INSV LRV MP4 MOV; do
     fi
 
     # Parse filename components - support VID_, LRV_, IMG_ prefixes
-    local prefix=""
-    local orig_date=""
-    local orig_time=""
-    local sequence=""
-    local base_name="$(basename "$file")"
+    prefix=""
+    orig_date=""
+    orig_time=""
+    sequence=""
+    base_name="$(basename "$file")"
     
     if [[ "$base_name" =~ ^(VID|LRV|IMG)_([0-9]{8})_([0-9]{6})_[0-9]{2}_([0-9]+)\. ]]; then
       prefix="${BASH_REMATCH[1]}"
@@ -191,24 +191,33 @@ for ext in insv lrv mp4 mov INSV LRV MP4 MOV; do
 
     if [[ "$apply_changes" -eq 1 ]]; then
       # Determine destination path
-      local dest_file=""
+      dest_file=""
       if [[ "$overwrite_in_place" -eq 1 ]]; then
-        dest_file="$new_name"
-        echo "📄 $file → $new_name"
-        mv "$file" "$new_name"
+        # Rename in the same directory as the original file
+        file_dir="$(dirname "$file")"
+        dest_file="$file_dir/$new_name"
+        echo "📄 $file → $dest_file"
+        mv "$file" "$dest_file"
       else
-        dest_file="corrected/$new_name"
+        # Preserve directory structure in corrected/
+        file_dir="$(dirname "$file")"
+        dest_dir="corrected/$file_dir"
+        mkdir -p "$dest_dir"
+        dest_file="$dest_dir/$new_name"
         echo "📄 $file → $dest_file"
         cp "$file" "$dest_file"
       fi
       
       # Update all timestamps using the library functions
-      local local_tz=$(date +%z)
-      local corrected_with_tz="${new_date:0:4}:${new_date:4:2}:${new_date:6:2} ${new_time:0:2}:${new_time:2:2}:${new_time:4:2}${local_tz}"
-      local utc_time=$(to_utc "$corrected_with_tz" 2>/dev/null || echo "")
-      
+      # First read existing timestamps to determine what needs updating
+      get_file_timestamps "$dest_file" || true
+
+      local_tz=$(date +%z)
+      corrected_with_tz="${new_date:0:4}:${new_date:4:2}:${new_date:6:2} ${new_time:0:2}:${new_time:2:2}:${new_time:4:2}${local_tz}"
+      utc_time=$(to_utc "$corrected_with_tz" || echo "")
+
       if [[ -n "$utc_time" ]]; then
-        set_file_timestamps "$dest_file" "$corrected_with_tz" "$utc_time"
+        set_file_timestamps "$dest_file" "$corrected_with_tz" "$utc_time" || true
       fi
       
       # Set file modification time
@@ -222,12 +231,14 @@ for ext in insv lrv mp4 mov INSV LRV MP4 MOV; do
     else
       # Dry run - show what would be done
       if [[ "$overwrite_in_place" -eq 1 ]]; then
-        echo "📄 $file → $new_name (rename)"
+        file_dir="$(dirname "$file")"
+        echo "📄 $file → $file_dir/$new_name (rename)"
       else
-        echo "📄 $file → corrected/$new_name (copy)"
+        file_dir="$(dirname "$file")"
+        echo "📄 $file → corrected/$file_dir/$new_name (copy)"
       fi
     fi
-  done
+  done < <(find . -name corrected -prune -o -name "*.$ext" -type f -print0)
 done
 
 # Summary

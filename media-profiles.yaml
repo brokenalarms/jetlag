@@ -2,15 +2,19 @@ profiles:
   insta360:
     destination: "/Volumes/Extreme GRN/Videos/Source Video/Insta360/Import/"
     camera: "insta-360"
+    companion_extensions: [".lrv", ".thm"]
 
   gopro:
     destination: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Import"
     camera: "gopro-hero-12"
+    companion_extensions: [".lrv", ".thm"]
 
   dji:
     destination: "/Volumes/Extreme GRN/Videos/Source Video/DJI/Import"
     camera: "dji-mini-pro-4"
+    companion_extensions: [".lrf", ".thm"]
 
   a7iv:
     destination: "/Volumes/Photos/Import"
     camera: "sony-a7iv"
+    companion_extensions: []

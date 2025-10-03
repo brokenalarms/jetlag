@@ -19,6 +19,7 @@ class ImportProfile(NamedTuple):
     """Configuration profile for media import"""
     destination: str
     camera: str
+    companion_extensions: Optional[List[str]] = None
 
 class ImportResult(NamedTuple):
     """Result of importing a single file"""
@@ -41,7 +42,8 @@ def load_profiles(profile_path: str) -> Dict[str, ImportProfile]:
         for name, config in data.get('profiles', data).items():
             profiles[name] = ImportProfile(
                 destination=os.path.expandvars(config['destination']),
-                camera=config.get('camera', name)
+                camera=config.get('camera', name),
+                companion_extensions=config.get('companion_extensions')
             )
         return profiles
     except Exception as e:
@@ -63,9 +65,10 @@ def apply_finder_tags(file_path: str, tags: List[str]) -> bool:
         return True
 
     try:
-        tag_list = ','.join(tags)
-        subprocess.run(['tag', '--add', tag_list, file_path],
-                      capture_output=True, check=True)
+        # Use tag command to apply tags
+        for tag in tags:
+            subprocess.run(['tag', '--add', tag, file_path],
+                          capture_output=True, check=True)
         return True
     except subprocess.CalledProcessError as e:
         print(f"Warning: Failed to apply tags to {file_path}: {e}", file=sys.stderr)
@@ -75,6 +78,14 @@ def add_camera_to_exif(file_path: str, camera: str) -> bool:
     """Add camera info to EXIF ImageDescription for Google Photos compatibility"""
     if not camera:
         return True
+
+    # Only apply EXIF tags to supported file types (skip .lrv, .insv, etc.)
+    # exiftool can handle these extensions without errors
+    supported_extensions = {'.mp4', '.mov', '.jpg', '.jpeg', '.png', '.dng', '.arw', '.cr2', '.nef'}
+    file_ext = Path(file_path).suffix.lower()
+
+    if file_ext not in supported_extensions:
+        return True  # Skip unsupported types silently
 
     try:
         subprocess.run([
@@ -100,36 +111,21 @@ def organize_file(file_path: str, destination: str, copy_mode: bool = True, appl
         cmd.append('--apply')
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        # Don't capture output - let organize-by-date.sh display its own errors intelligently
+        result = subprocess.run(cmd, text=True, check=True)
 
-        # Parse the output to determine what happened
-        output = result.stdout.strip()
+        # Assume success if the command completed without error
+        # The organize-by-date.sh script handles all its own output
         filename = os.path.basename(file_path)
+        action = "copied" if apply_changes else "would_copy"
 
-        if 'Skipped (already exists)' in output:
-            return ImportResult(True, "skipped", file_path)
-        elif 'Copied:' in output or 'Would copy:' in output:
-            # Extract destination path from output if possible
-            dest_path = None
-            for line in output.split('\n'):
-                if '→' in line and ('Copied:' in line or 'Would copy:' in line):
-                    # Try to extract the destination path
-                    parts = line.split('→')
-                    if len(parts) > 1:
-                        dest_part = parts[1].strip()
-                        if dest_part.endswith('/'):
-                            dest_path = os.path.join(dest_part, filename)
-                        else:
-                            dest_path = dest_part
-
-            action = "copied" if apply_changes else "would_copy"
-            return ImportResult(True, action, file_path, dest_path)
-        else:
-            return ImportResult(False, "failed", file_path, error="Unknown organize-by-date result")
+        # We can't reliably parse the dest_path without capturing output
+        # But that's OK - the script shows the user where files go
+        return ImportResult(True, action, file_path, dest_path=None)
 
     except subprocess.CalledProcessError as e:
-        error_msg = e.stderr.decode() if e.stderr else str(e)
-        return ImportResult(False, "failed", file_path, error=error_msg)
+        # The error output was already displayed by the subprocess
+        return ImportResult(False, "failed", file_path, error=None)
 
 def find_source_directory(specified_dir: Optional[str]) -> str:
     """Find source directory - either specified or auto-detect single unprocessed directory"""
@@ -156,13 +152,28 @@ def find_source_directory(specified_dir: Optional[str]) -> str:
 
     return candidates[0]
 
-def get_media_files(directory: str) -> List[str]:
+def get_media_files(directory: str, include_companion: bool = True, companion_extensions: Optional[List[str]] = None) -> List[str]:
     """Get all media files from directory, excluding system files"""
     media_files = []
+
+    # Default companion extensions (GoPro and DJI)
+    if companion_extensions is None:
+        companion_extensions = ['.lrv', '.thm', '.lrf']
+
+    # Convert to lowercase set for faster lookup
+    companion_exts = {ext.lower() for ext in companion_extensions}
+
     for root, _, files in os.walk(directory):
         for file in files:
             if file.startswith('.') or file in ['.DS_Store', 'Thumbs.db']:
                 continue
+
+            # Skip companion files if not wanted
+            if not include_companion:
+                file_ext = Path(file).suffix.lower()
+                if file_ext in companion_exts:
+                    continue
+
             media_files.append(os.path.join(root, file))
     return sorted(media_files)
 
@@ -224,53 +235,56 @@ def format_import_summary(results: List[ImportResult], archive_dir: Optional[str
     return '\n'.join(lines)
 
 def import_media(source_dir: str, profile: ImportProfile, apply_changes: bool = False,
-                 additional_tags: Optional[List[str]] = None) -> List[ImportResult]:
+                 additional_tags: Optional[List[str]] = None, skip_companion: bool = False) -> List[ImportResult]:
     """Main import function - processes all files in source directory"""
 
-    # Get all media files
-    media_files = get_media_files(source_dir)
+    # Get files to import (may exclude companions)
+    import_files = get_media_files(source_dir, include_companion=not skip_companion, companion_extensions=profile.companion_extensions)
 
-    if not media_files:
+    # Get ALL files for archiving (always includes companions)
+    all_files = get_media_files(source_dir, include_companion=True, companion_extensions=profile.companion_extensions)
+
+    if not import_files:
         print("No media files found to process")
         return []
 
-    print(f"Found {len(media_files)} file(s) to process")
+    if skip_companion:
+        companion_count = len(all_files) - len(import_files)
+        print(f"Found {len(import_files)} file(s) to import ({companion_count} companion files will be archived only)")
+    else:
+        print(f"Found {len(import_files)} file(s) to process")
     print()
 
-    # Process files
+    # Process files for import
     results = []
     archive_dir = None
 
-    for i, file_path in enumerate(media_files, 1):
+    for i, file_path in enumerate(import_files, 1):
         filename = os.path.basename(file_path)
 
         if apply_changes:
-            print(f"[{i}/{len(media_files)}] Processing: {filename}")
+            print(f"[{i}/{len(import_files)}] Processing: {filename}")
 
         # Organize the file
         result = organize_file(file_path, profile.destination, copy_mode=True, apply_changes=apply_changes)
         results.append(result)
 
         if not result.success:
-            if result.error:
-                print(f"  ⚠️  Processing failed: {result.error}")
+            # Error already displayed by organize-by-date.sh
             continue
 
-        # Apply camera info to EXIF and tags if file was successfully copied
-        if apply_changes and result.action == "copied" and result.dest_path:
-            if profile.camera:
-                add_camera_to_exif(result.dest_path, profile.camera)
-            if additional_tags:
-                apply_finder_tags(result.dest_path, additional_tags)
-
-        # Archive source file if successfully copied
+        # For successful copies in apply mode, archive the source file immediately
+        # This ensures progress is preserved in case of interruption
         if apply_changes and result.action == "copied":
+            # Create archive directory on first successful copy
             if not archive_dir:
                 archive_dir = create_archive_directory(source_dir, apply_changes)
                 if archive_dir:
                     print(f"Created archive folder: {os.path.basename(archive_dir)}")
 
-            archive_processed_file(file_path, archive_dir)
+            # Archive this file immediately (not at the end)
+            if archive_dir:
+                archive_processed_file(file_path, archive_dir)
 
     return results
 
@@ -283,6 +297,7 @@ def main():
 Examples:
   %(prog)s --profile insta360 --apply
   %(prog)s --profile gopro DCIM --apply
+  %(prog)s --profile gopro DCIM --skip-companion --apply
   %(prog)s DJI_0001 --dest '/Volumes/Backup/DJI/Import' --camera 'dji-mini-4-pro' --tags 'Drone' --apply
         """
     )
@@ -297,6 +312,8 @@ Examples:
                        help='Camera identifier to add to EXIF ImageDescription')
     parser.add_argument('--tags',
                        help='Comma-separated Finder tags to apply (in addition to camera info)')
+    parser.add_argument('--skip-companion', action='store_true',
+                       help='Skip companion files (.lrv, .thm) - saves space, recommended for FCP workflows')
     parser.add_argument('--profiles-file',
                        help='Path to profiles configuration file')
     parser.add_argument('--apply', action='store_true',
@@ -368,7 +385,7 @@ Examples:
 
     # Import media
     results = import_media(source_dir, profile, apply_changes=args.apply,
-                          additional_tags=additional_tags)
+                          additional_tags=additional_tags, skip_companion=args.skip_companion)
 
     if not results:
         return 0

@@ -1,6 +1,8 @@
 .DS_Store
 .claude/
+__pycache__
 
 # Environment files with secrets
 .env.local
 .env
+
