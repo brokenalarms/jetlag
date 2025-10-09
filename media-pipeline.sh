@@ -113,8 +113,8 @@ try:
       print('ERROR: Profile \"$profile\" not found', file=sys.stderr)
       sys.exit(1)
     p = data['profiles']['$profile']
-    # Output: ready_dir|timezone
-    print(f\"{p.get('ready_dir', '')}|{p.get('timezone', '')}\")
+    # Output: ready_dir
+    print(f\"{p.get('ready_dir', '')}\")
 except Exception as e:
   print(f'ERROR: {e}', file=sys.stderr)
   sys.exit(1)
@@ -127,11 +127,10 @@ except Exception as e:
     exit 1
   fi
 
-  IFS='|' read -r profile_ready_dir profile_timezone <<< "$profile_data"
+  profile_ready_dir="$profile_data"
 
-  # Use profile values if not overridden
+  # Use profile ready_dir if not overridden
   [[ -z "$target_dir" && -n "$profile_ready_dir" ]] && target_dir="$profile_ready_dir"
-  [[ ${#location_args[@]} -eq 0 && -n "$profile_timezone" ]] && location_args=("--timezone" "$profile_timezone")
 fi
 
 # Validate arguments
@@ -195,16 +194,27 @@ for file in "${files[@]}" ; do
   # Step 1: Tag media (must run before timestamp fixing as it changes file modified date)
   # Only run in apply mode since it modifies files
   if [[ $apply -eq 1 && -n "$profile" ]]; then
-    # Get camera from profile for tagging
-    camera=$(python3 -c "
+    # Get tags and exif from profile for tagging
+    tag_data=$(python3 -c "
 import yaml
 with open('$SCRIPT_DIR/media-profiles.yaml') as f:
   data = yaml.safe_load(f)
-  print(data['profiles']['$profile'].get('camera', ''))
+  p = data['profiles']['$profile']
+  tags = ','.join(p.get('tags', []))
+  exif = p.get('exif', {})
+  make = exif.get('make', '')
+  model = exif.get('model', '')
+  print(f'{tags}|{make}|{model}')
 " 2>/dev/null)
 
-    if [[ -n "$camera" ]]; then
-      "$SCRIPT_DIR/tag-media.py" "$file" --camera "$camera"
+    IFS='|' read -r tags make model <<< "$tag_data"
+
+    if [[ -n "$tags" || -n "$make" || -n "$model" ]]; then
+      cmd=("$SCRIPT_DIR/tag-media.py" "$file")
+      [[ -n "$tags" ]] && cmd+=("--tags" "$tags")
+      [[ -n "$make" ]] && cmd+=("--make" "$make")
+      [[ -n "$model" ]] && cmd+=("--model" "$model")
+      "${cmd[@]}"
     fi
   fi
 

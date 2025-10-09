@@ -2,25 +2,34 @@ profiles:
   insta360:
     destination: "/Volumes/Extreme GRN/Videos/Source Video/Insta360/Import/"
     ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/Insta360/Ready"
-    camera: "insta-360"
+    tags: ["insta-360-x4"]
+    exif:
+      make: "Insta360"
+      model: "X4"
     companion_extensions: [".lrv", ".thm"]
-    timezone: "+0800"
 
   gopro:
     destination: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Import"
     ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Ready"
-    camera: "gopro-hero-12"
+  tags: ["gopro-hero-12"]
+    exif: 
+      make: "GoPro"
+      model: "HERO12 Black"
     companion_extensions: [".thm"]
-    timezone: "+0800"
 
   dji:
     destination: "/Volumes/Extreme GRN/Videos/Source Video/DJI/Import"
     ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/DJI/Ready"
-    camera: "dji-mini-pro-4"
+    tags: ["dji-mini-4-pro"]
+    exif:
+      make: "DJI"
+      model: "Mini 4 Pro"
     companion_extensions: [".lrf", ".thm"]
-    timezone: "+0800"
 
   a7iv:
     destination: "/Volumes/Photos/Import"
-    camera: "sony-a7iv"
+    tags: ["sony-a7iv"]
+    exif:
+      make: "Sony"
+      model: "ILCE-7M4"
     companion_extensions: []

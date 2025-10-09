@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Media import script with profile-based configuration and Finder tags
+Media import script with profile-based configuration
 Imports media files from source directories to organized destinations with date-based folders
 """
 
@@ -26,8 +26,10 @@ signal.signal(signal.SIGINT, signal_handler)
 class ImportProfile(NamedTuple):
     """Configuration profile for media import"""
     destination: str
-    camera: str
     companion_extensions: Optional[List[str]] = None
+    tags: Optional[List[str]] = None
+    exif_make: Optional[str] = None
+    exif_model: Optional[str] = None
 
 class ImportResult(NamedTuple):
     """Result of importing a single file"""
@@ -48,10 +50,13 @@ def load_profiles(profile_path: str) -> Dict[str, ImportProfile]:
 
         profiles = {}
         for name, config in data.get('profiles', data).items():
+            exif = config.get('exif', {})
             profiles[name] = ImportProfile(
                 destination=os.path.expandvars(config['destination']),
-                camera=config.get('camera', name),
-                companion_extensions=config.get('companion_extensions')
+                companion_extensions=config.get('companion_extensions'),
+                tags=config.get('tags'),
+                exif_make=exif.get('make'),
+                exif_model=exif.get('model')
             )
         return profiles
     except Exception as e:
@@ -66,26 +71,6 @@ def get_default_profile_path() -> str:
         if profile_path.exists():
             return str(profile_path)
     return str(script_dir / 'media-profiles.yaml')
-
-def tag_media_file(file_path: str, camera: Optional[str] = None, tags: Optional[List[str]] = None) -> bool:
-    """Tag media file using tag-media.py script"""
-    if not camera and not tags:
-        return True
-
-    script_dir = Path(__file__).parent
-    tag_script = script_dir / 'tag-media.py'
-
-    cmd = [str(tag_script), file_path]
-    if camera:
-        cmd.extend(['--camera', camera])
-    if tags:
-        cmd.extend(['--tags', ','.join(tags)])
-
-    try:
-        subprocess.run(cmd, capture_output=True, check=True)
-        return True
-    except subprocess.CalledProcessError:
-        return False
 
 def organize_file(file_path: str, destination: str, copy_mode: bool = True, apply_changes: bool = False) -> ImportResult:
     """Organize a single file using organize-by-date.sh"""
@@ -114,6 +99,29 @@ def organize_file(file_path: str, destination: str, copy_mode: bool = True, appl
     except subprocess.CalledProcessError as e:
         # The error output was already displayed by the subprocess
         return ImportResult(False, "failed", file_path, error=None)
+
+def tag_file(file_path: str, tags: Optional[List[str]] = None, make: Optional[str] = None, model: Optional[str] = None) -> bool:
+    """Tag a file using tag-media.py script"""
+    if not tags and not make and not model:
+        return True
+
+    script_dir = Path(__file__).parent
+    tag_script = script_dir / 'tag-media.py'
+
+    cmd = [str(tag_script), file_path]
+    if tags:
+        cmd.extend(['--tags', ','.join(tags)])
+    if make:
+        cmd.extend(['--make', make])
+    if model:
+        cmd.extend(['--model', model])
+
+    try:
+        subprocess.run(cmd, text=True, check=True)
+        return True
+    except subprocess.CalledProcessError:
+        # Error already displayed by tag-media.py
+        return False
 
 def find_source_directory(specified_dir: Optional[str]) -> str:
     """Find source directory - either specified or auto-detect single unprocessed directory"""
@@ -244,8 +252,8 @@ def format_import_summary(results: List[ImportResult], archive_dir: Optional[str
 
     return '\n'.join(lines)
 
-def import_media(source_dir: str, profile: ImportProfile, apply_changes: bool = False,
-                 additional_tags: Optional[List[str]] = None, skip_companion: bool = False) -> tuple[List[ImportResult], Optional[str], List[str]]:
+def import_media(source_dir: str, profile: ImportProfile,
+                 apply_changes: bool = False, skip_companion: bool = False) -> tuple[List[ImportResult], Optional[str], List[str]]:
     """Main import function - processes all files in source directory
 
     Returns: (results, archive_dir, companion_files_to_archive)
@@ -282,6 +290,11 @@ def import_media(source_dir: str, profile: ImportProfile, apply_changes: bool = 
         if apply_changes:
             print(f"[{i}/{len(import_files)}] Processing: {filename}")
 
+        # Tag the file first (before organizing, to tag source file)
+        if apply_changes:
+            if not tag_file(file_path, tags=profile.tags, make=profile.exif_make, model=profile.exif_model):
+                print(f"   Warning: Tagging failed for {filename}")
+
         # Organize the file
         result = organize_file(file_path, profile.destination, copy_mode=True, apply_changes=apply_changes)
         results.append(result)
@@ -314,14 +327,13 @@ def import_media(source_dir: str, profile: ImportProfile, apply_changes: bool = 
 def main():
     """Command line interface"""
     parser = argparse.ArgumentParser(
-        description='Import media files with profile-based configuration and Finder tags',
+        description='Import media files with profile-based configuration',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   %(prog)s --profile insta360 --apply
   %(prog)s --profile gopro DCIM --apply
   %(prog)s --profile gopro DCIM --skip-companion --apply
-  %(prog)s DJI_0001 --dest '/Volumes/Backup/DJI/Import' --camera 'dji-mini-4-pro' --tags 'Drone' --apply
         """
     )
 
@@ -329,12 +341,6 @@ Examples:
                        help='Source directory (auto-detected if only one subdirectory exists)')
     parser.add_argument('--profile',
                        help='Profile name from configuration file')
-    parser.add_argument('--dest', '--destination',
-                       help='Destination path (can use env variables)')
-    parser.add_argument('--camera',
-                       help='Camera identifier to add to EXIF ImageDescription')
-    parser.add_argument('--tags',
-                       help='Comma-separated Finder tags to apply (in addition to camera info)')
     parser.add_argument('--skip-companion', action='store_true',
                        help='Skip companion files (.lrv, .thm) - saves space, recommended for FCP workflows')
     parser.add_argument('--profiles-file',
@@ -355,30 +361,23 @@ Examples:
             print("Available profiles:")
             for name, profile in profiles.items():
                 print(f"  {name:12} → {profile.destination}")
-                print(f"{'':14} camera: {profile.camera}")
         else:
             print("No profiles found")
             print(f"Create a profiles file at: {profiles_file}")
         return 0
 
-    # Determine profile or manual configuration
-    if args.profile:
-        if args.profile not in profiles:
-            print(f"Error: Profile '{args.profile}' not found", file=sys.stderr)
-            print(f"Available profiles: {', '.join(profiles.keys())}", file=sys.stderr)
-            return 1
-        profile = profiles[args.profile]
-    elif args.dest:
-        # Manual configuration
-        if not args.camera:
-            print("Error: --camera is required when using --dest", file=sys.stderr)
-            return 1
-        dest = os.path.expandvars(args.dest)
-        profile = ImportProfile(destination=dest, camera=args.camera)
-    else:
-        print("Error: Either --profile or --dest is required", file=sys.stderr)
+    # Load profile
+    if not args.profile:
+        print("Error: --profile is required", file=sys.stderr)
         print("Use --list-profiles to see available profiles", file=sys.stderr)
         return 1
+
+    if args.profile not in profiles:
+        print(f"Error: Profile '{args.profile}' not found", file=sys.stderr)
+        print(f"Available profiles: {', '.join(profiles.keys())}", file=sys.stderr)
+        return 1
+
+    profile = profiles[args.profile]
 
     # Find source directory
     try:
@@ -393,22 +392,18 @@ Examples:
         if not response.lower().startswith('y'):
             return 0
 
-    # Parse additional tags
-    additional_tags = args.tags.split(',') if args.tags else None
-
     # Display configuration
     print(f"→ Source:      {source_dir}")
     print(f"→ Destination: {profile.destination}")
-    if profile.camera:
-        print(f"→ Camera:      {profile.camera}")
-    if additional_tags:
-        print(f"→ Tags:        {', '.join(additional_tags)}")
     print(f"→ Mode:        {'APPLY' if args.apply else 'DRY RUN (no changes)'}")
     print()
 
     # Import media
-    results, archive_dir, companion_files = import_media(source_dir, profile, apply_changes=args.apply,
-                                                          additional_tags=additional_tags, skip_companion=args.skip_companion)
+    results, archive_dir, companion_files = import_media(
+        source_dir, profile,
+        apply_changes=args.apply,
+        skip_companion=args.skip_companion
+    )
 
     if not results:
         return 0

@@ -34,9 +34,9 @@ def apply_finder_tags(file_path: str, tags: List[str]) -> bool:
         print(f"Warning: Failed to apply tags to {file_path}: {e}", file=sys.stderr)
         return False
 
-def add_camera_to_exif(file_path: str, camera: str) -> bool:
-    """Add camera info to EXIF ImageDescription for Google Photos compatibility"""
-    if not camera:
+def add_camera_to_exif(file_path: str, make: str = None, model: str = None) -> bool:
+    """Add camera info to EXIF Make and Model fields"""
+    if not make and not model:
         return True
 
     # Only apply EXIF tags to supported file types (skip .lrv, .insv, etc.)
@@ -48,12 +48,14 @@ def add_camera_to_exif(file_path: str, camera: str) -> bool:
         return True  # Skip unsupported types silently
 
     try:
-        subprocess.run([
-            'exiftool', '-P', '-overwrite_original',
-            f'-ImageDescription={camera}',
-            f'-UserComment={camera}',
-            file_path
-        ], capture_output=True, check=True, text=True)
+        cmd = ['exiftool', '-P', '-overwrite_original']
+        if make:
+            cmd.append(f'-Make={make}')
+        if model:
+            cmd.append(f'-Model={model}')
+        cmd.append(file_path)
+
+        subprocess.run(cmd, capture_output=True, check=True, text=True)
         return True
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr.strip() if e.stderr else str(e)
@@ -63,7 +65,8 @@ def add_camera_to_exif(file_path: str, camera: str) -> bool:
 def main():
     parser = argparse.ArgumentParser(description='Tag media files with Finder tags and camera EXIF')
     parser.add_argument('files', nargs='+', help='Media files to tag')
-    parser.add_argument('--camera', help='Camera identifier to add to EXIF')
+    parser.add_argument('--make', help='Camera make/manufacturer to add to EXIF')
+    parser.add_argument('--model', help='Camera model to add to EXIF')
     parser.add_argument('--tags', help='Comma-separated Finder tags to apply')
 
     args = parser.parse_args()
@@ -80,16 +83,12 @@ def main():
             print(f"Warning: File not found: {file_path}", file=sys.stderr)
             continue
 
-        # Apply camera EXIF
-        if args.camera:
-            if not add_camera_to_exif(file_path, args.camera):
+        # Apply camera EXIF (Make and Model)
+        if args.make or args.model:
+            if not add_camera_to_exif(file_path, make=args.make, model=args.model):
                 continue
 
-            # Also apply camera as a Finder tag
-            if not apply_finder_tags(file_path, [args.camera]):
-                continue
-
-        # Apply additional Finder tags
+        # Apply Finder tags
         if finder_tags:
             if not apply_finder_tags(file_path, finder_tags):
                 continue
