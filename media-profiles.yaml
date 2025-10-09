@@ -33,3 +33,12 @@ profiles:
       make: "Sony"
       model: "ILCE-7M4"
     companion_extensions: []
+
+  iphone16pro:
+    destination: "/Volumes/Extreme GRN/Videos/Source Video/iPhone/Import"
+    # ready_dir not specified = organize to current directory
+    tags: ["iphone-16-pro"]
+    exif:
+      make: "Apple"
+      model: "iPhone 16 Pro"
+    companion_extensions: [".lrf", ".thm"]

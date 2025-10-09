@@ -126,7 +126,14 @@ except Exception as e:
   profile_ready_dir="$profile_data"
 
   # Use profile ready_dir if not overridden
-  [[ -z "$target_dir" && -n "$profile_ready_dir" ]] && target_dir="$profile_ready_dir"
+  # If ready_dir is not set or is "None" (from null), default to current directory
+  if [[ -z "$target_dir" ]]; then
+    if [[ -n "$profile_ready_dir" && "$profile_ready_dir" != "None" ]]; then
+      target_dir="$profile_ready_dir"
+    else
+      target_dir="."
+    fi
+  fi
 fi
 
 # Validate arguments
