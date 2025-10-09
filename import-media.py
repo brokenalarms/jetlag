@@ -7,6 +7,7 @@ Imports media files from source directories to organized destinations with date-
 import subprocess
 import sys
 import os
+import signal
 import json
 import yaml
 import shutil
@@ -14,6 +15,13 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, NamedTuple
 import argparse
+
+# Handle Ctrl-C gracefully
+def signal_handler(sig, frame):
+    print("\n\nInterrupted by user", file=sys.stderr)
+    sys.exit(130)
+
+signal.signal(signal.SIGINT, signal_handler)
 
 class ImportProfile(NamedTuple):
     """Configuration profile for media import"""
@@ -177,6 +185,28 @@ def get_media_files(directory: str, include_companion: bool = True, companion_ex
             media_files.append(os.path.join(root, file))
     return sorted(media_files)
 
+def find_companion_files(main_file_path: str, companion_extensions: Optional[List[str]] = None) -> List[str]:
+    """Find all companion files for a given main file (e.g., IMG_001.LRV for IMG_001.MP4)"""
+    if companion_extensions is None:
+        companion_extensions = ['.lrv', '.thm', '.lrf']
+
+    companion_exts = {ext.lower() for ext in companion_extensions}
+    base_path = Path(main_file_path)
+    base_name = base_path.stem  # filename without extension
+    parent_dir = base_path.parent
+
+    companions = []
+    for ext in companion_exts:
+        companion_path = parent_dir / f"{base_name}{ext}"
+        if companion_path.exists():
+            companions.append(str(companion_path))
+        # Also check uppercase extension
+        companion_path_upper = parent_dir / f"{base_name}{ext.upper()}"
+        if companion_path_upper.exists():
+            companions.append(str(companion_path_upper))
+
+    return companions
+
 def create_archive_directory(original_dir: str, apply_changes: bool) -> Optional[str]:
     """Create archive directory for processed files"""
     if not apply_changes:
@@ -235,21 +265,28 @@ def format_import_summary(results: List[ImportResult], archive_dir: Optional[str
     return '\n'.join(lines)
 
 def import_media(source_dir: str, profile: ImportProfile, apply_changes: bool = False,
-                 additional_tags: Optional[List[str]] = None, skip_companion: bool = False) -> List[ImportResult]:
-    """Main import function - processes all files in source directory"""
+                 additional_tags: Optional[List[str]] = None, skip_companion: bool = False) -> tuple[List[ImportResult], Optional[str], List[str]]:
+    """Main import function - processes all files in source directory
+
+    Returns: (results, archive_dir, companion_files_to_archive)
+    """
 
     # Get files to import (may exclude companions)
     import_files = get_media_files(source_dir, include_companion=not skip_companion, companion_extensions=profile.companion_extensions)
 
-    # Get ALL files for archiving (always includes companions)
+    # Get ALL files for archiving (capture this BEFORE we start moving files)
     all_files = get_media_files(source_dir, include_companion=True, companion_extensions=profile.companion_extensions)
+
+    # Calculate which files won't be imported but need archiving
+    import_files_set = set(import_files)
+    companion_files_to_archive = [f for f in all_files if f not in import_files_set]
 
     if not import_files:
         print("No media files found to process")
-        return []
+        return [], None, []
 
     if skip_companion:
-        companion_count = len(all_files) - len(import_files)
+        companion_count = len(companion_files_to_archive)
         print(f"Found {len(import_files)} file(s) to import ({companion_count} companion files will be archived only)")
     else:
         print(f"Found {len(import_files)} file(s) to process")
@@ -282,11 +319,17 @@ def import_media(source_dir: str, profile: ImportProfile, apply_changes: bool = 
                 if archive_dir:
                     print(f"Created archive folder: {os.path.basename(archive_dir)}")
 
-            # Archive this file immediately (not at the end)
+            # Archive this file and its companions immediately (not at the end)
             if archive_dir:
                 archive_processed_file(file_path, archive_dir)
 
-    return results
+                # Also archive companion files for this main file
+                companion_files = find_companion_files(file_path, profile.companion_extensions)
+                for companion_path in companion_files:
+                    if os.path.exists(companion_path):
+                        archive_processed_file(companion_path, archive_dir)
+
+    return results, archive_dir, companion_files_to_archive
 
 def main():
     """Command line interface"""
@@ -384,8 +427,8 @@ Examples:
     print()
 
     # Import media
-    results = import_media(source_dir, profile, apply_changes=args.apply,
-                          additional_tags=additional_tags, skip_companion=args.skip_companion)
+    results, archive_dir, companion_files = import_media(source_dir, profile, apply_changes=args.apply,
+                                                          additional_tags=additional_tags, skip_companion=args.skip_companion)
 
     if not results:
         return 0
@@ -394,16 +437,28 @@ Examples:
 
     # Handle post-processing for apply mode
     if args.apply:
-        archive_dir = None
         copied_count = sum(1 for r in results if r.action == "copied")
 
-        if copied_count > 0:
-            # Find archive directory (should have been created during processing)
-            current_date = datetime.now().strftime('%Y-%m-%d')
-            expected_archive = f"{os.path.basename(source_dir)} - copied {current_date}"
-            archive_path = os.path.join(os.path.dirname(source_dir), expected_archive)
-            if os.path.exists(archive_path):
-                archive_dir = archive_path
+        if copied_count > 0 and archive_dir:
+            # Check for orphaned companion files (shouldn't normally happen)
+            orphaned_companions = []
+            for file_path in companion_files:
+                if os.path.exists(file_path):
+                    orphaned_companions.append(file_path)
+
+            if orphaned_companions:
+                print(f"\n⚠️  Warning: Found {len(orphaned_companions)} orphaned companion file(s):")
+                print("   These companion files don't have a matching main file that was imported.")
+                for orphan in orphaned_companions:
+                    print(f"   - {os.path.basename(orphan)}")
+
+                response = input("\nArchive these orphaned files? (y/N) ")
+                if response.lower().startswith('y'):
+                    print("Archiving orphaned companion files...")
+                    for file_path in orphaned_companions:
+                        archive_processed_file(file_path, archive_dir)
+                else:
+                    print("Leaving orphaned files in source directory.")
 
         # Clean up empty source directory
         if archive_dir:

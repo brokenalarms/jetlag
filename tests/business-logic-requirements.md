@@ -101,13 +101,19 @@ Video: IMG_1897.MOV
 2. **Organize by date** using organize-by-date.sh
 
 ### Input Requirements
-- --source directory (or MEDIA_PIPELINE_SOURCE env var)
-- --target directory (or MEDIA_PIPELINE_TARGET env var) 
+- --source directory (default: current directory)
+- --target directory (required, or provided by --profile)
+- --profile (loads ready_dir and timezone from media-profiles.yaml)
 - --label required (for template substitution)
-- Location/timezone for timestamp fixing
+- Location/timezone for timestamp fixing (or provided by --profile)
+
+### Profile Support
+- Use --profile to load settings from media-profiles.yaml
+- Profile provides: ready_dir (target), timezone
+- CLI arguments override profile settings
 
 ### Template Handling
-- Use MEDIA_PIPELINE_TEMPLATE from env (default: "{{YYYY-MM-DD}}")
+- Use MEDIA_PIPELINE_TEMPLATE from env (default: "{{YYYY}}/{{label}}/{{YYYY}}-{{MM}}-{{DD}}/")
 - Pass template and label separately to organize-by-date.sh
 - Avoid bash parameter expansion with templates containing braces
 
@@ -119,8 +125,6 @@ Video: IMG_1897.MOV
 
 ### Environment Variables
 ```bash
-MEDIA_PIPELINE_SOURCE="Raw/"
-MEDIA_PIPELINE_TARGET="Ready/"  
 MEDIA_PIPELINE_TEMPLATE="{{YYYY}}/{{label}}/{{YYYY}}-{{MM}}-{{DD}}/"
 ```
 

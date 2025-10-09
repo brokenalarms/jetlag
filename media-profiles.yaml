@@ -1,18 +1,24 @@
 profiles:
   insta360:
     destination: "/Volumes/Extreme GRN/Videos/Source Video/Insta360/Import/"
+    ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/Insta360/Ready"
     camera: "insta-360"
     companion_extensions: [".lrv", ".thm"]
+    timezone: "+0800"
 
   gopro:
     destination: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Import"
+    ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Ready"
     camera: "gopro-hero-12"
-    companion_extensions: [".lrv", ".thm"]
+    companion_extensions: [".thm"]
+    timezone: "+0800"
 
   dji:
     destination: "/Volumes/Extreme GRN/Videos/Source Video/DJI/Import"
+    ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/DJI/Ready"
     camera: "dji-mini-pro-4"
     companion_extensions: [".lrf", ".thm"]
+    timezone: "+0800"
 
   a7iv:
     destination: "/Volumes/Photos/Import"

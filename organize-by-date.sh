@@ -169,10 +169,19 @@ process_file() {
         echo "✅ Moved: $base → $organized_path/"
       fi
     else
-      if [[ $copy_mode -eq 1 ]]; then
-        printf "[DRY RUN] Would copy: %s → %s\n" "$file" "$target_file"
+      # Show relative path for input, absolute path for output
+      local display_source abs_target
+      display_source="$file"  # Keep as-is (relative if user provided relative)
+      # Construct absolute target path (directory may not exist yet in dry-run)
+      if [[ "$target_file" = /* ]]; then
+        abs_target="$target_file"  # Already absolute
       else
-        printf "[DRY RUN] Would move: %s → %s\n" "$file" "$target_file"
+        abs_target="$(pwd)/$target_file"  # Make relative path absolute
+      fi
+      if [[ $copy_mode -eq 1 ]]; then
+        printf "[DRY RUN] Would copy: %s → %s\n" "$display_source" "$abs_target"
+      else
+        printf "[DRY RUN] Would move: %s → %s\n" "$display_source" "$abs_target"
       fi
     fi
   fi

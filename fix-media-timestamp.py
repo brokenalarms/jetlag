@@ -5,12 +5,27 @@ Declaratively fixes photo and video metadata timestamps
 Ensures file system timestamps match EXIF data for both photos and videos
 """
 
-import subprocess
-import sys
+import argparse
 import os
 import re
+import signal
+import subprocess
+import sys
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Optional, Callable
+
+# Handle Ctrl-C gracefully
+def signal_handler(sig, frame):
+    print("\n\nInterrupted by user", file=sys.stderr)
+    sys.exit(130)
+
+signal.signal(signal.SIGINT, signal_handler)
+
+try:
+    import humanize
+except ImportError:
+    print("Error: humanize library not found. Install with: pip install humanize", file=sys.stderr)
+    sys.exit(1)
 
 # Global cache for exiftool data to avoid reading same file multiple times
 _exif_cache: Dict[str, Dict[str, str]] = {}
@@ -225,9 +240,8 @@ def parse_datetime_original(datetime_str: str) -> Optional[datetime]:
             tz_hours = int(tz_hour[1:])
             tz_minutes = int(tz_min)
             tz_offset = tz_sign * (tz_hours * 60 + tz_minutes)
-            
+
             # Create timezone-aware datetime
-            from datetime import timezone, timedelta
             tz = timezone(timedelta(minutes=tz_offset))
             return dt.replace(tzinfo=tz)
         except ValueError:
@@ -502,6 +516,7 @@ def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None) ->
 def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None) -> dict:
     """Get all current timestamp data from file"""
     data = {
+        "file_path": file_path,  # Store file path for filename parsing
         "exif": read_exif_data(file_path),
         "file_system": get_file_system_timestamps(file_path),
         "datetime_original_str": "",
@@ -631,6 +646,11 @@ def determine_needed_changes(file_path: str, datetime_original: datetime) -> dic
 
     return changes
 
+def format_exif_timestamp_display(ts: str) -> str:
+    """Format EXIF timestamp with dashes for date, colons for time"""
+    # Convert YYYY:MM:DD HH:MM:SS to YYYY-MM-DD HH:MM:SS
+    return ts.replace(':', '-', 2) if ts else ts
+
 def format_original_timestamps(current_data: dict) -> str:
     """Format original timestamp display from raw data"""
     parts = []
@@ -641,41 +661,47 @@ def format_original_timestamps(current_data: dict) -> str:
     if source == "DateTimeOriginal with timezone":
         datetime_original = current_data["exif"].get("DateTimeOriginal", "")
         if datetime_original:
-            parts.append(f"{datetime_original} (DateTimeOriginal)")
+            parts.append(f"{format_exif_timestamp_display(datetime_original)} (DateTimeOriginal)")
     elif source == "CreationDate with timezone":
         creation_date = current_data["exif"].get("CreationDate", "")
         if creation_date:
-            parts.append(f"{creation_date} (Keys:CreationDate)")
+            parts.append(f"{format_exif_timestamp_display(creation_date)} (Keys:CreationDate)")
     elif source == "CreationDate with Z (UTC)":
         creation_date = current_data["exif"].get("CreationDate", "")
         if creation_date:
-            parts.append(f"{creation_date} (Keys:CreationDate UTC)")
+            parts.append(f"{format_exif_timestamp_display(creation_date)} (Keys:CreationDate UTC)")
     elif source == "DateTimeOriginal":
         datetime_original = current_data["exif"].get("DateTimeOriginal", "")
         if datetime_original:
-            parts.append(f"{datetime_original} (DateTimeOriginal)")
+            parts.append(f"{format_exif_timestamp_display(datetime_original)} (DateTimeOriginal)")
     elif source == "MediaCreateDate":
         media_create = current_data["exif"].get("MediaCreateDate", "")
+        file_ts = current_data["file_system"].get("modify", "")
         if media_create:
-            parts.append(f"{media_create} (MediaCreateDate)")
+            parts.append(f"{format_exif_timestamp_display(media_create)} UTC (MediaCreateDate)")
+        if file_ts:
+            parts.append(f"{format_exif_timestamp_display(file_ts)} local (file)")
     elif source == "filename":
-        parts.append(f"(from filename)")
+        # Show the parsed filename timestamp
+        filename_ts = parse_filename_timestamp(current_data.get("file_path", ""))
+        if filename_ts:
+            parts.append(f"{format_exif_timestamp_display(filename_ts)} (from filename)")
+        else:
+            parts.append(f"(from filename)")
     elif source in ["file birthtime", "file mtime"]:
         file_ts = current_data["file_system"].get("modify", "")
         if file_ts:
-            parts.append(f"{file_ts} (file)")
-
-    # Also show additional context
-    if source == "MediaCreateDate":
-        file_ts = current_data["file_system"].get("modify", "")
-        if file_ts:
-            parts.append(f"{file_ts} (file)")
+            parts.append(f"{format_exif_timestamp_display(file_ts)} (file)")
 
     return ", ".join(parts) if parts else "(no timestamps available)"
 
+def format_timestamp_display(dt: datetime) -> str:
+    """Format timestamp with dashes for date, colons for time"""
+    return dt.strftime('%Y-%m-%d %H:%M:%S%z')
+
 def format_corrected_timestamp(datetime_original: datetime, timestamp_source: str, timezone_source: str) -> str:
     """Format corrected timestamp display"""
-    corrected_str = same_as_original(datetime_original)
+    corrected_str = format_timestamp_display(datetime_original)
     tz_value = datetime_original.strftime('%z')
     # Format timezone with colon
     tz_formatted = f"{tz_value[:3]}:{tz_value[3:]}" if len(tz_value) == 5 else tz_value
@@ -699,11 +725,16 @@ def format_time_delta(seconds: float) -> str:
     """Format time delta in human-readable format"""
     sign = "+" if seconds > 0 else "-"
     td = timedelta(seconds=abs(seconds))
-    return f"{sign}{td}"
+    return f"{sign}{humanize.naturaldelta(td)}"
 
-def format_change_description(changes: dict, delta_seconds: Optional[float] = None) -> str:
+def format_change_description(changes: dict, delta_seconds: Optional[float] = None, current_data: dict = None) -> str:
     """Format change description from changes data"""
     parts = []
+
+    # Check if DateTimeOriginal needs to be written
+    needs_datetime_original = current_data and not current_data.get("exif", {}).get("DateTimeOriginal")
+    if needs_datetime_original:
+        parts.append("DateTimeOriginal (missing)")
 
     if changes.get("file_timestamps"):
         if delta_seconds is not None and abs(delta_seconds) > 1:
@@ -711,8 +742,17 @@ def format_change_description(changes: dict, delta_seconds: Optional[float] = No
             parts.append(f"File timestamps ({delta_str})")
         else:
             parts.append("File timestamps")
+
     if changes.get("quicktime_createdate"):
-        parts.append("QuickTime CreateDate")
+        # Show what the current MediaCreateDate is
+        if current_data:
+            media_create = current_data.get("exif", {}).get("MediaCreateDate", "")
+            if media_create:
+                parts.append(f"QuickTime CreateDate (was: {format_exif_timestamp_display(media_create)} UTC)")
+            else:
+                parts.append(f"QuickTime CreateDate (missing)")
+        else:
+            parts.append("QuickTime CreateDate")
 
     return ", ".join(parts) if parts else "No change"
 
@@ -749,7 +789,8 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, verbose: bool = 
     corrected_display = format_corrected_timestamp(datetime_original, timestamp_source, timezone_source)
     print(f"⏱️ Corrected: {corrected_display}")
     
-    utc_display = datetime_original.astimezone(timezone.utc).strftime('%Y:%m:%d %H:%M:%S UTC')
+    utc_dt = datetime_original.astimezone(timezone.utc)
+    utc_display = utc_dt.strftime('%Y-%m-%d %H:%M:%S UTC')
     print(f"🌐 UTC      : {utc_display}")
 
     # Calculate delta if file timestamps need updating
@@ -765,13 +806,11 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, verbose: bool = 
                 expected_dt = datetime.strptime(expected_time, '%Y:%m:%d %H:%M:%S')
                 # Calculate delta
                 delta_seconds = (expected_dt - current_dt).total_seconds()
-            except Exception as e:
-                print(f"DEBUG: Error calculating delta: {e}")
-                print(f"DEBUG: current_fs['modify'] = {current_fs.get('modify')}")
-                print(f"DEBUG: expected_time = {expected_time if 'expected_time' in locals() else 'N/A'}")
+            except:
+                pass
 
     # Display changes
-    change_desc = format_change_description(changes, delta_seconds)
+    change_desc = format_change_description(changes, delta_seconds, current_data)
     has_changes = changes["file_timestamps"] or changes.get("quicktime_createdate", False)
 
     if dry_run and has_changes:
@@ -791,26 +830,20 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, verbose: bool = 
 
     # Write DateTimeOriginal if it's missing and we have timezone info
     if not current_data["exif"].get("DateTimeOriginal") and current_data["datetime_original_str"]:
-        if write_datetime_original(file_path, current_data["datetime_original_str"]):
-            print("   ✅ Wrote DateTimeOriginal")
-        else:
+        if not write_datetime_original(file_path, current_data["datetime_original_str"]):
             print("   ❌ Failed to write DateTimeOriginal")
             success = False
 
     # Heal QuickTime CreateDate if needed
     if changes.get("quicktime_createdate"):
-        if write_quicktime_createdate(file_path, datetime_original):
-            print("   ✅ Healed QuickTime CreateDate")
-        else:
+        if not write_quicktime_createdate(file_path, datetime_original):
             print("   ❌ Failed to heal QuickTime CreateDate")
             success = False
 
     # Update file system timestamps if needed
     if changes["file_timestamps"]:
         expected_file_timestamp = get_expected_file_system_time(datetime_original)
-        if set_file_system_timestamps(file_path, expected_file_timestamp):
-            print("   ✅ Applied file timestamps")
-        else:
+        if not set_file_system_timestamps(file_path, expected_file_timestamp):
             print("   ❌ Failed to apply file timestamps")
             success = False
 
@@ -818,8 +851,6 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, verbose: bool = 
 
 def main():
     """Command line interface"""
-    import argparse
-    
     parser = argparse.ArgumentParser(description='Fix media timestamps - ensures file system timestamps match EXIF data')
     parser.add_argument('file', help='Media file (photo or video) to process')
     parser.add_argument('--timezone', help='Timezone offset (e.g. +09:00) - required when DateTimeOriginal lacks timezone info')
