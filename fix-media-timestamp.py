@@ -458,13 +458,18 @@ def set_file_system_timestamps(file_path: str, expected_timestamp: str) -> bool:
         print(f"Error setting file system timestamps: {e}", file=sys.stderr)
         return False
 
-def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None) -> tuple[Optional[str], str]:
+def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False) -> tuple[Optional[str], str]:
     """Get the best timestamp using 5-tier priority system from bash lib-timestamp.sh
     Returns: (timestamp_string, source_description)
     """
     exif_data = read_exif_data(file_path)
     file_timestamps = get_file_system_timestamps(file_path)
     base = os.path.basename(file_path)
+
+    if overwrite_datetimeoriginal:
+        filename_timestamp = parse_filename_timestamp(file_path)
+        if filename_timestamp and re.match(r'^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6}', base):
+            return filename_timestamp, "filename"
 
     # Priority 1: DateTimeOriginal with timezone (authoritative source)
     datetime_original = exif_data.get("DateTimeOriginal", "")
@@ -513,7 +518,7 @@ def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None) ->
 
     return None, "no timestamps found"
 
-def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None) -> dict:
+def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False) -> dict:
     """Get all current timestamp data from file"""
     data = {
         "file_path": file_path,  # Store file path for filename parsing
@@ -526,7 +531,7 @@ def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None
     }
 
     # Use 5-tier priority system to find best timestamp
-    best_timestamp, source = get_best_timestamp(file_path, timezone_offset)
+    best_timestamp, source = get_best_timestamp(file_path, timezone_offset, overwrite_datetimeoriginal)
     data["timestamp_source"] = source
 
     if best_timestamp:
@@ -772,11 +777,19 @@ def format_change_description(changes: dict, delta_seconds: Optional[float] = No
 
     return ", ".join(parts) if parts else "No change"
 
-def fix_media_timestamps(file_path: str, dry_run: bool = False, verbose: bool = False, timezone_offset: Optional[str] = None) -> bool:
-    """Main function to fix media (photo/video) timestamps"""
-    
+def fix_media_timestamps(file_path: str, dry_run: bool = False, verbose: bool = False, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False) -> bool:
+    """Main function to fix media (photo/video) timestamps
+
+    Args:
+        file_path: Path to media file
+        dry_run: If True, show changes without applying them
+        verbose: Show verbose output
+        timezone_offset: Timezone offset (e.g. +09:00) for files missing timezone
+        overwrite_datetimeoriginal: If True, overwrite DateTimeOriginal even if it exists (for genuinely wrong timestamps)
+    """
+
     # Get all data
-    current_data = get_all_timestamp_data(file_path, timezone_offset)
+    current_data = get_all_timestamp_data(file_path, timezone_offset, overwrite_datetimeoriginal)
     
     # Display header
     filename = os.path.basename(file_path)
@@ -844,8 +857,17 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, verbose: bool = 
     # Apply changes
     success = True
 
-    # Write DateTimeOriginal if it's missing and we have timezone info
-    if not current_data["exif"].get("DateTimeOriginal") and current_data["datetime_original_str"]:
+    # Write DateTimeOriginal if:
+    # 1. It's missing and we have timezone info, OR
+    # 2. overwrite_datetimeoriginal flag is set (for genuinely wrong timestamps)
+    should_write_datetime_original = (
+        (not current_data["exif"].get("DateTimeOriginal") and current_data["datetime_original_str"]) or
+        (overwrite_datetimeoriginal and current_data["datetime_original_str"])
+    )
+
+    if should_write_datetime_original:
+        if overwrite_datetimeoriginal and current_data["exif"].get("DateTimeOriginal"):
+            print("   ⚠️  Overwriting existing DateTimeOriginal (--overwrite-datetimeoriginal flag)")
         if not write_datetime_original(file_path, current_data["datetime_original_str"]):
             print("   ❌ Failed to write DateTimeOriginal")
             success = False
@@ -872,8 +894,9 @@ def main():
     parser.add_argument('--timezone', help='Timezone offset (e.g. +09:00) - required when DateTimeOriginal lacks timezone info')
     parser.add_argument('--country', help='Country code or name for automatic timezone lookup (e.g. JP, Taiwan)')
     parser.add_argument('--apply', action='store_true', help='Apply changes (default: dry run)')
+    parser.add_argument('--overwrite-datetimeoriginal', action='store_true', help='Overwrite DateTimeOriginal even if it exists (for genuinely wrong timestamps)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
-    
+
     args = parser.parse_args()
 
     # Convert file path to absolute path to ensure exiftool can find it
@@ -889,7 +912,13 @@ def main():
             print(f"Error: Could not determine timezone for country '{args.country}'", file=sys.stderr)
             return 1
 
-    success = fix_media_timestamps(file_path, dry_run=not args.apply, verbose=args.verbose, timezone_offset=timezone_offset)
+    success = fix_media_timestamps(
+        file_path,
+        dry_run=not args.apply,
+        verbose=args.verbose,
+        timezone_offset=timezone_offset,
+        overwrite_datetimeoriginal=args.overwrite_datetimeoriginal
+    )
 
     return 0 if success else 1
 
