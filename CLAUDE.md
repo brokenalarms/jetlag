@@ -7,6 +7,6 @@
 - DateTimeOriginal is the source of truth since it has both local time + datetime, so should never be modified (or written once if blank).
 - each base script operates on a single file. media-pipeline orchestrates via yaml profiles. all batched operations should happen to one file at a time before moving onto next. all batch operations should be performed in alphabetical order.
 - exiftool should only be called (in each script) once max on each file read with needed values cached, then once on write, for performance. 
-- scripts should be run compositionally, passing through args of higher level ones and never swallowing the output of building block scripts but rather making use of their existing output to avoid needing to add logs at a higher level besides summary.
+- scripts should be run compositionally, passing through args of higher level ones and never swallowing the output of building block scripts but rather making use of their existing output to avoid needing to add logs at a higher level besides summary. In other words, there should not be any 2>&1 for the output of any script that has been written in this directory.
 - timezone is the timezone a group of videos is shot in, but is a concern unrelated to the profiles in media-profiles which are camera profiles and could be shot in any number of timezones.
 - base level scripts are explictly provided all args and don't know about profiles. profiles are used by orchestrator scripts to generate args.

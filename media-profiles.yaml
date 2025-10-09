@@ -11,7 +11,7 @@ profiles:
   gopro:
     destination: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Import"
     ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Ready"
-  tags: ["gopro-hero-12"]
+    tags: ["gopro-hero-12"]
     exif: 
       make: "GoPro"
       model: "HERO12 Black"

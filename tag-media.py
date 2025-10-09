@@ -83,15 +83,29 @@ def main():
             print(f"Warning: File not found: {file_path}", file=sys.stderr)
             continue
 
+        filename = os.path.basename(file_path)
+        actions = []
+
         # Apply camera EXIF (Make and Model)
         if args.make or args.model:
+            exif_parts = []
+            if args.make:
+                exif_parts.append(args.make)
+            if args.model:
+                exif_parts.append(args.model)
+            actions.append(f"EXIF: {' / '.join(exif_parts)}")
+
             if not add_camera_to_exif(file_path, make=args.make, model=args.model):
                 continue
 
         # Apply Finder tags
         if finder_tags:
+            actions.append(f"Tags: {', '.join(finder_tags)}")
             if not apply_finder_tags(file_path, finder_tags):
                 continue
+
+        if actions:
+            print(f"  📌 Tagged: {filename} ({'; '.join(actions)})")
 
         success_count += 1
 

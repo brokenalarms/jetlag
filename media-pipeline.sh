@@ -104,7 +104,7 @@ if [[ -n "$profile" ]]; then
   fi
 
   # Parse profile using Python (yaml support)
-  profile_data=$(python3 -c "
+  if ! profile_data=$(python3 -c "
 import yaml, sys, os
 try:
   with open('$profiles_file') as f:
@@ -118,12 +118,8 @@ try:
 except Exception as e:
   print(f'ERROR: {e}', file=sys.stderr)
   sys.exit(1)
-" 2>&1)
-
-  exit_code=$?
-  if [[ $exit_code -ne 0 ]]; then
-    echo "$profile_data" >&2
-    echo "Available profiles: $(python3 -c "import yaml; print(', '.join(yaml.safe_load(open('$profiles_file'))['profiles'].keys()))" 2>/dev/null || echo "Could not read profiles")" >&2
+"); then
+    echo "Available profiles: $(python3 -c "import yaml; print(', '.join(yaml.safe_load(open('$profiles_file'))['profiles'].keys()))" || echo "Could not read profiles")" >&2
     exit 1
   fi
 
@@ -205,7 +201,7 @@ with open('$SCRIPT_DIR/media-profiles.yaml') as f:
   make = exif.get('make', '')
   model = exif.get('model', '')
   print(f'{tags}|{make}|{model}')
-" 2>/dev/null)
+")
 
     IFS='|' read -r tags make model <<< "$tag_data"
 
