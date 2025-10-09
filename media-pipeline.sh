@@ -167,6 +167,10 @@ while IFS= read -r -d '' file; do
   files+=("$file")
 done < <(find "$source_dir" -type f \( -iname "*.mp4" -o -iname "*.mov" -o -iname "*.insv" -o -iname "*.lrv" \) -print0)
 
+# Sort files alphabetically
+IFS=$'\n' files=($(sort <<<"${files[*]}"))
+unset IFS
+
 total_files=${#files[@]}
 
 if [[ $total_files -eq 0 ]]; then
@@ -177,9 +181,6 @@ fi
 echo "📹 Found $total_files video file(s) to process"
 echo
 
-# Set batch mode for fix-video-timestamp.sh to suppress completion messages
-export BATCH_MODE=1
-
 # Process each file through the pipeline
 processed=0
 succeeded=0
@@ -188,10 +189,26 @@ failed=0
 for file in "${files[@]}" ; do
   processed=$((processed + 1))
   base="$(basename "$file")"
-  
+
   echo "[$processed/$total_files] Processing: $base"
-  
-  # Step 1: Fix video timestamp
+
+  # Step 1: Tag media (must run before timestamp fixing as it changes file modified date)
+  # Only run in apply mode since it modifies files
+  if [[ $apply -eq 1 && -n "$profile" ]]; then
+    # Get camera from profile for tagging
+    camera=$(python3 -c "
+import yaml
+with open('$SCRIPT_DIR/media-profiles.yaml') as f:
+  data = yaml.safe_load(f)
+  print(data['profiles']['$profile'].get('camera', ''))
+" 2>/dev/null)
+
+    if [[ -n "$camera" ]]; then
+      "$SCRIPT_DIR/tag-media.py" "$file" --camera "$camera"
+    fi
+  fi
+
+  # Step 2: Fix video timestamp
   echo "  🔧 Fixing timestamp..."
   
   # Build arguments for fix-video-timestamp.sh
@@ -209,7 +226,7 @@ for file in "${files[@]}" ; do
     continue
   fi
   
-  # Step 2: Organize by date
+  # Step 3: Organize by date
   echo "  📁 Organizing by date..."
   
   # Build arguments for organize-by-date.sh

@@ -593,43 +593,59 @@ def check_file_system_timestamps_need_update(file_path: str, datetime_original: 
     current_fs = get_file_system_timestamps(file_path)
     expected_time = get_expected_file_system_time(datetime_original)
 
-    # Check if either birth time or modify time differs from expected (allow 60 second tolerance)
-    birth_needs_update = False
-    modify_needs_update = False
+    # Parse expected timestamp
+    try:
+        expected_dt = datetime.strptime(expected_time, '%Y:%m:%d %H:%M:%S')
+    except ValueError:
+        return True  # Can't parse expected time, assume update needed
 
-    if current_fs.get("birth"):
-        try:
-            current_birth = datetime.strptime(current_fs["birth"], '%Y:%m:%d %H:%M:%S')
-            expected_dt = datetime.strptime(expected_time, '%Y:%m:%d %H:%M:%S')
-            diff = abs((current_birth - expected_dt).total_seconds())
-            birth_needs_update = diff > 60
-        except:
-            birth_needs_update = True
-
+    # Check modify time (this is the primary timestamp we care about)
+    # Birth time is nice to have but not all filesystems support it reliably
+    modify_needs_update = True
     if current_fs.get("modify"):
         try:
             current_modify = datetime.strptime(current_fs["modify"], '%Y:%m:%d %H:%M:%S')
-            expected_dt = datetime.strptime(expected_time, '%Y:%m:%d %H:%M:%S')
             diff = abs((current_modify - expected_dt).total_seconds())
-            modify_needs_update = diff > 60
-        except:
-            modify_needs_update = True
+            # Allow 1 second tolerance for filesystem timing
+            modify_needs_update = diff > 1
+        except ValueError:
+            modify_needs_update = True  # Can't parse, assume update needed
 
-    return birth_needs_update or modify_needs_update
+    # Also check birth time if it exists
+    birth_needs_update = False
+    if current_fs.get("birth"):
+        try:
+            current_birth = datetime.strptime(current_fs["birth"], '%Y:%m:%d %H:%M:%S')
+            diff = abs((current_birth - expected_dt).total_seconds())
+            # Allow 1 second tolerance for filesystem timing
+            birth_needs_update = diff > 1
+        except ValueError:
+            birth_needs_update = True  # Can't parse, assume update needed
+
+    # Only require update if modify time needs it (birth time is optional)
+    return modify_needs_update or birth_needs_update
 
 def check_quicktime_createdate_needs_update(file_path: str, datetime_original: datetime) -> bool:
     """Check if QuickTime CreateDate needs updating to match correct UTC"""
     exif_data = read_exif_data(file_path)
-    current_create_date = exif_data.get("CreateDate", "")
+    # Check MediaCreateDate as that's what we're actually writing
+    current_create_date = exif_data.get("MediaCreateDate", "")
 
     if not current_create_date:
-        return True  # Missing, needs to be written
+        return False  # Not a QuickTime file, skip this check
 
     # Expected UTC from the datetime_original
     expected_utc = datetime_original.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
 
-    # Check if they match
-    return current_create_date != expected_utc
+    # Check if they match (allow 1 second tolerance for rounding)
+    try:
+        current_dt = datetime.strptime(current_create_date, "%Y:%m:%d %H:%M:%S")
+        expected_dt = datetime.strptime(expected_utc, "%Y:%m:%d %H:%M:%S")
+        diff = abs((current_dt - expected_dt).total_seconds())
+        return diff > 1
+    except ValueError:
+        # Can't parse, assume needs update
+        return True
 
 def determine_needed_changes(file_path: str, datetime_original: datetime) -> dict:
     """Determine what changes are needed"""
@@ -860,6 +876,9 @@ def main():
     
     args = parser.parse_args()
 
+    # Convert file path to absolute path to ensure exiftool can find it
+    file_path = os.path.abspath(args.file)
+
     # Handle country lookup for timezone
     timezone_offset = args.timezone
     if args.country and not timezone_offset:
@@ -870,7 +889,7 @@ def main():
             print(f"Error: Could not determine timezone for country '{args.country}'", file=sys.stderr)
             return 1
 
-    success = fix_media_timestamps(args.file, dry_run=not args.apply, verbose=args.verbose, timezone_offset=timezone_offset)
+    success = fix_media_timestamps(file_path, dry_run=not args.apply, verbose=args.verbose, timezone_offset=timezone_offset)
 
     return 0 if success else 1
 

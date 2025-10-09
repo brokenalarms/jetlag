@@ -67,44 +67,24 @@ def get_default_profile_path() -> str:
             return str(profile_path)
     return str(script_dir / 'media-profiles.yaml')
 
-def apply_finder_tags(file_path: str, tags: List[str]) -> bool:
-    """Apply Finder tags to a file using macOS tag command"""
-    if not tags:
+def tag_media_file(file_path: str, camera: Optional[str] = None, tags: Optional[List[str]] = None) -> bool:
+    """Tag media file using tag-media.py script"""
+    if not camera and not tags:
         return True
+
+    script_dir = Path(__file__).parent
+    tag_script = script_dir / 'tag-media.py'
+
+    cmd = [str(tag_script), file_path]
+    if camera:
+        cmd.extend(['--camera', camera])
+    if tags:
+        cmd.extend(['--tags', ','.join(tags)])
 
     try:
-        # Use tag command to apply tags
-        for tag in tags:
-            subprocess.run(['tag', '--add', tag, file_path],
-                          capture_output=True, check=True)
+        subprocess.run(cmd, capture_output=True, check=True)
         return True
-    except subprocess.CalledProcessError as e:
-        print(f"Warning: Failed to apply tags to {file_path}: {e}", file=sys.stderr)
-        return False
-
-def add_camera_to_exif(file_path: str, camera: str) -> bool:
-    """Add camera info to EXIF ImageDescription for Google Photos compatibility"""
-    if not camera:
-        return True
-
-    # Only apply EXIF tags to supported file types (skip .lrv, .insv, etc.)
-    # exiftool can handle these extensions without errors
-    supported_extensions = {'.mp4', '.mov', '.jpg', '.jpeg', '.png', '.dng', '.arw', '.cr2', '.nef'}
-    file_ext = Path(file_path).suffix.lower()
-
-    if file_ext not in supported_extensions:
-        return True  # Skip unsupported types silently
-
-    try:
-        subprocess.run([
-            'exiftool', '-overwrite_original',
-            f'-ImageDescription={camera}',
-            f'-UserComment={camera}',
-            file_path
-        ], capture_output=True, check=True)
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"Warning: Failed to add camera info to {file_path}: {e}", file=sys.stderr)
+    except subprocess.CalledProcessError:
         return False
 
 def organize_file(file_path: str, destination: str, copy_mode: bool = True, apply_changes: bool = False) -> ImportResult:

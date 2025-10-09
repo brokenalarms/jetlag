@@ -158,26 +158,27 @@ process_file() {
       return 1
     fi
   else
+    # Show relative path for input, absolute path for output
+    local display_source abs_target
+    display_source="$file"  # Keep as-is (relative if user provided relative)
+    # Construct absolute target path
+    if [[ "$target_file" = /* ]]; then
+      abs_target="$target_file"  # Already absolute
+    else
+      abs_target="$(pwd)/$target_file"  # Make relative path absolute
+    fi
+
     # Copy or move file to target
     if [[ $apply -eq 1 ]]; then
       mkdir -p "$target_path"
       if [[ $copy_mode -eq 1 ]]; then
         cp -p "$file" "$target_file"
-        echo "✅ Copied: $base → $organized_path/"
+        printf "✅ Copied: %s → %s\n" "$display_source" "$abs_target"
       else
         mv "$file" "$target_file"
-        echo "✅ Moved: $base → $organized_path/"
+        printf "✅ Moved: %s → %s\n" "$display_source" "$abs_target"
       fi
     else
-      # Show relative path for input, absolute path for output
-      local display_source abs_target
-      display_source="$file"  # Keep as-is (relative if user provided relative)
-      # Construct absolute target path (directory may not exist yet in dry-run)
-      if [[ "$target_file" = /* ]]; then
-        abs_target="$target_file"  # Already absolute
-      else
-        abs_target="$(pwd)/$target_file"  # Make relative path absolute
-      fi
       if [[ $copy_mode -eq 1 ]]; then
         printf "[DRY RUN] Would copy: %s → %s\n" "$display_source" "$abs_target"
       else

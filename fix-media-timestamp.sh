@@ -22,4 +22,5 @@ if [[ ! -f "$PYTHON_SCRIPT" ]]; then
 fi
 
 # Pass all arguments directly to Python implementation
+# Python will handle path resolution
 exec python3 "$PYTHON_SCRIPT" "$@"
