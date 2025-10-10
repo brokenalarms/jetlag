@@ -1,7 +1,14 @@
+backup_config:
+  local_base_path: "/Volumes/"
+  remote_base_path: "/volume1/Backup/ChronoSync/"
+
 profiles:
   insta360:
-    destination: "/Volumes/Extreme GRN/Videos/Source Video/Insta360/Import/"
+    import_dir: "/Volumes/Extreme GRN/Videos/Source Video/Insta360/Import/"
     ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/Insta360/Ready"
+    backup_enabled: true
+    backup_dir: "/Volumes/Extreme GRN/Videos/Source Video/Insta360"
+    backup_exclude_subdirs: ["Exports"]
     tags: ["insta-360-x4"]
     exif:
       make: "Insta360"
@@ -9,17 +16,23 @@ profiles:
     companion_extensions: [".lrv", ".thm"]
 
   gopro:
-    destination: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Import"
+    import_dir: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Import"
     ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Ready"
+    backup_enabled: true
+    backup_dir: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Ready"
+    backup_exclude_subdirs: []
     tags: ["gopro-hero-12"]
-    exif: 
+    exif:
       make: "GoPro"
       model: "HERO12 Black"
     companion_extensions: [".thm"]
 
   dji:
-    destination: "/Volumes/Extreme GRN/Videos/Source Video/DJI/Import"
+    import_dir: "/Volumes/Extreme GRN/Videos/Source Video/DJI/Import"
     ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/DJI/Ready"
+    backup_enabled: true
+    backup_dir: "/Volumes/Extreme GRN/Videos/Source Video/DJI/Ready"
+    backup_exclude_subdirs: []
     tags: ["dji-mini-4-pro"]
     exif:
       make: "DJI"
@@ -27,7 +40,10 @@ profiles:
     companion_extensions: [".lrf", ".thm"]
 
   a7iv:
-    destination: "/Volumes/Photos/Import"
+    import_dir: "/Volumes/Extreme GRN/Photos/Import"
+    backup_enabled: false
+    backup_dir: "/Volumes/Extreme GRN/Photos"
+    backup_exclude_subdirs: ["Import"]
     tags: ["sony-a7iv"]
     exif:
       make: "Sony"
@@ -35,10 +51,13 @@ profiles:
     companion_extensions: []
 
   iphone16pro:
-    destination: "/Volumes/Extreme GRN/Videos/Source Video/iPhone/Import"
+    import_dir: "/Volumes/Extreme GRN/Videos/Source Video/iPhone/Import"
     # ready_dir not specified = organize to current directory
+    backup_enabled: false
+    backup_dir: "/Volumes/Extreme GRN/Videos/Source Video/iPhone"
+    backup_exclude_subdirs: ["Import"]
     tags: ["iphone-16-pro"]
     exif:
       make: "Apple"
       model: "iPhone 16 Pro"
-    companion_extensions: [".lrf", ".thm"]
+    companion_extensions: []

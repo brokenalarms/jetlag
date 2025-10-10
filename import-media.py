@@ -25,7 +25,7 @@ signal.signal(signal.SIGINT, signal_handler)
 
 class ImportProfile(NamedTuple):
     """Configuration profile for media import"""
-    destination: str
+    import_dir: str
     companion_extensions: Optional[List[str]] = None
     tags: Optional[List[str]] = None
     exif_make: Optional[str] = None
@@ -52,7 +52,7 @@ def load_profiles(profile_path: str) -> Dict[str, ImportProfile]:
         for name, config in data.get('profiles', data).items():
             exif = config.get('exif', {})
             profiles[name] = ImportProfile(
-                destination=os.path.expandvars(config['destination']),
+                import_dir=os.path.expandvars(config['import_dir']),
                 companion_extensions=config.get('companion_extensions'),
                 tags=config.get('tags'),
                 exif_make=exif.get('make'),
@@ -72,12 +72,12 @@ def get_default_profile_path() -> str:
             return str(profile_path)
     return str(script_dir / 'media-profiles.yaml')
 
-def organize_file(file_path: str, destination: str, copy_mode: bool = True, apply_changes: bool = False) -> ImportResult:
+def organize_file(file_path: str, import_dir: str, copy_mode: bool = True, apply_changes: bool = False) -> ImportResult:
     """Organize a single file using organize-by-date.sh"""
     script_dir = Path(__file__).parent
     organize_script = script_dir / 'organize-by-date.sh'
 
-    cmd = [str(organize_script), file_path, '--target', destination]
+    cmd = [str(organize_script), file_path, '--target', import_dir]
     if copy_mode:
         cmd.append('--copy')
     if apply_changes:
@@ -296,7 +296,7 @@ def import_media(source_dir: str, profile: ImportProfile,
                 print(f"   Warning: Tagging failed for {filename}")
 
         # Organize the file
-        result = organize_file(file_path, profile.destination, copy_mode=True, apply_changes=apply_changes)
+        result = organize_file(file_path, profile.import_dir, copy_mode=True, apply_changes=apply_changes)
         results.append(result)
 
         if not result.success:
@@ -360,7 +360,7 @@ Examples:
         if profiles:
             print("Available profiles:")
             for name, profile in profiles.items():
-                print(f"  {name:12} → {profile.destination}")
+                print(f"  {name:12} → {profile.import_dir}")
         else:
             print("No profiles found")
             print(f"Create a profiles file at: {profiles_file}")
@@ -394,7 +394,7 @@ Examples:
 
     # Display configuration
     print(f"→ Source:      {source_dir}")
-    print(f"→ Destination: {profile.destination}")
+    print(f"→ Import target: {profile.import_dir}")
     print(f"→ Mode:        {'APPLY' if args.apply else 'DRY RUN (no changes)'}")
     print()
 

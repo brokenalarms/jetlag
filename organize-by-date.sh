@@ -76,6 +76,26 @@ log_verbose() {
   [[ $verbose -eq 1 ]] && echo "$@" >&2
 }
 
+cleanup_empty_parent_dirs() {
+  # Clean up empty parent directories after moving a file
+  # Only cleans directories that become empty as a result of this move
+  local file_dir="$1"
+
+  # Keep removing parent directories as long as they're empty
+  # Stop at root or when we hit a non-empty directory
+  while [[ -d "$file_dir" && "$file_dir" != "/" && "$file_dir" != "." ]]; do
+    # Try to remove the directory (only succeeds if empty)
+    if rmdir "$file_dir" 2>/dev/null; then
+      log_verbose "  Removed empty directory: $file_dir"
+      # Move up to parent
+      file_dir="$(dirname "$file_dir")"
+    else
+      # Directory not empty or can't be removed, stop here
+      break
+    fi
+  done
+}
+
 
 # Main processing
 process_file() {
@@ -134,8 +154,13 @@ process_file() {
         return 0
       else
         if [[ $apply -eq 1 ]]; then
+          # Save the source directory before removing
+          local source_dir="$(dirname "$file")"
           rm "$file"
           echo "✅ Removed duplicate source: $base (exists at $organized_path/)"
+
+          # Clean up empty parent directories after removing duplicate
+          cleanup_empty_parent_dirs "$source_dir"
         else
           echo "[DRY RUN] Would remove duplicate: $file (already at $target_file)"
         fi
@@ -147,8 +172,13 @@ process_file() {
           cp -p "$file" "$target_file"
           echo "✅ Copied (replaced smaller): $base → $organized_path/"
         else
+          # Save the source directory before moving
+          local source_dir="$(dirname "$file")"
           mv "$file" "$target_file"
           echo "✅ Moved (replaced smaller): $base → $organized_path/"
+
+          # Clean up empty parent directories after moving
+          cleanup_empty_parent_dirs "$source_dir"
         fi
       else
         echo "[DRY RUN] Would overwrite smaller: $file → $target_file"
@@ -175,8 +205,13 @@ process_file() {
         cp -p "$file" "$target_file"
         printf "✅ Copied: %s → %s\n" "$display_source" "$abs_target"
       else
+        # Save the source directory before moving
+        local source_dir="$(dirname "$file")"
         mv "$file" "$target_file"
         printf "✅ Moved: %s → %s\n" "$display_source" "$abs_target"
+
+        # Clean up empty parent directories after moving
+        cleanup_empty_parent_dirs "$source_dir"
       fi
     else
       if [[ $copy_mode -eq 1 ]]; then

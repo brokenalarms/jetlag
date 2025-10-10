@@ -10,13 +10,15 @@ source "$SCRIPT_DIR/lib/lib-sync.sh"
 
 # Function to show usage
 show_usage() {
-    echo "Usage: $0 [--apply] [--source PATH] [--dest PATH]"
+    echo "Usage: $0 [--apply] [--source PATH] [--dest PATH] [--exclude PATTERNS] [--filter-file FILE]"
     echo ""
     echo "Options:"
-    echo "  --apply         Actually perform the backup (dry-run by default)"
-    echo "  --source PATH   Override SOURCE_PATH from environment"
-    echo "  --dest PATH     Override NAS_BACKUP_PATH from environment"
-    echo "  --help          Show this help message"
+    echo "  --apply              Actually perform the backup (dry-run by default)"
+    echo "  --source PATH        Override SOURCE_PATH from environment"
+    echo "  --dest PATH          Override NAS_BACKUP_PATH from environment"
+    echo "  --exclude PATTERNS   Pipe-separated exclusion patterns (e.g. 'Dir1/|Dir2/')"
+    echo "  --filter-file FILE   Path to rsync filter rules file"
+    echo "  --help               Show this help message"
     echo ""
     echo "Without --apply, this script will show you what changes would be made"
     echo "without actually performing the backup."
@@ -25,6 +27,8 @@ show_usage() {
 # Parse command line arguments
 OVERRIDE_SOURCE=""
 OVERRIDE_DEST=""
+OVERRIDE_EXCLUDE=""
+FILTER_RULES=()
 EXTRA_RSYNC_ARGS=()
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -38,6 +42,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --dest)
             OVERRIDE_DEST="$2"
+            shift 2
+            ;;
+        --exclude)
+            OVERRIDE_EXCLUDE="$2"
+            shift 2
+            ;;
+        --filter-rule)
+            FILTER_RULES+=("$2")
             shift 2
             ;;
         --help|-h)
@@ -91,5 +103,6 @@ echo
 
 # Run rsync using the common function
 # No delete by default (incremental backup)
-# Exclude multiple folders (path relative to SOURCE_PATH, separated by |)
-run_rsync "$SOURCE" "$DEST" "$DRY_RUN" "$EXCLUSIONS" "" "Videos/Source Video/|Exports/" "${EXTRA_RSYNC_ARGS[*]:-}"
+# Exclude patterns from command line or empty string
+# Pass filter rules as array (safe expansion for empty array)
+run_rsync "$SOURCE" "$DEST" "$DRY_RUN" "$EXCLUSIONS" "" "$OVERRIDE_EXCLUDE" "${EXTRA_RSYNC_ARGS[*]:-}" ${FILTER_RULES[@]+"${FILTER_RULES[@]}"}

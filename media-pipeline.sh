@@ -266,22 +266,6 @@ with open('$SCRIPT_DIR/media-profiles.yaml') as f:
   echo  # Empty line between files
 done
 
-# Clean up empty subdirectories in source (only in apply mode with moves)
-if [[ $apply -eq 1 && $succeeded -gt 0 ]]; then
-  echo
-  echo "🧹 Cleaning up empty directories..."
-  # Find and remove empty directories in source_dir (but not source_dir itself)
-  # Use -mindepth 1 to exclude the source_dir itself
-  # Use -type d to only find directories
-  # Use -empty to only find empty directories
-  # Process from deepest to shallowest with sort -r
-  while IFS= read -r -d '' empty_dir; do
-    if rmdir "$empty_dir" 2>/dev/null; then
-      echo "  Removed: $(basename "$empty_dir")"
-    fi
-  done < <(find "$source_dir" -mindepth 1 -type d -empty -print0 | sort -rz)
-fi
-
 # Summary
 echo
 echo "==========================================="
