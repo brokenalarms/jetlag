@@ -78,8 +78,9 @@ run_rsync() {
     if [[ $DRY_RUN -eq 1 ]]; then
         # Filter output during dry run and capture for analysis
         local RSYNC_OUTPUT
-        RSYNC_OUTPUT=$($RSYNC_CMD $RSYNC_ARGS "${EXCLUDE_ARGS[@]}" "$SOURCE" "$DEST" 2>&1 | grep -v "skipping non-regular file" | tee /dev/tty)
+        RSYNC_OUTPUT=$($RSYNC_CMD $RSYNC_ARGS "${EXCLUDE_ARGS[@]}" "$SOURCE" "$DEST" 2>&1 | grep -v "skipping non-regular file")
         local RSYNC_EXIT_CODE="${PIPESTATUS[0]}"
+        echo "$RSYNC_OUTPUT"
     else
         # No filtering during actual transfer to preserve progress updates
         $RSYNC_CMD $RSYNC_ARGS "${EXCLUDE_ARGS[@]}" "$SOURCE" "$DEST"
