@@ -11,6 +11,7 @@ import re
 import signal
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Optional, Callable
 
@@ -43,9 +44,9 @@ def remove_field(dt_with_tz: datetime) -> None:
     return None
 
 def same_local_time_current_tz(dt_with_tz: datetime) -> str:
-    """Keep same local time as DateTimeOriginal for FCP compatibility"""
+    """Keep same local time as DateTimeOriginal"""
     # File system timestamps can't store timezone, so just use the local time
-    # FCP will interpret this as local time in whatever timezone it's running
+    # Applications will interpret this as local time in whatever timezone they're running
     return dt_with_tz.strftime('%Y:%m:%d %H:%M:%S')
 
 # File system timestamp functions - these are the only timestamps we modify
@@ -133,42 +134,8 @@ def get_country_name(input_country: str) -> str:
 
     return input_country
 
-def get_expected_file_system_time(datetime_original: datetime) -> str:
-    """Get the expected file system timestamp (displays original shooting time)
-
-    IMPORTANT: This intentionally creates "wrong" file timestamps for browsing convenience.
-
-    Philosophy:
-    - EXIF metadata (DateTimeOriginal, CreationDate) stores the TRUE shooting time with timezone
-      Example: 13:39:34+08:00 (shot in Taiwan) - this is the source of truth, never changes
-
-    - File system timestamps (birth/modify date) are set to ALWAYS display the shooting time
-      Example: Shot at 13:39 in Taiwan → file ALWAYS shows 13:39
-      Example: Whether you're in Japan (+09:00) or Taiwan (+08:00), file shows 13:39
-
-    Why: This allows browsing files chronologically as they happened during the day.
-         When editing footage from a trip, you can see "morning at 9am, lunch at 1pm" etc.
-         regardless of what timezone you're currently in.
-
-    Trade-off: The file timestamp will NOT represent the correct UTC moment.
-               - File shows: 13:39+09:00 (when in Japan) = 04:39 UTC ❌ (wrong!)
-               - Real UTC: 05:39 UTC (from 13:39+08:00)
-               - But for browsing/editing purposes, seeing 13:39 is more useful than seeing 14:39
-
-    The EXIF metadata always has the correct UTC/timezone, so no information is lost.
-
-    Implementation:
-    - Extract wall-clock time from source timezone (13:39:34 from 13:39:34+08:00)
-    - touch/SetFile will interpret this as current system timezone
-    - Result: file displays 13:39 regardless of where you are viewing it
-    """
-    # Extract the wall-clock time from the shooting timezone
-    # Example: 13:39:34+08:00 → "13:39:34"
-    # This will be interpreted by touch/SetFile as current system timezone
-    return datetime_original.strftime('%Y:%m:%d %H:%M:%S')
-
 # FileModifyDate and FileAccessDate are file system timestamps, not EXIF metadata
-# They will be handled separately by set_file_system_timestamps()
+# They are not modified by this script - video applications use Keys:CreationDate for timeline ordering
 
 def read_exif_data(file_path: str) -> Dict[str, str]:
     """Read all relevant EXIF data with single exiftool call (cached)"""
@@ -253,6 +220,18 @@ def ensure_colon_tz(tz_str: str) -> str:
     """Ensure timezone has colon format (+0200 -> +02:00, +02:00 stays +02:00)"""
     return re.sub(r'([+-][0-9]{2}):?([0-9]{2})$', r'\1:\2', tz_str)
 
+def normalize_timezone_input(tz_str: str) -> str:
+    """Normalize timezone input - ensure it has +/- sign and colon format"""
+    if not tz_str:
+        return tz_str
+
+    # If no +/- sign, add + (assume positive offset)
+    if not tz_str.startswith(('+', '-')):
+        tz_str = '+' + tz_str
+
+    # Ensure colon format
+    return ensure_colon_tz(tz_str)
+
 def normalize_timezone_format(value: str) -> str:
     """Normalize timezone format for consistent comparison"""
     if not value:
@@ -331,57 +310,6 @@ def get_file_system_timestamps(file_path: str) -> Dict[str, str]:
     except subprocess.CalledProcessError:
         return {"birth": "", "modify": ""}
 
-def file_timestamps_need_update(file_path: str, datetime_original: datetime) -> bool:
-    """Check if file system timestamps need updating"""
-    current_fs = get_file_system_timestamps(file_path)
-    expected_time = datetime_original.strftime('%Y:%m:%d %H:%M:%S')
-    
-    # Check if either birth time or modify time differs from expected
-    return (current_fs.get("birth", "") != expected_time or 
-            current_fs.get("modify", "") != expected_time)
-
-def determine_changes(file_path: str, datetime_original: datetime) -> Dict[str, Optional[str]]:
-    """Determine what changes are needed by comparing current vs expected values"""
-    current_data = read_exif_data(file_path)
-    changes = {}
-    
-    for field, transform_func in FIELD_TRANSFORMS.items():
-        expected = transform_func(datetime_original)
-        current = current_data.get(field, "")
-        
-        # Normalize both for comparison
-        current_norm = normalize_exif_value(current)
-        expected_norm = normalize_exif_value(expected) if expected else ""
-        
-        if current_norm != expected_norm:
-            changes[field] = expected
-    
-    return changes
-
-def apply_exif_changes(file_path: str, changes: Dict[str, Optional[str]]) -> bool:
-    """Apply EXIF changes with single exiftool call"""
-    if not changes:
-        return True
-
-    cmd = ["exiftool", "-P", "-fast2", "-overwrite_original"]
-    
-    for field, value in changes.items():
-        if value is None:
-            # Remove field
-            cmd.append(f"-{field}=")
-        else:
-            # Set field
-            cmd.append(f"-{field}={value}")
-    
-    cmd.append(file_path)
-    
-    try:
-        subprocess.run(cmd, capture_output=True, check=True)
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"Error applying EXIF changes: {e}", file=sys.stderr)
-        return False
-
 def write_datetime_original(file_path: str, datetime_with_tz: str) -> bool:
     """Write DateTimeOriginal to file if missing"""
     try:
@@ -395,11 +323,57 @@ def write_datetime_original(file_path: str, datetime_with_tz: str) -> bool:
         print(f"Error writing DateTimeOriginal: {e}", file=sys.stderr)
         return False
 
+def write_keys_creationdate(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False) -> bool:
+    """Write Keys:CreationDate
+
+    Without preserve_wallclock: Writes DateTimeOriginal with its timezone
+    With preserve_wallclock: Writes compensated value to preserve wall-clock time in current timezone
+
+    Args:
+        file_path: Path to the media file
+        datetime_original: datetime object with timezone info
+        preserve_wallclock: If True, compensate to preserve wall-clock shooting time
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        if preserve_wallclock:
+            # Write time compensated for current timezone to preserve wall-clock time
+            # Get wall-clock time and current timezone offset
+            wall_clock_time = datetime_original.strftime('%Y:%m:%d %H:%M:%S')
+            current_tz_offset = time.strftime('%z')
+            current_tz_formatted = f"{current_tz_offset[:3]}:{current_tz_offset[3:]}"
+            keys_value = f"{wall_clock_time}{current_tz_formatted}"
+        else:
+            # Write DateTimeOriginal value directly (with its original timezone)
+            keys_value = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
+            # Format timezone with colon
+            keys_value = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', keys_value)
+
+        cmd = [
+            "exiftool",
+            "-P",
+            "-overwrite_original",
+            f"-Keys:CreationDate={keys_value}",
+            file_path
+        ]
+        subprocess.run(cmd, capture_output=True, check=True)
+
+        # Invalidate cache since file was modified
+        if file_path in _exif_cache:
+            del _exif_cache[file_path]
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error writing Keys:CreationDate: {e}", file=sys.stderr)
+        return False
+
 def write_quicktime_createdate(file_path: str, datetime_original: datetime) -> bool:
-    """Write QuickTime CreateDate as UTC
+    """Write QuickTime CreateDate as UTC using QuickTimeUTC API
 
     This heals corrupted QuickTime CreateDate fields (common in iPhone files).
     Writes the UTC equivalent of the shooting time to QuickTime CreateDate.
+    Uses -api QuickTimeUTC=1 per CLAUDE.md to handle UTC conversion properly.
 
     Args:
         file_path: Path to the media file
@@ -414,10 +388,11 @@ def write_quicktime_createdate(file_path: str, datetime_original: datetime) -> b
         utc_dt = datetime_original.astimezone(timezone.utc)
         utc_time = utc_dt.strftime("%Y:%m:%d %H:%M:%S")
 
-        # Write UTC directly to QuickTime fields (no timezone conversion needed)
-        # QuickTime spec says these should be UTC, so write UTC directly
+        # Write UTC using QuickTimeUTC API
+        # This tells exiftool to interpret the value as UTC and handle conversion
         cmd = [
             "exiftool",
+            "-api", "QuickTimeUTC=1",
             "-P",
             "-overwrite_original",
             f"-QuickTime:CreateDate={utc_time}",
@@ -434,42 +409,14 @@ def write_quicktime_createdate(file_path: str, datetime_original: datetime) -> b
         print(f"Error writing QuickTime CreateDate: {e}", file=sys.stderr)
         return False
 
-def set_file_system_timestamps(file_path: str, expected_timestamp: str) -> bool:
-    """Set file system timestamps using pre-computed value"""
-    # Expected timestamp is already in the correct local time format: YYYY:MM:DD HH:MM:SS
-    try:
-        # Parse the expected timestamp
-        dt = datetime.strptime(expected_timestamp, '%Y:%m:%d %H:%M:%S')
 
-        # For SetFile (MM/DD/YYYY HH:MM:SS)
-        setfile_time = dt.strftime('%m/%d/%Y %H:%M:%S')
-
-        # For touch (YYYYMMDDHHMM.SS)
-        touch_time = dt.strftime('%Y%m%d%H%M.%S')
-
-        # Apply file system timestamp changes
-        subprocess.run(["SetFile", "-d", setfile_time, file_path],
-                      capture_output=True, check=True)
-        subprocess.run(["touch", "-t", touch_time, file_path],
-                      capture_output=True, check=True)
-
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"Error setting file system timestamps: {e}", file=sys.stderr)
-        return False
-
-def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False) -> tuple[Optional[str], str]:
+def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None) -> tuple[Optional[str], str]:
     """Get the best timestamp using 5-tier priority system from bash lib-timestamp.sh
     Returns: (timestamp_string, source_description)
     """
     exif_data = read_exif_data(file_path)
     file_timestamps = get_file_system_timestamps(file_path)
     base = os.path.basename(file_path)
-
-    if overwrite_datetimeoriginal:
-        filename_timestamp = parse_filename_timestamp(file_path)
-        if filename_timestamp and re.match(r'^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6}', base):
-            return filename_timestamp, "filename"
 
     # Priority 1: DateTimeOriginal with timezone (authoritative source)
     datetime_original = exif_data.get("DateTimeOriginal", "")
@@ -531,22 +478,38 @@ def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None
     }
 
     # Use 5-tier priority system to find best timestamp
-    best_timestamp, source = get_best_timestamp(file_path, timezone_offset, overwrite_datetimeoriginal)
+    best_timestamp, source = get_best_timestamp(file_path, timezone_offset)
     data["timestamp_source"] = source
 
     if best_timestamp:
         if source == "CreationDate with timezone":
-            # Use existing CreationDate with timezone
-            data["datetime_original_str"] = data["exif"].get("CreationDate", "")
-            data["timezone_source"] = "Keys:CreationDate metadata"
-            if data["datetime_original_str"]:
-                data["datetime_original"] = parse_datetime_original(data["datetime_original_str"])
+            # Check if we should override timezone
+            if timezone_offset:
+                # Override existing timezone with provided one
+                datetime_with_tz = f"{best_timestamp}{timezone_offset}"
+                data["datetime_original_str"] = datetime_with_tz
+                data["datetime_original"] = parse_datetime_original(datetime_with_tz)
+                data["timezone_source"] = f"--timezone flag ({timezone_offset})"
+            else:
+                # Use existing CreationDate with timezone
+                data["datetime_original_str"] = data["exif"].get("CreationDate", "")
+                data["timezone_source"] = "Keys:CreationDate metadata"
+                if data["datetime_original_str"]:
+                    data["datetime_original"] = parse_datetime_original(data["datetime_original_str"])
         elif source in ["DateTimeOriginal with timezone", "DateTimeOriginal"]:
-            # Use existing DateTimeOriginal
-            data["datetime_original_str"] = data["exif"].get("DateTimeOriginal", "")
-            data["timezone_source"] = "DateTimeOriginal metadata"
-            if data["datetime_original_str"]:
-                data["datetime_original"] = parse_datetime_original(data["datetime_original_str"])
+            # Check if we should override timezone
+            if timezone_offset:
+                # Override existing timezone with provided one
+                datetime_with_tz = f"{best_timestamp}{timezone_offset}"
+                data["datetime_original_str"] = datetime_with_tz
+                data["datetime_original"] = parse_datetime_original(datetime_with_tz)
+                data["timezone_source"] = f"--timezone flag ({timezone_offset})"
+            else:
+                # Use existing DateTimeOriginal
+                data["datetime_original_str"] = data["exif"].get("DateTimeOriginal", "")
+                data["timezone_source"] = "DateTimeOriginal metadata"
+                if data["datetime_original_str"]:
+                    data["datetime_original"] = parse_datetime_original(data["datetime_original_str"])
         elif source == "CreationDate with Z (UTC)":
             # Keys:CreationDate has UTC with Z marker, convert to local time using timezone_offset
             # This handles iPhone files where QuickTime CreateDate is corrupted
@@ -593,10 +556,116 @@ def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None
 
     return data
 
-def check_file_system_timestamps_need_update(file_path: str, datetime_original: datetime) -> bool:
-    """Check if file system timestamps need updating to match original shooting time"""
+def get_expected_file_system_time(datetime_original: datetime, preserve_wallclock: bool = False) -> str:
+    """Calculate what file system timestamp should be
+
+    Default: Convert to current timezone for consistent display
+    Example: Shot at 10:29 in +08:00, viewing in +09:00 → file timestamp should be 11:29
+
+    With preserve_wallclock: Use shooting time directly
+    Example: Shot at 10:29 → file timestamp should be 10:29
+
+    Args:
+        datetime_original: datetime object with timezone info
+        preserve_wallclock: If True, preserve wall-clock shooting time
+
+    Returns:
+        Timestamp string in format "YYYY:MM:DD HH:MM:SS"
+    """
+    if preserve_wallclock:
+        # Use shooting time directly (wall-clock time)
+        return datetime_original.strftime('%Y:%m:%d %H:%M:%S')
+    else:
+        # Convert to current local timezone for consistent display
+        # This ensures file timestamp matches what Keys:CreationDate displays
+        local_dt = datetime_original.astimezone()
+        return local_dt.strftime('%Y:%m:%d %H:%M:%S')
+
+def set_file_system_timestamps(file_path: str, timestamp_str: str) -> bool:
+    """Set file system birth and modification timestamps
+
+    Args:
+        file_path: Path to the file
+        timestamp_str: Timestamp in format "YYYY:MM:DD HH:MM:SS"
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Convert timestamp to format for touch command: YYYYMMDDHHMM.SS
+        # Parse the timestamp
+        dt = datetime.strptime(timestamp_str, '%Y:%m:%d %H:%M:%S')
+        touch_format = dt.strftime('%Y%m%d%H%M.%S')
+
+        # Set modification time using touch
+        subprocess.run(
+            ["touch", "-m", "-t", touch_format, file_path],
+            check=True,
+            capture_output=True
+        )
+
+        # Set birth time (creation time) - macOS specific
+        subprocess.run(
+            ["touch", "-t", touch_format, file_path],
+            check=True,
+            capture_output=True
+        )
+
+        return True
+    except (subprocess.CalledProcessError, ValueError) as e:
+        print(f"Error setting file timestamps: {e}", file=sys.stderr)
+        return False
+
+def check_keys_creationdate_needs_update(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False) -> bool:
+    """Check if Keys:CreationDate needs updating
+
+    Args:
+        file_path: Path to the media file
+        datetime_original: datetime object with timezone info
+        preserve_wallclock: If True, check against compensated value
+
+    Returns:
+        True if Keys:CreationDate needs updating, False otherwise
+    """
+    exif_data = read_exif_data(file_path)
+    current_creation_date = exif_data.get("CreationDate", "")
+
+    if not current_creation_date:
+        # Missing, needs to be written
+        return True
+
+    # Calculate expected value based on preserve_wallclock flag
+    if preserve_wallclock:
+        # Expected: wall-clock time with current timezone
+        wall_clock_time = datetime_original.strftime('%Y:%m:%d %H:%M:%S')
+        current_tz_offset = time.strftime('%z')
+        current_tz_formatted = f"{current_tz_offset[:3]}:{current_tz_offset[3:]}"
+        expected_value = f"{wall_clock_time}{current_tz_formatted}"
+    else:
+        # Expected: DateTimeOriginal with its original timezone
+        expected_value = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
+        # Format timezone with colon
+        expected_value = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', expected_value)
+
+    # Normalize both values for comparison (handle timezone format differences)
+    current_norm = normalize_exif_value(current_creation_date)
+    expected_norm = normalize_exif_value(expected_value)
+
+    return current_norm != expected_norm
+
+def check_file_system_timestamps_need_update(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False) -> bool:
+    """Check if file system timestamps need updating
+
+    Args:
+        file_path: Path to the media file
+        datetime_original: datetime object with timezone info
+        preserve_wallclock: If True, match wall-clock shooting time instead
+
+    Returns:
+        True if timestamps need updating, False otherwise
+    """
     current_fs = get_file_system_timestamps(file_path)
-    expected_time = get_expected_file_system_time(datetime_original)
+    expected_time = get_expected_file_system_time(datetime_original, preserve_wallclock)
 
     # Parse expected timestamp
     try:
@@ -652,15 +721,28 @@ def check_quicktime_createdate_needs_update(file_path: str, datetime_original: d
         # Can't parse, assume needs update
         return True
 
-def determine_needed_changes(file_path: str, datetime_original: datetime) -> dict:
-    """Determine what changes are needed"""
+def determine_needed_changes(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False) -> dict:
+    """Determine what changes are needed
+
+    Args:
+        file_path: Path to the media file
+        datetime_original: datetime object with timezone info
+        preserve_wallclock: If True, preserve wall-clock shooting time
+
+    Returns:
+        Dictionary with boolean flags for needed changes
+    """
     changes = {
+        "keys_creationdate": False,
         "file_timestamps": False,
         "quicktime_createdate": False
     }
 
+    # Check if Keys:CreationDate needs updating
+    changes["keys_creationdate"] = check_keys_creationdate_needs_update(file_path, datetime_original, preserve_wallclock)
+
     # Check if file system timestamps need updating
-    changes["file_timestamps"] = check_file_system_timestamps_need_update(file_path, datetime_original)
+    changes["file_timestamps"] = check_file_system_timestamps_need_update(file_path, datetime_original, preserve_wallclock)
 
     # Check if QuickTime CreateDate needs updating
     changes["quicktime_createdate"] = check_quicktime_createdate_needs_update(file_path, datetime_original)
@@ -748,7 +830,7 @@ def format_time_delta(seconds: float) -> str:
     td = timedelta(seconds=abs(seconds))
     return f"{sign}{humanize.naturaldelta(td)}"
 
-def format_change_description(changes: dict, delta_seconds: Optional[float] = None, current_data: dict = None) -> str:
+def format_change_description(changes: dict, delta_seconds: Optional[float] = None, current_data: Optional[dict] = None, preserve_wallclock: bool = False, expected_file_time: Optional[str] = None) -> str:
     """Format change description from changes data"""
     parts = []
 
@@ -757,10 +839,35 @@ def format_change_description(changes: dict, delta_seconds: Optional[float] = No
     if needs_datetime_original:
         parts.append("DateTimeOriginal (missing)")
 
+    if changes.get("keys_creationdate"):
+        # Show what the current Keys:CreationDate is
+        if current_data:
+            creation_date = current_data.get("exif", {}).get("CreationDate", "")
+            if creation_date:
+                parts.append(f"Keys:CreationDate (was: {format_exif_timestamp_display(creation_date)})")
+            else:
+                parts.append("Keys:CreationDate (missing)")
+        else:
+            parts.append("Keys:CreationDate")
+
     if changes.get("file_timestamps"):
         if delta_seconds is not None and abs(delta_seconds) > 1:
             delta_str = format_time_delta(delta_seconds)
-            parts.append(f"File timestamps ({delta_str})")
+
+            # Show what time we're setting to
+            if expected_file_time:
+                expected_dt = datetime.strptime(expected_file_time, '%Y:%m:%d %H:%M:%S')
+                time_display = expected_dt.strftime('%H:%M')
+
+                if preserve_wallclock:
+                    parts.append(f"File timestamps ({delta_str} to {time_display}, shooting time)")
+                else:
+                    # Get current system timezone offset
+                    system_tz_offset = time.strftime('%z')
+                    system_tz_formatted = f"{system_tz_offset[:3]}:{system_tz_offset[3:]}"
+                    parts.append(f"File timestamps ({delta_str} to {time_display}, display time in {system_tz_formatted})")
+            else:
+                parts.append(f"File timestamps ({delta_str})")
         else:
             parts.append("File timestamps")
 
@@ -777,24 +884,24 @@ def format_change_description(changes: dict, delta_seconds: Optional[float] = No
 
     return ", ".join(parts) if parts else "No change"
 
-def fix_media_timestamps(file_path: str, dry_run: bool = False, verbose: bool = False, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False) -> bool:
+def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False, preserve_wallclock: bool = False) -> bool:
     """Main function to fix media (photo/video) timestamps
 
     Args:
         file_path: Path to media file
         dry_run: If True, show changes without applying them
-        verbose: Show verbose output
         timezone_offset: Timezone offset (e.g. +09:00) for files missing timezone
         overwrite_datetimeoriginal: If True, overwrite DateTimeOriginal even if it exists (for genuinely wrong timestamps)
+        preserve_wallclock: If True, preserve wall-clock shooting time instead of adjusting for current timezone
     """
 
     # Get all data
     current_data = get_all_timestamp_data(file_path, timezone_offset, overwrite_datetimeoriginal)
-    
+
     # Display header
     filename = os.path.basename(file_path)
     print(f"\033[36m🔍 {filename}\033[0m")
-    
+
     if not current_data["datetime_original"]:
         # Check if we have CreateDate but missing timezone
         create_date = current_data["exif"].get("CreateDate", "")
@@ -805,10 +912,13 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, verbose: bool = 
             return False
         print("❌ No valid DateTimeOriginal found")
         return False
-    
+
     datetime_original = current_data["datetime_original"]
-    changes = determine_needed_changes(file_path, datetime_original)
-    
+    datetime_original_str = current_data["datetime_original_str"]
+
+    # Determine needed changes
+    changes = determine_needed_changes(file_path, datetime_original, preserve_wallclock=preserve_wallclock)
+
     # Format and display timestamps
     original_display = format_original_timestamps(current_data)
     print(f"📅 Original : {original_display}")
@@ -817,13 +927,14 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, verbose: bool = 
     timezone_source = current_data.get("timezone_source", "")
     corrected_display = format_corrected_timestamp(datetime_original, timestamp_source, timezone_source)
     print(f"⏱️ Corrected: {corrected_display}")
-    
+
     utc_dt = datetime_original.astimezone(timezone.utc)
     utc_display = utc_dt.strftime('%Y-%m-%d %H:%M:%S UTC')
     print(f"🌐 UTC      : {utc_display}")
 
-    # Calculate delta if file timestamps need updating
+    # Calculate delta and expected time if file timestamps need updating
     delta_seconds = None
+    expected_file_time = None
     if changes.get("file_timestamps"):
         current_fs = current_data["file_system"]
         if current_fs.get("modify"):
@@ -831,16 +942,16 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, verbose: bool = 
                 # Parse current file timestamp (no timezone, local time)
                 current_dt = datetime.strptime(current_fs["modify"], '%Y:%m:%d %H:%M:%S')
                 # Parse expected timestamp (no timezone, local time)
-                expected_time = get_expected_file_system_time(datetime_original)
-                expected_dt = datetime.strptime(expected_time, '%Y:%m:%d %H:%M:%S')
+                expected_file_time = get_expected_file_system_time(datetime_original, preserve_wallclock=preserve_wallclock)
+                expected_dt = datetime.strptime(expected_file_time, '%Y:%m:%d %H:%M:%S')
                 # Calculate delta
                 delta_seconds = (expected_dt - current_dt).total_seconds()
             except:
                 pass
 
     # Display changes
-    change_desc = format_change_description(changes, delta_seconds, current_data)
-    has_changes = changes["file_timestamps"] or changes.get("quicktime_createdate", False)
+    change_desc = format_change_description(changes, delta_seconds, current_data, preserve_wallclock, expected_file_time)
+    has_changes = changes.get("keys_creationdate", False) or changes["file_timestamps"] or changes.get("quicktime_createdate", False)
 
     if dry_run and has_changes:
         print(f"📊 Change   : {change_desc} (DRY RUN)")
@@ -872,6 +983,12 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, verbose: bool = 
             print("   ❌ Failed to write DateTimeOriginal")
             success = False
 
+    # Write Keys:CreationDate if needed
+    if changes.get("keys_creationdate"):
+        if not write_keys_creationdate(file_path, datetime_original, preserve_wallclock):
+            print("   ❌ Failed to write Keys:CreationDate")
+            success = False
+
     # Heal QuickTime CreateDate if needed
     if changes.get("quicktime_createdate"):
         if not write_quicktime_createdate(file_path, datetime_original):
@@ -880,7 +997,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, verbose: bool = 
 
     # Update file system timestamps if needed
     if changes["file_timestamps"]:
-        expected_file_timestamp = get_expected_file_system_time(datetime_original)
+        expected_file_timestamp = get_expected_file_system_time(datetime_original, preserve_wallclock=preserve_wallclock)
         if not set_file_system_timestamps(file_path, expected_file_timestamp):
             print("   ❌ Failed to apply file timestamps")
             success = False
@@ -895,7 +1012,7 @@ def main():
     parser.add_argument('--country', help='Country code or name for automatic timezone lookup (e.g. JP, Taiwan)')
     parser.add_argument('--apply', action='store_true', help='Apply changes (default: dry run)')
     parser.add_argument('--overwrite-datetimeoriginal', action='store_true', help='Overwrite DateTimeOriginal even if it exists (for genuinely wrong timestamps)')
-    parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
+    parser.add_argument('--preserve-wallclock-time', action='store_true', help='Preserve wall-clock shooting time instead of adjusting for current timezone')
 
     args = parser.parse_args()
 
@@ -904,6 +1021,10 @@ def main():
 
     # Handle country lookup for timezone
     timezone_offset = args.timezone
+    if timezone_offset:
+        # Normalize timezone format (add + sign if missing, ensure colon)
+        timezone_offset = normalize_timezone_input(timezone_offset)
+
     if args.country and not timezone_offset:
         timezone_offset = get_timezone_for_country(args.country)
         if timezone_offset:
@@ -915,9 +1036,9 @@ def main():
     success = fix_media_timestamps(
         file_path,
         dry_run=not args.apply,
-        verbose=args.verbose,
         timezone_offset=timezone_offset,
-        overwrite_datetimeoriginal=args.overwrite_datetimeoriginal
+        overwrite_datetimeoriginal=args.overwrite_datetimeoriginal,
+        preserve_wallclock=args.preserve_wallclock_time
     )
 
     return 0 if success else 1

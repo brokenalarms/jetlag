@@ -52,7 +52,7 @@ profiles:
 
   iphone16pro:
     import_dir: "/Volumes/Extreme GRN/Videos/Source Video/iPhone/Import"
-    # ready_dir not specified = organize to current directory
+    ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/iPhone/Ready"
     backup_enabled: false
     backup_dir: "/Volumes/Extreme GRN/Videos/Source Video/iPhone"
     backup_exclude_subdirs: ["Import"]
