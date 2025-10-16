@@ -123,7 +123,7 @@ while IFS= read -r -d '' file; do
     failed_count=$((failed_count + 1))
     echo "⚠️ Failed to process: $(basename "$file")"
   fi
-done < <(eval "find . -type f \\( $file_pattern \\) -print0")
+done < <(eval "find . -type f \\( $file_pattern \\) -print0" | sort -z)
 
 # Always show summary even if no files processed
 if [[ $file_count -eq 0 ]]; then

@@ -187,6 +187,7 @@ echo
 processed=0
 succeeded=0
 failed=0
+failed_files=()
 
 for file in "${files[@]}" ; do
   processed=$((processed + 1))
@@ -195,8 +196,7 @@ for file in "${files[@]}" ; do
   echo "[$processed/$total_files] Processing: $base"
 
   # Step 1: Tag media (must run before timestamp fixing as it changes file modified date)
-  # Only run in apply mode since it modifies files
-  if [[ $apply -eq 1 && -n "$profile" ]]; then
+  if [[ -n "$profile" ]]; then
     # Get tags and exif from profile for tagging
     tag_data=$(python3 -c "
 import yaml
@@ -213,17 +213,19 @@ with open('$SCRIPT_DIR/media-profiles.yaml') as f:
     IFS='|' read -r tags make model <<< "$tag_data"
 
     if [[ -n "$tags" || -n "$make" || -n "$model" ]]; then
+      echo "🏷️  Checking tags..."
       cmd=("$SCRIPT_DIR/tag-media.py" "$file")
       [[ -n "$tags" ]] && cmd+=("--tags" "$tags")
       [[ -n "$make" ]] && cmd+=("--make" "$make")
       [[ -n "$model" ]] && cmd+=("--model" "$model")
-      "${cmd[@]}"
+      [[ $apply -eq 1 ]] && cmd+=("--apply")
+      "${cmd[@]}" 2>&1 | sed 's/^/  /'
     fi
   fi
 
   # Step 2: Fix video timestamp
-  echo "  🔧 Fixing timestamp..."
-  
+  echo "🔧 Fixing timestamp..."
+
   # Build arguments for fix-video-timestamp.sh
   fix_args=()
   [[ $apply -eq 1 ]] && fix_args+=("--apply")
@@ -231,22 +233,23 @@ with open('$SCRIPT_DIR/media-profiles.yaml') as f:
   if [[ ${#location_args[@]} -gt 0 ]]; then
     fix_args+=("${location_args[@]}")
   fi
-  
-  if ! "$SCRIPT_DIR/fix-media-timestamp.sh" "$file" "${fix_args[@]+"${fix_args[@]}"}"; then
+
+  if ! "$SCRIPT_DIR/fix-media-timestamp.sh" "$file" "${fix_args[@]+"${fix_args[@]}"}" 2>&1 | sed 's/^/  /'; then
     echo "   ❌ Timestamp fix failed for $base"
     failed=$((failed + 1))
+    failed_files+=("$base")
     echo  # Empty line between files
     continue
   fi
   
   # Step 3: Organize by date
-  echo "  📁 Organizing by date..."
-  
+  echo "📁 Organizing by date..."
+
   # Build arguments for organize-by-date.sh
   org_args=("--target" "$target_dir")
   [[ $apply -eq 1 ]] && org_args+=("--apply")
   [[ $verbose -eq 1 ]] && org_args+=("--verbose")
-  
+
   # Pass raw template and label separately
   if [[ -n "$MEDIA_PIPELINE_TEMPLATE" ]]; then
     template="$MEDIA_PIPELINE_TEMPLATE"
@@ -255,10 +258,11 @@ with open('$SCRIPT_DIR/media-profiles.yaml') as f:
   fi
   org_args+=("--template" "$template")
   org_args+=("--label" "$label")
-  
-  if ! "$SCRIPT_DIR/organize-by-date.sh" "$file" "${org_args[@]+"${org_args[@]}"}"; then
+
+  if ! "$SCRIPT_DIR/organize-by-date.sh" "$file" "${org_args[@]+"${org_args[@]}"}" 2>&1 | sed 's/^/  /'; then
     echo "   ❌ Organization failed for $base"
     failed=$((failed + 1))
+    failed_files+=("$base")
   else
     succeeded=$((succeeded + 1))
   fi
@@ -275,6 +279,11 @@ echo "Total files processed: $processed"
 echo "Successfully completed: $succeeded"
 if [[ $failed -gt 0 ]]; then
   echo "Failed: $failed"
+  echo ""
+  echo "Failed files:"
+  for failed_file in "${failed_files[@]}"; do
+    echo "  - $failed_file"
+  done
 fi
 
 if [[ $apply -eq 1 ]]; then

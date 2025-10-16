@@ -81,6 +81,10 @@ while IFS= read -r -d '' file; do
   files+=("$file")
 done < <(find "$source_dir" -type f ! -name ".*" -print0)
 
+# Sort files alphabetically
+IFS=$'\n' files=($(sort <<<"${files[*]}"))
+unset IFS
+
 total_files=${#files[@]}
 
 if [[ $total_files -eq 0 ]]; then
