@@ -15,8 +15,16 @@ run_rsync() {
     local EXTRA_EXCLUDES="${6:-}"
     local EXTRA_ARGS="${7:-}"
     
-    # Build rsync command (no compression by default - can be added via EXTRA_ARGS if needed)
-    local RSYNC_ARGS="-aviz --no-perms --no-owner --no-group --no-links --omit-dir-times --human-readable"
+    # Build rsync command
+    # Note: Removed -z (rsync compression) to avoid "deflate on token" errors with large files
+    # We use SSH compression (-C) instead which is more reliable
+    local RSYNC_ARGS="-avi --no-perms --no-owner --no-group --no-links --omit-dir-times --human-readable"
+
+    # Add bandwidth limit to avoid triggering hotel QoS (if RSYNC_BW_LIMIT is set)
+    # Set in .env.local: RSYNC_BW_LIMIT=5000  (KB/s, ~5 MB/s is typically safe)
+    if [[ -n "${RSYNC_BW_LIMIT:-}" ]]; then
+        RSYNC_ARGS="$RSYNC_ARGS --bwlimit=${RSYNC_BW_LIMIT}"
+    fi
     
     # Add delete options if requested
     if [[ "$DELETE_FLAG" == "delete" ]]; then
@@ -78,12 +86,13 @@ run_rsync() {
     if [[ $DRY_RUN -eq 1 ]]; then
         # Filter output during dry run and capture for analysis
         local RSYNC_OUTPUT
-        RSYNC_OUTPUT=$($RSYNC_CMD $RSYNC_ARGS "${EXCLUDE_ARGS[@]}" "$SOURCE" "$DEST" 2>&1 | grep -v "skipping non-regular file")
+        RSYNC_OUTPUT=$($RSYNC_CMD -e "ssh -C" $RSYNC_ARGS "${EXCLUDE_ARGS[@]}" "$SOURCE" "$DEST" 2>&1 | grep -v "skipping non-regular file")
         local RSYNC_EXIT_CODE="${PIPESTATUS[0]}"
         echo "$RSYNC_OUTPUT"
     else
         # No filtering during actual transfer to preserve progress updates
-        $RSYNC_CMD $RSYNC_ARGS "${EXCLUDE_ARGS[@]}" "$SOURCE" "$DEST"
+        # Use SSH compression (-C) to avoid hotel throttling
+        $RSYNC_CMD -e "ssh -C" $RSYNC_ARGS "${EXCLUDE_ARGS[@]}" "$SOURCE" "$DEST"
         local RSYNC_EXIT_CODE=$?
     fi
     

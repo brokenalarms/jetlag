@@ -24,3 +24,6 @@
     - to that extent, stop adding --verbose mode unless instructed.
 - base level scripts are explictly provided all args and don't know about profiles. profiles are used by orchestrator scripts to generate args.
 - batch files always pass through all args transparently
+- TESTING
+  - tests should be run as part of validating feature changes
+  - tests should not be updated without explicit confirmation, unless we use TDD to make the change, confirm that the the tests now break in the way expected, then update the test accordingly. Otherwise tests at this stage should not break from a change unless there is a regression, and the test should be used to identify this regression.
