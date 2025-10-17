@@ -19,7 +19,8 @@
 - BEST PRACTICES
   - data should be separated from presentation - formatted text shouldn't be relied on for function args, rather key names better suited for describing data, and formatted text should be built at the time of display using data, for example each data element in a structured dict that then forms the building blocks for information/logs
   - No hardcoded defaults in code - all configuration must be read from configuration files (media-profiles.yaml) or environment variables (.env.local). If required config is missing, fail immediately with a clear error message directing the user where to add it. This ensures portability across different computers and deployment environments.
-  - each base script operates on a single file. media-pipeline orchestrates via yaml profiles. all batched operations should happen to one file at a time before moving onto next, so if the script gets interrupted, it will continue from the next incompletely processed file and not repeat any steps. all batch operations should be performed in alphabetical order.
+  - each base script operates on a single file. media-pipeline orchestrates via yaml profiles. It's job is to translate profiles to args for the base scripts and run them in sequence.
+  - all batched operations should happen to one file at a time before moving onto next, so if the script gets interrupted, it will continue from the next incompletely processed file and not repeat any steps. all batch operations should be performed in alphabetical order.
   - scripts should be run compositionally, passing through args of higher level ones and never swallowing the output of building block scripts but rather making use of their existing output to avoid needing to add logs at a higher level besides summary. In other words, there should not be any 2>&1 for the output of any script that has been written in this directory.
     - to that extent, stop adding --verbose mode unless instructed.
 - base level scripts are explictly provided all args and don't know about profiles. profiles are used by orchestrator scripts to generate args.
@@ -27,3 +28,18 @@
 - TESTING
   - tests should be run as part of validating feature changes
   - tests should not be updated without explicit confirmation, unless we use TDD to make the change, confirm that the the tests now break in the way expected, then update the test accordingly. Otherwise tests at this stage should not break from a change unless there is a regression, and the test should be used to identify this regression.
+  - testing that returncode is 0 is not testing the actual behavior or effect of the code, just that it ran without error, so would make for a useless test
+  - simarly testing result.stdout reveals nothing but what the logs said, which could lie. the changes to the fake test file need to be recorded before and after with actual/expected human readable messages.
+- SCENARIO/REGRESSION TESTS:
+  - fix-media-timestamp:
+    - if --overwrite-datetimeoriginal is specified, --timezone must be provided
+    - files with YYYYMMDD_HHMMSS in the filename are first source of truth and filename should never be modified
+    - DateTimeOriginal is next source of truth and should never be modified unless --overwrite-datetimeoriginal is specified
+    - if a file was shot in timezone +0800, with the script run in +0900, then we would expect Keys:Creation date to end up with the +0800 timezone, and the birthdate to end up as one hour later
+    - if a different --timezone is specified that doesn't match DateTimeOriginal, then we should exit with a warning unless --overwrite-datetime-original is specified
+    - if DateTimeOriginal is missing and we change timezones, we would expect the Quicktime UTC fields MediaCreateDate, file birth date, Keys:CreationDate to all be updated
+    - if --preserve-wallclock-time is specified, then we would expect the file birthtime to be set back one hour in order to make the edited file appear in this timezone as if it was shot at the same time in this timezone
+  - organize-by-date:
+    - file is sorted into label template provided
+    - directories that were left empty as the result of a file being moved from it are deleted as soon as that last file is removed from it
+    - directories that were already empty and didn't become so from files being moved are left 

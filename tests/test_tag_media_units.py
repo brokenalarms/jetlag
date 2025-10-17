@@ -14,8 +14,14 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Import the tag-media module
-import tag_media as tm
+# Import hyphenated module name
+import importlib.util
+spec = importlib.util.spec_from_file_location(
+    "tag_media",
+    str(Path(__file__).parent.parent / "tag-media.py")
+)
+tm = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(tm)
 
 
 class TestGetExistingTags:

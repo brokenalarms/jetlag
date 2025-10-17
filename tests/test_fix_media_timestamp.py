@@ -135,7 +135,8 @@ class TestFixMediaTimestamp:
         assert abs(stat_after_second.st_birthtime - birthtime_after_first) < 2  # 2 second tolerance
 
     def test_timezone_flag(self, test_video_no_timezone):
-        """Test --timezone flag for files without timezone"""
+        """Test --timezone flag adds timezone to DateTimeOriginal without timezone"""
+        # File has DateTimeOriginal but no timezone - should add it
         result = subprocess.run([
             "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
             test_video_no_timezone,
@@ -144,7 +145,15 @@ class TestFixMediaTimestamp:
         ], capture_output=True, text=True)
 
         assert result.returncode == 0
-        assert "+08:00" in result.stdout or "+0800" in result.stdout
+
+        # Verify Keys:CreationDate was written with timezone
+        exif_result = subprocess.run([
+            "exiftool", "-s", "-Keys:CreationDate", test_video_no_timezone
+        ], capture_output=True, text=True, check=True)
+
+        # Should have timezone added
+        assert "CreationDate" in exif_result.stdout
+        assert "+08:00" in exif_result.stdout
 
     def test_keys_creationdate_updated(self, test_video):
         """Test that Keys:CreationDate is written correctly"""

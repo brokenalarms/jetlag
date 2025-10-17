@@ -39,7 +39,22 @@ class TestTagMedia:
         return video_path
 
     def test_dry_run_no_changes(self, test_video):
-        """Test that dry run doesn't modify files"""
+        """Test that dry run doesn't modify files
+
+        Actual: File unchanged after dry run
+        Expected: No tags or EXIF added in dry run mode
+        """
+        # Record before state
+        tag_result_before = subprocess.run([
+            "tag", "--list", test_video
+        ], capture_output=True, text=True)
+        has_tag_before = "test-tag" in tag_result_before.stdout
+
+        exif_result_before = subprocess.run([
+            "exiftool", "-Make", "-Model", test_video
+        ], capture_output=True, text=True)
+        has_make_before = "TestMake" in exif_result_before.stdout
+
         # Run without --apply (dry run mode)
         result = subprocess.run([
             "python3", str(SCRIPT_DIR / "tag-media.py"),
@@ -49,25 +64,37 @@ class TestTagMedia:
             "--model", "TestModel"
         ], capture_output=True, text=True)
 
-        assert result.returncode == 0
-        assert "(DRY RUN)" in result.stdout
-
-        # Verify no tags were actually added
-        tag_result = subprocess.run([
+        # Record after state
+        tag_result_after = subprocess.run([
             "tag", "--list", test_video
         ], capture_output=True, text=True)
+        has_tag_after = "test-tag" in tag_result_after.stdout
 
-        assert "test-tag" not in tag_result.stdout
-
-        # Verify no EXIF was written
-        exif_result = subprocess.run([
+        exif_result_after = subprocess.run([
             "exiftool", "-Make", "-Model", test_video
         ], capture_output=True, text=True)
+        has_make_after = "TestMake" in exif_result_after.stdout
 
-        assert "TestMake" not in exif_result.stdout
+        # Verify behavior: dry run should not modify file
+        assert result.returncode == 0, f"Script should succeed: {result.stderr}"
+        assert has_tag_before == False, "Tag should not exist before"
+        assert has_tag_after == False, f"Actual: tag added in dry run, Expected: no changes in dry run"
+        assert has_make_before == False, "Make should not exist before"
+        assert has_make_after == False, f"Actual: EXIF added in dry run, Expected: no changes in dry run"
 
     def test_apply_mode_adds_tags(self, test_video):
-        """Test that apply mode adds tags"""
+        """Test that apply mode adds tags
+
+        Actual: Tags added to file
+        Expected: Both test-tag and another-tag present
+        """
+        # Record before state
+        tag_result_before = subprocess.run([
+            "tag", "--list", "--no-name", test_video
+        ], capture_output=True, text=True)
+        has_test_tag_before = "test-tag" in tag_result_before.stdout
+        has_another_tag_before = "another-tag" in tag_result_before.stdout
+
         result = subprocess.run([
             "python3", str(SCRIPT_DIR / "tag-media.py"),
             test_video,
@@ -75,20 +102,33 @@ class TestTagMedia:
             "--apply"
         ], capture_output=True, text=True)
 
-        assert result.returncode == 0
-        assert "Tagged" in result.stdout or "📌" in result.stdout
-        assert "(DRY RUN)" not in result.stdout
-
-        # Verify tags were added
-        tag_result = subprocess.run([
+        # Record after state
+        tag_result_after = subprocess.run([
             "tag", "--list", "--no-name", test_video
         ], capture_output=True, text=True, check=True)
+        has_test_tag_after = "test-tag" in tag_result_after.stdout
+        has_another_tag_after = "another-tag" in tag_result_after.stdout
 
-        assert "test-tag" in tag_result.stdout
-        assert "another-tag" in tag_result.stdout
+        # Verify behavior: tags should be added
+        assert result.returncode == 0, f"Script should succeed: {result.stderr}"
+        assert has_test_tag_before == False, "test-tag should not exist before"
+        assert has_another_tag_before == False, "another-tag should not exist before"
+        assert has_test_tag_after == True, f"Actual: test-tag not added, Expected: test-tag present"
+        assert has_another_tag_after == True, f"Actual: another-tag not added, Expected: another-tag present"
 
     def test_apply_mode_adds_exif(self, test_video):
-        """Test that apply mode adds EXIF data"""
+        """Test that apply mode adds EXIF data
+
+        Actual: EXIF fields added to file
+        Expected: Make=GoPro, Model=HERO12 Black
+        """
+        # Record before state
+        exif_result_before = subprocess.run([
+            "exiftool", "-s", "-Make", "-Model", test_video
+        ], capture_output=True, text=True)
+        has_make_before = "GoPro" in exif_result_before.stdout
+        has_model_before = "HERO12 Black" in exif_result_before.stdout
+
         result = subprocess.run([
             "python3", str(SCRIPT_DIR / "tag-media.py"),
             test_video,
@@ -97,19 +137,26 @@ class TestTagMedia:
             "--apply"
         ], capture_output=True, text=True)
 
-        assert result.returncode == 0
-        assert "EXIF" in result.stdout
-
-        # Verify EXIF was written
-        exif_result = subprocess.run([
+        # Record after state
+        exif_result_after = subprocess.run([
             "exiftool", "-s", "-Make", "-Model", test_video
         ], capture_output=True, text=True, check=True)
+        has_make_after = "GoPro" in exif_result_after.stdout
+        has_model_after = "HERO12 Black" in exif_result_after.stdout
 
-        assert "GoPro" in exif_result.stdout
-        assert "HERO12 Black" in exif_result.stdout
+        # Verify behavior: EXIF should be added
+        assert result.returncode == 0, f"Script should succeed: {result.stderr}"
+        assert has_make_before == False, "Make should not exist before"
+        assert has_model_before == False, "Model should not exist before"
+        assert has_make_after == True, f"Actual: Make not added, Expected: Make=GoPro"
+        assert has_model_after == True, f"Actual: Model not added, Expected: Model=HERO12 Black"
 
     def test_idempotency_tags(self, test_video):
-        """Test that adding same tags twice doesn't duplicate"""
+        """Test that adding same tags twice doesn't duplicate
+
+        Actual: Tag count stays at 1 after second run
+        Expected: Idempotent, tag appears exactly once
+        """
         # First run
         subprocess.run([
             "python3", str(SCRIPT_DIR / "tag-media.py"),
@@ -118,7 +165,13 @@ class TestTagMedia:
             "--apply"
         ], capture_output=True, check=True)
 
-        # Second run should report already tagged
+        # Verify tag was added once
+        tag_result_after_first = subprocess.run([
+            "tag", "--list", "--no-name", test_video
+        ], capture_output=True, text=True, check=True)
+        count_after_first = tag_result_after_first.stdout.count("test-tag")
+
+        # Second run
         result = subprocess.run([
             "python3", str(SCRIPT_DIR / "tag-media.py"),
             test_video,
@@ -126,19 +179,23 @@ class TestTagMedia:
             "--apply"
         ], capture_output=True, text=True)
 
-        assert result.returncode == 0
-        assert "Already tagged correctly" in result.stdout
-
         # Verify tag wasn't duplicated
-        tag_result = subprocess.run([
+        tag_result_after_second = subprocess.run([
             "tag", "--list", "--no-name", test_video
         ], capture_output=True, text=True, check=True)
+        count_after_second = tag_result_after_second.stdout.count("test-tag")
 
-        # Should only appear once
-        assert tag_result.stdout.count("test-tag") == 1
+        # Verify idempotent behavior
+        assert result.returncode == 0, f"Script should succeed: {result.stderr}"
+        assert count_after_first == 1, "Tag should appear once after first run"
+        assert count_after_second == 1, f"Actual: tag appears {count_after_second} times, Expected: tag appears exactly once (idempotent)"
 
     def test_idempotency_exif(self, test_video):
-        """Test that setting same EXIF twice doesn't rewrite"""
+        """Test that setting same EXIF twice doesn't rewrite
+
+        Actual: Modification time unchanged after second run
+        Expected: Idempotent, no file write on second run
+        """
         # First run
         subprocess.run([
             "python3", str(SCRIPT_DIR / "tag-media.py"),
@@ -147,11 +204,18 @@ class TestTagMedia:
             "--model", "HERO12 Black",
             "--apply"
         ], capture_output=True, check=True)
+
+        # Verify EXIF was written
+        exif_result_after_first = subprocess.run([
+            "exiftool", "-s", "-Make", "-Model", test_video
+        ], capture_output=True, text=True, check=True)
+        has_make_after_first = "GoPro" in exif_result_after_first.stdout
+        has_model_after_first = "HERO12 Black" in exif_result_after_first.stdout
 
         # Get modification time after first run
         mtime_after_first = os.stat(test_video).st_mtime
 
-        # Second run should report already tagged
+        # Second run
         result = subprocess.run([
             "python3", str(SCRIPT_DIR / "tag-media.py"),
             test_video,
@@ -160,15 +224,28 @@ class TestTagMedia:
             "--apply"
         ], capture_output=True, text=True)
 
-        assert result.returncode == 0
-        assert "Already tagged correctly" in result.stdout
+        # Verify EXIF unchanged
+        exif_result_after_second = subprocess.run([
+            "exiftool", "-s", "-Make", "-Model", test_video
+        ], capture_output=True, text=True, check=True)
+        has_make_after_second = "GoPro" in exif_result_after_second.stdout
+        has_model_after_second = "HERO12 Black" in exif_result_after_second.stdout
 
         # Modification time shouldn't change (no exiftool write)
         mtime_after_second = os.stat(test_video).st_mtime
-        assert abs(mtime_after_second - mtime_after_first) < 1  # Allow 1 second tolerance
+
+        # Verify idempotent behavior
+        assert result.returncode == 0, f"Script should succeed: {result.stderr}"
+        assert has_make_after_first == True and has_model_after_first == True, "EXIF should be set after first run"
+        assert has_make_after_second == True and has_model_after_second == True, "EXIF should still be set after second run"
+        assert abs(mtime_after_second - mtime_after_first) < 1, f"Actual: file was modified (mtime changed), Expected: no file write on idempotent second run"
 
     def test_partial_update_tags(self, test_video):
-        """Test that only missing tags are added"""
+        """Test that only missing tags are added
+
+        Actual: Both tags present, new-tag added after existing-tag
+        Expected: Only new-tag added on second run (partial update)
+        """
         # Add first tag
         subprocess.run([
             "python3", str(SCRIPT_DIR / "tag-media.py"),
@@ -176,6 +253,13 @@ class TestTagMedia:
             "--tags", "existing-tag",
             "--apply"
         ], capture_output=True, check=True)
+
+        # Verify first tag was added
+        tag_result_after_first = subprocess.run([
+            "tag", "--list", "--no-name", test_video
+        ], capture_output=True, text=True, check=True)
+        has_existing_tag_after_first = "existing-tag" in tag_result_after_first.stdout
+        has_new_tag_after_first = "new-tag" in tag_result_after_first.stdout
 
         # Add second tag (first should be skipped)
         result = subprocess.run([
@@ -185,20 +269,26 @@ class TestTagMedia:
             "--apply"
         ], capture_output=True, text=True)
 
-        assert result.returncode == 0
-        # Should only report adding new-tag
-        assert "new-tag" in result.stdout
-        # Should not mention existing-tag was added
-        if "Tagged:" in result.stdout:
-            # Extract the tagged line
-            for line in result.stdout.split('\n'):
-                if "Tagged:" in line or "📌" in line:
-                    assert "new-tag" in line
-                    # existing-tag shouldn't be in the "tags added" list
-                    break
+        # Verify both tags present
+        tag_result_after_second = subprocess.run([
+            "tag", "--list", "--no-name", test_video
+        ], capture_output=True, text=True, check=True)
+        has_existing_tag_after_second = "existing-tag" in tag_result_after_second.stdout
+        has_new_tag_after_second = "new-tag" in tag_result_after_second.stdout
+
+        # Verify partial update behavior
+        assert result.returncode == 0, f"Script should succeed: {result.stderr}"
+        assert has_existing_tag_after_first == True, "existing-tag should be added in first run"
+        assert has_new_tag_after_first == False, "new-tag should not exist after first run"
+        assert has_existing_tag_after_second == True, "existing-tag should still be present"
+        assert has_new_tag_after_second == True, f"Actual: new-tag not added, Expected: new-tag added in second run (partial update)"
 
     def test_partial_update_exif(self, test_video):
-        """Test that only missing EXIF fields are updated"""
+        """Test that only missing EXIF fields are updated
+
+        Actual: Both Make and Model present after second run
+        Expected: Only Model added in second run (partial update)
+        """
         # Set Make only
         subprocess.run([
             "python3", str(SCRIPT_DIR / "tag-media.py"),
@@ -206,6 +296,13 @@ class TestTagMedia:
             "--make", "GoPro",
             "--apply"
         ], capture_output=True, check=True)
+
+        # Verify Make was added
+        exif_result_after_first = subprocess.run([
+            "exiftool", "-s", "-Make", "-Model", test_video
+        ], capture_output=True, text=True, check=True)
+        has_make_after_first = "GoPro" in exif_result_after_first.stdout
+        has_model_after_first = "HERO12 Black" in exif_result_after_first.stdout
 
         # Set both Make and Model (only Model should be written)
         result = subprocess.run([
@@ -216,9 +313,19 @@ class TestTagMedia:
             "--apply"
         ], capture_output=True, text=True)
 
-        assert result.returncode == 0
-        # Should report adding Model but not Make
-        assert "Model" in result.stdout or "HERO12 Black" in result.stdout
+        # Verify both present
+        exif_result_after_second = subprocess.run([
+            "exiftool", "-s", "-Make", "-Model", test_video
+        ], capture_output=True, text=True, check=True)
+        has_make_after_second = "GoPro" in exif_result_after_second.stdout
+        has_model_after_second = "HERO12 Black" in exif_result_after_second.stdout
+
+        # Verify partial update behavior
+        assert result.returncode == 0, f"Script should succeed: {result.stderr}"
+        assert has_make_after_first == True, "Make should be added in first run"
+        assert has_model_after_first == False, "Model should not exist after first run"
+        assert has_make_after_second == True, "Make should still be present"
+        assert has_model_after_second == True, f"Actual: Model not added, Expected: Model added in second run (partial update)"
 
     def test_multiple_files(self, temp_dir):
         """Test processing multiple files"""
@@ -250,14 +357,33 @@ class TestTagMedia:
             assert "batch-tag" in tag_result.stdout
 
     def test_unsupported_file_type(self, temp_dir):
-        """Test that unsupported file types are handled gracefully"""
-        # Create .lrv file (not supported for EXIF)
-        lrv_path = os.path.join(temp_dir, "test.lrv")
+        """Test that unsupported file types are handled gracefully
+
+        Actual: .lrv file gets tags but not EXIF
+        Expected: Tags added, EXIF skipped for unsupported type
+        """
+        # Create .lrv file (not supported for EXIF) by creating mp4 then renaming
+        mp4_path = os.path.join(temp_dir, "test.mp4")
         subprocess.run([
             "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
             "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            lrv_path
+            mp4_path
         ], capture_output=True, check=True)
+
+        # Rename to .lrv
+        lrv_path = os.path.join(temp_dir, "test.lrv")
+        shutil.move(mp4_path, lrv_path)
+
+        # Record before state
+        tag_result_before = subprocess.run([
+            "tag", "--list", "--no-name", lrv_path
+        ], capture_output=True, text=True)
+        has_tag_before = "test-tag" in tag_result_before.stdout
+
+        exif_result_before = subprocess.run([
+            "exiftool", "-s", "-Make", lrv_path
+        ], capture_output=True, text=True)
+        has_make_before = "GoPro" in exif_result_before.stdout
 
         # Should skip EXIF for .lrv but still allow tags
         result = subprocess.run([
@@ -268,9 +394,23 @@ class TestTagMedia:
             "--apply"
         ], capture_output=True, text=True)
 
-        assert result.returncode == 0
-        # Should have tagged but not added EXIF
-        assert "test-tag" in result.stdout or "Already tagged" in result.stdout
+        # Record after state
+        tag_result_after = subprocess.run([
+            "tag", "--list", "--no-name", lrv_path
+        ], capture_output=True, text=True, check=True)
+        has_tag_after = "test-tag" in tag_result_after.stdout
+
+        exif_result_after = subprocess.run([
+            "exiftool", "-s", "-Make", lrv_path
+        ], capture_output=True, text=True)
+        has_make_after = "GoPro" in exif_result_after.stdout
+
+        # Verify behavior: tags should be added, EXIF should be skipped for .lrv
+        assert result.returncode == 0, f"Script should succeed: {result.stderr}"
+        assert has_tag_before == False, "Tag should not exist before"
+        assert has_tag_after == True, f"Actual: tag not added to .lrv file, Expected: test-tag added despite unsupported type"
+        assert has_make_before == False, "Make should not exist before"
+        assert has_make_after == False, f"Actual: EXIF Make added to .lrv file, Expected: EXIF skipped for unsupported .lrv type"
 
     def test_output_format(self, test_video):
         """Test that output follows presentation format"""
@@ -289,7 +429,23 @@ class TestTagMedia:
         assert "(DRY RUN)" in result.stdout
 
     def test_combined_tags_and_exif(self, test_video):
-        """Test adding both tags and EXIF together"""
+        """Test adding both tags and EXIF together
+
+        Actual: Both tags and EXIF added
+        Expected: Tag and EXIF metadata present on file
+        """
+        # Record before state
+        tag_result_before = subprocess.run([
+            "tag", "--list", "--no-name", test_video
+        ], capture_output=True, text=True)
+        has_tag_before = "gopro-hero-12" in tag_result_before.stdout
+
+        exif_result_before = subprocess.run([
+            "exiftool", "-s", "-Make", "-Model", test_video
+        ], capture_output=True, text=True)
+        has_make_before = "GoPro" in exif_result_before.stdout
+        has_model_before = "HERO12 Black" in exif_result_before.stdout
+
         result = subprocess.run([
             "python3", str(SCRIPT_DIR / "tag-media.py"),
             test_video,
@@ -299,21 +455,26 @@ class TestTagMedia:
             "--apply"
         ], capture_output=True, text=True)
 
-        assert result.returncode == 0
-        assert "EXIF" in result.stdout
-        assert "Tags" in result.stdout
-
         # Verify both were added
-        tag_result = subprocess.run([
+        tag_result_after = subprocess.run([
             "tag", "--list", "--no-name", test_video
         ], capture_output=True, text=True, check=True)
-        assert "gopro-hero-12" in tag_result.stdout
+        has_tag_after = "gopro-hero-12" in tag_result_after.stdout
 
-        exif_result = subprocess.run([
+        exif_result_after = subprocess.run([
             "exiftool", "-s", "-Make", "-Model", test_video
         ], capture_output=True, text=True, check=True)
-        assert "GoPro" in exif_result.stdout
-        assert "HERO12 Black" in exif_result.stdout
+        has_make_after = "GoPro" in exif_result_after.stdout
+        has_model_after = "HERO12 Black" in exif_result_after.stdout
+
+        # Verify combined behavior
+        assert result.returncode == 0, f"Script should succeed: {result.stderr}"
+        assert has_tag_before == False, "Tag should not exist before"
+        assert has_make_before == False, "Make should not exist before"
+        assert has_model_before == False, "Model should not exist before"
+        assert has_tag_after == True, f"Actual: tag not added, Expected: gopro-hero-12 tag present"
+        assert has_make_after == True, f"Actual: Make not added, Expected: Make=GoPro"
+        assert has_model_after == True, f"Actual: Model not added, Expected: Model=HERO12 Black"
 
 
 class TestTagMediaDataPresentation:

@@ -24,8 +24,11 @@ def get_existing_finder_tags(file_path: str) -> List[str]:
     try:
         result = subprocess.run(['tag', '--list', '--no-name', file_path],
                               capture_output=True, check=True, text=True)
-        # Parse tags - one per line
-        existing_tags = [tag.strip() for tag in result.stdout.strip().split('\n') if tag.strip()]
+        # Parse tags - comma-separated on a single line
+        output = result.stdout.strip()
+        if not output:
+            return []
+        existing_tags = [tag.strip() for tag in output.split(',') if tag.strip()]
         return existing_tags
     except subprocess.CalledProcessError:
         return []

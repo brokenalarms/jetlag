@@ -413,10 +413,21 @@ def write_quicktime_createdate(file_path: str, datetime_original: datetime) -> b
 def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False) -> tuple[Optional[str], str]:
     """Get the best timestamp using 5-tier priority system from bash lib-timestamp.sh
     Returns: (timestamp_string, source_description)
+
+    When overwrite_datetimeoriginal=True:
+    - Filename is Priority 1 for Insta360/DJI files (source of truth at capture time)
+    - Ignores existing DateTimeOriginal (which may be corrupted)
     """
     exif_data = read_exif_data(file_path)
     file_timestamps = get_file_system_timestamps(file_path)
     base = os.path.basename(file_path)
+
+    # When overwriting, filename is first source of truth for Insta360/DJI files
+    if overwrite_datetimeoriginal:
+        filename_timestamp = parse_filename_timestamp(file_path)
+        # Check for Insta360/DJI filename patterns
+        if filename_timestamp and (re.match(r'^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6}', base) or re.match(r'^DJI_[0-9]{14}_', base)):
+            return filename_timestamp, "filename (overwrite mode)"
 
     # Priority 1: DateTimeOriginal with timezone (authoritative source)
     datetime_original = exif_data.get("DateTimeOriginal", "")
@@ -440,9 +451,9 @@ def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None, ov
         if re.match(r'[0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}', timestamp):
             return timestamp, "CreationDate with Z (UTC)"
 
-    # Priority 3: Filename for VID/IMG/LRV files with parseable names (Insta360, etc.)
+    # Priority 3: Filename for VID/IMG/LRV/DJI files with parseable names (Insta360, DJI, etc.)
     filename_timestamp = parse_filename_timestamp(file_path)
-    if filename_timestamp and re.match(r'^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6}', base):
+    if filename_timestamp and (re.match(r'^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6}', base) or re.match(r'^DJI_[0-9]{14}_', base)):
         return filename_timestamp, "filename"
 
     # Priority 4: DateTimeOriginal without timezone
@@ -466,7 +477,13 @@ def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None, ov
     return None, "no timestamps found"
 
 def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False) -> dict:
-    """Get all current timestamp data from file"""
+    """Get all current timestamp data from file
+
+    When overwrite_datetimeoriginal=True:
+    - Requires timezone_offset to be provided
+    - Uses filename timestamp with provided timezone (for Insta360/DJI files)
+    - Ignores existing DateTimeOriginal
+    """
     data = {
         "file_path": file_path,  # Store file path for filename parsing
         "exif": read_exif_data(file_path),
@@ -477,12 +494,23 @@ def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None
         "timezone_source": ""  # Track where timezone came from
     }
 
+    # Validate: --overwrite-datetimeoriginal requires --timezone
+    if overwrite_datetimeoriginal and not timezone_offset:
+        raise ValueError("--overwrite-datetimeoriginal requires --timezone to be specified")
+
     # Use 5-tier priority system to find best timestamp
     best_timestamp, source = get_best_timestamp(file_path, timezone_offset, overwrite_datetimeoriginal)
     data["timestamp_source"] = source
 
     if best_timestamp:
-        if source == "CreationDate with timezone":
+        # When overwriting with filename, use filename + provided timezone
+        if source == "filename (overwrite mode)":
+            if timezone_offset:
+                datetime_with_tz = f"{best_timestamp}{timezone_offset}"
+                data["datetime_original_str"] = datetime_with_tz
+                data["datetime_original"] = parse_datetime_original(datetime_with_tz)
+                data["timezone_source"] = f"--timezone flag ({timezone_offset})"
+        elif source == "CreationDate with timezone":
             # Check if we should override timezone (only with --overwrite-datetimeoriginal)
             if overwrite_datetimeoriginal and timezone_offset:
                 # Override existing timezone with provided one
@@ -504,8 +532,14 @@ def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None
                 data["datetime_original_str"] = datetime_with_tz
                 data["datetime_original"] = parse_datetime_original(datetime_with_tz)
                 data["timezone_source"] = f"--timezone flag ({timezone_offset})"
+            elif source == "DateTimeOriginal" and timezone_offset:
+                # DateTimeOriginal exists but has no timezone - add provided timezone
+                datetime_with_tz = f"{best_timestamp}{timezone_offset}"
+                data["datetime_original_str"] = datetime_with_tz
+                data["datetime_original"] = parse_datetime_original(datetime_with_tz)
+                data["timezone_source"] = f"--timezone flag ({timezone_offset})"
             else:
-                # Use existing DateTimeOriginal (source of truth)
+                # Use existing DateTimeOriginal with timezone (source of truth)
                 data["datetime_original_str"] = data["exif"].get("DateTimeOriginal", "")
                 data["timezone_source"] = "DateTimeOriginal metadata"
                 if data["datetime_original_str"]:
@@ -905,6 +939,30 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
         overwrite_datetimeoriginal: If True, overwrite DateTimeOriginal even if it exists (for genuinely wrong timestamps)
         preserve_wallclock: If True, preserve wall-clock shooting time instead of adjusting for current timezone
     """
+
+    # Check for timezone mismatch before processing
+    if timezone_offset and not overwrite_datetimeoriginal:
+        exif_data = read_exif_data(file_path)
+        datetime_original = exif_data.get("DateTimeOriginal", "")
+
+        # Check if DateTimeOriginal has a timezone
+        tz_match = re.search(r'([+-]\d{2}):?(\d{2})$', datetime_original)
+        if tz_match:
+            existing_tz = f"{tz_match.group(1)}:{tz_match.group(2)}"
+            provided_tz = normalize_timezone_input(timezone_offset)
+
+            # Normalize both for comparison (remove colon)
+            existing_tz_normalized = existing_tz.replace(':', '')
+            provided_tz_normalized = provided_tz.replace(':', '')
+
+            if existing_tz_normalized != provided_tz_normalized:
+                filename = os.path.basename(file_path)
+                print(f"\033[36m🔍 {filename}\033[0m")
+                print(f"❌ Timezone mismatch:")
+                print(f"   DateTimeOriginal has timezone: {existing_tz}")
+                print(f"   You provided timezone: {provided_tz}")
+                print(f"   Use --overwrite-datetimeoriginal to force overwrite with new timezone")
+                return False
 
     # Get all data
     current_data = get_all_timestamp_data(file_path, timezone_offset, overwrite_datetimeoriginal)

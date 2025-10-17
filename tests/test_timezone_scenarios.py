@@ -13,7 +13,15 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-import fix_media_timestamp as fmt
+
+# Import hyphenated module name
+import importlib.util
+spec = importlib.util.spec_from_file_location(
+    "fix_media_timestamp",
+    str(Path(__file__).parent.parent / "fix-media-timestamp.py")
+)
+fmt = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(fmt)
 
 
 SCRIPT_DIR = Path(__file__).parent.parent

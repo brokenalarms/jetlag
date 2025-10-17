@@ -47,9 +47,18 @@ class TestOrganizeByDate:
         return video_path
 
     def test_dry_run_no_move(self, test_video_with_date, temp_dir):
-        """Test that dry run doesn't move files"""
+        """Test that dry run doesn't move files
+
+        Actual: File stays in source, target empty
+        Expected: Same (dry run = no changes)
+        """
         target_dir = os.path.join(temp_dir, "target")
         os.makedirs(target_dir, exist_ok=True)
+
+        # Record before state
+        source_exists_before = os.path.exists(test_video_with_date)
+        target_path = os.path.join(target_dir, "2025-06-18", "test_video.mp4")
+        target_exists_before = os.path.exists(target_path)
 
         result = subprocess.run([
             "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
@@ -59,19 +68,30 @@ class TestOrganizeByDate:
             "--label", "Test"
         ], capture_output=True, text=True)
 
-        assert result.returncode == 0
-        assert "(DRY RUN)" in result.stdout
+        # Record after state
+        source_exists_after = os.path.exists(test_video_with_date)
+        target_exists_after = os.path.exists(target_path)
 
-        # File should still be in original location
-        assert os.path.exists(test_video_with_date)
-
-        # Target directory should not have the file
-        assert not os.path.exists(os.path.join(target_dir, "2025-06-18", "test_video.mp4"))
+        # Verify behavior: dry run should not move file
+        assert result.returncode == 0, f"Script failed: {result.stderr}"
+        assert source_exists_before == True, "Source should exist before"
+        assert target_exists_before == False, "Target should not exist before"
+        assert source_exists_after == True, f"Actual: source missing after dry run, Expected: source still exists"
+        assert target_exists_after == False, f"Actual: target created during dry run, Expected: target empty"
 
     def test_apply_mode_moves_file(self, test_video_with_date, temp_dir):
-        """Test that apply mode moves file to correct location"""
+        """Test that apply mode moves file to correct location
+
+        Actual: File moved to target, source empty
+        Expected: File organized by date in target directory
+        """
         target_dir = os.path.join(temp_dir, "target")
         os.makedirs(target_dir, exist_ok=True)
+
+        # Record before state
+        source_exists_before = os.path.exists(test_video_with_date)
+        target_path = os.path.join(target_dir, "2025-06-18", "test_video.mp4")
+        target_exists_before = os.path.exists(target_path)
 
         result = subprocess.run([
             "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
@@ -82,42 +102,61 @@ class TestOrganizeByDate:
             "--apply"
         ], capture_output=True, text=True)
 
-        assert result.returncode == 0
-        assert "(DRY RUN)" not in result.stdout
+        # Record after state
+        source_exists_after = os.path.exists(test_video_with_date)
+        target_exists_after = os.path.exists(target_path)
 
-        # File should be moved to target
-        expected_path = os.path.join(target_dir, "2025-06-18", "test_video.mp4")
-        assert os.path.exists(expected_path)
-
-        # Original should be gone
-        assert not os.path.exists(test_video_with_date)
+        # Verify behavior: file should be moved
+        assert result.returncode == 0, f"Script failed: {result.stderr}"
+        assert source_exists_before == True, "Source should exist before"
+        assert target_exists_before == False, "Target should not exist before"
+        assert source_exists_after == False, f"Actual: source still exists after apply, Expected: source moved away"
+        assert target_exists_after == True, f"Actual: target missing after apply, Expected: file at {target_path}"
 
     def test_template_substitution(self, test_video_with_date, temp_dir):
-        """Test that template variables are substituted correctly"""
+        """Test that template variables are substituted correctly
+
+        Actual: File organized with template pattern
+        Expected: File at 2025/Taiwan/2025-06-18/test_video.mp4
+        """
         target_dir = os.path.join(temp_dir, "target")
         os.makedirs(target_dir, exist_ok=True)
+
+        # Record before state
+        source_exists_before = os.path.exists(test_video_with_date)
+        expected_path = os.path.join(target_dir, "2025", "Taiwan", "2025-06-18", "test_video.mp4")
+        target_exists_before = os.path.exists(expected_path)
 
         result = subprocess.run([
             "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
             test_video_with_date,
             "--target", target_dir,
-            "--template", "{{YYYY}}/{{LABEL}}/{{YYYY}}-{{MM}}-{{DD}}",
+            "--template", "{{YYYY}}/{{label}}/{{YYYY}}-{{MM}}-{{DD}}",
             "--label", "Taiwan",
             "--apply"
         ], capture_output=True, text=True)
 
-        assert result.returncode == 0
+        # Record after state
+        source_exists_after = os.path.exists(test_video_with_date)
+        target_exists_after = os.path.exists(expected_path)
 
-        # File should be in 2025/Taiwan/2025-06-18/
-        expected_path = os.path.join(target_dir, "2025", "Taiwan", "2025-06-18", "test_video.mp4")
-        assert os.path.exists(expected_path)
+        # Verify behavior: file should be organized with template pattern
+        assert result.returncode == 0, f"Script failed: {result.stderr}"
+        assert source_exists_before == True, "Source should exist before"
+        assert target_exists_before == False, "Target should not exist before"
+        assert source_exists_after == False, f"Actual: source still exists, Expected: source moved"
+        assert target_exists_after == True, f"Actual: file not at expected location, Expected: {expected_path}"
 
     def test_idempotency_already_organized(self, test_video_with_date, temp_dir):
-        """Test that already-organized files are detected"""
+        """Test that already-organized files are detected
+
+        Actual: File stays in place after second run
+        Expected: Idempotent behavior, file not moved again
+        """
         target_dir = os.path.join(temp_dir, "target")
         os.makedirs(target_dir, exist_ok=True)
 
-        # First run
+        # First run - organize file
         subprocess.run([
             "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
             test_video_with_date,
@@ -128,9 +167,14 @@ class TestOrganizeByDate:
         ], capture_output=True, check=True)
 
         moved_path = os.path.join(target_dir, "2025-06-18", "test_video.mp4")
-        assert os.path.exists(moved_path)
+        assert os.path.exists(moved_path), "First run should organize file"
 
-        # Second run on moved file should report already organized
+        # Get inode before second run
+        stat_before = os.stat(moved_path)
+        inode_before = stat_before.st_ino
+        mtime_before = stat_before.st_mtime
+
+        # Second run on already-organized file
         result = subprocess.run([
             "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
             moved_path,
@@ -140,23 +184,36 @@ class TestOrganizeByDate:
             "--apply"
         ], capture_output=True, text=True)
 
-        assert result.returncode == 0
-        assert "Already organized" in result.stdout
+        # Get inode after second run
+        stat_after = os.stat(moved_path)
+        inode_after = stat_after.st_ino
+        mtime_after = stat_after.st_mtime
+
+        # Verify idempotent behavior: file should not be moved/modified
+        assert result.returncode == 0, f"Script should succeed: {result.stderr}"
+        assert os.path.exists(moved_path), "File should still exist at original location"
+        assert inode_before == inode_after, f"Actual: file was moved (inode changed), Expected: file stays in place (same inode)"
+        assert abs(mtime_after - mtime_before) < 2, f"Actual: file was modified, Expected: file unchanged"
 
     def test_label_required(self, test_video_with_date, temp_dir):
-        """Test that --label is required when template uses {{LABEL}}"""
+        """Test that --label is required when template uses {{label}}
+
+        Actual: Script should fail
+        Expected: Error message about missing label
+        """
         target_dir = os.path.join(temp_dir, "target")
 
-        # Should fail without --label when template uses {{LABEL}}
+        # Should fail without --label when template uses {{label}}
         result = subprocess.run([
             "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
             test_video_with_date,
             "--target", target_dir,
-            "--template", "{{LABEL}}/{{YYYY}}-{{MM}}-{{DD}}"
+            "--template", "{{label}}/{{YYYY}}-{{MM}}-{{DD}}"
         ], capture_output=True, text=True)
 
-        assert result.returncode != 0
-        assert "label" in result.stderr.lower() or "LABEL" in result.stderr
+        # Verify error handling
+        assert result.returncode != 0, f"Actual: script succeeded, Expected: script should fail when {{{{label}}}} in template but no --label provided. stderr: {result.stderr}"
+        assert "label" in result.stderr.lower(), f"Actual: no 'label' in error message, Expected: error mentions 'label'. stderr: {result.stderr}"
 
     def test_creates_directories(self, test_video_with_date, temp_dir):
         """Test that directory structure is created"""
