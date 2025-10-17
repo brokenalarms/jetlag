@@ -225,6 +225,40 @@ class TestChangeDetection:
         # All should be boolean
         assert isinstance(changes["keys_creationdate"], bool)
 
+    def test_birthtime_tolerance_within_60_seconds(self):
+        """Test that birthtime differences <= 60 seconds don't trigger update"""
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+
+        # Set birthtime to 59 seconds before expected (within tolerance)
+        # Expected: 07:25:21, Setting: 07:24:22 (59 seconds before)
+        subprocess.run([
+            "SetFile", "-d", "06/18/2025 07:24:22", self.test_video
+        ], capture_output=True, check=True)
+
+        # Should NOT need update (within 60 second tolerance)
+        needs_update = fmt.check_file_system_timestamps_need_update(
+            self.test_video, dt, preserve_wallclock=True
+        )
+
+        assert needs_update is False, "59 second difference should NOT trigger update"
+
+    def test_birthtime_tolerance_exceeds_60_seconds(self):
+        """Test that birthtime differences > 60 seconds trigger update"""
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+
+        # Set birthtime to 61 seconds before expected (exceeds tolerance)
+        # Expected: 07:25:21, Setting: 07:24:20 (61 seconds before)
+        subprocess.run([
+            "SetFile", "-d", "06/18/2025 07:24:20", self.test_video
+        ], capture_output=True, check=True)
+
+        # Should need update (exceeds 60 second tolerance)
+        needs_update = fmt.check_file_system_timestamps_need_update(
+            self.test_video, dt, preserve_wallclock=True
+        )
+
+        assert needs_update is True, "61 second difference should trigger update"
+
 
 class TestWriteOperations:
     """Test write operations and idempotency"""

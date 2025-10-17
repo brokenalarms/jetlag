@@ -711,8 +711,9 @@ def check_file_system_timestamps_need_update(file_path: str, datetime_original: 
         try:
             current_birth = datetime.strptime(current_fs["birth"], '%Y:%m:%d %H:%M:%S')
             diff = abs((current_birth - expected_dt).total_seconds())
-            # Allow 1 second tolerance for filesystem timing
-            return diff > 1
+            # Allow 60 second tolerance - matches bash version behavior
+            # Small differences from file copies or system timing shouldn't trigger updates
+            return diff > 60
         except ValueError:
             return True  # Can't parse, assume update needed
 

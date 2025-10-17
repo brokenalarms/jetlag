@@ -186,12 +186,14 @@ echo
 # Process each file through the pipeline
 processed=0
 succeeded=0
+changed=0
 failed=0
 failed_files=()
 
 for file in "${files[@]}" ; do
   processed=$((processed + 1))
   base="$(basename "$file")"
+  file_changed=0
 
   echo "[$processed/$total_files] Processing: $base"
 
@@ -219,7 +221,12 @@ with open('$SCRIPT_DIR/media-profiles.yaml') as f:
       [[ -n "$make" ]] && cmd+=("--make" "$make")
       [[ -n "$model" ]] && cmd+=("--model" "$model")
       [[ $apply -eq 1 ]] && cmd+=("--apply")
-      "${cmd[@]}" 2>&1 | sed 's/^/  /'
+      tag_output=$("${cmd[@]}" 2>&1)
+      echo "$tag_output" | sed 's/^/  /'
+      # Check if tags were changed (output contains "Tagged:" or "EXIF:" but not "Already tagged")
+      if [[ "$tag_output" =~ (📌|Tagged:|EXIF:) ]] && [[ ! "$tag_output" =~ "Already tagged correctly" ]]; then
+        file_changed=1
+      fi
     fi
   fi
 
@@ -234,14 +241,23 @@ with open('$SCRIPT_DIR/media-profiles.yaml') as f:
     fix_args+=("${location_args[@]}")
   fi
 
-  if ! "$SCRIPT_DIR/fix-media-timestamp.sh" "$file" "${fix_args[@]+"${fix_args[@]}"}" 2>&1 | sed 's/^/  /'; then
+  fix_output=$("$SCRIPT_DIR/fix-media-timestamp.sh" "$file" "${fix_args[@]+"${fix_args[@]}"}" 2>&1)
+  fix_rc=$?
+  echo "$fix_output" | sed 's/^/  /'
+
+  if [[ $fix_rc -ne 0 ]]; then
     echo "   ❌ Timestamp fix failed for $base"
     failed=$((failed + 1))
     failed_files+=("$base")
     echo  # Empty line between files
     continue
   fi
-  
+
+  # Check if timestamp was changed (output contains checkmark or "Updated" but not "No change needed")
+  if [[ "$fix_output" =~ (✅|Updated|Written) ]] && [[ ! "$fix_output" =~ "No change needed" ]]; then
+    file_changed=1
+  fi
+
   # Step 3: Organize by date
   echo "📁 Organizing by date..."
 
@@ -259,14 +275,25 @@ with open('$SCRIPT_DIR/media-profiles.yaml') as f:
   org_args+=("--template" "$template")
   org_args+=("--label" "$label")
 
-  if ! "$SCRIPT_DIR/organize-by-date.sh" "$file" "${org_args[@]+"${org_args[@]}"}" 2>&1 | sed 's/^/  /'; then
+  org_output=$("$SCRIPT_DIR/organize-by-date.sh" "$file" "${org_args[@]+"${org_args[@]}"}" 2>&1)
+  org_rc=$?
+  echo "$org_output" | sed 's/^/  /'
+
+  if [[ $org_rc -ne 0 ]]; then
     echo "   ❌ Organization failed for $base"
     failed=$((failed + 1))
     failed_files+=("$base")
   else
     succeeded=$((succeeded + 1))
+    # Check if file was moved (output contains "Moved:" or "Copied:" but not "Already organized")
+    if [[ "$org_output" =~ (✅\ Moved:|✅\ Copied:) ]]; then
+      file_changed=1
+    fi
   fi
-  
+
+  # Increment changed counter if any step changed the file
+  [[ $file_changed -eq 1 ]] && changed=$((changed + 1))
+
   echo  # Empty line between files
 done
 
@@ -277,6 +304,8 @@ echo "📊 MEDIA PIPELINE SUMMARY"
 echo "-------------------------------------------"
 echo "Total files processed: $processed"
 echo "Successfully completed: $succeeded"
+echo "Files changed: $changed"
+echo "Files unchanged: $((succeeded - changed))"
 if [[ $failed -gt 0 ]]; then
   echo "Failed: $failed"
   echo ""

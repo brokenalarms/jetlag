@@ -4,7 +4,7 @@ backup_config:
 
 profiles:
   insta360:
-    import_dir: "/Volumes/Extreme GRN/Videos/Source Video/Insta360/Import/"
+    import_dir: "/Volumes/Extreme GRN/Videos/Source Video/Insta360/Import"
     ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/Insta360/Ready"
     backup_enabled: true
     backup_dir: "/Volumes/Extreme GRN/Videos/Source Video/Insta360"
@@ -39,10 +39,10 @@ profiles:
       model: "Mini 4 Pro"
     companion_extensions: [".lrf", ".thm"]
 
-  a7iv:
+  sony-photos:
     import_dir: "/Volumes/Extreme GRN/Photos/Import"
-    backup_enabled: false
-    backup_dir: "/Volumes/Extreme GRN/Photos"
+    backup_enabled: true
+    backup_dir: "/Volumes/Extreme GRN/Photos/Originals"
     backup_exclude_subdirs: ["Import"]
     tags: ["sony-a7iv"]
     exif:
@@ -50,12 +50,23 @@ profiles:
       model: "ILCE-7M4"
     companion_extensions: []
 
+  sony-video:
+    import_dir: "/Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Import"
+    backup_enabled: true
+    backup_dir: "/Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Ready"
+    backup_exclude_subdirs: []
+    tags: ["sony-a7iv"]
+    exif:
+      make: "Sony"
+      model: "ILCE-7M4"
+    companion_extensions: [".xml", ".bin", ".jpg"]
+
   iphone16pro:
     import_dir: "/Volumes/Extreme GRN/Videos/Source Video/iPhone/Import"
     ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/iPhone/Ready"
     backup_enabled: false
     backup_dir: "/Volumes/Extreme GRN/Videos/Source Video/iPhone"
-    backup_exclude_subdirs: ["Import"]
+    backup_exclude_subdirs: []
     tags: ["iphone-16-pro"]
     exif:
       make: "Apple"

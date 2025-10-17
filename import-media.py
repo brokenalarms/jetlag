@@ -72,6 +72,49 @@ def get_default_profile_path() -> str:
             return str(profile_path)
     return str(script_dir / 'media-profiles.yaml')
 
+def compute_destination_path(file_path: str, import_dir: str) -> Optional[str]:
+    """Compute the expected destination path for a file based on its DateTimeOriginal
+
+    This replicates the logic from organize-by-date.sh using get_file_date_for_organization
+    """
+    try:
+        # Get file date (YYYY-MM-DD format)
+        result = subprocess.run(
+            ['exiftool', '-fast2', '-s', '-DateTimeOriginal', file_path],
+            capture_output=True, text=True, check=True
+        )
+
+        file_date = None
+        for line in result.stdout.strip().split('\n'):
+            if ':' in line:
+                key, value = line.split(':', 1)
+                if key.strip() == 'DateTimeOriginal':
+                    dt_str = value.strip()
+                    if dt_str:
+                        # Extract date part and convert YYYY:MM:DD → YYYY-MM-DD
+                        date_part = dt_str.split(' ')[0]
+                        file_date = date_part.replace(':', '-')
+                        break
+
+        if not file_date:
+            # Fallback to file modification time
+            from datetime import datetime
+            mtime = os.path.getmtime(file_path)
+            file_date = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d')
+
+        # Expand template: {{YYYY}}/{{YYYY}}-{{MM}}-{{DD}} (default template)
+        year, month, day = file_date.split('-')
+        organized_path = f"{year}/{file_date}"
+
+        # Construct full destination path
+        filename = os.path.basename(file_path)
+        dest_path = os.path.join(import_dir, organized_path, filename)
+
+        return dest_path
+
+    except Exception:
+        return None
+
 def organize_file(file_path: str, import_dir: str, copy_mode: bool = True, apply_changes: bool = False) -> ImportResult:
     """Organize a single file using organize-by-date.sh"""
     script_dir = Path(__file__).parent
@@ -84,23 +127,28 @@ def organize_file(file_path: str, import_dir: str, copy_mode: bool = True, apply
         cmd.append('--apply')
 
     try:
-        # Don't capture output - let organize-by-date.sh display its own errors intelligently
-        result = subprocess.run(cmd, text=True, check=True)
+        # Capture output to display it
+        result = subprocess.run(cmd, text=True, check=True, capture_output=True)
 
-        # Assume success if the command completed without error
-        # The organize-by-date.sh script handles all its own output
-        filename = os.path.basename(file_path)
+        # Print the output (since we're capturing it)
+        if result.stdout:
+            print(result.stdout.rstrip())
+
         action = "copied" if apply_changes else "would_copy"
 
-        # We can't reliably parse the dest_path without capturing output
-        # But that's OK - the script shows the user where files go
-        return ImportResult(True, action, file_path, dest_path=None)
+        # Compute destination path only when needed (for tagging after copy)
+        # Don't waste time during dry run since we don't tag in dry run mode
+        dest_path = compute_destination_path(file_path, import_dir) if apply_changes else None
+
+        return ImportResult(True, action, file_path, dest_path=dest_path)
 
     except subprocess.CalledProcessError as e:
         # The error output was already displayed by the subprocess
+        if e.stderr:
+            print(e.stderr, file=sys.stderr)
         return ImportResult(False, "failed", file_path, error=None)
 
-def tag_file(file_path: str, tags: Optional[List[str]] = None, make: Optional[str] = None, model: Optional[str] = None) -> bool:
+def tag_file(file_path: str, tags: Optional[List[str]] = None, make: Optional[str] = None, model: Optional[str] = None, apply_changes: bool = False) -> bool:
     """Tag a file using tag-media.py script"""
     if not tags and not make and not model:
         return True
@@ -115,6 +163,8 @@ def tag_file(file_path: str, tags: Optional[List[str]] = None, make: Optional[st
         cmd.extend(['--make', make])
     if model:
         cmd.extend(['--model', model])
+    if apply_changes:
+        cmd.append('--apply')
 
     try:
         subprocess.run(cmd, text=True, check=True)
@@ -207,15 +257,43 @@ def create_archive_directory(original_dir: str, apply_changes: bool) -> Optional
     os.makedirs(archive_path, exist_ok=True)
     return archive_path
 
-def archive_processed_file(file_path: str, archive_dir: Optional[str]) -> bool:
-    """Move processed file to archive directory"""
+def cleanup_empty_parent_dirs(file_dir: str, source_root: str) -> None:
+    """Clean up empty parent directories after moving a file
+
+    Keep removing parent directories as long as they're empty.
+    Stop at source_root or when we hit a non-empty directory.
+    """
+    while file_dir and file_dir != source_root and file_dir != '/' and file_dir != '.':
+        try:
+            # Try to remove the directory (only succeeds if empty)
+            os.rmdir(file_dir)
+            # Move up to parent
+            file_dir = os.path.dirname(file_dir)
+        except OSError:
+            # Directory not empty or can't be removed, stop here
+            break
+
+def archive_processed_file(file_path: str, source_dir: str, archive_dir: Optional[str]) -> bool:
+    """Move processed file to archive directory, preserving relative directory structure"""
     if not archive_dir:
         return True
 
     try:
-        filename = os.path.basename(file_path)
-        archive_file_path = os.path.join(archive_dir, filename)
+        # Save the directory before moving the file
+        source_file_dir = os.path.dirname(file_path)
+
+        # Preserve directory structure relative to source_dir
+        rel_path = os.path.relpath(file_path, source_dir)
+        archive_file_path = os.path.join(archive_dir, rel_path)
+
+        # Create parent directories if needed
+        os.makedirs(os.path.dirname(archive_file_path), exist_ok=True)
+
         shutil.move(file_path, archive_file_path)
+
+        # Clean up empty parent directories after moving
+        cleanup_empty_parent_dirs(source_file_dir, source_dir)
+
         return True
     except Exception as e:
         print(f"Warning: Failed to archive {file_path}: {e}", file=sys.stderr)
@@ -290,18 +368,19 @@ def import_media(source_dir: str, profile: ImportProfile,
         if apply_changes:
             print(f"[{i}/{len(import_files)}] Processing: {filename}")
 
-        # Tag the file first (before organizing, to tag source file)
-        if apply_changes:
-            if not tag_file(file_path, tags=profile.tags, make=profile.exif_make, model=profile.exif_model):
-                print(f"   Warning: Tagging failed for {filename}")
-
-        # Organize the file
+        # Organize the file (copy to destination)
         result = organize_file(file_path, profile.import_dir, copy_mode=True, apply_changes=apply_changes)
         results.append(result)
 
         if not result.success:
             # Error already displayed by organize-by-date.sh
             continue
+
+        # ALWAYS tag the DESTINATION file after organizing (whether or not profile has tags)
+        # This ensures tagging happens AFTER copy/move, never before (much faster than tagging on memory card)
+        if apply_changes and result.dest_path and os.path.exists(result.dest_path):
+            if not tag_file(result.dest_path, tags=profile.tags, make=profile.exif_make, model=profile.exif_model, apply_changes=apply_changes):
+                print(f"   Warning: Tagging failed for {filename}")
 
         # For successful copies in apply mode, archive the source file immediately
         # This ensures progress is preserved in case of interruption
@@ -314,13 +393,13 @@ def import_media(source_dir: str, profile: ImportProfile,
 
             # Archive this file and its companions immediately (not at the end)
             if archive_dir:
-                archive_processed_file(file_path, archive_dir)
+                archive_processed_file(file_path, source_dir, archive_dir)
 
                 # Also archive companion files for this main file
                 companion_files = find_companion_files(file_path, profile.companion_extensions)
                 for companion_path in companion_files:
                     if os.path.exists(companion_path):
-                        archive_processed_file(companion_path, archive_dir)
+                        archive_processed_file(companion_path, source_dir, archive_dir)
 
     return results, archive_dir, companion_files_to_archive
 
@@ -431,7 +510,7 @@ Examples:
                 if response.lower().startswith('y'):
                     print("Archiving orphaned companion files...")
                     for file_path in orphaned_companions:
-                        archive_processed_file(file_path, archive_dir)
+                        archive_processed_file(file_path, source_dir, archive_dir)
                 else:
                     print("Leaving orphaned files in source directory.")
 

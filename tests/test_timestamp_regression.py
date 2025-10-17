@@ -450,5 +450,209 @@ class TestMissingDateTimeOriginalWithTimezoneChange:
         assert birth_time > 0
 
 
+class TestBirthTimeCalculation:
+    """
+    Regression test: Birth time calculation must be accurate
+
+    Bug: Birth time was off by 1 hour when converting from Keys:CreationDate
+    Example: Keys:CreationDate = 07:15:30+08:00
+    - Expected birth (UTC): 23:15:30
+    - Was getting:          22:15:30 (1 hour wrong)
+    """
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    def _create_test_video(self, path: str, datetime_with_tz: str) -> None:
+        """Create a test video with specific DateTimeOriginal"""
+        # Create basic video
+        subprocess.run([
+            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
+            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
+            path
+        ], capture_output=True, check=True)
+
+        # Set DateTimeOriginal
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            f"-DateTimeOriginal={datetime_with_tz}",
+            path
+        ], capture_output=True, check=True)
+
+    def _get_birth_time_local(self, path: str) -> str:
+        """Get file birth time in local timezone"""
+        result = subprocess.run(
+            ["stat", "-f", "%SB", "-t", "%Y:%m:%d %H:%M:%S", path],
+            capture_output=True, text=True, check=True
+        )
+        return result.stdout.strip()
+
+    def test_birth_time_regular_mode(self):
+        """
+        Birth time in regular mode should match UTC converted to current timezone
+
+        Example: File shot at 07:15:30 in Taiwan (+08:00)
+        - UTC time: 2025-06-17 23:15:30
+        - Viewing in Japan (+09:00)
+        - Birth time should be: 2025-06-18 08:15:30 local
+        """
+        video_path = os.path.join(self.temp_dir, "test_taiwan.mp4")
+        self._create_test_video(video_path, "2025:06:18 07:15:30+08:00")
+
+        # Run script in regular mode
+        result = subprocess.run([
+            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path,
+            "--timezone", "+0800",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0, f"Script failed:\n{result.stderr}"
+
+        # Check birth time
+        birth_local = self._get_birth_time_local(video_path)
+        actual_time = birth_local.split()[1]  # Extract HH:MM:SS
+
+        # Expected: 08:15:30 (07:15 Taiwan + 1 hour for Japan timezone)
+        expected_time = "08:15:30"
+
+        assert actual_time == expected_time, (
+            f"Birth time incorrect in regular mode:\n"
+            f"  Expected: {expected_time}\n"
+            f"  Actual:   {actual_time}\n"
+            f"  Full:     {birth_local}"
+        )
+
+    def test_birth_time_preserve_wallclock_mode(self):
+        """
+        Birth time with preserve-wallclock should match shooting time
+
+        Example: File shot at 07:15:30 in Taiwan (+08:00)
+        - With --preserve-wallclock-time
+        - Birth time should be: 2025-06-18 07:15:30 local (shooting time preserved)
+        """
+        video_path = os.path.join(self.temp_dir, "test_wallclock.mp4")
+        self._create_test_video(video_path, "2025:06:18 07:15:30+08:00")
+
+        # Run with preserve-wallclock-time
+        result = subprocess.run([
+            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path,
+            "--timezone", "+0800",
+            "--preserve-wallclock-time",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0, f"Script failed:\n{result.stderr}"
+
+        # Check birth time
+        birth_local = self._get_birth_time_local(video_path)
+        actual_time = birth_local.split()[1]  # Extract HH:MM:SS
+
+        # Expected: 07:15:30 (shooting time preserved)
+        expected_time = "07:15:30"
+
+        assert actual_time == expected_time, (
+            f"Birth time incorrect in preserve-wallclock mode:\n"
+            f"  Expected: {expected_time}\n"
+            f"  Actual:   {actual_time}\n"
+            f"  Full:     {birth_local}"
+        )
+
+    def test_birth_time_idempotency_regular(self):
+        """
+        Running script twice in regular mode should not change birth time second time
+        """
+        video_path = os.path.join(self.temp_dir, "test_idempotent.mp4")
+        self._create_test_video(video_path, "2025:06:18 07:15:30+08:00")
+
+        # First run
+        subprocess.run([
+            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path,
+            "--timezone", "+0800",
+            "--apply"
+        ], capture_output=True, check=True)
+
+        birth_after_first = self._get_birth_time_local(video_path)
+
+        # Second run should detect no changes needed
+        result = subprocess.run([
+            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path,
+            "--timezone", "+0800"
+        ], capture_output=True, text=True, check=True)
+
+        # Should show "No change needed" or similar
+        assert "No change" in result.stdout or "no change" in result.stdout.lower(), (
+            f"Second run should detect no changes:\n{result.stdout}"
+        )
+
+        birth_after_second = self._get_birth_time_local(video_path)
+
+        assert birth_after_first == birth_after_second, (
+            f"Birth time should not change on second run:\n"
+            f"  After first:  {birth_after_first}\n"
+            f"  After second: {birth_after_second}"
+        )
+
+    def test_birth_time_detection_after_preserve_wallclock(self):
+        """
+        Script should detect wrong birth time after running with preserve-wallclock
+
+        Scenario:
+        1. File processed with --preserve-wallclock-time (birth time = 07:15:30)
+        2. Running without --preserve-wallclock-time should detect change needed
+        3. Should update to 08:15:30 (UTC converted to current timezone)
+        """
+        video_path = os.path.join(self.temp_dir, "test_detect.mp4")
+        self._create_test_video(video_path, "2025:06:18 07:15:30+08:00")
+
+        # First run: with preserve-wallclock-time
+        subprocess.run([
+            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path,
+            "--timezone", "+0800",
+            "--preserve-wallclock-time",
+            "--apply"
+        ], capture_output=True, check=True)
+
+        # Verify birth time is 07:15:30 (wall-clock time)
+        birth_after_preserve = self._get_birth_time_local(video_path)
+        assert "07:15:30" in birth_after_preserve, (
+            f"After preserve-wallclock, birth time should be 07:15:30:\n{birth_after_preserve}"
+        )
+
+        # Second run: without preserve-wallclock-time (should detect change needed)
+        result = subprocess.run([
+            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path,
+            "--timezone", "+0800"
+        ], capture_output=True, text=True, check=True)
+
+        # Should detect birth time needs updating
+        assert "Birth time" in result.stdout, (
+            f"Script should detect birth time needs updating:\n{result.stdout}"
+        )
+
+        # Apply the fix
+        subprocess.run([
+            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path,
+            "--timezone", "+0800",
+            "--apply"
+        ], capture_output=True, check=True)
+
+        # Verify birth time is now 08:15:30 (UTC + timezone offset)
+        birth_after_fix = self._get_birth_time_local(video_path)
+        assert "08:15:30" in birth_after_fix, (
+            f"After fix, birth time should be 08:15:30:\n{birth_after_fix}"
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
