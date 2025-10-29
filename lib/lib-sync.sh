@@ -22,7 +22,7 @@ run_rsync() {
 
     # Add bandwidth limit to avoid triggering hotel QoS (if RSYNC_BW_LIMIT is set)
     # Set in .env.local: RSYNC_BW_LIMIT=5000  (KB/s, ~5 MB/s is typically safe)
-    if [[ -n "${RSYNC_BW_LIMIT:-}" ]]; then
+    if [[ -n "${RSYNC_BW_LIMIT:-}" ]] && [[ "${RSYNC_BW_LIMIT}" != "0" ]]; then
         RSYNC_ARGS="$RSYNC_ARGS --bwlimit=${RSYNC_BW_LIMIT}"
     fi
     

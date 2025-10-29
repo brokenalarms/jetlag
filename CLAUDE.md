@@ -22,9 +22,11 @@
   - each base script operates on a single file. media-pipeline orchestrates via yaml profiles. It's job is to translate profiles to args for the base scripts and run them in sequence.
   - all batched operations should happen to one file at a time before moving onto next, so if the script gets interrupted, it will continue from the next incompletely processed file and not repeat any steps. all batch operations should be performed in alphabetical order.
   - scripts should be run compositionally, passing through args of higher level ones and never swallowing the output of building block scripts but rather making use of their existing output to avoid needing to add logs at a higher level besides summary. In other words, there should not be any 2>&1 for the output of any script that has been written in this directory.
+    - scripts at the bottom level operating on a single file (eg organize-by-date, fix-media-timestamp) can capture_output of system-level things like mkdir etc.
     - to that extent, stop adding --verbose mode unless instructed.
 - base level scripts are explictly provided all args and don't know about profiles. profiles are used by orchestrator scripts to generate args.
 - batch files always pass through all args transparently
+- don't reference Claude or Claude.md
 - TESTING
   - tests should be run as part of validating feature changes
   - tests should not be updated without explicit confirmation, unless we use TDD to make the change, confirm that the the tests now break in the way expected, then update the test accordingly. Otherwise tests at this stage should not break from a change unless there is a regression, and the test should be used to identify this regression.

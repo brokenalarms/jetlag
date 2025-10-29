@@ -167,14 +167,14 @@ process_file() {
       fi
     elif [[ "$dst_size" -lt "$src_size" ]]; then
       if [[ $apply -eq 1 ]]; then
-        mkdir -p "$target_path"
+        mkdir -p "$target_path" || return 1
         if [[ $copy_mode -eq 1 ]]; then
-          cp -p "$file" "$target_file"
+          cp -p "$file" "$target_file" || return 1
           echo "✅ Copied (replaced smaller): $base → $organized_path/"
         else
           # Save the source directory before moving
           local source_dir="$(dirname "$file")"
-          mv "$file" "$target_file"
+          mv "$file" "$target_file" || return 1
           echo "✅ Moved (replaced smaller): $base → $organized_path/"
 
           # Clean up empty parent directories after moving
@@ -200,14 +200,14 @@ process_file() {
 
     # Copy or move file to target
     if [[ $apply -eq 1 ]]; then
-      mkdir -p "$target_path"
+      mkdir -p "$target_path" || return 1
       if [[ $copy_mode -eq 1 ]]; then
-        cp -p "$file" "$target_file"
+        cp -p "$file" "$target_file" || return 1
         printf "✅ Copied: %s → %s\n" "$display_source" "$abs_target"
       else
         # Save the source directory before moving
         local source_dir="$(dirname "$file")"
-        mv "$file" "$target_file"
+        mv "$file" "$target_file" || return 1
         printf "✅ Moved: %s → %s\n" "$display_source" "$abs_target"
 
         # Clean up empty parent directories after moving

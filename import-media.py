@@ -127,12 +127,8 @@ def organize_file(file_path: str, import_dir: str, copy_mode: bool = True, apply
         cmd.append('--apply')
 
     try:
-        # Capture output to display it
-        result = subprocess.run(cmd, text=True, check=True, capture_output=True)
-
-        # Print the output (since we're capturing it)
-        if result.stdout:
-            print(result.stdout.rstrip())
+        # Let output pass through naturally for owned scripts
+        result = subprocess.run(cmd, text=True, check=True)
 
         action = "copied" if apply_changes else "would_copy"
 
@@ -143,9 +139,7 @@ def organize_file(file_path: str, import_dir: str, copy_mode: bool = True, apply
         return ImportResult(True, action, file_path, dest_path=dest_path)
 
     except subprocess.CalledProcessError as e:
-        # The error output was already displayed by the subprocess
-        if e.stderr:
-            print(e.stderr, file=sys.stderr)
+        # Errors already displayed by subprocess
         return ImportResult(False, "failed", file_path, error=None)
 
 def tag_file(file_path: str, tags: Optional[List[str]] = None, make: Optional[str] = None, model: Optional[str] = None, apply_changes: bool = False) -> bool:
@@ -263,14 +257,20 @@ def cleanup_empty_parent_dirs(file_dir: str, source_root: str) -> None:
     Keep removing parent directories as long as they're empty.
     Stop at source_root or when we hit a non-empty directory.
     """
+    import errno
+
     while file_dir and file_dir != source_root and file_dir != '/' and file_dir != '.':
         try:
             # Try to remove the directory (only succeeds if empty)
             os.rmdir(file_dir)
             # Move up to parent
             file_dir = os.path.dirname(file_dir)
-        except OSError:
-            # Directory not empty or can't be removed, stop here
+        except OSError as e:
+            # Directory not empty - expected, stop here
+            if e.errno == errno.ENOTEMPTY or e.errno == errno.EEXIST:
+                break
+            # Other errors (permissions, etc) - warn but stop
+            print(f"Warning: Could not remove empty directory {file_dir}: {e}", file=sys.stderr)
             break
 
 def archive_processed_file(file_path: str, source_dir: str, archive_dir: Optional[str]) -> bool:
