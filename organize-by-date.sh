@@ -195,7 +195,7 @@ process_file() {
     if [[ "$target_file" = /* ]]; then
       abs_target="$target_file"  # Already absolute
     else
-      abs_target="$(pwd)/$target_file"  # Make relative path absolute
+      abs_target="$(pwd)/${target_file#./}"  # Make relative path absolute, strip leading ./
     fi
 
     # Copy or move file to target

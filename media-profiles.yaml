@@ -54,6 +54,7 @@ profiles:
   sony-video:
     import_dir: "/Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Import"
     backup_enabled: true
+    ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Ready"
     backup_dir: "/Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Ready"
     backup_exclude_subdirs: []
     tags: ["sony-a7iv"]

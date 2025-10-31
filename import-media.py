@@ -299,10 +299,28 @@ def archive_processed_file(file_path: str, source_dir: str, archive_dir: Optiona
         print(f"Warning: Failed to archive {file_path}: {e}", file=sys.stderr)
         return False
 
+def cleanup_all_empty_subdirs(directory: str) -> None:
+    """Recursively remove all empty subdirectories within directory
+
+    Walk bottom-up so we can remove parent directories after their children
+    """
+    for root, dirs, files in os.walk(directory, topdown=False):
+        for dir_name in dirs:
+            dir_path = os.path.join(root, dir_name)
+            try:
+                # Try to remove (only succeeds if empty)
+                os.rmdir(dir_path)
+            except OSError:
+                # Directory not empty or can't be removed, that's fine
+                pass
+
 def cleanup_empty_directory(directory: str) -> None:
-    """Remove original directory if empty after processing"""
+    """Remove all empty subdirectories, then original directory if empty after processing"""
     try:
-        # Check if directory is empty (ignoring hidden files)
+        # First pass: recursively remove all empty subdirectories
+        cleanup_all_empty_subdirs(directory)
+
+        # Check if root directory is empty (ignoring hidden files)
         remaining_files = get_media_files(directory)
         if not remaining_files:
             os.rmdir(directory)
