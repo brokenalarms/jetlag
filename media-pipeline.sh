@@ -144,6 +144,24 @@ fi
 # Validate label is provided
 [[ -n "$label" ]] || { echo "ERROR: --label is required" >&2; exit 1; }
 
+# Check for stale exiftool_tmp directories that would cause exiftool to fail
+exiftool_tmp_dirs=$(find "$source_dir" -type d -name "exiftool_tmp" 2>/dev/null)
+if [[ -n "$exiftool_tmp_dirs" ]]; then
+  tmp_count=$(echo "$exiftool_tmp_dirs" | wc -l | tr -d ' ')
+  echo "⚠️  Found $tmp_count stale exiftool_tmp director$([ "$tmp_count" -eq 1 ] && echo "y" || echo "ies") in source:" >&2
+  echo "$exiftool_tmp_dirs" | sed 's/^/   /' >&2
+  echo >&2
+  read -p "Delete them? This will allow exiftool to run. (y/n) " -n 1 -r
+  echo >&2
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    find "$source_dir" -type d -name "exiftool_tmp" -exec rm -rf {} + 2>/dev/null
+    echo "✅ Deleted exiftool_tmp directories" >&2
+  else
+    echo "ERROR: Cannot proceed - exiftool will fail with these directories present" >&2
+    exit 1
+  fi
+fi
+
 # Helper functions
 log_verbose() {
   [[ $verbose -eq 1 ]] && echo "$@" >&2
@@ -296,6 +314,11 @@ with open('$SCRIPT_DIR/media-profiles.yaml') as f:
 
   echo  # Empty line between files
 done
+
+# Clean up empty directories in source (only in apply mode)
+if [[ $apply -eq 1 ]]; then
+  find "$source_dir" -type d -empty -delete 2>/dev/null || true
+fi
 
 # Summary
 echo
