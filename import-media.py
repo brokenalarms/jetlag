@@ -26,6 +26,7 @@ signal.signal(signal.SIGINT, signal_handler)
 class ImportProfile(NamedTuple):
     """Configuration profile for media import"""
     import_dir: str
+    file_extensions: Optional[List[str]] = None
     companion_extensions: Optional[List[str]] = None
     tags: Optional[List[str]] = None
     exif_make: Optional[str] = None
@@ -53,6 +54,7 @@ def load_profiles(profile_path: str) -> Dict[str, ImportProfile]:
             exif = config.get('exif', {})
             profiles[name] = ImportProfile(
                 import_dir=os.path.expandvars(config['import_dir']),
+                file_extensions=config.get('file_extensions'),
                 companion_extensions=config.get('companion_extensions'),
                 tags=config.get('tags'),
                 exif_make=exif.get('make'),
@@ -192,26 +194,46 @@ def find_source_directory(specified_dir: Optional[str]) -> str:
 
     return candidates[0]
 
-def get_media_files(directory: str, include_companion: bool = True, companion_extensions: Optional[List[str]] = None) -> List[str]:
-    """Get all media files from directory, excluding system files"""
+def get_media_files(directory: str, include_companion: bool = True, companion_extensions: Optional[List[str]] = None, file_extensions: Optional[List[str]] = None) -> List[str]:
+    """Get all media files from directory, excluding system files
+
+    Args:
+        directory: Directory to search
+        include_companion: If True, include companion files
+        companion_extensions: List of companion file extensions (e.g., ['.lrv', '.thm'])
+        file_extensions: List of allowed file extensions (e.g., ['.mp4', '.mov']). If None, all files are included.
+
+    Returns:
+        List of file paths matching the criteria
+    """
     media_files = []
 
     # Default companion extensions (GoPro and DJI)
     if companion_extensions is None:
         companion_extensions = ['.lrv', '.thm', '.lrf']
 
-    # Convert to lowercase set for faster lookup
+    # Convert to lowercase sets for case-insensitive lookup
     companion_exts = {ext.lower() for ext in companion_extensions}
+    allowed_exts = {ext.lower() for ext in file_extensions} if file_extensions else None
 
     for root, _, files in os.walk(directory):
         for file in files:
             if file.startswith('.') or file in ['.DS_Store', 'Thumbs.db']:
                 continue
 
+            file_ext = Path(file).suffix.lower()
+
             # Skip companion files if not wanted
-            if not include_companion:
-                file_ext = Path(file).suffix.lower()
-                if file_ext in companion_exts:
+            if not include_companion and file_ext in companion_exts:
+                continue
+
+            # If file_extensions specified, only include matching files (and companion files if wanted)
+            if allowed_exts is not None:
+                is_allowed = file_ext in allowed_exts
+                is_companion = file_ext in companion_exts
+
+                # Include if it's an allowed extension, or if it's a companion and we want companions
+                if not (is_allowed or (is_companion and include_companion)):
                     continue
 
             media_files.append(os.path.join(root, file))
@@ -310,7 +332,8 @@ def cleanup_empty_directory(directory: str) -> None:
         )
 
         # Check if root directory is empty (ignoring hidden files)
-        remaining_files = get_media_files(directory)
+        # Don't filter by extension here - just check if any media files remain
+        remaining_files = get_media_files(directory, include_companion=True, companion_extensions=None, file_extensions=None)
         if not remaining_files:
             os.rmdir(directory)
             print(f"Removed empty directory: {os.path.basename(directory)}")
@@ -345,10 +368,20 @@ def import_media(source_dir: str, profile: ImportProfile,
     """
 
     # Get files to import (may exclude companions)
-    import_files = get_media_files(source_dir, include_companion=not skip_companion, companion_extensions=profile.companion_extensions)
+    import_files = get_media_files(
+        source_dir,
+        include_companion=not skip_companion,
+        companion_extensions=profile.companion_extensions,
+        file_extensions=profile.file_extensions
+    )
 
     # Get ALL files for archiving (capture this BEFORE we start moving files)
-    all_files = get_media_files(source_dir, include_companion=True, companion_extensions=profile.companion_extensions)
+    all_files = get_media_files(
+        source_dir,
+        include_companion=True,
+        companion_extensions=profile.companion_extensions,
+        file_extensions=profile.file_extensions
+    )
 
     # Calculate which files won't be imported but need archiving
     import_files_set = set(import_files)

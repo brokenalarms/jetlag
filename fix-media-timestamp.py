@@ -323,33 +323,23 @@ def write_datetime_original(file_path: str, datetime_with_tz: str) -> bool:
         print(f"Error writing DateTimeOriginal: {e}", file=sys.stderr)
         return False
 
-def write_keys_creationdate(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False) -> bool:
-    """Write Keys:CreationDate
+def write_keys_creationdate(file_path: str, datetime_original: datetime) -> bool:
+    """Write Keys:CreationDate with original timezone
 
-    Without preserve_wallclock: Writes DateTimeOriginal with its timezone
-    With preserve_wallclock: Writes compensated value to preserve wall-clock time in current timezone
+    Always writes DateTimeOriginal with its original timezone to maintain correct absolute time.
 
     Args:
         file_path: Path to the media file
         datetime_original: datetime object with timezone info
-        preserve_wallclock: If True, compensate to preserve wall-clock shooting time
 
     Returns:
         True if successful, False otherwise
     """
     try:
-        if preserve_wallclock:
-            # Write time compensated for current timezone to preserve wall-clock time
-            # Get wall-clock time and current timezone offset
-            wall_clock_time = datetime_original.strftime('%Y:%m:%d %H:%M:%S')
-            current_tz_offset = time.strftime('%z')
-            current_tz_formatted = f"{current_tz_offset[:3]}:{current_tz_offset[3:]}"
-            keys_value = f"{wall_clock_time}{current_tz_formatted}"
-        else:
-            # Write DateTimeOriginal value directly (with its original timezone)
-            keys_value = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
-            # Format timezone with colon
-            keys_value = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', keys_value)
+        # Write DateTimeOriginal value directly (with its original timezone)
+        keys_value = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
+        # Format timezone with colon
+        keys_value = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', keys_value)
 
         cmd = [
             "exiftool",
@@ -646,13 +636,12 @@ def set_file_system_timestamps(file_path: str, timestamp_str: str) -> bool:
         print(f"Error setting file timestamps: {e}", file=sys.stderr)
         return False
 
-def check_keys_creationdate_needs_update(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False) -> bool:
+def check_keys_creationdate_needs_update(file_path: str, datetime_original: datetime) -> bool:
     """Check if Keys:CreationDate needs updating
 
     Args:
         file_path: Path to the media file
         datetime_original: datetime object with timezone info
-        preserve_wallclock: If True, check against compensated value
 
     Returns:
         True if Keys:CreationDate needs updating, False otherwise
@@ -664,18 +653,10 @@ def check_keys_creationdate_needs_update(file_path: str, datetime_original: date
         # Missing, needs to be written
         return True
 
-    # Calculate expected value based on preserve_wallclock flag
-    if preserve_wallclock:
-        # Expected: wall-clock time with current timezone
-        wall_clock_time = datetime_original.strftime('%Y:%m:%d %H:%M:%S')
-        current_tz_offset = time.strftime('%z')
-        current_tz_formatted = f"{current_tz_offset[:3]}:{current_tz_offset[3:]}"
-        expected_value = f"{wall_clock_time}{current_tz_formatted}"
-    else:
-        # Expected: DateTimeOriginal with its original timezone
-        expected_value = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
-        # Format timezone with colon
-        expected_value = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', expected_value)
+    # Expected: DateTimeOriginal with its original timezone
+    expected_value = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
+    # Format timezone with colon
+    expected_value = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', expected_value)
 
     # Normalize both values for comparison (handle timezone format differences)
     current_norm = normalize_exif_value(current_creation_date)
@@ -748,7 +729,7 @@ def determine_needed_changes(file_path: str, datetime_original: datetime, preser
     Args:
         file_path: Path to the media file
         datetime_original: datetime object with timezone info
-        preserve_wallclock: If True, preserve wall-clock shooting time
+        preserve_wallclock: If True, preserve wall-clock shooting time for birth time
 
     Returns:
         Dictionary with boolean flags for needed changes
@@ -759,10 +740,10 @@ def determine_needed_changes(file_path: str, datetime_original: datetime, preser
         "quicktime_createdate": False
     }
 
-    # Check if Keys:CreationDate needs updating
-    changes["keys_creationdate"] = check_keys_creationdate_needs_update(file_path, datetime_original, preserve_wallclock)
+    # Check if Keys:CreationDate needs updating (always uses original timezone)
+    changes["keys_creationdate"] = check_keys_creationdate_needs_update(file_path, datetime_original)
 
-    # Check if file system timestamps need updating
+    # Check if file system timestamps need updating (preserve_wallclock affects this)
     changes["file_timestamps"] = check_file_system_timestamps_need_update(file_path, datetime_original, preserve_wallclock)
 
     # Check if QuickTime CreateDate needs updating
@@ -930,7 +911,7 @@ def format_change_description(changes: dict, timestamp_data: Optional[dict] = No
 
     return ", ".join(parts) if parts else "No change"
 
-def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False, preserve_wallclock: bool = False) -> bool:
+def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False, preserve_wallclock: bool = True) -> bool:
     """Main function to fix media (photo/video) timestamps
 
     Args:
@@ -938,7 +919,8 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
         dry_run: If True, show changes without applying them
         timezone_offset: Timezone offset (e.g. +09:00) for files missing timezone
         overwrite_datetimeoriginal: If True, overwrite DateTimeOriginal even if it exists (for genuinely wrong timestamps)
-        preserve_wallclock: If True, preserve wall-clock shooting time instead of adjusting for current timezone
+        preserve_wallclock: If True, set birth time to wall-clock shooting time (default, stable across timezone changes)
+                          If False, convert birth time to current timezone for display
     """
 
     # Check for timezone mismatch before processing
@@ -1057,9 +1039,9 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
             print("   ❌ Failed to write DateTimeOriginal")
             success = False
 
-    # Write Keys:CreationDate if needed
+    # Write Keys:CreationDate if needed (always uses original timezone)
     if changes.get("keys_creationdate"):
-        if not write_keys_creationdate(file_path, datetime_original, preserve_wallclock):
+        if not write_keys_creationdate(file_path, datetime_original):
             print("   ❌ Failed to write Keys:CreationDate")
             success = False
 
@@ -1086,7 +1068,7 @@ def main():
     parser.add_argument('--country', help='Country code or name for automatic timezone lookup (e.g. JP, Taiwan)')
     parser.add_argument('--apply', action='store_true', help='Apply changes (default: dry run)')
     parser.add_argument('--overwrite-datetimeoriginal', action='store_true', help='Overwrite DateTimeOriginal even if it exists (for genuinely wrong timestamps)')
-    parser.add_argument('--preserve-wallclock-time', action='store_true', help='Preserve wall-clock shooting time instead of adjusting for current timezone')
+    parser.add_argument('--convert-to-current-timezone', action='store_true', help='Convert birth time to current timezone instead of using wall-clock shooting time (default: use shooting time)')
 
     args = parser.parse_args()
 
@@ -1112,7 +1094,7 @@ def main():
         dry_run=not args.apply,
         timezone_offset=timezone_offset,
         overwrite_datetimeoriginal=args.overwrite_datetimeoriginal,
-        preserve_wallclock=args.preserve_wallclock_time
+        preserve_wallclock=not args.convert_to_current_timezone  # Invert: flag converts to current tz, default preserves wall-clock
     )
 
     return 0 if success else 1

@@ -13,6 +13,7 @@ profiles:
     exif:
       make: "Insta360"
       model: "X4"
+    file_extensions: [".mp4", ".insv"]
     companion_extensions: [".lrv", ".thm"]
 
   gopro:
@@ -25,7 +26,8 @@ profiles:
     exif:
       make: "GoPro"
       model: "HERO12 Black"
-    companion_extensions: [".thm"]
+    file_extensions: [".mp4"]
+    companion_extensions: [".thm", ".lrv"]
 
   dji:
     import_dir: "/Volumes/Extreme GRN/Videos/Source Video/DJI/Import"
@@ -37,9 +39,10 @@ profiles:
     exif:
       make: "DJI"
       model: "Mini 4 Pro"
+    file_extensions: [".mp4", ".mov"]
     companion_extensions: [".lrf", ".thm"]
 
-  sony-photos:
+    sony-photos:
     # import_dir: "/Volumes/Extreme GRN/Photos/Import"
     import_dir: "~/Pictures/Photos/Import"
     backup_enabled: true
@@ -49,6 +52,7 @@ profiles:
     exif:
       make: "Sony"
       model: "ILCE-7M4"
+    file_extensions: [".arw", ".jpg"]
     companion_extensions: []
 
   sony-video:
@@ -61,7 +65,8 @@ profiles:
     exif:
       make: "Sony"
       model: "ILCE-7M4"
-    companion_extensions: [".xml", ".bin", ".jpg"]
+    file_extensions: [".mp4", ".mov"]
+    companion_extensions: [".xml", ".bin"]
 
   iphone16pro:
     import_dir: "/Volumes/Extreme GRN/Videos/Source Video/iPhone/Import"
@@ -73,4 +78,5 @@ profiles:
     exif:
       make: "Apple"
       model: "iPhone 16 Pro"
+    file_extensions: [".mov", ".mp4"]
     companion_extensions: []
