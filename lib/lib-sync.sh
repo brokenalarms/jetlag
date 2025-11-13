@@ -20,9 +20,10 @@ run_rsync() {
     # We use SSH compression (-C) instead which is more reliable
     local RSYNC_ARGS="-avi --no-perms --no-owner --no-group --no-links --omit-dir-times --human-readable"
 
-    # Add bandwidth limit to avoid triggering hotel QoS (if RSYNC_BW_LIMIT is set)
+    # Add bandwidth limit for remote transfers only (if RSYNC_BW_LIMIT is set)
+    # Only applies to network/SSH copies, not local disk-to-disk transfers
     # Set in .env.local: RSYNC_BW_LIMIT=5000  (KB/s, ~5 MB/s is typically safe)
-    if [[ -n "${RSYNC_BW_LIMIT:-}" ]] && [[ "${RSYNC_BW_LIMIT}" != "0" ]]; then
+    if [[ "$DEST" == *"@"* ]] && [[ -n "${RSYNC_BW_LIMIT:-}" ]] && [[ "${RSYNC_BW_LIMIT}" != "0" ]]; then
         RSYNC_ARGS="$RSYNC_ARGS --bwlimit=${RSYNC_BW_LIMIT}"
     fi
     

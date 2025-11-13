@@ -129,10 +129,22 @@ def organize_file(file_path: str, import_dir: str, copy_mode: bool = True, apply
         cmd.append('--apply')
 
     try:
-        # Let output pass through naturally for owned scripts
-        result = subprocess.run(cmd, text=True, check=True)
+        # Capture output to detect skipped files, but still display it
+        result = subprocess.run(cmd, text=True, check=True, capture_output=True)
 
-        action = "copied" if apply_changes else "would_copy"
+        # Print output to maintain pass-through behavior
+        if result.stdout:
+            print(result.stdout, end='')
+        if result.stderr:
+            print(result.stderr, end='', file=sys.stderr)
+
+        # Detect if file was skipped by checking output
+        was_skipped = 'Skipped (already exists)' in result.stdout
+
+        if was_skipped:
+            action = "skipped"
+        else:
+            action = "copied" if apply_changes else "would_copy"
 
         # Compute destination path only when needed (for tagging after copy)
         # Don't waste time during dry run since we don't tag in dry run mode
@@ -141,7 +153,11 @@ def organize_file(file_path: str, import_dir: str, copy_mode: bool = True, apply
         return ImportResult(True, action, file_path, dest_path=dest_path)
 
     except subprocess.CalledProcessError as e:
-        # Errors already displayed by subprocess
+        # Display any captured output from failed command
+        if e.stdout:
+            print(e.stdout, end='')
+        if e.stderr:
+            print(e.stderr, end='', file=sys.stderr)
         return ImportResult(False, "failed", file_path, error=None)
 
 def tag_file(file_path: str, tags: Optional[List[str]] = None, make: Optional[str] = None, model: Optional[str] = None, apply_changes: bool = False) -> bool:
@@ -300,29 +316,53 @@ def archive_processed_file(file_path: str, source_dir: str, archive_dir: Optiona
     if not archive_dir:
         return True
 
+    # Save the directory before moving the file
+    source_file_dir = os.path.dirname(file_path)
+
+    # Preserve directory structure relative to source_dir
+    rel_path = os.path.relpath(file_path, source_dir)
+    archive_file_path = os.path.join(archive_dir, rel_path)
+
+    # Create parent directories if needed
+    os.makedirs(os.path.dirname(archive_file_path), exist_ok=True)
+
     try:
-        # Save the directory before moving the file
-        source_file_dir = os.path.dirname(file_path)
-
-        # Preserve directory structure relative to source_dir
-        rel_path = os.path.relpath(file_path, source_dir)
-        archive_file_path = os.path.join(archive_dir, rel_path)
-
-        # Create parent directories if needed
-        os.makedirs(os.path.dirname(archive_file_path), exist_ok=True)
-
+        # Try move first (fastest for same filesystem)
         shutil.move(file_path, archive_file_path)
 
         # Clean up empty parent directories after moving
         cleanup_empty_parent_dirs(source_file_dir, source_dir)
 
         return True
-    except Exception as e:
-        print(f"Warning: Failed to archive {file_path}: {e}", file=sys.stderr)
-        return False
+
+    except (OSError, PermissionError):
+        # Move failed - try copy + delete fallback for restricted filesystems (e.g. camera SD cards)
+        try:
+            # Copy file with metadata
+            shutil.copy2(file_path, archive_file_path)
+
+            # Try to delete source
+            try:
+                os.remove(file_path)
+                # Clean up empty parent directories after successful delete
+                cleanup_empty_parent_dirs(source_file_dir, source_dir)
+                return True
+            except (OSError, PermissionError):
+                # Copy succeeded but delete failed (read-only filesystem) - that's okay
+                print(f"   Note: Archived {os.path.relpath(file_path, source_dir)} (source retained on read-only media)")
+                return True
+
+        except Exception as copy_error:
+            print(f"Warning: Failed to archive {os.path.relpath(file_path, source_dir)}: {copy_error}", file=sys.stderr)
+            return False
 
 def cleanup_empty_directory(directory: str) -> None:
     """Remove all empty subdirectories, then original directory if empty after processing"""
+    # Check if directory still exists (may have been cleaned up incrementally during archiving)
+    if not os.path.exists(directory):
+        print(f"✓ Source directory already cleaned up: {os.path.basename(directory)}")
+        return
+
     try:
         # First pass: recursively remove all empty subdirectories using find
         subprocess.run(
@@ -422,10 +462,10 @@ def import_media(source_dir: str, profile: ImportProfile,
             if not tag_file(result.dest_path, tags=profile.tags, make=profile.exif_make, model=profile.exif_model, apply_changes=apply_changes):
                 print(f"   Warning: Tagging failed for {filename}")
 
-        # For successful copies in apply mode, archive the source file immediately
+        # For successfully processed files (copied or skipped) in apply mode, archive the source file immediately
         # This ensures progress is preserved in case of interruption
-        if apply_changes and result.action == "copied":
-            # Create archive directory on first successful copy
+        if apply_changes and result.action in ["copied", "skipped"]:
+            # Create archive directory on first successful file
             if not archive_dir:
                 archive_dir = create_archive_directory(source_dir, apply_changes)
                 if archive_dir:

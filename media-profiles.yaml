@@ -39,10 +39,10 @@ profiles:
     exif:
       make: "DJI"
       model: "Mini 4 Pro"
-    file_extensions: [".mp4", ".mov"]
-    companion_extensions: [".lrf", ".thm"]
+    file_extensions: [".mp4", ".mov", ".dng"]
+    companion_extensions: [".lrf", ".thm", ".srt"]
 
-    sony-photos:
+  sony-photos:
     # import_dir: "/Volumes/Extreme GRN/Photos/Import"
     import_dir: "~/Pictures/Photos/Import"
     backup_enabled: true
