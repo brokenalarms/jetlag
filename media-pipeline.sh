@@ -172,7 +172,7 @@ echo "→ Source:  $source_dir"
 echo "→ Target:  $target_dir"
 echo "→ Mode:    $([[ $apply -eq 1 ]] && echo "APPLY (files will be processed)" || echo "DRY RUN (no changes)")"
 if [[ ${#location_args[@]} -gt 0 ]]; then
-  echo "→ Timezone: ${location_args[*]}"
+  printf "→ Timezone: %s %s\n" "${location_args[0]}" "${location_args[1]}"
 else
   echo "→ Timezone: From video metadata (or will prompt if needed)"
 fi
@@ -181,15 +181,40 @@ echo
 # Create target directory if it doesn't exist (for apply mode)
 [[ $apply -eq 1 ]] && mkdir -p "$target_dir"
 
-# Find all video files to process
+# Find all media files to process (using profile file_extensions if available)
 files=()
-while IFS= read -r -d '' file; do
-  files+=("$file")
-done < <(find "$source_dir" -type f \( -iname "*.mp4" -o -iname "*.mov" -o -iname "*.insv" -o -iname "*.lrv" \) -print0)
+if [[ -n "$profile" ]]; then
+  # Get extensions from profile (space-separated list like ".mp4 .mov")
+  extensions=$(python3 -c "
+import yaml
+with open('$SCRIPT_DIR/media-profiles.yaml') as f:
+  data = yaml.safe_load(f)
+  exts = data['profiles']['$profile'].get('file_extensions', ['.mp4', '.mov'])
+  print(' '.join(exts))
+")
+  # Build find args array properly to avoid glob expansion
+  find_args=()
+  first=1
+  for ext in $extensions; do
+    [[ $first -eq 0 ]] && find_args+=("-o")
+    find_args+=("-iname" "*$ext")
+    first=0
+  done
+  while IFS= read -r -d '' file; do
+    files+=("$file")
+  done < <(find "$source_dir" -type f \( "${find_args[@]}" \) -print0)
+else
+  # Default extensions
+  while IFS= read -r -d '' file; do
+    files+=("$file")
+  done < <(find "$source_dir" -type f \( -iname "*.mp4" -o -iname "*.mov" \) -print0)
+fi
 
-# Sort files alphabetically
-IFS=$'\n' files=($(sort <<<"${files[*]}"))
-unset IFS
+# Sort files alphabetically (handle empty array)
+if [[ ${#files[@]} -gt 0 ]]; then
+  IFS=$'\n' files=($(sort <<<"${files[*]}"))
+  unset IFS
+fi
 
 total_files=${#files[@]}
 

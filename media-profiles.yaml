@@ -39,11 +39,12 @@ profiles:
     exif:
       make: "DJI"
       model: "Mini 4 Pro"
-    file_extensions: [".mp4", ".mov", ".dng"]
+    file_extensions: [".mp4", ".mov", ".dng", ".jpg"]
     companion_extensions: [".lrf", ".thm", ".srt"]
 
   sony-photo:
     import_dir: "/Volumes/Extreme GRN/Photos/Import"
+    # ready_dir: "/Volumes/Extreme GRN/Photos/Originals"
     # import_dir: "~/Pictures/Photos/Import"
     backup_enabled: true
     backup_dir: "/Volumes/Extreme GRN/Photos/Originals"
@@ -53,7 +54,7 @@ profiles:
       make: "Sony"
       model: "ILCE-7M4"
     file_extensions: [".arw", ".jpg", ".hif"]
-    companion_extensions: []
+    companion_extensions: [".xml"]
 
   sony-video:
     import_dir: "/Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Import"
@@ -66,7 +67,7 @@ profiles:
       make: "Sony"
       model: "ILCE-7M4"
     file_extensions: [".mp4", ".mov"]
-    companion_extensions: [".xml", ".bin"]
+    companion_extensions: [".xml", ".bin", ".jpg"]
 
   iphone16pro:
     import_dir: "/Volumes/Extreme GRN/Videos/Source Video/iPhone/Import"
