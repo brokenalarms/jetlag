@@ -253,14 +253,21 @@ def cleanup_empty_parent_dirs(file_dir: str, source_root: str) -> None:
     """Clean up empty parent directories after moving a file
 
     Keep removing parent directories as long as they're empty.
-    Stop at source_root or when we hit a non-empty directory.
+    Stop after source_root or when we hit a non-empty directory.
     """
     import errno
 
-    while file_dir and file_dir != source_root and file_dir != '/' and file_dir != '.':
+    # Normalize paths for comparison
+    source_root = os.path.normpath(source_root)
+
+    while file_dir and file_dir != '/' and file_dir != '.':
+        file_dir = os.path.normpath(file_dir)
         try:
             # Try to remove the directory (only succeeds if empty)
             os.rmdir(file_dir)
+            # Stop after removing source_root
+            if file_dir == source_root:
+                break
             # Move up to parent
             file_dir = os.path.dirname(file_dir)
         except OSError as e:
@@ -315,32 +322,6 @@ def archive_processed_file(file_path: str, source_dir: str, archive_dir: Optiona
         except Exception as copy_error:
             print(f"Warning: Failed to archive {os.path.relpath(file_path, source_dir)}: {copy_error}", file=sys.stderr)
             return False
-
-def cleanup_empty_directory(directory: str) -> None:
-    """Remove all empty subdirectories, then original directory if empty after processing"""
-    # Check if directory still exists (may have been cleaned up incrementally during archiving)
-    if not os.path.exists(directory):
-        print(f"✓ Source directory already cleaned up: {os.path.basename(directory)}")
-        return
-
-    try:
-        # First pass: recursively remove all empty subdirectories using find
-        subprocess.run(
-            ["find", directory, "-type", "d", "-empty", "-delete"],
-            capture_output=True,
-            check=False  # Don't raise on error, some dirs may be protected
-        )
-
-        # Check if root directory is empty (ignoring hidden files)
-        # Don't filter by extension here - just check if any media files remain
-        remaining_files = get_media_files(directory, include_companion=True, companion_extensions=None, file_extensions=None)
-        if not remaining_files:
-            os.rmdir(directory)
-            print(f"Removed empty directory: {os.path.basename(directory)}")
-        else:
-            print(f"⚠️  Original folder '{os.path.basename(directory)}' still contains {len(remaining_files)} file(s)")
-    except OSError as e:
-        print(f"Note: Could not remove directory {directory}: {e}")
 
 def format_import_summary(results: List[ImportResult], archive_dir: Optional[str]) -> str:
     """Format import summary from results"""
@@ -558,15 +539,12 @@ Examples:
                 # Create archive directory if needed
                 if not archive_dir:
                     archive_dir = create_archive_directory(source_dir, args.apply)
-                for file_path in orphaned_companions:
-                    archive_processed_file(file_path, source_dir, archive_dir)
-                print(f"Archived to: {os.path.basename(archive_dir)}")
+                if archive_dir:
+                    for file_path in orphaned_companions:
+                        archive_processed_file(file_path, source_dir, archive_dir)
+                    print(f"Archived to: {os.path.basename(archive_dir)}")
             else:
                 print("Leaving companion files in source directory.")
-
-        # Clean up empty source directory
-        if archive_dir:
-            cleanup_empty_directory(source_dir)
 
         # Display summary
         if any(r.action in ["copied", "moved", "skipped", "already_organized"] for r in results):
