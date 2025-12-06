@@ -46,6 +46,22 @@
   - organize-by-date:
     - file is sorted into label template provided
     - directories that were left empty as the result of a file being moved from it are deleted as soon as that last file is removed from it
-    - directories that were already empty and didn't become so from files being moved are left 
-
+    - directories that were already empty and didn't become so from files being moved are left
+    - .DS_Store files should be deleted if they're the only thing preventing directory cleanup
     - the shell script entry point to each py file imports the required venv
+- WORKFLOWS
+  - import-media.py: copies from SD card (import_dir) to ready_dir, uses --copy mode, tags after copy
+  - media-pipeline.sh: processes files already in ready_dir, uses move mode, fixes timestamps then organizes
+  - both use organize-by-date.sh which outputs `@@dest=` and `@@action=` to stdout for parent to parse
+- MEDIA-PIPELINE ARCHITECTURE (to be rewritten in Python)
+  - flow per file: tag-media.py → fix-media-timestamp.py → organize-by-date.sh
+  - reads media-profiles.yaml to get: ready_dir (target), file_extensions, tags, exif make/model
+  - CLI args: --profile NAME, --source DIR, --target DIR, --timezone +HHMM, --group NAME, --apply
+  - --group is embedded into the organize template: `{{YYYY}}/GROUP/{{YYYY}}-{{MM}}-{{DD}}`
+  - finds files using profile's file_extensions (e.g., [".mp4", ".insv"]), processes alphabetically
+  - checks for stale exiftool_tmp directories at startup (exiftool fails silently if these exist)
+  - summary at end: total processed, succeeded, changed, unchanged, failed (with list)
+- CAMERA QUIRKS
+  - GoPro: FAT filesystem stores modification time in camera's local timezone (no TZ info). If camera is set to +02:00 but Mac is +09:00, birth/modify times will be 7 hours off. MediaCreateDate is UTC and correct.
+  - macOS: when copying from SD card, birth time is often preserved from source FAT filesystem (not reset to copy time). This means birth time reflects camera's wrong timezone.
+  - birth time shift of ~7 hours (or other non-standard offset) indicates camera timezone mismatch, not a bug

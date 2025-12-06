@@ -1,83 +1,110 @@
 backup_config:
-  local_base_path: "/Volumes/"
-  remote_base_path: "/volume1/Backup/ChronoSync/"
-
+  local_base_path: /Volumes/
+  remote_base_path: /volume1/Backup/ChronoSync/
 profiles:
-  insta360:
-    import_dir: "/Volumes/Extreme GRN/Videos/Source Video/Insta360/Import"
-    ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/Insta360/Ready"
-    backup_enabled: true
-    backup_dir: "/Volumes/Extreme GRN/Videos/Source Video/Insta360"
-    backup_exclude_subdirs: ["Exports"]
-    tags: ["insta-360-x4"]
-    exif:
-      make: "Insta360"
-      model: "X4"
-    file_extensions: [".mp4", ".insv"]
-    companion_extensions: [".lrv", ".thm", ".list"]
-
-  gopro:
-    import_dir: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Import"
-    ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Ready"
-    backup_enabled: true
-    backup_dir: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Ready"
-    backup_exclude_subdirs: []
-    tags: ["gopro-hero-12"]
-    exif:
-      make: "GoPro"
-      model: "HERO12 Black"
-    file_extensions: [".mp4"]
-    companion_extensions: [".thm", ".lrv", ".sav"]
-
   dji:
-    import_dir: "/Volumes/Extreme GRN/Videos/Source Video/DJI/Import"
-    ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/DJI/Ready"
+    backup_dir: /Volumes/Extreme GRN/Videos/Source Video/DJI/Ready
     backup_enabled: true
-    backup_dir: "/Volumes/Extreme GRN/Videos/Source Video/DJI/Ready"
     backup_exclude_subdirs: []
-    tags: ["dji-mini-4-pro"]
+    companion_extensions:
+    - .lrf
+    - .thm
+    - .srt
     exif:
-      make: "DJI"
-      model: "Mini 4 Pro"
-    file_extensions: [".mp4", ".mov", ".dng", ".jpg"]
-    companion_extensions: [".lrf", ".thm", ".srt"]
-
-  sony-photo:
-    import_dir: "/Volumes/Extreme GRN/Photos/Import"
-    # ready_dir: "/Volumes/Extreme GRN/Photos/Originals"
-    # import_dir: "~/Pictures/Photos/Import"
+      make: DJI
+      model: Mini 4 Pro
+    file_extensions:
+    - .mp4
+    - .mov
+    - .dng
+    - .jpg
+    import_dir: /Volumes/Extreme GRN/Videos/Source Video/DJI/Import
+    ready_dir: /Volumes/Extreme GRN/Videos/Source Video/DJI/Ready
+    tags:
+    - dji-mini-4-pro
+  gopro:
+    backup_dir: /Volumes/Extreme GRN/Videos/Source Video/GoPro/Ready
     backup_enabled: true
-    backup_dir: "/Volumes/Extreme GRN/Photos/Originals"
-    backup_exclude_subdirs: ["Import"]
-    tags: ["sony-a7iv"]
-    exif:
-      make: "Sony"
-      model: "ILCE-7M4"
-    file_extensions: [".arw", ".jpg", ".hif"]
-    companion_extensions: [".xml"]
-
-  sony-video:
-    import_dir: "/Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Import"
-    backup_enabled: true
-    ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Ready"
-    backup_dir: "/Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Ready"
     backup_exclude_subdirs: []
-    tags: ["sony-a7iv"]
+    companion_extensions:
+    - .thm
+    - .lrv
+    - .sav
     exif:
-      make: "Sony"
-      model: "ILCE-7M4"
-    file_extensions: [".mp4", ".mov"]
-    companion_extensions: [".xml", ".bin", ".jpg"]
-
+      make: GoPro
+      model: HERO12 Black
+    file_extensions:
+    - .mp4
+    import_dir: /Volumes/Extreme GRN/Videos/Source Video/GoPro/Import
+    ready_dir: /Volumes/Extreme GRN/Videos/Source Video/GoPro/Ready
+    tags:
+    - gopro-hero-12
+  insta360:
+    backup_dir: /Volumes/Extreme GRN/Videos/Source Video/Insta360
+    backup_enabled: true
+    backup_exclude_subdirs:
+    - Exports
+    companion_extensions:
+    - .lrv
+    - .thm
+    - .list
+    exif:
+      make: Insta360
+      model: X4
+    file_extensions:
+    - .mp4
+    - .insv
+    import_dir: /Volumes/Extreme GRN/Videos/Source Video/Insta360/Import
+    ready_dir: /Volumes/Extreme GRN/Videos/Source Video/Insta360/Ready
+    tags:
+    - insta-360-x4
   iphone16pro:
-    import_dir: "/Volumes/Extreme GRN/Videos/Source Video/iPhone/Import"
-    ready_dir: "/Volumes/Extreme GRN/Videos/Source Video/iPhone/Ready"
+    backup_dir: /Volumes/Extreme GRN/Videos/Source Video/iPhone
     backup_enabled: false
-    backup_dir: "/Volumes/Extreme GRN/Videos/Source Video/iPhone"
     backup_exclude_subdirs: []
-    tags: ["iphone-16-pro"]
-    exif:
-      make: "Apple"
-      model: "iPhone 16 Pro"
-    file_extensions: [".mov", ".mp4"]
     companion_extensions: []
+    exif:
+      make: Apple
+      model: iPhone 16 Pro
+    file_extensions:
+    - .mov
+    - .mp4
+    import_dir: /Volumes/Extreme GRN/Videos/Source Video/iPhone/Import
+    ready_dir: /Volumes/Extreme GRN/Videos/Source Video/iPhone/Ready
+    tags:
+    - iphone-16-pro
+  sony-photo:
+    backup_dir: /Volumes/Extreme GRN/Photos/Originals
+    backup_enabled: true
+    backup_exclude_subdirs:
+    - Import
+    companion_extensions:
+    - .xml
+    exif:
+      make: Sony
+      model: ILCE-7M4
+    file_extensions:
+    - .arw
+    - .jpg
+    - .hif
+    import_dir: /Volumes/Extreme GRN/Photos/Import
+    tags:
+    - sony-a7iv
+  sony-video:
+    backup_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Ready
+    backup_enabled: true
+    backup_exclude_subdirs: []
+    companion_extensions:
+    - .xml
+    - .bin
+    - .jpg
+    exif:
+      make: Sony
+      model: ILCE-7M4
+    file_extensions:
+    - .mp4
+    - .mov
+    import_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Import
+    ready_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Ready
+    tags:
+    - sony-a7iv

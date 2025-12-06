@@ -335,11 +335,6 @@ with open('$SCRIPT_DIR/media-profiles.yaml') as f:
   echo  # Empty line between files
 done
 
-# Clean up empty directories in source (only in apply mode)
-if [[ $apply -eq 1 ]]; then
-  find "$source_dir" -type d -empty -delete 2>/dev/null || true
-fi
-
 # Summary
 echo
 echo "==========================================="

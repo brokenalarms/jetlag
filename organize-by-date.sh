@@ -84,6 +84,16 @@ cleanup_empty_parent_dirs() {
   # Keep removing parent directories as long as they're empty
   # Stop at root or when we hit a non-empty directory
   while [[ -d "$file_dir" && "$file_dir" != "/" && "$file_dir" != "." ]]; do
+    # Delete .DS_Store if it's the only thing preventing cleanup
+    if [[ -f "$file_dir/.DS_Store" ]]; then
+      # Check if .DS_Store is the only file (use -mindepth 1 to skip the dir itself)
+      local file_count
+      file_count=$(find "$file_dir" -mindepth 1 -maxdepth 1 ! -name '.DS_Store' | wc -l)
+      if [[ $file_count -eq 0 ]]; then
+        rm -f "$file_dir/.DS_Store"
+      fi
+    fi
+
     # Try to remove the directory (only succeeds if empty)
     if rmdir "$file_dir" 2>/dev/null; then
       log_verbose "  Removed empty directory: $file_dir"

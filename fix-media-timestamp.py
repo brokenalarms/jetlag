@@ -781,11 +781,11 @@ def format_original_timestamps(current_data: dict) -> str:
             parts.append(f"{format_exif_timestamp_display(datetime_original)} (DateTimeOriginal)")
     elif source == "MediaCreateDate":
         media_create = current_data["exif"].get("MediaCreateDate", "")
-        file_ts = current_data["file_system"].get("modify", "")
+        birth_ts = current_data["file_system"].get("birth", "")
         if media_create:
             parts.append(f"{format_exif_timestamp_display(media_create)} UTC (MediaCreateDate)")
-        if file_ts:
-            parts.append(f"{format_exif_timestamp_display(file_ts)} local (file)")
+        if birth_ts:
+            parts.append(f"{format_exif_timestamp_display(birth_ts)} local (file)")
     elif source == "filename":
         # Show the parsed filename timestamp
         filename_ts = parse_filename_timestamp(current_data.get("file_path", ""))
@@ -793,10 +793,14 @@ def format_original_timestamps(current_data: dict) -> str:
             parts.append(f"{format_exif_timestamp_display(filename_ts)} (from filename)")
         else:
             parts.append(f"(from filename)")
-    elif source in ["file birthtime", "file mtime"]:
-        file_ts = current_data["file_system"].get("modify", "")
-        if file_ts:
-            parts.append(f"{format_exif_timestamp_display(file_ts)} (file)")
+    elif source == "file birthtime":
+        birth_ts = current_data["file_system"].get("birth", "")
+        if birth_ts:
+            parts.append(f"{format_exif_timestamp_display(birth_ts)} (file birth)")
+    elif source == "file mtime":
+        mod_ts = current_data["file_system"].get("modify", "")
+        if mod_ts:
+            parts.append(f"{format_exif_timestamp_display(mod_ts)} (file modified)")
 
     return ", ".join(parts) if parts else "(no timestamps available)"
 
@@ -827,10 +831,27 @@ def format_corrected_timestamp(datetime_original: datetime, timestamp_source: st
     return f"{corrected_str} (from {source_display} with timezone, tz: {tz_source_display})"
 
 def format_time_delta(seconds: float) -> str:
-    """Format time delta in human-readable format"""
+    """Format time delta showing hours, rounded to nearest hour if within 2 minutes"""
     sign = "+" if seconds > 0 else "-"
-    td = timedelta(seconds=abs(seconds))
-    return f"{sign}{humanize.naturaldelta(td)}"
+    total_seconds = abs(seconds)
+    total_minutes = total_seconds / 60
+    hours = total_minutes / 60
+
+    # Round to nearest hour if within 2 minutes of a whole hour
+    nearest_hour = round(hours)
+    if nearest_hour > 0 and abs(hours - nearest_hour) * 60 < 2:  # within 2 minutes
+        return f"{sign}{nearest_hour} hour{'s' if nearest_hour != 1 else ''}"
+
+    # Otherwise show exact hours and minutes
+    hours = int(total_minutes // 60)
+    minutes = int(total_minutes % 60)
+
+    if minutes == 0:
+        return f"{sign}{hours} hour{'s' if hours != 1 else ''}"
+    elif hours == 0:
+        return f"{sign}{minutes} minute{'s' if minutes != 1 else ''}"
+    else:
+        return f"{sign}{hours}h {minutes}m"
 
 def format_change_description(changes: dict, timestamp_data: Optional[dict] = None, current_data: Optional[dict] = None, preserve_wallclock: bool = False, datetime_original: Optional[datetime] = None) -> str:
     """Format change description from changes data"""
@@ -876,21 +897,34 @@ def format_change_description(changes: dict, timestamp_data: Optional[dict] = No
     if changes.get("file_timestamps"):
         if timestamp_data and timestamp_data.get("expected_time"):
             birth_delta = timestamp_data.get("birth_delta_seconds")
+            current_birth_str = timestamp_data.get("current_birth")
 
             if birth_delta is not None and abs(birth_delta) > 1:
-                # Show birth time delta
-                delta_str = format_time_delta(birth_delta)
                 expected_dt = datetime.strptime(timestamp_data["expected_time"], '%Y:%m:%d %H:%M:%S')
-                time_display = expected_dt.strftime('%H:%M')
 
-                if preserve_wallclock:
-                    parts.append(f"Birth time ({delta_str} to {time_display}, shooting time)")
+                # Check if dates differ (not just times)
+                if current_birth_str:
+                    current_birth_dt = datetime.strptime(current_birth_str, '%Y:%m:%d %H:%M:%S')
+                    dates_differ = current_birth_dt.date() != expected_dt.date()
                 else:
-                    system_tz_offset = time.strftime('%z')
-                    system_tz_formatted = f"{system_tz_offset[:3]}:{system_tz_offset[3:]}"
-                    parts.append(f"Birth time ({delta_str} to {time_display}, display time in {system_tz_formatted})")
+                    dates_differ = False
+
+                if dates_differ:
+                    # Show full date change: "2025-12-06 → 2025-10-05 10:00"
+                    current_display = current_birth_dt.strftime('%Y-%m-%d %H:%M')
+                    expected_display = expected_dt.strftime('%Y-%m-%d %H:%M')
+                    parts.append(f"Birth time ({current_display} → {expected_display})")
+                else:
+                    # Same date, just show time change
+                    delta_str = format_time_delta(birth_delta)
+                    time_display = expected_dt.strftime('%H:%M')
+                    if preserve_wallclock:
+                        parts.append(f"Birth time ({delta_str} to {time_display}, shooting time)")
+                    else:
+                        system_tz_offset = time.strftime('%z')
+                        system_tz_formatted = f"{system_tz_offset[:3]}:{system_tz_offset[3:]}"
+                        parts.append(f"Birth time ({delta_str} to {time_display}, display time in {system_tz_formatted})")
             else:
-                # Delta is ≤1 second but still detected as needing update (edge case)
                 parts.append("Birth time")
         else:
             parts.append("Birth time")
@@ -992,6 +1026,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
 
         timestamp_data = {
             "expected_time": expected_file_time,
+            "current_birth": current_fs.get("birth"),
             "birth_delta_seconds": None
         }
 
