@@ -27,7 +27,7 @@ profiles:
       make: "GoPro"
       model: "HERO12 Black"
     file_extensions: [".mp4"]
-    companion_extensions: [".thm", ".lrv"]
+    companion_extensions: [".thm", ".lrv", ".sav"]
 
   dji:
     import_dir: "/Volumes/Extreme GRN/Videos/Source Video/DJI/Import"

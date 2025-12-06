@@ -74,89 +74,49 @@ def get_default_profile_path() -> str:
             return str(profile_path)
     return str(script_dir / 'media-profiles.yaml')
 
-def compute_destination_path(file_path: str, import_dir: str) -> Optional[str]:
-    """Compute the expected destination path for a file based on its DateTimeOriginal
-
-    This replicates the logic from organize-by-date.sh using get_file_date_for_organization
-    """
+def parse_json_result(stdout: str) -> Optional[dict]:
+    """Parse JSON result from organize-by-date.sh --json output"""
     try:
-        # Get file date (YYYY-MM-DD format)
-        result = subprocess.run(
-            ['exiftool', '-fast2', '-s', '-DateTimeOriginal', file_path],
-            capture_output=True, text=True, check=True
-        )
-
-        file_date = None
-        for line in result.stdout.strip().split('\n'):
-            if ':' in line:
-                key, value = line.split(':', 1)
-                if key.strip() == 'DateTimeOriginal':
-                    dt_str = value.strip()
-                    if dt_str:
-                        # Extract date part and convert YYYY:MM:DD → YYYY-MM-DD
-                        date_part = dt_str.split(' ')[0]
-                        file_date = date_part.replace(':', '-')
-                        break
-
-        if not file_date:
-            # Fallback to file modification time
-            from datetime import datetime
-            mtime = os.path.getmtime(file_path)
-            file_date = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d')
-
-        # Expand template: {{YYYY}}/{{YYYY}}-{{MM}}-{{DD}} (default template)
-        year, month, day = file_date.split('-')
-        organized_path = f"{year}/{file_date}"
-
-        # Construct full destination path
-        filename = os.path.basename(file_path)
-        dest_path = os.path.join(import_dir, organized_path, filename)
-
-        return dest_path
-
-    except Exception:
+        return json.loads(stdout.strip())
+    except (json.JSONDecodeError, ValueError):
         return None
 
-def organize_file(file_path: str, import_dir: str, copy_mode: bool = True, apply_changes: bool = False) -> ImportResult:
+def organize_file(file_path: str, import_dir: str, group: str, copy_mode: bool = True, apply_changes: bool = False) -> ImportResult:
     """Organize a single file using organize-by-date.sh"""
     script_dir = Path(__file__).parent
     organize_script = script_dir / 'organize-by-date.sh'
 
-    cmd = [str(organize_script), file_path, '--target', import_dir]
+    template = f'{{{{YYYY}}}}/{group}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}'
+    cmd = [str(organize_script), file_path, '--target', import_dir, '--template', template, '--json']
     if copy_mode:
         cmd.append('--copy')
     if apply_changes:
         cmd.append('--apply')
 
     try:
-        # Capture output to detect skipped files, but still display it
         result = subprocess.run(cmd, text=True, check=True, capture_output=True)
 
-        # Print output to maintain pass-through behavior
-        if result.stdout:
-            print(result.stdout, end='')
-        if result.stderr:
-            print(result.stderr, end='', file=sys.stderr)
+        # Parse JSON result
+        data = parse_json_result(result.stdout)
+        if not data:
+            print(f"Warning: Could not parse JSON from organize-by-date.sh", file=sys.stderr)
+            return ImportResult(False, "failed", file_path, error="JSON parse error")
 
-        # Detect if file was skipped by checking output
-        was_skipped = 'Skipped (already exists)' in result.stdout
+        # Display the message from child script
+        if data.get('message'):
+            print(data['message'])
 
-        if was_skipped:
-            action = "skipped"
-        else:
-            action = "copied" if apply_changes else "would_copy"
-
-        # Compute destination path only when needed (for tagging after copy)
-        # Don't waste time during dry run since we don't tag in dry run mode
-        dest_path = compute_destination_path(file_path, import_dir) if apply_changes else None
+        action = data.get('action', 'unknown')
+        dest_path = data.get('dest')
 
         return ImportResult(True, action, file_path, dest_path=dest_path)
 
     except subprocess.CalledProcessError as e:
-        # Display any captured output from failed command
-        if e.stdout:
-            print(e.stdout, end='')
-        if e.stderr:
+        # Try to parse JSON even on failure (may contain error info)
+        data = parse_json_result(e.stdout) if e.stdout else None
+        if data and data.get('message'):
+            print(data['message'])
+        elif e.stderr:
             print(e.stderr, end='', file=sys.stderr)
         return ImportResult(False, "failed", file_path, error=None)
 
@@ -384,9 +344,9 @@ def cleanup_empty_directory(directory: str) -> None:
 
 def format_import_summary(results: List[ImportResult], archive_dir: Optional[str]) -> str:
     """Format import summary from results"""
-    copied = sum(1 for r in results if r.action == "copied")
-    skipped = sum(1 for r in results if r.action == "skipped")
-    failed = sum(1 for r in results if r.action == "failed")
+    copied = sum(1 for r in results if r.action in ["copied", "moved"])
+    skipped = sum(1 for r in results if r.action in ["skipped", "already_organized"])
+    failed = sum(1 for r in results if r.action in ["failed", "skipped_larger"])
 
     lines = []
     if copied > 0:
@@ -400,7 +360,7 @@ def format_import_summary(results: List[ImportResult], archive_dir: Optional[str
 
     return '\n'.join(lines)
 
-def import_media(source_dir: str, profile: ImportProfile,
+def import_media(source_dir: str, profile: ImportProfile, group: str,
                  apply_changes: bool = False, skip_companion: bool = False) -> tuple[List[ImportResult], Optional[str], List[str]]:
     """Main import function - processes all files in source directory
 
@@ -427,9 +387,13 @@ def import_media(source_dir: str, profile: ImportProfile,
     import_files_set = set(import_files)
     companion_files_to_archive = [f for f in all_files if f not in import_files_set]
 
-    if not import_files:
+    if not import_files and not companion_files_to_archive:
         print("No media files found to process")
         return [], None, []
+
+    if not import_files:
+        print(f"No media files to import ({len(companion_files_to_archive)} companion file(s) to archive)")
+        return [], None, companion_files_to_archive
 
     if skip_companion:
         companion_count = len(companion_files_to_archive)
@@ -449,7 +413,7 @@ def import_media(source_dir: str, profile: ImportProfile,
             print(f"[{i}/{len(import_files)}] Processing: {filename}")
 
         # Organize the file (copy to destination)
-        result = organize_file(file_path, profile.import_dir, copy_mode=True, apply_changes=apply_changes)
+        result = organize_file(file_path, profile.import_dir, group, copy_mode=True, apply_changes=apply_changes)
         results.append(result)
 
         if not result.success:
@@ -464,7 +428,7 @@ def import_media(source_dir: str, profile: ImportProfile,
 
         # For successfully processed files (copied or skipped) in apply mode, archive the source file immediately
         # This ensures progress is preserved in case of interruption
-        if apply_changes and result.action in ["copied", "skipped"]:
+        if apply_changes and result.action in ["copied", "moved", "skipped", "already_organized"]:
             # Create archive directory on first successful file
             if not archive_dir:
                 archive_dir = create_archive_directory(source_dir, apply_changes)
@@ -490,9 +454,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s --profile insta360 --apply
-  %(prog)s --profile gopro DCIM --apply
-  %(prog)s --profile gopro DCIM --skip-companion --apply
+  %(prog)s --profile insta360 --group Japan --apply
+  %(prog)s --profile gopro --group Japan DCIM --apply
+  %(prog)s --profile gopro --group Japan DCIM --skip-companion --apply
         """
     )
 
@@ -500,6 +464,8 @@ Examples:
                        help='Source directory (auto-detected if only one subdirectory exists)')
     parser.add_argument('--profile',
                        help='Profile name from configuration file')
+    parser.add_argument('--group',
+                       help='Group name for organizing dates (e.g., "Japan", "Wedding")')
     parser.add_argument('--skip-companion', action='store_true',
                        help='Skip companion files (.lrv, .thm) - saves space, recommended for FCP workflows')
     parser.add_argument('--profiles-file',
@@ -525,12 +491,17 @@ Examples:
             print(f"Create a profiles file at: {profiles_file}")
         return 0
 
-    # Load profile
+    # Validate required arguments
     if not args.profile:
         print("Error: --profile is required", file=sys.stderr)
         print("Use --list-profiles to see available profiles", file=sys.stderr)
         return 1
 
+    if not args.group:
+        print("Error: --group is required", file=sys.stderr)
+        return 1
+
+    # Load profile
     if args.profile not in profiles:
         print(f"Error: Profile '{args.profile}' not found", file=sys.stderr)
         print(f"Available profiles: {', '.join(profiles.keys())}", file=sys.stderr)
@@ -559,47 +530,46 @@ Examples:
 
     # Import media
     results, archive_dir, companion_files = import_media(
-        source_dir, profile,
+        source_dir, profile, args.group,
         apply_changes=args.apply,
         skip_companion=args.skip_companion
     )
 
-    if not results:
+    if not results and not companion_files:
         return 0
 
     print()
 
     # Handle post-processing for apply mode
     if args.apply:
-        copied_count = sum(1 for r in results if r.action == "copied")
+        # Check for companion files that need archiving
+        orphaned_companions = []
+        for file_path in companion_files:
+            if os.path.exists(file_path):
+                orphaned_companions.append(file_path)
 
-        if copied_count > 0 and archive_dir:
-            # Check for orphaned companion files (shouldn't normally happen)
-            orphaned_companions = []
-            for file_path in companion_files:
-                if os.path.exists(file_path):
-                    orphaned_companions.append(file_path)
+        if orphaned_companions:
+            print(f"\n⚠️  Found {len(orphaned_companions)} companion file(s) to archive:")
+            for orphan in orphaned_companions:
+                print(f"   - {os.path.basename(orphan)}")
 
-            if orphaned_companions:
-                print(f"\n⚠️  Warning: Found {len(orphaned_companions)} orphaned companion file(s):")
-                print("   These companion files don't have a matching main file that was imported.")
-                for orphan in orphaned_companions:
-                    print(f"   - {os.path.basename(orphan)}")
-
-                response = input("\nArchive these orphaned files? (y/N) ")
-                if response.lower().startswith('y'):
-                    print("Archiving orphaned companion files...")
-                    for file_path in orphaned_companions:
-                        archive_processed_file(file_path, source_dir, archive_dir)
-                else:
-                    print("Leaving orphaned files in source directory.")
+            response = input("\nArchive these files? (y/N) ")
+            if response.lower().startswith('y'):
+                # Create archive directory if needed
+                if not archive_dir:
+                    archive_dir = create_archive_directory(source_dir, args.apply)
+                for file_path in orphaned_companions:
+                    archive_processed_file(file_path, source_dir, archive_dir)
+                print(f"Archived to: {os.path.basename(archive_dir)}")
+            else:
+                print("Leaving companion files in source directory.")
 
         # Clean up empty source directory
         if archive_dir:
             cleanup_empty_directory(source_dir)
 
         # Display summary
-        if any(r.action in ["copied", "skipped"] for r in results):
+        if any(r.action in ["copied", "moved", "skipped", "already_organized"] for r in results):
             print("✅ Import Summary:")
             print(format_import_summary(results, archive_dir))
             print("📁 Files have been organized by date during import.")
@@ -607,7 +577,7 @@ Examples:
             print("✅ No new files to copy")
     else:
         # Dry run summary
-        would_copy = sum(1 for r in results if r.action == "would_copy")
+        would_copy = sum(1 for r in results if r.action in ["would_copy", "would_move"])
         current_date = datetime.now().strftime('%Y-%m-%d')
         new_name = f"{os.path.basename(source_dir)} - copied {current_date}"
 
@@ -616,6 +586,8 @@ Examples:
             print(f"   Would create archive: '{new_name}'")
             print(f"   Would remove original: '{os.path.basename(source_dir)}'")
             print("   Files would be organized into date folders")
+        if companion_files:
+            print(f"   Would prompt to archive {len(companion_files)} companion file(s)")
         print()
         print("   Re-run with --apply to execute")
 

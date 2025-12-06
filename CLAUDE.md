@@ -22,6 +22,7 @@
   - each base script operates on a single file. media-pipeline orchestrates via yaml profiles. It's job is to translate profiles to args for the base scripts and run them in sequence.
   - all batched operations should happen to one file at a time before moving onto next, so if the script gets interrupted, it will continue from the next incompletely processed file and not repeat any steps. all batch operations should be performed in alphabetical order.
   - scripts should be run compositionally, passing through args of higher level ones and never swallowing the output of building block scripts but rather making use of their existing output to avoid needing to add logs at a higher level besides summary. In other words, there should not be any 2>&1 for the output of any script that has been written in this directory.
+    - if a parent script needs to know the result of what a child script did (e.g., destination path after organizing), use `--json` mode to get structured data. Child scripts support `--json` which outputs `{"action":"...", "dest":"...", "message":"..."}`. Parent prints `message` for display (child owns presentation), uses `dest`/`action` for logic.
     - scripts at the bottom level operating on a single file (eg organize-by-date, fix-media-timestamp) can capture_output of system-level things like mkdir etc.
     - to that extent, stop adding --verbose mode unless instructed.
 - base level scripts are explictly provided all args and don't know about profiles. profiles are used by orchestrator scripts to generate args.
@@ -45,3 +46,5 @@
     - file is sorted into label template provided
     - directories that were left empty as the result of a file being moved from it are deleted as soon as that last file is removed from it
     - directories that were already empty and didn't become so from files being moved are left 
+
+    - the shell script entry point to each py file imports the required venv
