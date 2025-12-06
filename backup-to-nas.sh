@@ -85,18 +85,18 @@ if [[ ! -d "$SOURCE" ]]; then
 fi
 
 if [[ "$DRY_RUN" -eq 0 ]]; then
-    echo "🔄 Starting backup to NAS..."
+    echo "🔄 Starting backup to NAS..." >&2
 else
-    echo "🔍 DRY RUN: Showing what would be backed up to NAS..."
-    echo "Use --apply to actually perform the backup"
+    echo "🔍 DRY RUN: Showing what would be backed up to NAS..." >&2
+    echo "Use --apply to actually perform the backup" >&2
 fi
-echo "Source: $SOURCE"
-echo "Destination: $DEST"
-echo "Exclusions: $EXCLUSIONS"
+echo "Source: $SOURCE" >&2
+echo "Destination: $DEST" >&2
+echo "Exclusions: $EXCLUSIONS" >&2
 if [[ -n "$ADDITIONAL_EXCLUDE" ]]; then
-    echo "Additional exclusions: $ADDITIONAL_EXCLUDE"
+    echo "Additional exclusions: $ADDITIONAL_EXCLUDE" >&2
 fi
-echo
+echo >&2
 
 # Run rsync using the common function
 # No delete by default (incremental backup)

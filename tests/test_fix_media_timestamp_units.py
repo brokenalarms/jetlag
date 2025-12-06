@@ -537,6 +537,135 @@ class TestGetAllTimestampData:
         assert "--timezone flag" in data["timezone_source"]
 
 
+class TestFormattingFunctions:
+    """Test display formatting functions"""
+
+    def test_format_exif_timestamp_display(self):
+        """Test EXIF timestamp formatting (colons to dashes for date)"""
+        result = fmt.format_exif_timestamp_display("2025:06:18 07:25:21")
+        assert result == "2025-06-18 07:25:21"
+
+    def test_format_exif_timestamp_display_empty(self):
+        """Test formatting handles empty string"""
+        result = fmt.format_exif_timestamp_display("")
+        assert result == ""
+
+    def test_format_timestamp_display(self):
+        """Test datetime formatting"""
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+        result = fmt.format_timestamp_display(dt)
+        assert result == "2025-06-18 07:25:21+0800"
+
+    def test_format_time_delta_exact_hour(self):
+        """Test formatting exact hour delta"""
+        result = fmt.format_time_delta(3600)  # 1 hour
+        assert result == "+1 hour"
+
+    def test_format_time_delta_multiple_hours(self):
+        """Test formatting multiple hours delta"""
+        result = fmt.format_time_delta(7200)  # 2 hours
+        assert result == "+2 hours"
+
+    def test_format_time_delta_negative(self):
+        """Test formatting negative delta"""
+        result = fmt.format_time_delta(-3600)  # -1 hour
+        assert result == "-1 hour"
+
+    def test_format_time_delta_minutes_only(self):
+        """Test formatting minutes only"""
+        result = fmt.format_time_delta(1800)  # 30 minutes
+        assert result == "+30 minutes"
+
+    def test_format_time_delta_hours_and_minutes(self):
+        """Test formatting hours and minutes"""
+        result = fmt.format_time_delta(5400)  # 1h 30m
+        assert result == "+1h 30m"
+
+    def test_format_time_delta_rounds_to_hour(self):
+        """Test that times within 2 minutes of hour round to hour"""
+        result = fmt.format_time_delta(3660)  # 1 hour + 1 minute
+        assert result == "+1 hour"
+
+
+class TestLocationTimezone:
+    """Test location-based timezone lookup"""
+
+    def test_get_timezone_for_country_code(self):
+        """Test getting timezone for country code returns valid format"""
+        result = fmt.get_timezone_for_country("JP")
+        # Returns None if CSV files don't exist, or a timezone string
+        if result is not None:
+            # Should be in +HHMM or +HH:MM format
+            assert result[0] in ["+", "-"]
+            assert len(result) >= 5
+
+    def test_get_timezone_for_invalid_country(self):
+        """Test that invalid country returns None"""
+        result = fmt.get_timezone_for_country("XX")
+        assert result is None
+
+    def test_get_country_name_from_code(self):
+        """Test getting country name from code"""
+        result = fmt.get_country_name("JP")
+        # Should return "Japan" if CSV exists, otherwise "JP"
+        assert result in ["Japan", "JP"]
+
+    def test_get_country_name_passthrough(self):
+        """Test that unknown country code is returned as-is"""
+        result = fmt.get_country_name("Unknown Country")
+        assert result == "Unknown Country"
+
+
+class TestDetermineNeededChanges:
+    """Test the determine_needed_changes function"""
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.test_video = os.path.join(self.temp_dir, "test.mp4")
+
+        subprocess.run([
+            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
+            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
+            self.test_video
+        ], capture_output=True, check=True)
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    def test_returns_all_required_keys(self):
+        """Test that all required change keys are returned"""
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+        changes = fmt.determine_needed_changes(self.test_video, dt)
+
+        assert "keys_creationdate" in changes
+        assert "file_timestamps" in changes
+        assert "quicktime_createdate" in changes
+
+    def test_fresh_file_needs_all_changes(self):
+        """Test that a fresh file needs Keys:CreationDate and file timestamps"""
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+        changes = fmt.determine_needed_changes(self.test_video, dt)
+
+        # Fresh file should need Keys:CreationDate
+        assert changes["keys_creationdate"] is True
+        # Fresh file should need file timestamps fixed
+        assert changes["file_timestamps"] is True
+
+    def test_preserve_wallclock_affects_file_timestamps(self):
+        """Test that preserve_wallclock parameter is passed through"""
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+
+        # Set birthtime to match wallclock time (07:25:21)
+        subprocess.run([
+            "SetFile", "-d", "06/18/2025 07:25:21", self.test_video
+        ], capture_output=True, check=True)
+
+        # With preserve_wallclock=True, shouldn't need update
+        changes = fmt.determine_needed_changes(self.test_video, dt, preserve_wallclock=True)
+        assert changes["file_timestamps"] is False
+
+
 if __name__ == "__main__":
     # Run with pytest
     import pytest

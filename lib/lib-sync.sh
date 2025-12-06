@@ -2,6 +2,13 @@
 # Library - Sync/rsync functionality for backup scripts
 # Not executable directly - source this file from other scripts
 
+# Output conventions:
+# - Human-readable messages go to stderr
+# - Machine-readable data goes to stdout with @@ prefix:
+#   @@files_transferred=N
+#   @@bytes_transferred=N
+#   @@total_size=N
+
 # Function to run rsync with standard options
 # Usage: run_rsync SOURCE DEST DRY_RUN [EXCLUSIONS_FILE] [DELETE_FLAG] [EXTRA_EXCLUDES] [EXTRA_ARGS]
 # DELETE_FLAG: "" (default - no delete), "delete", or custom delete flags
@@ -54,10 +61,12 @@ run_rsync() {
     fi
     
     # Add dry run flag and adjust output format
+    # Always include --stats for machine-readable output
+    RSYNC_ARGS="$RSYNC_ARGS --stats"
     if [[ $DRY_RUN -eq 1 ]]; then
-        RSYNC_ARGS="$RSYNC_ARGS --dry-run --info=name,stats2"
+        RSYNC_ARGS="$RSYNC_ARGS --dry-run --info=name"
     else
-        # Show per-file progress with --progress flag
+        # Per-file progress display
         RSYNC_ARGS="$RSYNC_ARGS --progress"
     fi
     
@@ -66,16 +75,16 @@ run_rsync() {
         RSYNC_ARGS="$RSYNC_ARGS $EXTRA_ARGS"
     fi
     
-    # Run rsync
-    echo "🔄 Starting sync..."
+    # Run rsync (human-readable to stderr, machine-readable @@ to stdout)
+    echo "🔄 Starting sync..." >&2
     if [[ $DRY_RUN -eq 1 ]]; then
-        echo "(This is a dry run - no files will be copied)"
-        echo ""
+        echo "(This is a dry run - no files will be copied)" >&2
+        echo "" >&2
     fi
-    
+
     # Capture rsync exit code
     set +e
-    
+
     # Check if we should use sshpass for password authentication
     local RSYNC_CMD="rsync"
     if [[ -n "${NAS_PASSWORD:-}" ]] && [[ "$DEST" == *"@"* ]]; then
@@ -83,40 +92,110 @@ run_rsync() {
         RSYNC_CMD="sshpass -e rsync"
         export SSHPASS="$NAS_PASSWORD"
     fi
-    
-    if [[ $DRY_RUN -eq 1 ]]; then
-        # Filter output during dry run and capture for analysis
-        local RSYNC_OUTPUT
-        RSYNC_OUTPUT=$($RSYNC_CMD -e "ssh -C" $RSYNC_ARGS "${EXCLUDE_ARGS[@]}" "$SOURCE" "$DEST" 2>&1 | grep -v "skipping non-regular file")
-        local RSYNC_EXIT_CODE="${PIPESTATUS[0]}"
-        echo "$RSYNC_OUTPUT"
-    else
-        # No filtering during actual transfer to preserve progress updates
-        # Use SSH compression (-C) to avoid hotel throttling
-        $RSYNC_CMD -e "ssh -C" $RSYNC_ARGS "${EXCLUDE_ARGS[@]}" "$SOURCE" "$DEST"
-        local RSYNC_EXIT_CODE=$?
-    fi
-    
+
+    # Capture output to parse stats
+    local RSYNC_OUTPUT
+    local RSYNC_EXIT_CODE
+
+    # Capture output while displaying
+    # No grep in pipeline - avoids buffering that breaks --progress display
+    local RSYNC_TEMP
+    RSYNC_TEMP=$(mktemp)
+    local INTERRUPTED=0
+    local START_TIME
+    START_TIME=$(date +%s)
+
+    # Trap to handle Ctrl+C - set flag to parse partial stats before exit
+    trap 'INTERRUPTED=1' INT
+
+    $RSYNC_CMD -e "ssh -C" $RSYNC_ARGS "${EXCLUDE_ARGS[@]}" "$SOURCE" "$DEST" 2>&1 | \
+        tee "$RSYNC_TEMP" >&2
+    RSYNC_EXIT_CODE="${PIPESTATUS[0]}"
+
+    local END_TIME
+    END_TIME=$(date +%s)
+    local ELAPSED=$((END_TIME - START_TIME))
+
+    # Remove trap
+    trap - INT
+
+    # Filter when reading for stats
+    RSYNC_OUTPUT=$(grep -v "skipping non-regular file" "$RSYNC_TEMP" 2>/dev/null || true)
+    rm -f "$RSYNC_TEMP"
+
+    # If interrupted, we still continue to parse stats below, then exit
+
     # Clean up password from environment
     unset SSHPASS
     set -e
-    
-    echo ""
+
+    # Parse stats from rsync output and emit @@ lines to stdout
+    local files_transferred=0
+    local bytes_transferred=0
+    local total_size=0
+
+    # Try to parse from --stats output first (only present if rsync completed)
+    if [[ "$RSYNC_OUTPUT" =~ Number\ of\ regular\ files\ transferred:\ ([0-9,]+) ]]; then
+        files_transferred="${BASH_REMATCH[1]//,/}"
+    fi
+
+    if [[ "$RSYNC_OUTPUT" =~ Total\ transferred\ file\ size:\ ([0-9,]+) ]]; then
+        bytes_transferred="${BASH_REMATCH[1]//,/}"
+    fi
+
+    if [[ "$RSYNC_OUTPUT" =~ Total\ file\ size:\ ([0-9,]+) ]]; then
+        total_size="${BASH_REMATCH[1]//,/}"
+    fi
+
+    # If no stats (interrupted), parse from progress output for completed files
+    # Progress lines look like: "272.51M 100%  5.52MB/s  0:00:47 (xfr#1, ...)"
+    if [[ "$files_transferred" -eq 0 ]] && [[ "$RSYNC_OUTPUT" == *"100%"* ]]; then
+        # Count files that reached 100%
+        files_transferred=$(echo "$RSYNC_OUTPUT" | grep -c "100%" || true)
+
+        # Sum up bytes from completed files
+        # Format: "272.51M 100%" or "1.23G 100%" etc
+        local size_sum=0
+        while IFS= read -r line; do
+            if [[ "$line" =~ ([0-9.]+)([KMGT]?)\ +100% ]]; then
+                local num="${BASH_REMATCH[1]}"
+                local unit="${BASH_REMATCH[2]}"
+                local multiplier=1
+                case "$unit" in
+                    K) multiplier=1024 ;;
+                    M) multiplier=1048576 ;;
+                    G) multiplier=1073741824 ;;
+                    T) multiplier=1099511627776 ;;
+                esac
+                # Use awk for floating point math
+                local bytes=$(awk "BEGIN {printf \"%.0f\", $num * $multiplier}")
+                size_sum=$((size_sum + bytes))
+            fi
+        done <<< "$RSYNC_OUTPUT"
+        bytes_transferred=$size_sum
+    fi
+
+    # Output machine-readable data to stdout
+    echo "@@files_transferred=$files_transferred"
+    echo "@@bytes_transferred=$bytes_transferred"
+    echo "@@total_size=$total_size"
+    echo "@@elapsed_seconds=$ELAPSED"
+
+    echo "" >&2
     if [[ $RSYNC_EXIT_CODE -eq 0 ]]; then
         if [[ $DRY_RUN -eq 1 ]]; then
-            # Check if any files would be transferred
-            if [[ "$RSYNC_OUTPUT" == *"Number of regular files transferred: 0"* ]]; then
-                echo "✅ Everything is up to date - no files need to be synced"
+            if [[ "$files_transferred" -eq 0 ]]; then
+                echo "✅ Everything is up to date - no files need to be synced" >&2
             else
-                echo "📝 Files that would be synced are listed above"
+                echo "📝 Files that would be synced are listed above" >&2
             fi
-            echo "🧪 Dry run completed. Use --apply to perform the actual sync."
+            echo "🧪 Dry run completed. Use --apply to perform the actual sync." >&2
         else
-            echo "✅ Sync completed successfully"
+            echo "✅ Sync completed successfully" >&2
         fi
     else
-        echo "❌ Sync failed with error code: $RSYNC_EXIT_CODE"
-        echo "Common error codes: 12=Protocol error, 23=Partial transfer, 24=Files vanished"
+        echo "❌ Sync failed with error code: $RSYNC_EXIT_CODE" >&2
+        echo "Common error codes: 12=Protocol error, 23=Partial transfer, 24=Files vanished" >&2
         return $RSYNC_EXIT_CODE
     fi
 }

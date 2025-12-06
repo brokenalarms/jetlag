@@ -62,19 +62,19 @@ EXCLUSIONS="${EXCLUSIONS_FILE:-${HOME}/.exclusions.txt}"
 # Validate paths exist
 validate_paths "$SOURCE" "$DEST" || exit 1
 
-echo "📁 Local Backup"
-echo "Source:      $SOURCE"
-echo "Destination: $DEST"
-echo "Exclusions:  $EXCLUSIONS"
+echo "📁 Local Backup" >&2
+echo "Source:      $SOURCE" >&2
+echo "Destination: $DEST" >&2
+echo "Exclusions:  $EXCLUSIONS" >&2
 
 if [[ $DRY_RUN -eq 1 ]]; then
-    echo "Mode:        DRY RUN (no changes will be made)"
-    echo "Use --apply to perform actual backup"
+    echo "Mode:        DRY RUN (no changes will be made)" >&2
+    echo "Use --apply to perform actual backup" >&2
 else
-    echo "Mode:        APPLYING CHANGES"
+    echo "Mode:        APPLYING CHANGES" >&2
 fi
 
-echo ""
+echo "" >&2
 
 # Run rsync using the common function with delete mode
 run_rsync "$SOURCE" "$DEST" "$DRY_RUN" "$EXCLUSIONS" "delete" ""
