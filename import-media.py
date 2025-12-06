@@ -35,7 +35,6 @@ class ImportProfile(NamedTuple):
 class ImportResult(NamedTuple):
     """Result of importing a single file"""
     success: bool
-    action: str  # "copied", "skipped", "failed"
     source_path: str
     dest_path: Optional[str] = None
     error: Optional[str] = None
@@ -74,51 +73,47 @@ def get_default_profile_path() -> str:
             return str(profile_path)
     return str(script_dir / 'media-profiles.yaml')
 
-def parse_json_result(stdout: str) -> Optional[dict]:
-    """Parse JSON result from organize-by-date.sh --json output"""
-    try:
-        return json.loads(stdout.strip())
-    except (json.JSONDecodeError, ValueError):
-        return None
+def parse_machine_output(stdout: str) -> dict:
+    """Parse machine-readable output (lines starting with @@)"""
+    result = {}
+    for line in stdout.strip().split('\n'):
+        if line.startswith('@@') and '=' in line:
+            key, value = line[2:].split('=', 1)
+            result[key] = value
+    return result
 
 def organize_file(file_path: str, import_dir: str, group: str, copy_mode: bool = True, apply_changes: bool = False) -> ImportResult:
-    """Organize a single file using organize-by-date.sh"""
+    """Organize a single file using organize-by-date.sh
+
+    organize-by-date.sh outputs:
+    - stderr: human-readable messages (passed through to user)
+    - stdout: machine-readable data prefixed with @@ (e.g., @@dest=/path/to/file)
+
+    We need the dest path because tagging happens AFTER copy - tagging the destination
+    is much faster than tagging on a slow memory card.
+    """
     script_dir = Path(__file__).parent
     organize_script = script_dir / 'organize-by-date.sh'
 
     template = f'{{{{YYYY}}}}/{group}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}'
-    cmd = [str(organize_script), file_path, '--target', import_dir, '--template', template, '--json']
+    cmd = [str(organize_script), file_path, '--target', import_dir, '--template', template]
     if copy_mode:
         cmd.append('--copy')
     if apply_changes:
         cmd.append('--apply')
 
     try:
-        result = subprocess.run(cmd, text=True, check=True, capture_output=True)
+        # Capture stdout (machine data), let stderr pass through to user
+        result = subprocess.run(cmd, text=True, check=True, stdout=subprocess.PIPE)
 
-        # Parse JSON result
-        data = parse_json_result(result.stdout)
-        if not data:
-            print(f"Warning: Could not parse JSON from organize-by-date.sh", file=sys.stderr)
-            return ImportResult(False, "failed", file_path, error="JSON parse error")
-
-        # Display the message from child script
-        if data.get('message'):
-            print(data['message'])
-
-        action = data.get('action', 'unknown')
+        data = parse_machine_output(result.stdout)
         dest_path = data.get('dest')
 
-        return ImportResult(True, action, file_path, dest_path=dest_path)
+        return ImportResult(True, file_path, dest_path=dest_path)
 
-    except subprocess.CalledProcessError as e:
-        # Try to parse JSON even on failure (may contain error info)
-        data = parse_json_result(e.stdout) if e.stdout else None
-        if data and data.get('message'):
-            print(data['message'])
-        elif e.stderr:
-            print(e.stderr, end='', file=sys.stderr)
-        return ImportResult(False, "failed", file_path, error=None)
+    except subprocess.CalledProcessError:
+        # stderr already passed through to user
+        return ImportResult(False, file_path)
 
 def tag_file(file_path: str, tags: Optional[List[str]] = None, make: Optional[str] = None, model: Optional[str] = None, apply_changes: bool = False) -> bool:
     """Tag a file using tag-media.py script"""
@@ -325,15 +320,12 @@ def archive_processed_file(file_path: str, source_dir: str, archive_dir: Optiona
 
 def format_import_summary(results: List[ImportResult], archive_dir: Optional[str]) -> str:
     """Format import summary from results"""
-    copied = sum(1 for r in results if r.action in ["copied", "moved"])
-    skipped = sum(1 for r in results if r.action in ["skipped", "already_organized"])
-    failed = sum(1 for r in results if r.action in ["failed", "skipped_larger"])
+    succeeded = sum(1 for r in results if r.success)
+    failed = sum(1 for r in results if not r.success)
 
     lines = []
-    if copied > 0:
-        lines.append(f"   - Copied: {copied} file(s)")
-    if skipped > 0:
-        lines.append(f"   - Skipped: {skipped} file(s) (already exist)")
+    if succeeded > 0:
+        lines.append(f"   - Processed: {succeeded} file(s)")
     if failed > 0:
         lines.append(f"   - Failed: {failed} file(s)")
     if archive_dir:
@@ -409,7 +401,7 @@ def import_media(source_dir: str, profile: ImportProfile, group: str,
 
         # For successfully processed files (copied or skipped) in apply mode, archive the source file immediately
         # This ensures progress is preserved in case of interruption
-        if apply_changes and result.action in ["copied", "moved", "skipped", "already_organized"]:
+        if apply_changes and result.success:
             # Create archive directory on first successful file
             if not archive_dir:
                 archive_dir = create_archive_directory(source_dir, apply_changes)
@@ -547,20 +539,16 @@ Examples:
                 print("Leaving companion files in source directory.")
 
         # Display summary
-        if any(r.action in ["copied", "moved", "skipped", "already_organized"] for r in results):
-            print("✅ Import Summary:")
-            print(format_import_summary(results, archive_dir))
-            print("📁 Files have been organized by date during import.")
-        else:
-            print("✅ No new files to copy")
+        print("✅ Import complete")
+        print(format_import_summary(results, archive_dir))
     else:
         # Dry run summary
-        would_copy = sum(1 for r in results if r.action in ["would_copy", "would_move"])
+        would_process = sum(1 for r in results if r.success)
         current_date = datetime.now().strftime('%Y-%m-%d')
         new_name = f"{os.path.basename(source_dir)} - copied {current_date}"
 
-        print(f"🧪 Dry run complete. Would process {would_copy} file(s)")
-        if would_copy > 0:
+        print(f"🧪 Dry run complete. Would process {would_process} file(s)")
+        if would_process > 0:
             print(f"   Would create archive: '{new_name}'")
             print(f"   Would remove original: '{os.path.basename(source_dir)}'")
             print("   Files would be organized into date folders")

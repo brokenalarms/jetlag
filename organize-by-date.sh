@@ -14,7 +14,6 @@ source "$SCRIPT_DIR/lib/lib-timestamp.sh"
 # Initialize variables
 apply=0
 verbose=0
-json_mode=0
 file=""
 target_dir=""
 template=""
@@ -22,17 +21,14 @@ location=""
 label=""
 copy_mode=0
 
-# Result variables for JSON output
-result_action=""
+# Result variables
 result_dest=""
-result_message=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --apply) apply=1; shift ;;
     --copy) copy_mode=1; shift ;;
-    --json) json_mode=1; shift ;;
     --verbose|-v) verbose=1; shift ;;
     --target)
       shift
@@ -58,7 +54,6 @@ while [[ $# -gt 0 ]]; do
       echo "  --template TMPL     Path template (default: {{YYYY}}/{{YYYY}}-{{MM}}-{{DD}})"
       echo "                      Variables: {{YYYY}}, {{MM}}, {{DD}}, {{label}}"
       echo "  --label LABEL       Label value for {{label}} template variable"
-      echo "  --json              Output JSON instead of human-readable messages"
       echo "  --apply             Apply changes (default: dry run)"
       echo "  --verbose, -v       Show detailed processing info"
       echo "  --help, -h          Show this help"
@@ -103,41 +98,22 @@ cleanup_empty_parent_dirs() {
   done
 }
 
-set_result() {
-  result_action="$1"
-  result_dest="$2"
-  result_message="$3"
-}
-
-output_result() {
-  if [[ $json_mode -eq 1 ]]; then
-    # Escape JSON strings
-    local escaped_dest="${result_dest//\\/\\\\}"
-    escaped_dest="${escaped_dest//\"/\\\"}"
-    local escaped_message="${result_message//\\/\\\\}"
-    escaped_message="${escaped_message//\"/\\\"}"
-    printf '{"action":"%s","dest":"%s","message":"%s"}\n' "$result_action" "$escaped_dest" "$escaped_message"
-  else
-    [[ -n "$result_message" ]] && echo "$result_message"
-  fi
-}
-
 # Main processing
 process_file() {
   local file="$1"
   local base="$(basename "$file")"
-  
+
   log_verbose "Processing: $file"
-  
+
   # Get date for organization
   local file_date
   if ! file_date="$(get_file_date_for_organization "$file")"; then
-    set_result "failed" "" "ERROR: Cannot determine date for $base"
+    echo "ERROR: Cannot determine date for $base" >&2
     return 1
   fi
-  
+
   log_verbose "  Date: $file_date"
-  
+
   # Apply template to create organized path
   local template_path
   if [[ -n "$template" ]]; then
@@ -147,48 +123,52 @@ process_file() {
   fi
   local organized_path
   if ! organized_path="$(expand_path_template "$template_path" "$file_date" "$label")"; then
-    set_result "failed" "" "ERROR: Failed to expand template for $base"
+    echo "ERROR: Failed to expand template for $base" >&2
     return 1
   fi
-  
+
   # Create target path (handle trailing/leading slashes)
   local target_path="${target_dir%/}/${organized_path#/}"
   local target_file="$target_path/$base"
-  
+
   # Debug: check for newlines
   if [[ "$target_file" =~ $'\n' ]]; then
     echo "DEBUG: target_file contains newline: [$target_file]" >&2
     echo "DEBUG: target_dir=[$target_dir] organized_path=[$organized_path] base=[$base]" >&2
   fi
-  
+
   # Check if file is already in correct location
   if [[ "$(dirname "$(realpath "$file")")" == "$(realpath "$target_path" 2>/dev/null || echo "$target_path")" ]]; then
-    set_result "already_organized" "$target_file" "✓ Already organized: $base ($organized_path)"
+    echo "✓ Already organized: $base ($organized_path)" >&2
+    result_dest="$target_file"
     return 0
   fi
-  
+
   # Check if target file already exists
   if [[ -f "$target_file" ]]; then
     # Compare file sizes
     local src_size dst_size
     src_size=$(stat -f "%z" "$file" 2>/dev/null || stat -c "%s" "$file" 2>/dev/null)
     dst_size=$(stat -f "%z" "$target_file" 2>/dev/null || stat -c "%s" "$target_file" 2>/dev/null)
-    
+
     if [[ "$src_size" -eq "$dst_size" ]]; then
       if [[ $copy_mode -eq 1 ]]; then
-        set_result "skipped" "$target_file" "✓ Skipped (already exists): $base → $organized_path/"
+        echo "✓ Skipped (already exists): $base → $organized_path/" >&2
+        result_dest="$target_file"
         return 0
       else
         if [[ $apply -eq 1 ]]; then
           # Save the source directory before removing
           local source_dir="$(dirname "$file")"
           rm "$file"
-          set_result "removed_duplicate" "$target_file" "✅ Removed duplicate source: $base (exists at $organized_path/)"
+          echo "✅ Removed duplicate source: $base (exists at $organized_path/)" >&2
+          result_dest="$target_file"
 
           # Clean up empty parent directories after removing duplicate
           cleanup_empty_parent_dirs "$source_dir"
         else
-          set_result "would_remove_duplicate" "$target_file" "[DRY RUN] Would remove duplicate: $file (already at $target_file)"
+          echo "[DRY RUN] Would remove duplicate: $file (already at $target_file)" >&2
+          result_dest="$target_file"
         fi
       fi
     elif [[ "$dst_size" -lt "$src_size" ]]; then
@@ -196,21 +176,25 @@ process_file() {
         mkdir -p "$target_path" || return 1
         if [[ $copy_mode -eq 1 ]]; then
           cp -p "$file" "$target_file" || return 1
-          set_result "copied" "$target_file" "✅ Copied (replaced smaller): $base → $organized_path/"
+          echo "✅ Copied (replaced smaller): $base → $organized_path/" >&2
+          result_dest="$target_file"
         else
           # Save the source directory before moving
           local source_dir="$(dirname "$file")"
           mv "$file" "$target_file" || return 1
-          set_result "moved" "$target_file" "✅ Moved (replaced smaller): $base → $organized_path/"
+          echo "✅ Moved (replaced smaller): $base → $organized_path/" >&2
+          result_dest="$target_file"
 
           # Clean up empty parent directories after moving
           cleanup_empty_parent_dirs "$source_dir"
         fi
       else
-        set_result "would_overwrite" "$target_file" "[DRY RUN] Would overwrite smaller: $file → $target_file"
+        echo "[DRY RUN] Would overwrite smaller: $file → $target_file" >&2
+        result_dest="$target_file"
       fi
     else
-      set_result "skipped_larger" "$target_file" "⚠️  Destination larger than source, keeping destination: $base → $organized_path/"
+      echo "⚠️  Destination larger than source, keeping destination: $base → $organized_path/" >&2
+      result_dest="$target_file"
       return 1
     fi
   else
@@ -229,21 +213,25 @@ process_file() {
       mkdir -p "$target_path" || return 1
       if [[ $copy_mode -eq 1 ]]; then
         cp -p "$file" "$target_file" || return 1
-        set_result "copied" "$abs_target" "$(printf "✅ Copied: %s → %s" "$display_source" "$abs_target")"
+        printf "✅ Copied: %s → %s\n" "$display_source" "$abs_target" >&2
+        result_dest="$abs_target"
       else
         # Save the source directory before moving
         local source_dir="$(dirname "$file")"
         mv "$file" "$target_file" || return 1
-        set_result "moved" "$abs_target" "$(printf "✅ Moved: %s → %s" "$display_source" "$abs_target")"
+        printf "✅ Moved: %s → %s\n" "$display_source" "$abs_target" >&2
+        result_dest="$abs_target"
 
         # Clean up empty parent directories after moving
         cleanup_empty_parent_dirs "$source_dir"
       fi
     else
       if [[ $copy_mode -eq 1 ]]; then
-        set_result "would_copy" "$abs_target" "$(printf "[DRY RUN] Would copy: %s → %s" "$display_source" "$abs_target")"
+        printf "[DRY RUN] Would copy: %s → %s\n" "$display_source" "$abs_target" >&2
+        result_dest="$abs_target"
       else
-        set_result "would_move" "$abs_target" "$(printf "[DRY RUN] Would move: %s → %s" "$display_source" "$abs_target")"
+        printf "[DRY RUN] Would move: %s → %s\n" "$display_source" "$abs_target" >&2
+        result_dest="$abs_target"
       fi
     fi
   fi
@@ -252,8 +240,10 @@ process_file() {
 }
 
 # Process the file
-process_file "$file"
-exit_code=$?
+if ! process_file "$file"; then
+  exit 1
+fi
 
-output_result
-exit $exit_code
+# Output destination path to stdout (for parent scripts to capture)
+# Prefixed with @@ to indicate machine-readable output
+echo "@@dest=$result_dest"
