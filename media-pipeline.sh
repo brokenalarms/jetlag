@@ -195,11 +195,15 @@ with open('$SCRIPT_DIR/media-profiles.yaml') as f:
   # Build find args array properly to avoid glob expansion
   find_args=()
   first=1
+  # Temporarily restore default IFS for word splitting on spaces
+  OLD_IFS="$IFS"
+  IFS=' '
   for ext in $extensions; do
     [[ $first -eq 0 ]] && find_args+=("-o")
     find_args+=("-iname" "*$ext")
     first=0
   done
+  IFS="$OLD_IFS"
   while IFS= read -r -d '' file; do
     files+=("$file")
   done < <(find "$source_dir" -type f \( "${find_args[@]}" \) -print0)

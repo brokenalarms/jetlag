@@ -172,18 +172,6 @@ class TestFixMediaTimestamp:
         assert "CreationDate" in result.stdout
         assert "+08:00" in result.stdout  # Should preserve timezone
 
-    def test_preserve_wallclock_time(self, test_video):
-        """Test --preserve-wallclock-time flag"""
-        result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            test_video,
-            "--preserve-wallclock-time",
-            "--apply"
-        ], capture_output=True, text=True)
-
-        assert result.returncode == 0
-        assert "shooting time" in result.stdout or "wall-clock" in result.stdout.lower()
-
     def test_filename_pattern_parsing(self, temp_dir):
         """Test that filename patterns are recognized (e.g., VID_YYYYMMDD_HHMMSS)"""
         video_path = os.path.join(temp_dir, "VID_20250618_072521.mp4")

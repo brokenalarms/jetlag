@@ -64,8 +64,7 @@ class TestOrganizeByDate:
             "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
             test_video_with_date,
             "--target", target_dir,
-            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
-            "--label", "Test"
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}"
         ], capture_output=True, text=True)
 
         # Record after state
@@ -98,7 +97,6 @@ class TestOrganizeByDate:
             test_video_with_date,
             "--target", target_dir,
             "--template", "{{YYYY}}-{{MM}}-{{DD}}",
-            "--label", "Test",
             "--apply"
         ], capture_output=True, text=True)
 
@@ -131,8 +129,7 @@ class TestOrganizeByDate:
             "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
             test_video_with_date,
             "--target", target_dir,
-            "--template", "{{YYYY}}/{{label}}/{{YYYY}}-{{MM}}-{{DD}}",
-            "--label", "Taiwan",
+            "--template", "{{YYYY}}/Taiwan/{{YYYY}}-{{MM}}-{{DD}}",
             "--apply"
         ], capture_output=True, text=True)
 
@@ -162,7 +159,6 @@ class TestOrganizeByDate:
             test_video_with_date,
             "--target", target_dir,
             "--template", "{{YYYY}}-{{MM}}-{{DD}}",
-            "--label", "Test",
             "--apply"
         ], capture_output=True, check=True)
 
@@ -180,7 +176,6 @@ class TestOrganizeByDate:
             moved_path,
             "--target", target_dir,
             "--template", "{{YYYY}}-{{MM}}-{{DD}}",
-            "--label", "Test",
             "--apply"
         ], capture_output=True, text=True)
 
@@ -195,26 +190,6 @@ class TestOrganizeByDate:
         assert inode_before == inode_after, f"Actual: file was moved (inode changed), Expected: file stays in place (same inode)"
         assert abs(mtime_after - mtime_before) < 2, f"Actual: file was modified, Expected: file unchanged"
 
-    def test_label_required(self, test_video_with_date, temp_dir):
-        """Test that --label is required when template uses {{label}}
-
-        Actual: Script should fail
-        Expected: Error message about missing label
-        """
-        target_dir = os.path.join(temp_dir, "target")
-
-        # Should fail without --label when template uses {{label}}
-        result = subprocess.run([
-            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
-            test_video_with_date,
-            "--target", target_dir,
-            "--template", "{{label}}/{{YYYY}}-{{MM}}-{{DD}}"
-        ], capture_output=True, text=True)
-
-        # Verify error handling
-        assert result.returncode != 0, f"Actual: script succeeded, Expected: script should fail when {{{{label}}}} in template but no --label provided. stderr: {result.stderr}"
-        assert "label" in result.stderr.lower(), f"Actual: no 'label' in error message, Expected: error mentions 'label'. stderr: {result.stderr}"
-
     def test_creates_directories(self, test_video_with_date, temp_dir):
         """Test that directory structure is created"""
         target_dir = os.path.join(temp_dir, "target")
@@ -225,7 +200,6 @@ class TestOrganizeByDate:
             test_video_with_date,
             "--target", target_dir,
             "--template", "{{YYYY}}/{{MM}}/{{DD}}",
-            "--label", "Test",
             "--apply"
         ], capture_output=True, text=True)
 
@@ -267,7 +241,6 @@ class TestOrganizeByDate:
                 video,
                 "--target", target_dir,
                 "--template", "{{YYYY}}-{{MM}}-{{DD}}",
-                "--label", "Test",
                 "--apply"
             ], capture_output=True, check=True)
 
@@ -283,8 +256,7 @@ class TestOrganizeByDate:
             "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
             test_video_with_date,
             "--target", target_dir,
-            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
-            "--label", "Test"
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}"
         ], capture_output=True, text=True)
 
         assert result.returncode == 0
@@ -321,8 +293,7 @@ class TestOrganizeByDateEdgeCases:
             "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
             video_path,
             "--target", target_dir,
-            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
-            "--label", "Test"
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}"
         ], capture_output=True, text=True)
 
         # May succeed with file birthtime or fail - both valid
@@ -353,7 +324,6 @@ class TestOrganizeByDateEdgeCases:
             video_path,
             "--target", target_dir,
             "--template", "{{YYYY}}-{{MM}}-{{DD}}",
-            "--label", "Test",
             "--apply"
         ], capture_output=True, text=True)
 

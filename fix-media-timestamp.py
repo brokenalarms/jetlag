@@ -945,7 +945,7 @@ def format_change_description(changes: dict, timestamp_data: Optional[dict] = No
 
     return ", ".join(parts) if parts else "No change"
 
-def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False, preserve_wallclock: bool = True) -> bool:
+def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False, preserve_wallclock: bool = False) -> bool:
     """Main function to fix media (photo/video) timestamps
 
     Args:
@@ -953,8 +953,8 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
         dry_run: If True, show changes without applying them
         timezone_offset: Timezone offset (e.g. +09:00) for files missing timezone
         overwrite_datetimeoriginal: If True, overwrite DateTimeOriginal even if it exists (for genuinely wrong timestamps)
-        preserve_wallclock: If True, set birth time to wall-clock shooting time (default, stable across timezone changes)
-                          If False, convert birth time to current timezone for display
+        preserve_wallclock: If True, preserve literal wall-clock shooting time (10:30 stays 10:30)
+                          If False (default), convert to current timezone for correct equivalent display
     """
 
     # Check for timezone mismatch before processing
@@ -1103,7 +1103,7 @@ def main():
     parser.add_argument('--country', help='Country code or name for automatic timezone lookup (e.g. JP, Taiwan)')
     parser.add_argument('--apply', action='store_true', help='Apply changes (default: dry run)')
     parser.add_argument('--overwrite-datetimeoriginal', action='store_true', help='Overwrite DateTimeOriginal even if it exists (for genuinely wrong timestamps)')
-    parser.add_argument('--convert-to-current-timezone', action='store_true', help='Convert birth time to current timezone instead of using wall-clock shooting time (default: use shooting time)')
+    parser.add_argument('--preserve-wallclock-time', action='store_true', help='Preserve literal wall-clock shooting time (10:30 stays 10:30) instead of converting to current timezone for display')
 
     args = parser.parse_args()
 
@@ -1129,7 +1129,7 @@ def main():
         dry_run=not args.apply,
         timezone_offset=timezone_offset,
         overwrite_datetimeoriginal=args.overwrite_datetimeoriginal,
-        preserve_wallclock=not args.convert_to_current_timezone  # Invert: flag converts to current tz, default preserves wall-clock
+        preserve_wallclock=args.preserve_wallclock_time
     )
 
     return 0 if success else 1

@@ -11,6 +11,7 @@ import shutil
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import subprocess
+import pytest
 
 # Add parent directory to path to import the script
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -185,7 +186,7 @@ class TestChangeDetection:
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
 
         needs_update = fmt.check_keys_creationdate_needs_update(
-            self.test_video, dt, preserve_wallclock=False
+            self.test_video, dt
         )
 
         # Should need update if Keys:CreationDate is missing
@@ -206,7 +207,7 @@ class TestChangeDetection:
         fmt._exif_cache.clear()
 
         needs_update = fmt.check_keys_creationdate_needs_update(
-            self.test_video, dt, preserve_wallclock=False
+            self.test_video, dt
         )
 
         # Should NOT need update if already correct
@@ -295,7 +296,7 @@ class TestWriteOperations:
         """Test writing Keys:CreationDate"""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
 
-        success = fmt.write_keys_creationdate(self.test_video, dt, preserve_wallclock=False)
+        success = fmt.write_keys_creationdate(self.test_video, dt)
 
         assert success is True
 
@@ -408,6 +409,132 @@ class TestBestTimestampPriority:
 
         assert timestamp == "2025:06:18 07:25:21"
         assert "filename" in source
+
+
+class TestGetAllTimestampData:
+    """Test get_all_timestamp_data function - the 5-tier priority system"""
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    def _create_video(self, filename, exif_args=None):
+        """Create test video with optional EXIF data"""
+        path = os.path.join(self.temp_dir, filename)
+        subprocess.run([
+            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
+            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p", path
+        ], capture_output=True, check=True)
+        if exif_args:
+            subprocess.run(
+                ["exiftool", "-P", "-overwrite_original"] + exif_args + [path],
+                capture_output=True, check=True
+            )
+        fmt._exif_cache.clear()
+        return path
+
+    def test_datetimeoriginal_with_timezone(self):
+        """Priority 1: DateTimeOriginal with timezone is source of truth"""
+        video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
+
+        data = fmt.get_all_timestamp_data(video)
+
+        assert data["timestamp_source"] == "DateTimeOriginal with timezone"
+        assert data["datetime_original"] is not None
+        assert data["datetime_original"].hour == 7
+        assert data["datetime_original"].minute == 25
+        assert data["datetime_original"].utcoffset() == timedelta(hours=8)
+
+    def test_creationdate_with_timezone(self):
+        """Priority 2: Keys:CreationDate with timezone when no DateTimeOriginal"""
+        video = self._create_video("test.mp4", ["-Keys:CreationDate=2025:06:18 09:30:00+09:00"])
+
+        data = fmt.get_all_timestamp_data(video)
+
+        assert data["timestamp_source"] == "CreationDate with timezone"
+        assert data["datetime_original"] is not None
+        assert data["datetime_original"].hour == 9
+        assert data["datetime_original"].minute == 30
+        assert data["datetime_original"].utcoffset() == timedelta(hours=9)
+
+    def test_creationdate_utc_with_timezone_flag(self):
+        """CreationDate with Z (UTC) needs --timezone to convert to local time"""
+        video = self._create_video("test.mp4", ["-Keys:CreationDate=2025:06:17 23:25:21Z"])
+
+        data = fmt.get_all_timestamp_data(video, timezone_offset="+08:00")
+
+        assert data["timestamp_source"] == "CreationDate with Z (UTC)"
+        assert data["datetime_original"] is not None
+        # UTC 23:25:21 + 8 hours = 07:25:21 next day
+        assert data["datetime_original"].hour == 7
+        assert data["datetime_original"].day == 18
+        assert data["datetime_original"].utcoffset() == timedelta(hours=8)
+
+    def test_mediacreatedate_with_timezone_flag(self):
+        """MediaCreateDate (UTC) needs --timezone to convert to local time"""
+        video = self._create_video("test.mp4", ["-QuickTime:MediaCreateDate=2025:06:17 23:25:21"])
+
+        data = fmt.get_all_timestamp_data(video, timezone_offset="+08:00")
+
+        assert data["timestamp_source"] == "MediaCreateDate"
+        assert data["datetime_original"] is not None
+        # UTC 23:25:21 + 8 hours = 07:25:21 next day
+        assert data["datetime_original"].hour == 7
+        assert data["datetime_original"].day == 18
+
+    def test_filename_with_timezone_flag(self):
+        """Filename pattern VID_YYYYMMDD_HHMMSS needs --timezone"""
+        video = self._create_video("VID_20250618_072521.mp4")
+
+        data = fmt.get_all_timestamp_data(video, timezone_offset="+08:00")
+
+        assert "filename" in data["timestamp_source"]
+        assert data["datetime_original"] is not None
+        assert data["datetime_original"].hour == 7
+        assert data["datetime_original"].minute == 25
+        assert data["datetime_original"].second == 21
+
+    def test_overwrite_mode_uses_filename(self):
+        """--overwrite-datetimeoriginal uses filename even when EXIF exists"""
+        # Filename says 06:38:09, but EXIF says 09:38:09 (corrupted)
+        video = self._create_video(
+            "VID_20250619_063809.mp4",
+            ["-DateTimeOriginal=2025:06:19 09:38:09+08:00"]
+        )
+
+        data = fmt.get_all_timestamp_data(
+            video,
+            timezone_offset="+08:00",
+            overwrite_datetimeoriginal=True
+        )
+
+        assert data["timestamp_source"] == "filename (overwrite mode)"
+        assert data["datetime_original"].hour == 6  # From filename, not 9 from EXIF
+        assert data["datetime_original"].minute == 38
+        assert data["datetime_original"].second == 9
+
+    def test_overwrite_requires_timezone(self):
+        """--overwrite-datetimeoriginal requires --timezone"""
+        video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
+
+        with pytest.raises(ValueError) as exc_info:
+            fmt.get_all_timestamp_data(video, overwrite_datetimeoriginal=True)
+
+        assert "requires --timezone" in str(exc_info.value)
+
+    def test_datetimeoriginal_without_timezone_adds_flag_timezone(self):
+        """DateTimeOriginal without timezone uses --timezone flag"""
+        video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21"])
+
+        data = fmt.get_all_timestamp_data(video, timezone_offset="+08:00")
+
+        assert data["timestamp_source"] == "DateTimeOriginal"
+        assert data["datetime_original"] is not None
+        assert data["datetime_original"].utcoffset() == timedelta(hours=8)
+        assert "--timezone flag" in data["timezone_source"]
 
 
 if __name__ == "__main__":

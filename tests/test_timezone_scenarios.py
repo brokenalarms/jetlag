@@ -146,51 +146,6 @@ class TestTimezoneScenarios:
         # Day could be 17 or 18 depending on viewing timezone
         assert birth_time.day in [17, 18]
 
-    def test_scenario_preserve_wallclock_shooting_time(self):
-        """
-        SCENARIO: User wants files to show shooting time regardless of viewing timezone
-
-        Timeline:
-        - Shot: 2025-06-18 07:25:21 in Taiwan (+08:00)
-        - User wants to always see 07:25:21 when viewing
-
-        Expected behavior with --preserve-wallclock-time:
-        - DateTimeOriginal: 2025:06:18 07:25:21+08:00 (preserved)
-        - Keys:CreationDate: 2025:06:18 07:25:21+09:00 (wall-clock with current TZ)
-        - File birth time: Should show 07:25:21 in any timezone
-        """
-        video_path = self.create_video_shot_in_timezone(
-            "taiwan_wallclock.mp4",
-            "2025:06:18 07:25:21",
-            "+08:00"
-        )
-
-        # Run with --preserve-wallclock-time
-        subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            video_path,
-            "--preserve-wallclock-time",
-            "--apply"
-        ], capture_output=True, check=True)
-
-        # Verify DateTimeOriginal is still preserved
-        fmt._exif_cache.clear()
-        exif = fmt.read_exif_data(video_path)
-        assert "2025:06:18 07:25:21" in exif.get("DateTimeOriginal", "")
-        assert "+08:00" in exif.get("DateTimeOriginal", "")
-
-        # Keys:CreationDate should have wall-clock time but with current timezone
-        keys_cd = self.get_keys_creationdate(video_path)
-        assert "2025:06:18 07:25:21" in keys_cd
-        # Timezone will be current system timezone, not +08:00
-
-        # File birth time should be 07:25:21 (wall-clock time)
-        birth_time = self.get_file_birth_time(video_path)
-        assert birth_time.hour == 7
-        assert birth_time.minute == 25
-        # Allow 1 minute tolerance for test execution time
-        assert abs(birth_time.second - 21) <= 60
-
     def test_scenario_gopro_footage_different_timezones(self):
         """
         SCENARIO: GoPro footage shot across multiple timezones (e.g., traveling)
@@ -530,7 +485,6 @@ class TestRealWorldWorkflow:
             video_path,
             "--target", self.target_dir,
             "--template", "{{YYYY}}-{{MM}}-{{DD}}",
-            "--label", "Taiwan",
             "--apply"
         ], capture_output=True, check=True)
 

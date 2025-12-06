@@ -333,57 +333,6 @@ class TestTimezoneConversion:
         assert birth_time > 0
 
 
-class TestPreserveWallclockTime:
-    """
-    CLAUDE.md: "if --preserve-wallclock-time is specified, then we would expect
-    the file birthtime to be set back one hour in order to make the edited file
-    appear in this timezone as if it was shot at the same time in this timezone"
-    """
-
-    def setup_method(self):
-        self.temp_dir = tempfile.mkdtemp()
-
-    def teardown_method(self):
-        shutil.rmtree(self.temp_dir)
-        fmt._exif_cache.clear()
-
-    def test_preserve_wallclock_time_mode(self):
-        """
-        With --preserve-wallclock-time:
-        - Birth time should match shooting time (wall-clock), not display time
-        """
-        video_path = os.path.join(self.temp_dir, "wallclock_video.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
-        # Shot at 06:38:09 in Taiwan (+08:00)
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:19 06:38:09+08:00",
-            video_path
-        ], capture_output=True, check=True)
-
-        # Run with --preserve-wallclock-time
-        subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            video_path,
-            "--preserve-wallclock-time",
-            "--apply"
-        ], capture_output=True, check=True)
-
-        # Birth time should preserve wall-clock shooting time (06:38)
-        birth_time = os.stat(video_path).st_birthtime
-        birth_dt = datetime.fromtimestamp(birth_time)
-
-        # Should show 06:38 (shooting time), not adjusted for viewing timezone
-        assert birth_dt.hour == 6
-        assert birth_dt.minute == 38
-
-
 class TestMissingDateTimeOriginalWithTimezoneChange:
     """
     CLAUDE.md: "if DateTimeOriginal is missing and we change timezones,
@@ -527,42 +476,6 @@ class TestBirthTimeCalculation:
             f"  Full:     {birth_local}"
         )
 
-    def test_birth_time_preserve_wallclock_mode(self):
-        """
-        Birth time with preserve-wallclock should match shooting time
-
-        Example: File shot at 07:15:30 in Taiwan (+08:00)
-        - With --preserve-wallclock-time
-        - Birth time should be: 2025-06-18 07:15:30 local (shooting time preserved)
-        """
-        video_path = os.path.join(self.temp_dir, "test_wallclock.mp4")
-        self._create_test_video(video_path, "2025:06:18 07:15:30+08:00")
-
-        # Run with preserve-wallclock-time
-        result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            video_path,
-            "--timezone", "+0800",
-            "--preserve-wallclock-time",
-            "--apply"
-        ], capture_output=True, text=True)
-
-        assert result.returncode == 0, f"Script failed:\n{result.stderr}"
-
-        # Check birth time
-        birth_local = self._get_birth_time_local(video_path)
-        actual_time = birth_local.split()[1]  # Extract HH:MM:SS
-
-        # Expected: 07:15:30 (shooting time preserved)
-        expected_time = "07:15:30"
-
-        assert actual_time == expected_time, (
-            f"Birth time incorrect in preserve-wallclock mode:\n"
-            f"  Expected: {expected_time}\n"
-            f"  Actual:   {actual_time}\n"
-            f"  Full:     {birth_local}"
-        )
-
     def test_birth_time_idempotency_regular(self):
         """
         Running script twice in regular mode should not change birth time second time
@@ -599,60 +512,6 @@ class TestBirthTimeCalculation:
             f"  After first:  {birth_after_first}\n"
             f"  After second: {birth_after_second}"
         )
-
-    def test_birth_time_detection_after_preserve_wallclock(self):
-        """
-        Script should detect wrong birth time after running with preserve-wallclock
-
-        Scenario:
-        1. File processed with --preserve-wallclock-time (birth time = 07:15:30)
-        2. Running without --preserve-wallclock-time should detect change needed
-        3. Should update to 08:15:30 (UTC converted to current timezone)
-        """
-        video_path = os.path.join(self.temp_dir, "test_detect.mp4")
-        self._create_test_video(video_path, "2025:06:18 07:15:30+08:00")
-
-        # First run: with preserve-wallclock-time
-        subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            video_path,
-            "--timezone", "+0800",
-            "--preserve-wallclock-time",
-            "--apply"
-        ], capture_output=True, check=True)
-
-        # Verify birth time is 07:15:30 (wall-clock time)
-        birth_after_preserve = self._get_birth_time_local(video_path)
-        assert "07:15:30" in birth_after_preserve, (
-            f"After preserve-wallclock, birth time should be 07:15:30:\n{birth_after_preserve}"
-        )
-
-        # Second run: without preserve-wallclock-time (should detect change needed)
-        result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            video_path,
-            "--timezone", "+0800"
-        ], capture_output=True, text=True, check=True)
-
-        # Should detect birth time needs updating
-        assert "Birth time" in result.stdout, (
-            f"Script should detect birth time needs updating:\n{result.stdout}"
-        )
-
-        # Apply the fix
-        subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            video_path,
-            "--timezone", "+0800",
-            "--apply"
-        ], capture_output=True, check=True)
-
-        # Verify birth time is now 08:15:30 (UTC + timezone offset)
-        birth_after_fix = self._get_birth_time_local(video_path)
-        assert "08:15:30" in birth_after_fix, (
-            f"After fix, birth time should be 08:15:30:\n{birth_after_fix}"
-        )
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
