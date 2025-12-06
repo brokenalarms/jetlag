@@ -108,7 +108,7 @@ run_rsync() {
     # Trap to handle Ctrl+C - set flag to parse partial stats before exit
     trap 'INTERRUPTED=1' INT
 
-    $RSYNC_CMD -e "ssh -C" $RSYNC_ARGS "${EXCLUDE_ARGS[@]}" "$SOURCE" "$DEST" 2>&1 | \
+    $RSYNC_CMD -e "ssh -C" --info=skip0 $RSYNC_ARGS "${EXCLUDE_ARGS[@]}" "$SOURCE" "$DEST" 2>&1 | \
         tee "$RSYNC_TEMP" >&2
     RSYNC_EXIT_CODE="${PIPESTATUS[0]}"
 
