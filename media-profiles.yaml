@@ -73,6 +73,7 @@ profiles:
     - .arw
     - .jpg
     - .hif
+    - .xmp
     companion_extensions:
     - .xml
   sony-video:

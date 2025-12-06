@@ -16,6 +16,10 @@
   - our devices DO write UTC time to Media CreateDate and quicktime fields, and so we should interpret them as such (verifying that they are correct by adding the timezone encapsulated in DateTimeOriginal and checking it matches). We should generally avoid using the ExifTool QuicktimeUTC flag to handle this conversion for us since it's more complicated.
     - there is no such thing as writing to UTC field as wall-clock time and having Final Cut Pro recognize it's not UTC anymore. FCP will take an integer QT UTC field as UTC, or a string field with 'Z' as UTC or with timezone.
     - for performance, for each file in each script, exiftool should be called once to get requirements, then writing requirements are built in memory, then exiftool is again called once to write out the built up requirements.
+- YAML FORMAT
+  - In media-profiles.yaml, use inline array format `[item1, item2]` for short lists like file_extensions, companion_extensions, and tags
+  - Do NOT rewrite these as multi-line bullet lists with `-` prefix
+  - Example: `file_extensions: [.mp4, .mov]` NOT `file_extensions:\n  - .mp4\n  - .mov`
 - BEST PRACTICES
   - data should be separated from presentation - formatted text shouldn't be relied on for function args, rather key names better suited for describing data, and formatted text should be built at the time of display using data, for example each data element in a structured dict that then forms the building blocks for information/logs
   - No hardcoded defaults in code - all configuration must be read from configuration files (media-profiles.yaml) or environment variables (.env.local). If required config is missing, fail immediately with a clear error message directing the user where to add it. This ensures portability across different computers and deployment environments.
