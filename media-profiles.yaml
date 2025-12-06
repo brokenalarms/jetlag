@@ -14,7 +14,7 @@ profiles:
       make: "Insta360"
       model: "X4"
     file_extensions: [".mp4", ".insv"]
-    companion_extensions: [".lrv", ".thm"]
+    companion_extensions: [".lrv", ".thm", ".list"]
 
   gopro:
     import_dir: "/Volumes/Extreme GRN/Videos/Source Video/GoPro/Import"
