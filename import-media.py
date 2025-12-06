@@ -36,6 +36,7 @@ class ImportResult(NamedTuple):
     """Result of importing a single file"""
     success: bool
     source_path: str
+    action: str = ""  # copied, moved, skipped, overwrote
     dest_path: Optional[str] = None
     error: Optional[str] = None
 
@@ -108,12 +109,13 @@ def organize_file(file_path: str, import_dir: str, group: str, copy_mode: bool =
 
         data = parse_machine_output(result.stdout)
         dest_path = data.get('dest')
+        action = data.get('action', '')
 
-        return ImportResult(True, file_path, dest_path=dest_path)
+        return ImportResult(True, file_path, action=action, dest_path=dest_path)
 
     except subprocess.CalledProcessError:
         # stderr already passed through to user
-        return ImportResult(False, file_path)
+        return ImportResult(False, file_path, action='failed')
 
 def tag_file(file_path: str, tags: Optional[List[str]] = None, make: Optional[str] = None, model: Optional[str] = None, apply_changes: bool = False) -> bool:
     """Tag a file using tag-media.py script"""
@@ -233,13 +235,13 @@ def find_companion_files(main_file_path: str, companion_extensions: Optional[Lis
     return companions
 
 def create_archive_directory(original_dir: str, apply_changes: bool) -> Optional[str]:
-    """Create archive directory for processed files"""
+    """Create archive directory as sibling to source_dir in pwd"""
     if not apply_changes:
         return None
 
     current_date = datetime.now().strftime('%Y-%m-%d')
     archive_name = f"{os.path.basename(original_dir)} - copied {current_date}"
-    archive_path = os.path.join(os.path.dirname(original_dir), archive_name)
+    archive_path = os.path.join(os.path.dirname(original_dir) or ".", archive_name)
 
     os.makedirs(archive_path, exist_ok=True)
     return archive_path
@@ -249,14 +251,21 @@ def cleanup_empty_parent_dirs(file_dir: str, source_root: str) -> None:
 
     Keep removing parent directories as long as they're empty.
     Stop after source_root or when we hit a non-empty directory.
+    Never removes the current working directory.
     """
     import errno
 
     # Normalize paths for comparison
-    source_root = os.path.normpath(source_root)
+    source_root = os.path.normpath(os.path.abspath(source_root))
+    cwd = os.path.abspath('.')
 
     while file_dir and file_dir != '/' and file_dir != '.':
-        file_dir = os.path.normpath(file_dir)
+        file_dir = os.path.normpath(os.path.abspath(file_dir))
+
+        # Never delete current working directory
+        if file_dir == cwd:
+            break
+
         try:
             # Try to remove the directory (only succeeds if empty)
             os.rmdir(file_dir)
@@ -273,10 +282,24 @@ def cleanup_empty_parent_dirs(file_dir: str, source_root: str) -> None:
             print(f"Warning: Could not remove empty directory {file_dir}: {e}", file=sys.stderr)
             break
 
+def is_file_locked(file_path: str) -> bool:
+    """Check if file has macOS locked (uchg) flag"""
+    try:
+        import stat
+        flags = os.stat(file_path).st_flags
+        return bool(flags & stat.UF_IMMUTABLE)
+    except (OSError, AttributeError):
+        return False
+
 def archive_processed_file(file_path: str, source_dir: str, archive_dir: Optional[str]) -> bool:
     """Move processed file to archive directory, preserving relative directory structure"""
     if not archive_dir:
         return True
+
+    # Check for locked source file (macOS) - can't delete after copying
+    if is_file_locked(file_path):
+        print(f"⚠️  Skipped archive (source file locked): {os.path.relpath(file_path, source_dir)}")
+        return True  # Not a failure, just can't archive
 
     # Save the directory before moving the file
     source_file_dir = os.path.dirname(file_path)
@@ -284,6 +307,11 @@ def archive_processed_file(file_path: str, source_dir: str, archive_dir: Optiona
     # Preserve directory structure relative to source_dir
     rel_path = os.path.relpath(file_path, source_dir)
     archive_file_path = os.path.join(archive_dir, rel_path)
+
+    # Check if destination already exists and is locked (from previous failed run)
+    if os.path.exists(archive_file_path) and is_file_locked(archive_file_path):
+        print(f"⚠️  Skipped archive (dest file locked): {os.path.relpath(file_path, source_dir)}")
+        return True
 
     # Create parent directories if needed
     os.makedirs(os.path.dirname(archive_file_path), exist_ok=True)
@@ -298,10 +326,11 @@ def archive_processed_file(file_path: str, source_dir: str, archive_dir: Optiona
         return True
 
     except (OSError, PermissionError):
-        # Move failed - try copy + delete fallback for restricted filesystems (e.g. camera SD cards)
+        # Move failed - try cp command fallback (handles macOS extended attributes better)
         try:
-            # Copy file with metadata
-            shutil.copy2(file_path, archive_file_path)
+            result = subprocess.run(['cp', '-p', file_path, archive_file_path], capture_output=True, text=True)
+            if result.returncode != 0:
+                raise OSError(result.stderr.strip() or f"cp failed with code {result.returncode}")
 
             # Try to delete source
             try:
@@ -310,12 +339,16 @@ def archive_processed_file(file_path: str, source_dir: str, archive_dir: Optiona
                 cleanup_empty_parent_dirs(source_file_dir, source_dir)
                 return True
             except (OSError, PermissionError):
-                # Copy succeeded but delete failed (read-only filesystem) - that's okay
-                print(f"   Note: Archived {os.path.relpath(file_path, source_dir)} (source retained on read-only media)")
+                # Copy succeeded but delete failed - could be locked file or read-only media
+                if is_file_locked(file_path):
+                    print(f"⚠️  Copied to archive but source locked (delete manually): {os.path.relpath(file_path, source_dir)}")
+                else:
+                    print(f"   Note: Archived {os.path.relpath(file_path, source_dir)} (source retained on read-only media)")
                 return True
 
         except Exception as copy_error:
-            print(f"Warning: Failed to archive {os.path.relpath(file_path, source_dir)}: {copy_error}", file=sys.stderr)
+            abs_archive = os.path.abspath(archive_file_path)
+            print(f"Warning: Failed to archive {os.path.relpath(file_path, source_dir)} → {abs_archive}: {copy_error}", file=sys.stderr)
             return False
 
 def format_import_summary(results: List[ImportResult], archive_dir: Optional[str]) -> str:
@@ -393,15 +426,16 @@ def import_media(source_dir: str, profile: ImportProfile, group: str,
             # Error already displayed by organize-by-date.sh
             continue
 
-        # ALWAYS tag the DESTINATION file after organizing (whether or not profile has tags)
-        # This ensures tagging happens AFTER copy/move, never before (much faster than tagging on memory card)
-        if apply_changes and result.dest_path and os.path.exists(result.dest_path):
+        # Tag the DESTINATION file only if it was actually copied/moved (not skipped)
+        # Skipped files already exist at destination and were presumably already tagged
+        if apply_changes and result.action in ('copied', 'moved', 'overwrote') and result.dest_path and os.path.exists(result.dest_path):
             if not tag_file(result.dest_path, tags=profile.tags, make=profile.exif_make, model=profile.exif_model, apply_changes=apply_changes):
                 print(f"   Warning: Tagging failed for {filename}")
 
-        # For successfully processed files (copied or skipped) in apply mode, archive the source file immediately
+        # For successfully processed files in apply mode, archive the source file immediately
         # This ensures progress is preserved in case of interruption
-        if apply_changes and result.success:
+        # Only archive if source file still exists (skipped files in copy mode still exist)
+        if apply_changes and result.success and os.path.exists(file_path):
             # Create archive directory on first successful file
             if not archive_dir:
                 archive_dir = create_archive_directory(source_dir, apply_changes)
@@ -489,6 +523,11 @@ Examples:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
+    # Require subdirectory, not "."
+    if source_dir == ".":
+        print("Error: Must specify a subdirectory (e.g., DCIM), not '.'", file=sys.stderr)
+        return 1
+
     # Check if already processed
     if '- copied' in os.path.basename(source_dir):
         response = input(f"Directory '{os.path.basename(source_dir)}' appears already processed. Continue? (y/N) ")
@@ -549,8 +588,7 @@ Examples:
 
         print(f"🧪 Dry run complete. Would process {would_process} file(s)")
         if would_process > 0:
-            print(f"   Would create archive: '{new_name}'")
-            print(f"   Would remove original: '{os.path.basename(source_dir)}'")
+            print(f"   Would archive source files to: '{new_name}'")
             print("   Files would be organized into date folders")
         if companion_files:
             print(f"   Would prompt to archive {len(companion_files)} companion file(s)")

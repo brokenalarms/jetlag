@@ -22,7 +22,7 @@ verbose=0
 source_dir=""
 target_dir=""
 profile=""
-label=""
+group=""
 location_args=()
 
 # No default location - always require CLI argument
@@ -57,10 +57,10 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       location_args=("--timezone" "$1"); shift ;;
-    --label)
+    --group)
       shift
-      [[ $# -gt 0 ]] || { echo "ERROR: --label requires a label value"; exit 1; }
-      label="$1"; shift ;;
+      [[ $# -gt 0 ]] || { echo "ERROR: --group requires a group name"; exit 1; }
+      group="$1"; shift ;;
     --help|-h)
       echo "Usage: media-pipeline.sh [--profile PROFILE | --source SOURCE --target TARGET] [OPTIONS]"
       echo "Options:"
@@ -71,7 +71,7 @@ while [[ $# -gt 0 ]]; do
       echo "                     (overrides profile ready_dir)"
       echo "  --location NAME    Use location name/code for timezone lookup"
       echo "  --timezone TZ      Use specific timezone (+HHMM format, overrides profile)"
-      echo "  --label LABEL      Label for template substitution (required)"
+      echo "  --group NAME       Group name for organizing dates (e.g., 'Japan', 'Wedding') (required)"
       echo "  --apply           Apply changes (default: dry run)"
       echo "  --verbose, -v     Show detailed processing info"
       echo "  --help, -h        Show this help"
@@ -81,8 +81,8 @@ while [[ $# -gt 0 ]]; do
       echo "  2. Organize files into date-based directory structure"
       echo ""
       echo "Examples:"
-      echo "  media-pipeline.sh --profile insta360 --label Taiwan --apply"
-      echo "  media-pipeline.sh --source Exports --target Ready --timezone +0800 --label Taiwan"
+      echo "  media-pipeline.sh --profile insta360 --group Taiwan --apply"
+      echo "  media-pipeline.sh --source Exports --target Ready --timezone +0800 --group Taiwan"
       exit 0 ;;
     -*) echo "ERROR: Unknown option $1" >&2; exit 1 ;;
     *) echo "ERROR: Unexpected argument $1" >&2; exit 1 ;;
@@ -141,8 +141,8 @@ fi
 [[ -d "$source_dir" ]] || { echo "ERROR: Source directory not found: $source_dir" >&2; exit 1; }
 [[ -n "$target_dir" ]] || { echo "ERROR: --target is required (or use --profile with ready_dir)" >&2; exit 1; }
 
-# Validate label is provided
-[[ -n "$label" ]] || { echo "ERROR: --label is required" >&2; exit 1; }
+# Validate group is provided
+[[ -n "$group" ]] || { echo "ERROR: --group is required" >&2; exit 1; }
 
 # Check for stale exiftool_tmp directories that would cause exiftool to fail
 exiftool_tmp_dirs=$(find "$source_dir" -type d -name "exiftool_tmp" 2>/dev/null)
@@ -284,18 +284,13 @@ with open('$SCRIPT_DIR/media-profiles.yaml') as f:
   [[ $apply -eq 1 ]] && org_args+=("--apply")
   [[ $verbose -eq 1 ]] && org_args+=("--verbose")
 
-  # Pass raw template and label separately
-  if [[ -n "$MEDIA_PIPELINE_TEMPLATE" ]]; then
-    template="$MEDIA_PIPELINE_TEMPLATE"
-  else
-    template="{{YYYY}}-{{MM}}-{{DD}}"
-  fi
+  # Construct template with group embedded
+  template="{{YYYY}}/${group}/{{YYYY}}-{{MM}}-{{DD}}"
   org_args+=("--template" "$template")
-  org_args+=("--label" "$label")
 
-  org_output=$("$SCRIPT_DIR/organize-by-date.sh" "$file" "${org_args[@]+"${org_args[@]}"}" 2>&1)
+  # stderr passes through to user, capture stdout for machine data
+  org_stdout=$("$SCRIPT_DIR/organize-by-date.sh" "$file" "${org_args[@]+"${org_args[@]}"}")
   org_rc=$?
-  echo "$org_output" | sed 's/^/  /'
 
   if [[ $org_rc -ne 0 ]]; then
     echo "   ❌ Organization failed for $base"
@@ -303,8 +298,8 @@ with open('$SCRIPT_DIR/media-profiles.yaml') as f:
     failed_files+=("$base")
   else
     succeeded=$((succeeded + 1))
-    # Check if file was moved (output contains "Moved:" or "Copied:" but not "Already organized")
-    if [[ "$org_output" =~ (✅\ Moved:|✅\ Copied:) ]]; then
+    # Check if file was actually moved/copied (not skipped)
+    if [[ "$org_stdout" =~ @@action=(copied|moved|overwrote) ]]; then
       file_changed=1
     fi
   fi
