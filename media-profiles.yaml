@@ -109,13 +109,3 @@ profiles:
     - .mov
     - .mp4
     companion_extensions: []
-  _test:
-    import_dir: /var/folders/1y/wxf5d3pn0kd_qd3gtd6_vlym0000gn/T/tmpaaf2ipmz/source
-    ready_dir: /var/folders/1y/wxf5d3pn0kd_qd3gtd6_vlym0000gn/T/tmpaaf2ipmz/target
-    file_extensions:
-    - .mp4
-    tags:
-    - test-camera
-    exif:
-      make: Test
-      model: Camera

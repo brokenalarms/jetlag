@@ -134,17 +134,39 @@ run_rsync() {
     local bytes_transferred=0
     local total_size=0
 
+    # Helper function to convert human-readable size to bytes
+    # Handles formats like "108.12G", "1.56T", "500M", "1234" (plain bytes)
+    convert_to_bytes() {
+        local size_str="$1"
+        local num unit multiplier=1
+
+        if [[ "$size_str" =~ ^([0-9.,]+)([KMGT]?)$ ]]; then
+            num="${BASH_REMATCH[1]//,/}"
+            unit="${BASH_REMATCH[2]}"
+            case "$unit" in
+                K) multiplier=1024 ;;
+                M) multiplier=1048576 ;;
+                G) multiplier=1073741824 ;;
+                T) multiplier=1099511627776 ;;
+            esac
+            awk "BEGIN {printf \"%.0f\", $num * $multiplier}"
+        else
+            echo "0"
+        fi
+    }
+
     # Try to parse from --stats output first (only present if rsync completed)
+    # rsync with --human-readable outputs "Total transferred file size: 108.12G bytes"
     if [[ "$RSYNC_OUTPUT" =~ Number\ of\ regular\ files\ transferred:\ ([0-9,]+) ]]; then
         files_transferred="${BASH_REMATCH[1]//,/}"
     fi
 
-    if [[ "$RSYNC_OUTPUT" =~ Total\ transferred\ file\ size:\ ([0-9,]+) ]]; then
-        bytes_transferred="${BASH_REMATCH[1]//,/}"
+    if [[ "$RSYNC_OUTPUT" =~ Total\ transferred\ file\ size:\ ([0-9.,]+[KMGT]?)\ bytes ]]; then
+        bytes_transferred=$(convert_to_bytes "${BASH_REMATCH[1]}")
     fi
 
-    if [[ "$RSYNC_OUTPUT" =~ Total\ file\ size:\ ([0-9,]+) ]]; then
-        total_size="${BASH_REMATCH[1]//,/}"
+    if [[ "$RSYNC_OUTPUT" =~ Total\ file\ size:\ ([0-9.,]+[KMGT]?)\ bytes ]]; then
+        total_size=$(convert_to_bytes "${BASH_REMATCH[1]}")
     fi
 
     # If no stats (interrupted), parse from progress output for completed files
