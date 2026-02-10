@@ -295,23 +295,28 @@ def main():
     if args.profile:
         profile = load_profile(args.profile)
 
-    # Determine source directory
-    source_dir = args.source or "."
-    if not os.path.isdir(source_dir):
-        print(f"ERROR: Source directory not found: {source_dir}", file=sys.stderr)
-        sys.exit(1)
-
-    # Determine target directory
+    # Determine source and target directories from profile or CLI args
+    source_dir = args.source
     target_dir = args.target
-    if not target_dir and profile:
+
+    if profile:
         ready_dir = profile.get("ready_dir")
         if ready_dir and ready_dir != "None":
-            target_dir = ready_dir
-        else:
-            target_dir = "."
+            if not source_dir:
+                source_dir = ready_dir
+            if not target_dir:
+                target_dir = ready_dir
+
+    if not source_dir:
+        print("ERROR: --source is required (or use --profile with ready_dir)", file=sys.stderr)
+        sys.exit(1)
 
     if not target_dir:
         print("ERROR: --target is required (or use --profile with ready_dir)", file=sys.stderr)
+        sys.exit(1)
+
+    if not os.path.isdir(source_dir):
+        print(f"ERROR: Source directory not found: {source_dir}", file=sys.stderr)
         sys.exit(1)
 
     # Validate group is provided

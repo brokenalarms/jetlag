@@ -399,6 +399,96 @@ class TestMissingDateTimeOriginalWithTimezoneChange:
         assert birth_time > 0
 
 
+class TestExtractMetadataTimezone:
+    """
+    extract_metadata_timezone should output @@timezone= to stdout when
+    DateTimeOriginal or CreationDate contains a timezone offset.
+    """
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    def _create_test_video(self, path: str) -> None:
+        subprocess.run([
+            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
+            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
+            path
+        ], capture_output=True, check=True)
+
+    def test_extracts_timezone_from_datetimeoriginal(self):
+        """When DateTimeOriginal has +08:00, extract_metadata_timezone returns it"""
+        video_path = os.path.join(self.temp_dir, "test_tz.mp4")
+        self._create_test_video(video_path)
+
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-DateTimeOriginal=2025:10:24 11:48:59+08:00",
+            video_path
+        ], capture_output=True, check=True)
+
+        fmt._exif_cache.clear()
+        result = fmt.extract_metadata_timezone(video_path)
+        assert result == "+08:00"
+
+    def test_extracts_timezone_from_creationdate(self):
+        """When DateTimeOriginal has no timezone but CreationDate does, extract from CreationDate"""
+        video_path = os.path.join(self.temp_dir, "test_tz_cd.mp4")
+        self._create_test_video(video_path)
+
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-Keys:CreationDate=2025:10:24 11:48:59+13:00",
+            video_path
+        ], capture_output=True, check=True)
+
+        fmt._exif_cache.clear()
+        result = fmt.extract_metadata_timezone(video_path)
+        assert result == "+13:00"
+
+    def test_returns_none_when_no_timezone(self):
+        """When no field has timezone info, returns None"""
+        video_path = os.path.join(self.temp_dir, "test_no_tz.mp4")
+        self._create_test_video(video_path)
+
+        fmt._exif_cache.clear()
+        result = fmt.extract_metadata_timezone(video_path)
+        assert result is None
+
+    def test_stdout_contains_timezone_marker(self):
+        """Running the script on a file with timezone emits @@timezone= to stdout"""
+        video_path = os.path.join(self.temp_dir, "test_stdout_tz.mp4")
+        self._create_test_video(video_path)
+
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-DateTimeOriginal=2025:10:24 11:48:59+08:00",
+            video_path
+        ], capture_output=True, check=True)
+
+        result = subprocess.run([
+            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path
+        ], capture_output=True, text=True)
+
+        assert "@@timezone=+08:00" in result.stdout
+
+    def test_no_timezone_marker_when_absent(self):
+        """Running the script on a file without timezone does not emit @@timezone="""
+        video_path = os.path.join(self.temp_dir, "test_no_stdout_tz.mp4")
+        self._create_test_video(video_path)
+
+        result = subprocess.run([
+            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path
+        ], capture_output=True, text=True)
+
+        assert "@@timezone=" not in result.stdout
+
+
 class TestBirthTimeCalculation:
     """
     Regression test: Birth time calculation must be accurate

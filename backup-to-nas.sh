@@ -27,6 +27,7 @@ show_usage() {
 OVERRIDE_SOURCE=""
 OVERRIDE_DEST=""
 ADDITIONAL_EXCLUDE=""
+MACHINE_READABLE=0
 EXTRA_RSYNC_ARGS=()
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -45,6 +46,10 @@ while [[ $# -gt 0 ]]; do
         --exclude)
             ADDITIONAL_EXCLUDE="$2"
             shift 2
+            ;;
+        --machine-readable)
+            MACHINE_READABLE=1
+            shift
             ;;
         --help|-h)
             show_usage
@@ -101,4 +106,4 @@ echo >&2
 # Run rsync using the common function
 # No delete by default (incremental backup)
 # Additional exclude patterns from command line or empty string
-run_rsync "$SOURCE" "$DEST" "$DRY_RUN" "$EXCLUSIONS" "" "$ADDITIONAL_EXCLUDE" "${EXTRA_RSYNC_ARGS[*]:-}"
+run_rsync "$SOURCE" "$DEST" "$DRY_RUN" "$EXCLUSIONS" "" "$ADDITIONAL_EXCLUDE" "${EXTRA_RSYNC_ARGS[*]:-}" "$MACHINE_READABLE"

@@ -62,11 +62,11 @@ LOCAL_SYNC_PATH={temp_dirs['dest']}/
         yield env_path
         os.remove(env_path)
 
-    def test_sync_local_no_at_at_in_output(self, temp_dirs, mock_env_file):
-        """sync-local.sh should not display @@ lines to user
+    def test_sync_local_no_at_at_output(self, temp_dirs, mock_env_file):
+        """sync-local.sh should not output @@ lines (no parent to consume them)
 
-        Actual: Run sync-local.sh and capture all output
-        Expected: No lines starting with @@ in stdout or stderr
+        Actual: Run sync-local.sh and capture stdout/stderr separately
+        Expected: No @@ lines anywhere (script doesn't request machine-readable)
         """
         # Create minimal exclusions file
         exclusions_file = os.path.join(temp_dirs['tmpdir'], "exclusions.txt")
@@ -89,23 +89,20 @@ LOCAL_SYNC_PATH={temp_dirs['dest']}/
             cwd=str(SCRIPT_DIR)
         )
 
-        # Combine stdout and stderr (what user sees)
-        all_output = result.stdout + result.stderr
+        # No @@ lines in stdout (machine-readable not requested)
+        stdout_at_at = [line for line in result.stdout.split('\n') if line.startswith('@@')]
+        assert stdout_at_at == [], f"@@ lines should not be in stdout: {stdout_at_at}"
 
-        # Check no @@ lines leaked
-        at_at_lines = [line for line in all_output.split('\n') if line.startswith('@@')]
-        assert at_at_lines == [], f"@@ lines leaked to output: {at_at_lines}"
+        # No @@ lines in stderr
+        stderr_at_at = [line for line in result.stderr.split('\n') if line.startswith('@@')]
+        assert stderr_at_at == [], f"@@ lines should not be in stderr: {stderr_at_at}"
 
-    def test_backup_to_nas_no_at_at_in_stderr(self, temp_dirs):
+    def test_backup_to_nas_no_at_at_in_stderr(self):
         """backup-to-nas.sh should not display @@ lines to stderr
 
-        Actual: Run backup-to-nas.sh and capture stderr
-        Expected: No lines starting with @@ in stderr (stdout has @@ for parent script)
+        Actual: Run backup-to-nas.sh --help and capture output
+        Expected: No lines starting with @@ in help output
         """
-        # backup-to-nas.sh outputs @@ to stdout (for parent to capture)
-        # but stderr (user-visible messages) should not contain @@
-
-        # Skip if NAS not configured - just test the script structure
         result = subprocess.run(
             [str(SCRIPT_DIR / "backup-to-nas.sh"), "--help"],
             capture_output=True,
@@ -130,7 +127,7 @@ LOCAL_SYNC_PATH={temp_dirs['dest']}/
 set -euo pipefail
 source "{SCRIPT_DIR}/lib/lib-common.sh"
 source "{SCRIPT_DIR}/lib/lib-sync.sh"
-run_rsync "{temp_dirs['source']}/" "{temp_dirs['dest']}/" 0 "" "none" ""
+run_rsync "{temp_dirs['source']}/" "{temp_dirs['dest']}/" 0 "" "none" "" "" 1
 """)
         os.chmod(test_script, 0o755)
 
@@ -153,6 +150,39 @@ run_rsync "{temp_dirs['source']}/" "{temp_dirs['dest']}/" 0 "" "none" ""
         # stderr should NOT contain @@ lines (that's for human-readable output)
         stderr_at_at = [line for line in result.stderr.split('\n') if line.startswith('@@')]
         assert stderr_at_at == [], f"@@ lines should not be in stderr: {stderr_at_at}"
+
+    def test_lib_sync_filters_skipping_messages(self, temp_dirs):
+        """lib-sync.sh should filter 'skipping non-regular file' messages from stderr
+
+        Actual: Create a symlink, run rsync which generates skipping message
+        Expected: Message should be filtered out of stderr
+        """
+        # Create a symlink in source to trigger "skipping non-regular file" message
+        symlink_path = os.path.join(temp_dirs['source'], "test_symlink")
+        os.symlink("/tmp", symlink_path)
+
+        # Create test script that runs rsync
+        test_script = os.path.join(temp_dirs['tmpdir'], "test_skip_filter.sh")
+        with open(test_script, "w") as f:
+            f.write(f"""#!/bin/bash
+set -euo pipefail
+source "{SCRIPT_DIR}/lib/lib-common.sh"
+source "{SCRIPT_DIR}/lib/lib-sync.sh"
+run_rsync "{temp_dirs['source']}/" "{temp_dirs['dest']}/" 0 "" "" "" "" 1
+""")
+        os.chmod(test_script, 0o755)
+
+        result = subprocess.run(
+            [test_script],
+            capture_output=True,
+            text=True,
+            cwd=str(SCRIPT_DIR)
+        )
+
+        # stderr should NOT contain "skipping non-regular file" (filtered out)
+        skipping_lines = [line for line in result.stderr.split('\n')
+                         if "skipping non-regular file" in line]
+        assert skipping_lines == [], f"'skipping' messages should be filtered: {skipping_lines}"
 
     def test_lib_sync_converts_human_readable_sizes(self, temp_dirs):
         """lib-sync.sh should convert rsync's human-readable sizes to bytes

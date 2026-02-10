@@ -945,6 +945,18 @@ def format_change_description(changes: dict, timestamp_data: Optional[dict] = No
 
     return ", ".join(parts) if parts else "No change"
 
+def extract_metadata_timezone(file_path: str) -> Optional[str]:
+    """Extract timezone offset from DateTimeOriginal or CreationDate if present."""
+    exif_data = read_exif_data(file_path)
+    for field in ["DateTimeOriginal", "CreationDate"]:
+        value = exif_data.get(field, "")
+        if value:
+            tz_match = re.search(r'([+-]\d{2}):?(\d{2})$', value)
+            if tz_match:
+                return f"{tz_match.group(1)}:{tz_match.group(2)}"
+    return None
+
+
 def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False, preserve_wallclock: bool = False) -> bool:
     """Main function to fix media (photo/video) timestamps
 
@@ -956,6 +968,10 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
         preserve_wallclock: If True, preserve literal wall-clock shooting time (10:30 stays 10:30)
                           If False (default), convert to current timezone for correct equivalent display
     """
+
+    detected_tz = extract_metadata_timezone(file_path)
+    if detected_tz:
+        print(f"@@timezone={detected_tz}")
 
     # Check for timezone mismatch before processing
     if timezone_offset and not overwrite_datetimeoriginal:

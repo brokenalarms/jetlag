@@ -258,10 +258,12 @@ def main():
         print(file=sys.stderr)
 
         # Build command for backup-to-nas.sh
+        # Pass --machine-readable to get @@ stats on stdout for parsing
         cmd = [
             str(backup_script),
             '--source', source_path,
-            '--dest', dest_path
+            '--dest', dest_path,
+            '--machine-readable'
         ]
 
         # Add exclusions if specified

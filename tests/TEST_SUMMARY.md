@@ -50,7 +50,7 @@ Comprehensive test suite for media timestamp fixing, tagging, and organization s
 ### Integration Tests (Testing Complete Workflows)
 
 **`test_organize_by_date.py`**
-- Tests organize-by-date.sh bash script
+- Tests organize-by-date.py (via organize-by-date.sh wrapper)
 - Validates file organization and template substitution
 - Key areas:
   - Dry run vs apply mode
@@ -152,8 +152,8 @@ These tests lock in current behavior for:
 |--------|-----------|----------------|------------------|
 | fix-media-timestamp.py | ✅ | ✅ | ✅ |
 | tag-media.py | ✅ | - | ✅ |
-| organize-by-date.sh | - | - | ✅ |
-| media-pipeline.sh | - | ✅ (workflow) | - |
+| organize-by-date.py | ✅ | - | ✅ |
+| media-pipeline.py | - | ✅ (workflow) | - |
 
 ## Example Test Output
 

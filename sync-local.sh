@@ -77,5 +77,4 @@ fi
 echo "" >&2
 
 # Run rsync using the common function with delete mode
-# Suppress @@ machine-readable output (no parent script to consume it)
-run_rsync "$SOURCE" "$DEST" "$DRY_RUN" "$EXCLUSIONS" "delete" "" >/dev/null
+run_rsync "$SOURCE" "$DEST" "$DRY_RUN" "$EXCLUSIONS" "delete" ""

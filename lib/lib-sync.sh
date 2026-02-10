@@ -10,9 +10,10 @@
 #   @@total_size=N
 
 # Function to run rsync with standard options
-# Usage: run_rsync SOURCE DEST DRY_RUN [EXCLUSIONS_FILE] [DELETE_FLAG] [EXTRA_EXCLUDES] [EXTRA_ARGS]
+# Usage: run_rsync SOURCE DEST DRY_RUN [EXCLUSIONS_FILE] [DELETE_FLAG] [EXTRA_EXCLUDES] [EXTRA_ARGS] [MACHINE_READABLE]
 # DELETE_FLAG: "" (default - no delete), "delete", or custom delete flags
 # EXTRA_EXCLUDES: Additional exclude patterns (separate from exclusions file)
+# MACHINE_READABLE: "1" to emit @@key=value lines to stdout for parent script parsing
 run_rsync() {
     local SOURCE="$1"
     local DEST="$2"
@@ -21,6 +22,7 @@ run_rsync() {
     local DELETE_FLAG="${5:-}"
     local EXTRA_EXCLUDES="${6:-}"
     local EXTRA_ARGS="${7:-}"
+    local MACHINE_READABLE="${8:-0}"
     
     # Build rsync command
     # Note: Removed -z (rsync compression) to avoid "deflate on token" errors with large files
@@ -108,9 +110,16 @@ run_rsync() {
     # Trap to handle Ctrl+C - set flag to parse partial stats before exit
     trap 'INTERRUPTED=1' INT
 
-    $RSYNC_CMD -e "ssh -C" --info=skip0 $RSYNC_ARGS "${EXCLUDE_ARGS[@]}" "$SOURCE" "$DEST" 2>&1 | \
-        tee "$RSYNC_TEMP" >&2
-    RSYNC_EXIT_CODE="${PIPESTATUS[0]}"
+    # Stream separation:
+    # - rsync stdout → tee (capture to file + display to stderr)
+    # - rsync stderr → grep filter (remove "skipping" messages) → stderr
+    local RSYNC_EXIT_FILE
+    RSYNC_EXIT_FILE=$(mktemp)
+    ( $RSYNC_CMD -e "ssh -C" $RSYNC_ARGS "${EXCLUDE_ARGS[@]}" "$SOURCE" "$DEST" \
+        2> >(grep --line-buffered -v "skipping non-regular file" >&2) \
+        > >(tee "$RSYNC_TEMP" >&2); echo $? > "$RSYNC_EXIT_FILE" )
+    RSYNC_EXIT_CODE=$(cat "$RSYNC_EXIT_FILE")
+    rm -f "$RSYNC_EXIT_FILE"
 
     local END_TIME
     END_TIME=$(date +%s)
@@ -119,8 +128,8 @@ run_rsync() {
     # Remove trap
     trap - INT
 
-    # Filter when reading for stats
-    RSYNC_OUTPUT=$(grep -v "skipping non-regular file" "$RSYNC_TEMP" 2>/dev/null || true)
+    # Read captured stdout for stats parsing (stderr filtered separately above)
+    RSYNC_OUTPUT=$(cat "$RSYNC_TEMP" 2>/dev/null || true)
     rm -f "$RSYNC_TEMP"
 
     # If interrupted, we still continue to parse stats below, then exit
@@ -197,11 +206,13 @@ run_rsync() {
         bytes_transferred=$size_sum
     fi
 
-    # Output machine-readable data to stdout
-    echo "@@files_transferred=$files_transferred"
-    echo "@@bytes_transferred=$bytes_transferred"
-    echo "@@total_size=$total_size"
-    echo "@@elapsed_seconds=$ELAPSED"
+    # Output machine-readable data to stdout (only if requested by parent)
+    if [[ "$MACHINE_READABLE" == "1" ]]; then
+        echo "@@files_transferred=$files_transferred"
+        echo "@@bytes_transferred=$bytes_transferred"
+        echo "@@total_size=$total_size"
+        echo "@@elapsed_seconds=$ELAPSED"
+    fi
 
     echo "" >&2
     if [[ $RSYNC_EXIT_CODE -eq 0 ]]; then

@@ -16,6 +16,9 @@ from datetime import datetime
 from typing import Dict, List, Optional, NamedTuple
 import argparse
 
+sys.path.insert(0, str(Path(__file__).parent))
+from lib.filesystem import cleanup_empty_parent_dirs
+
 # Handle Ctrl-C gracefully
 def signal_handler(sig, frame):
     print("\n\nInterrupted by user", file=sys.stderr)
@@ -26,6 +29,7 @@ signal.signal(signal.SIGINT, signal_handler)
 class ImportProfile(NamedTuple):
     """Configuration profile for media import"""
     import_dir: str
+    source_dir: Optional[str] = None
     file_extensions: Optional[List[str]] = None
     companion_extensions: Optional[List[str]] = None
     tags: Optional[List[str]] = None
@@ -54,6 +58,7 @@ def load_profiles(profile_path: str) -> Dict[str, ImportProfile]:
             exif = config.get('exif', {})
             profiles[name] = ImportProfile(
                 import_dir=os.path.expandvars(config['import_dir']),
+                source_dir=config.get('source_dir'),
                 file_extensions=config.get('file_extensions'),
                 companion_extensions=config.get('companion_extensions'),
                 tags=config.get('tags'),
@@ -245,42 +250,6 @@ def create_archive_directory(original_dir: str, apply_changes: bool) -> Optional
 
     os.makedirs(archive_path, exist_ok=True)
     return archive_path
-
-def cleanup_empty_parent_dirs(file_dir: str, source_root: str) -> None:
-    """Clean up empty parent directories after moving a file
-
-    Keep removing parent directories as long as they're empty.
-    Stop after source_root or when we hit a non-empty directory.
-    Never removes the current working directory.
-    """
-    import errno
-
-    # Normalize paths for comparison
-    source_root = os.path.normpath(os.path.abspath(source_root))
-    cwd = os.path.abspath('.')
-
-    while file_dir and file_dir != '/' and file_dir != '.':
-        file_dir = os.path.normpath(os.path.abspath(file_dir))
-
-        # Never delete current working directory
-        if file_dir == cwd:
-            break
-
-        try:
-            # Try to remove the directory (only succeeds if empty)
-            os.rmdir(file_dir)
-            # Stop after removing source_root
-            if file_dir == source_root:
-                break
-            # Move up to parent
-            file_dir = os.path.dirname(file_dir)
-        except OSError as e:
-            # Directory not empty - expected, stop here
-            if e.errno == errno.ENOTEMPTY or e.errno == errno.EEXIST:
-                break
-            # Other errors (permissions, etc) - warn but stop
-            print(f"Warning: Could not remove empty directory {file_dir}: {e}", file=sys.stderr)
-            break
 
 def is_file_locked(file_path: str) -> bool:
     """Check if file has macOS locked (uchg) flag"""
@@ -516,9 +485,10 @@ Examples:
 
     profile = profiles[args.profile]
 
-    # Find source directory
+    # Find source directory (profile's source_dir used as default)
+    specified_dir = args.source_dir or profile.source_dir
     try:
-        source_dir = find_source_directory(args.source_dir)
+        source_dir = find_source_directory(specified_dir)
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1

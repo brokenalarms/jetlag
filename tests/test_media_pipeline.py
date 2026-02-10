@@ -161,8 +161,7 @@ class TestFileDiscovery:
         create_test_video(source / "2025-10-05" / "test2.mp4")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         assert "Found 2 video file(s)" in result.stdout
@@ -175,8 +174,7 @@ class TestFileDiscovery:
         (source / "2025-10-05" / "test.txt").write_bytes(b"fake")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         assert "Found 1 video file(s)" in result.stdout
@@ -188,8 +186,7 @@ class TestFileDiscovery:
         create_test_video(source / "2025-10-06" / "subdir" / "test2.mp4")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         assert "Found 2 video file(s)" in result.stdout
@@ -202,8 +199,7 @@ class TestFileDiscovery:
         create_test_video(source / "mango.mp4")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         lines = result.stdout.split("\n")
@@ -224,8 +220,7 @@ class TestDryRunMode:
         create_test_video(video)
 
         result = run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         assert video.exists(), "Source file should still exist"
@@ -241,8 +236,7 @@ class TestDryRunMode:
         original_dto = get_exif_field(video, "DateTimeOriginal")
 
         run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         new_dto = get_exif_field(video, "DateTimeOriginal")
@@ -260,8 +254,7 @@ class TestApplyMode:
         create_test_video(video, media_create_date="2025:10:05 01:00:00")
 
         run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "TestGroup", "--apply"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "TestGroup", "--apply"],
         )
 
         assert not video.exists(), "Source file should be moved"
@@ -279,8 +272,7 @@ class TestApplyMode:
         assert get_exif_field(video, "DateTimeOriginal") == ""
 
         run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test", "--apply"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         # Find the moved file
@@ -296,62 +288,12 @@ class TestApplyMode:
         create_test_video(video, media_create_date="2025:10:05 01:00:00")
 
         run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test", "--apply"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         moved = list(target.rglob("*.mp4"))[0]
         creation_date = get_exif_field(moved, "CreationDate")
         assert "+09:00" in creation_date or "+0900" in creation_date
-
-
-class TestDirectoryCleanup:
-    """Tests for empty directory cleanup after moving files."""
-
-    def test_removes_empty_source_directory_after_move(self, temp_workspace, test_profile):
-        """Empty source directories are removed after last file is moved."""
-        source = temp_workspace["source"]
-        subdir = source / "2025-10-05"
-        video = subdir / "test.mp4"
-        create_test_video(video)
-
-        run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test", "--apply"],
-            cwd=source,
-        )
-
-        assert not subdir.exists(), "Empty directory should be removed"
-
-    def test_removes_ds_store_before_cleanup(self, temp_workspace, test_profile):
-        """Directories with only .DS_Store are cleaned up."""
-        source = temp_workspace["source"]
-        subdir = source / "2025-10-05"
-        video = subdir / "test.mp4"
-        create_test_video(video)
-        (subdir / ".DS_Store").write_bytes(b"fake ds_store")
-
-        run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test", "--apply"],
-            cwd=source,
-        )
-
-        assert not subdir.exists(), "Directory with only .DS_Store should be removed"
-
-    def test_preserves_nonempty_directories(self, temp_workspace, test_profile):
-        """Directories with other files are not removed."""
-        source = temp_workspace["source"]
-        subdir = source / "2025-10-05"
-        video = subdir / "test.mp4"
-        create_test_video(video)
-        (subdir / "other.txt").write_bytes(b"keep me")
-
-        run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test", "--apply"],
-            cwd=source,
-        )
-
-        assert subdir.exists(), "Directory with other files should remain"
-        assert (subdir / "other.txt").exists()
 
 
 class TestGroupTemplate:
@@ -365,8 +307,7 @@ class TestGroupTemplate:
         create_test_video(video, media_create_date="2025:08:15 03:00:00")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "South Korea Trip", "--apply"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "South Korea Trip", "--apply"],
         )
 
         # Debug: show what happened
@@ -382,8 +323,7 @@ class TestGroupTemplate:
         create_test_video(video, media_create_date="2025:08:15 03:00:00")
 
         run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "08-09 - South Korea", "--apply"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "08-09 - South Korea", "--apply"],
         )
 
         expected = target / "2025" / "08-09 - South Korea" / "2025-08-15" / "test.mp4"
@@ -405,8 +345,7 @@ class TestTimezoneHandling:
         create_test_video(video, media_create_date="2025:10:05 01:00:00")
 
         run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test", "--apply"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         moved = list(target.rglob("*.mp4"))[0]
@@ -420,8 +359,7 @@ class TestTimezoneHandling:
         create_test_video(video)
 
         result = run_pipeline(
-            ["--profile", test_profile, "--timezone", "JST", "--group", "Test"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "JST", "--group", "Test"],
         )
 
         assert result.returncode != 0
@@ -439,8 +377,7 @@ class TestSummaryOutput:
         create_test_video(source / "test3.mp4")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test", "--apply"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         assert "Total files processed: 3" in result.stdout
@@ -455,8 +392,7 @@ class TestSummaryOutput:
         video.chmod(0o000)
 
         result = run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test", "--apply"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         # Restore permissions for cleanup
@@ -475,8 +411,7 @@ class TestExiftoolTmpDetection:
         create_test_video(source / "test.mp4")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         assert "exiftool_tmp" in result.output
@@ -492,8 +427,7 @@ class TestTagging:
         create_test_video(video)
 
         result = run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test", "--apply"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         # Check that tagging was reported in output (Spotlight indexing unreliable in temp dirs)
@@ -507,8 +441,7 @@ class TestTagging:
         create_test_video(video)
 
         run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test", "--apply"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         moved = list(target.rglob("*.mp4"))[0]
@@ -534,8 +467,7 @@ class TestAlreadyProcessedFiles:
         )
 
         result = run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test", "--apply"],
-            cwd=correct_path.parent,
+            ["--profile", test_profile, "--source", str(correct_path.parent), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         assert "Already organized" in result.output or "No change" in result.output
@@ -550,24 +482,23 @@ class TestCLIArguments:
         create_test_video(source / "test.mp4")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900"],
         )
 
         assert result.returncode != 0
         assert "--group" in result.output or "required" in result.output.lower()
 
-    def test_source_defaults_to_current_directory(self, temp_workspace, test_profile):
-        """Without --source, uses current directory."""
-        source = temp_workspace["source"]
-        create_test_video(source / "test.mp4")
+    def test_source_defaults_to_profile_ready_dir(self, temp_workspace, test_profile):
+        """Without --source, uses profile's ready_dir."""
+        target = temp_workspace["target"]
+        create_test_video(target / "test.mp4")
 
         result = run_pipeline(
             ["--profile", test_profile, "--timezone", "+0900", "--group", "Test"],
-            cwd=source,
         )
 
-        assert "Source:  ." in result.stdout
+        assert str(target) in result.stdout
+        assert "Found 1 video file(s)" in result.stdout
 
     def test_target_from_profile_ready_dir(self, temp_workspace, test_profile):
         """--target defaults to profile's ready_dir."""
@@ -576,8 +507,7 @@ class TestCLIArguments:
         create_test_video(source / "test.mp4")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test"],
-            cwd=source,
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         assert str(target) in result.stdout

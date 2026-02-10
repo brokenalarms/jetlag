@@ -332,5 +332,357 @@ class TestOrganizeByDateEdgeCases:
         assert os.path.exists(expected_path)
 
 
+class TestCopyMode:
+    """Tests for --copy mode (used by import-media)."""
+
+    @pytest.fixture
+    def temp_dir(self):
+        tmpdir = tempfile.mkdtemp()
+        yield tmpdir
+        shutil.rmtree(tmpdir)
+
+    def _create_video(self, path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        subprocess.run([
+            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
+            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p", path
+        ], capture_output=True, check=True)
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-DateTimeOriginal=2025:06:18 07:25:21+08:00", path
+        ], capture_output=True, check=True)
+
+    def test_copy_mode_preserves_source(self, temp_dir):
+        """--copy leaves source file in place."""
+        source = os.path.join(temp_dir, "source", "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+
+        result = subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--copy", "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        assert os.path.exists(source), "Source must remain after copy"
+        assert os.path.exists(os.path.join(target_dir, "2025-06-18", "test.mp4"))
+
+    def test_copy_mode_action_output(self, temp_dir):
+        """--copy emits @@action=copied on stdout."""
+        source = os.path.join(temp_dir, "source", "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+
+        result = subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--copy", "--apply"
+        ], capture_output=True, text=True)
+
+        assert "@@action=copied" in result.stdout
+
+
+class TestMachineOutput:
+    """Tests for @@key=value stdout output and stderr/stdout split."""
+
+    @pytest.fixture
+    def temp_dir(self):
+        tmpdir = tempfile.mkdtemp()
+        yield tmpdir
+        shutil.rmtree(tmpdir)
+
+    def _create_video(self, path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        subprocess.run([
+            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
+            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p", path
+        ], capture_output=True, check=True)
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-DateTimeOriginal=2025:06:18 07:25:21+08:00", path
+        ], capture_output=True, check=True)
+
+    def test_move_action_output(self, temp_dir):
+        """Move mode emits @@action=moved on stdout."""
+        source = os.path.join(temp_dir, "source", "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+
+        result = subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        assert "@@action=moved" in result.stdout
+
+    def test_dry_run_would_move_action(self, temp_dir):
+        """Dry run emits @@action=would_move."""
+        source = os.path.join(temp_dir, "source", "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+
+        result = subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}"
+        ], capture_output=True, text=True)
+
+        assert "@@action=would_move" in result.stdout
+
+    def test_dry_run_would_copy_action(self, temp_dir):
+        """Dry run with --copy emits @@action=would_copy."""
+        source = os.path.join(temp_dir, "source", "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+
+        result = subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--copy"
+        ], capture_output=True, text=True)
+
+        assert "@@action=would_copy" in result.stdout
+
+    def test_dest_output_is_absolute(self, temp_dir):
+        """@@dest= value is an absolute path."""
+        source = os.path.join(temp_dir, "source", "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+
+        result = subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        for line in result.stdout.split('\n'):
+            if line.startswith('@@dest='):
+                dest = line.split('=', 1)[1]
+                assert os.path.isabs(dest), f"@@dest should be absolute, got: {dest}"
+
+    def test_stdout_only_machine_readable(self, temp_dir):
+        """stdout contains only @@key=value lines, human messages go to stderr."""
+        source = os.path.join(temp_dir, "source", "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+
+        result = subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        for line in result.stdout.strip().split('\n'):
+            if line.strip():
+                assert line.startswith('@@'), f"Non-@@ line on stdout: {line!r}"
+
+        assert result.stderr.strip(), "Human-readable output should be on stderr"
+
+    def test_skipped_action_for_already_organized(self, temp_dir):
+        """Already-organized file emits @@action=skipped."""
+        source = os.path.join(temp_dir, "source", "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+
+        # First run: move file
+        subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--apply"
+        ], capture_output=True, check=True)
+
+        moved_path = os.path.join(target_dir, "2025-06-18", "test.mp4")
+
+        # Second run: same file already in place
+        result = subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            moved_path, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        assert "@@action=skipped" in result.stdout
+
+
+class TestOverwriteMode:
+    """Tests for --overwrite and same-size auto-skip."""
+
+    @pytest.fixture
+    def temp_dir(self):
+        tmpdir = tempfile.mkdtemp()
+        yield tmpdir
+        shutil.rmtree(tmpdir)
+
+    def _create_video(self, path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        subprocess.run([
+            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
+            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p", path
+        ], capture_output=True, check=True)
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-DateTimeOriginal=2025:06:18 07:25:21+08:00", path
+        ], capture_output=True, check=True)
+
+    def test_same_size_auto_skips(self, temp_dir):
+        """Existing file with same size is auto-skipped."""
+        source = os.path.join(temp_dir, "source", "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+
+        # First copy
+        subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--copy", "--apply"
+        ], capture_output=True, check=True)
+
+        # Second copy of same file (same size)
+        result = subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--copy", "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        assert "@@action=skipped" in result.stdout
+
+    def test_overwrite_replaces_existing(self, temp_dir):
+        """--overwrite replaces existing file instead of skipping."""
+        source = os.path.join(temp_dir, "source", "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+
+        # First copy
+        subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--copy", "--apply"
+        ], capture_output=True, check=True)
+
+        dest_path = os.path.join(target_dir, "2025-06-18", "test.mp4")
+        assert os.path.exists(dest_path)
+
+        # Without --overwrite, same-size file is skipped
+        skip_result = subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--copy", "--apply"
+        ], capture_output=True, text=True)
+        assert "@@action=skipped" in skip_result.stdout
+
+        # With --overwrite, file is overwritten
+        result = subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--copy", "--overwrite", "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        assert "@@action=overwrote" in result.stdout
+
+
+class TestDirectoryCleanupAfterMove:
+    """Tests for empty directory cleanup in organize-by-date.sh after move."""
+
+    @pytest.fixture
+    def temp_dir(self):
+        tmpdir = tempfile.mkdtemp()
+        yield tmpdir
+        shutil.rmtree(tmpdir)
+
+    def _create_video(self, path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        subprocess.run([
+            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
+            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p", path
+        ], capture_output=True, check=True)
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-DateTimeOriginal=2025:06:18 07:25:21+08:00", path
+        ], capture_output=True, check=True)
+
+    def test_empty_source_dir_removed_after_move(self, temp_dir):
+        """Source directory is cleaned up after last file is moved out."""
+        subdir = os.path.join(temp_dir, "source", "subdir")
+        source = os.path.join(subdir, "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+
+        subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--apply"
+        ], capture_output=True, check=True)
+
+        assert not os.path.exists(subdir), "Empty source subdir should be removed"
+
+    def test_ds_store_only_dir_removed(self, temp_dir):
+        """Directory with only .DS_Store is cleaned up after move."""
+        subdir = os.path.join(temp_dir, "source", "subdir")
+        source = os.path.join(subdir, "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+        Path(os.path.join(subdir, ".DS_Store")).write_bytes(b"fake")
+
+        subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--apply"
+        ], capture_output=True, check=True)
+
+        assert not os.path.exists(subdir), "Dir with only .DS_Store should be removed"
+
+    def test_nonempty_dir_preserved(self, temp_dir):
+        """Directory with other files is not removed after move."""
+        subdir = os.path.join(temp_dir, "source", "subdir")
+        source = os.path.join(subdir, "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+        Path(os.path.join(subdir, "other.txt")).write_bytes(b"keep")
+
+        subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--apply"
+        ], capture_output=True, check=True)
+
+        assert os.path.exists(subdir), "Dir with other files should remain"
+        assert os.path.exists(os.path.join(subdir, "other.txt"))
+
+    def test_copy_mode_no_cleanup(self, temp_dir):
+        """Copy mode should not remove source directories."""
+        subdir = os.path.join(temp_dir, "source", "subdir")
+        source = os.path.join(subdir, "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+
+        subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--copy", "--apply"
+        ], capture_output=True, check=True)
+
+        assert os.path.exists(subdir), "Copy mode should not clean up source"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

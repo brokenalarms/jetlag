@@ -16,7 +16,7 @@
   - our devices DO write UTC time to Media CreateDate and quicktime fields, and so we should interpret them as such (verifying that they are correct by adding the timezone encapsulated in DateTimeOriginal and checking it matches). We should generally avoid using the ExifTool QuicktimeUTC flag to handle this conversion for us since it's more complicated.
     - there is no such thing as writing to UTC field as wall-clock time and having Final Cut Pro recognize it's not UTC anymore. FCP will take an integer QT UTC field as UTC, or a string field with 'Z' as UTC or with timezone.
     - for performance, for each file in each script, exiftool should be called once to get requirements, then writing requirements are built in memory, then exiftool is again called once to write out the built up requirements.
-- YAML FORMAT
+- YAMLFORMAT
   - In media-profiles.yaml, use inline array format `[item1, item2]` for short lists like file_extensions, companion_extensions, and tags
   - Do NOT rewrite these as multi-line bullet lists with `-` prefix
   - Example: `file_extensions: [.mp4, .mov]` NOT `file_extensions:\n  - .mp4\n  - .mov`
@@ -55,10 +55,10 @@
     - the shell script entry point to each py file imports the required venv
 - WORKFLOWS
   - import-media.py: copies from SD card (import_dir) to ready_dir, uses --copy mode, tags after copy
-  - media-pipeline.sh: processes files already in ready_dir, uses move mode, fixes timestamps then organizes
-  - both use organize-by-date.sh which outputs `@@dest=` and `@@action=` to stdout for parent to parse
-- MEDIA-PIPELINE ARCHITECTURE (to be rewritten in Python)
-  - flow per file: tag-media.py → fix-media-timestamp.py → organize-by-date.sh
+  - media-pipeline.py: processes files already in ready_dir, uses move mode, fixes timestamps then organizes
+  - both use organize-by-date.py which outputs `@@dest=` and `@@action=` to stdout for parent to parse
+- MEDIA-PIPELINE ARCHITECTURE
+  - flow per file: tag-media.py → fix-media-timestamp.py → organize-by-date.py
   - reads media-profiles.yaml to get: ready_dir (target), file_extensions, tags, exif make/model
   - CLI args: --profile NAME, --source DIR, --target DIR, --timezone +HHMM, --group NAME, --apply
   - --group is embedded into the organize template: `{{YYYY}}/GROUP/{{YYYY}}-{{MM}}-{{DD}}`

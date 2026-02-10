@@ -3,6 +3,7 @@ backup_config:
   remote_base_path: /volume1/Backup/ChronoSync/
 profiles:
   insta360:
+    source_dir: /Volumes/Untitled/DCIM
     import_dir: /Volumes/Extreme GRN/Videos/Source Video/Insta360/Import
     ready_dir: /Volumes/Extreme GRN/Videos/Source Video/Insta360/Ready
     backup_enabled: true
@@ -22,6 +23,7 @@ profiles:
     - .thm
     - .list
   gopro:
+    source_dir: /Volumes/Untitled/DCIM
     import_dir: /Volumes/Extreme GRN/Videos/Source Video/GoPro/Import
     ready_dir: /Volumes/Extreme GRN/Videos/Source Video/GoPro/Ready
     backup_enabled: true
@@ -38,7 +40,8 @@ profiles:
     - .thm
     - .lrv
     - .sav
-  dji:
+  dji-mini-4-pro:
+    source_dir: /Volumes/Untitled/DCIM
     import_dir: /Volumes/Extreme GRN/Videos/Source Video/DJI/Import
     ready_dir: /Volumes/Extreme GRN/Videos/Source Video/DJI/Ready
     backup_enabled: true
@@ -58,7 +61,8 @@ profiles:
     - .lrf
     - .thm
     - .srt
-  sony-photo:
+  sony-a7iv-photo:
+    source_dir: /Volumes/Untitled/DCIM
     import_dir: /Volumes/Extreme GRN/Photos/Import
     backup_enabled: true
     backup_dir: /Volumes/Extreme GRN/Photos/Originals
@@ -76,7 +80,8 @@ profiles:
     - .xmp
     companion_extensions:
     - .xml
-  sony-video:
+  sony-a7iv-video:
+    source_dir: /Volumes/Untitled/PRIVATE
     import_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Import
     backup_enabled: true
     ready_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Ready
@@ -94,7 +99,46 @@ profiles:
     - .xml
     - .bin
     - .jpg
-  iphone16pro:
+  sony-a7v-photo:
+    source_dir: /Volumes/Untitled/DCIM
+    import_dir: /Volumes/Extreme GRN/Photos/Import
+    backup_enabled: true
+    backup_dir: /Volumes/Extreme GRN/Photos/Originals
+    backup_exclude_subdirs:
+    - Import
+    tags:
+    - sony-a7v
+    exif:
+      make: Sony
+      model: ILCE-7M5
+    file_extensions:
+    - .arw
+    - .jpg
+    - .hif
+    - .xmp
+    companion_extensions:
+    - .xml
+  sony-a7v-video:
+    source_dir: /Volumes/Untitled/PRIVATE
+    import_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7V/Import
+    backup_enabled: true
+    ready_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7V/Ready
+    backup_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7V/Ready
+    backup_exclude_subdirs: []
+    tags:
+    - sony-a7v
+    exif:
+      make: Sony
+      model: ILCE-7M5
+    file_extensions:
+    - .mp4
+    - .mov
+    companion_extensions:
+    - .xml
+    - .bin
+    - .jpg
+  iphone-16-pro:
+    source_dir: /Volumes/Untitled/DCIM
     import_dir: /Volumes/Extreme GRN/Videos/Source Video/iPhone/Import
     ready_dir: /Volumes/Extreme GRN/Videos/Source Video/iPhone/Ready
     backup_enabled: false
