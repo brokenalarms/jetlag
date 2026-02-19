@@ -17,7 +17,7 @@ from typing import Dict, List, Optional, NamedTuple
 import argparse
 
 sys.path.insert(0, str(Path(__file__).parent))
-from lib.filesystem import cleanup_empty_parent_dirs
+from lib.filesystem import cleanup_empty_parent_dirs, parse_machine_output
 
 # Handle Ctrl-C gracefully
 def signal_handler(sig, frame):
@@ -78,15 +78,6 @@ def get_default_profile_path() -> str:
         if profile_path.exists():
             return str(profile_path)
     return str(script_dir / 'media-profiles.yaml')
-
-def parse_machine_output(stdout: str) -> dict:
-    """Parse machine-readable output (lines starting with @@)"""
-    result = {}
-    for line in stdout.strip().split('\n'):
-        if line.startswith('@@') and '=' in line:
-            key, value = line[2:].split('=', 1)
-            result[key] = value
-    return result
 
 def organize_file(file_path: str, import_dir: str, group: str, copy_mode: bool = True, apply_changes: bool = False) -> ImportResult:
     """Organize a single file using organize-by-date.sh

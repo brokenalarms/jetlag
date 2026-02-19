@@ -2,6 +2,7 @@
 
 import errno
 import os
+from pathlib import Path
 
 
 def cleanup_empty_parent_dirs(file_dir: str, stop_at: str) -> None:
@@ -43,3 +44,43 @@ def cleanup_empty_parent_dirs(file_dir: str, stop_at: str) -> None:
             print(f"Warning: Could not remove empty directory {file_dir}: {e}",
                   file=__import__('sys').stderr)
             break
+
+
+def find_media_files(source_dir: str, extensions: list[str]) -> list[Path]:
+    """Find all media files with given extensions, sorted alphabetically.
+
+    Args:
+        source_dir: Directory to search recursively
+        extensions: List of file extensions to match (e.g., [".mp4", ".mov"])
+
+    Returns:
+        List of Path objects, deduplicated and sorted case-insensitively
+    """
+    source = Path(source_dir)
+    files = []
+
+    for ext in extensions:
+        files.extend(source.rglob(f"*{ext}"))
+        files.extend(source.rglob(f"*{ext.upper()}"))
+
+    unique_files = list(set(files))
+    unique_files.sort(key=lambda p: str(p).lower())
+
+    return unique_files
+
+
+def parse_machine_output(stdout: str) -> dict:
+    """Parse machine-readable @@key=value lines from subprocess stdout.
+
+    Args:
+        stdout: Raw stdout string from a subprocess
+
+    Returns:
+        Dict of key-value pairs parsed from @@key=value lines
+    """
+    result = {}
+    for line in stdout.strip().split('\n'):
+        if line.startswith('@@') and '=' in line:
+            key, value = line[2:].split('=', 1)
+            result[key] = value
+    return result

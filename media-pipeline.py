@@ -10,6 +10,7 @@ Processes all video files in SOURCE, fixes timestamps, then organizes by date in
 """
 
 import argparse
+import json
 import os
 import re
 import signal
@@ -20,6 +21,8 @@ from typing import Optional
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).parent))
+from lib.filesystem import find_media_files
 
 SCRIPT_DIR = Path(__file__).parent
 
@@ -30,8 +33,12 @@ def signal_handler(sig, frame):
     sys.exit(130)
 
 
-def load_profile(profile_name: str) -> dict:
-    """Load profile from media-profiles.yaml."""
+def load_config(profile_name: str) -> tuple[dict, dict]:
+    """Load profile and top-level config from media-profiles.yaml.
+
+    Returns:
+        tuple of (profile_dict, full_config_dict)
+    """
     profiles_file = SCRIPT_DIR / "media-profiles.yaml"
     if not profiles_file.exists():
         print(f"ERROR: Profile file not found: {profiles_file}", file=sys.stderr)
@@ -47,24 +54,7 @@ def load_profile(profile_name: str) -> dict:
         print(f"Available profiles: {available}", file=sys.stderr)
         sys.exit(1)
 
-    return profiles[profile_name]
-
-
-def find_media_files(source_dir: str, extensions: list[str]) -> list[Path]:
-    """Find all media files with given extensions, sorted alphabetically."""
-    source = Path(source_dir)
-    files = []
-
-    for ext in extensions:
-        # Case-insensitive matching
-        files.extend(source.rglob(f"*{ext}"))
-        files.extend(source.rglob(f"*{ext.upper()}"))
-
-    # Remove duplicates and sort
-    unique_files = list(set(files))
-    unique_files.sort(key=lambda p: str(p).lower())
-
-    return unique_files
+    return profiles[profile_name], data
 
 
 def check_exiftool_tmp(source_dir: str) -> list[Path]:
@@ -143,12 +133,12 @@ def run_organize_by_date(
     template: str,
     apply: bool,
     verbose: bool
-) -> tuple[str, str, int]:
+) -> tuple[str, str, str, int]:
     """Run organize-by-date.py on a file.
 
     Returns:
-        tuple of (stderr_output, action, return_code)
-        action is parsed from @@action=X in stdout
+        tuple of (stderr_output, action, dest_path, return_code)
+        action and dest are parsed from @@key=value lines in stdout
     """
     cmd = [
         str(SCRIPT_DIR / "organize-by-date.sh"),
@@ -166,12 +156,47 @@ def run_organize_by_date(
 
     # Parse @@key=value from stdout
     action = ""
+    dest = ""
+    for line in result.stdout.split("\n"):
+        if line.startswith("@@action="):
+            action = line.split("=", 1)[1]
+        elif line.startswith("@@dest="):
+            dest = line.split("=", 1)[1]
+
+    # stderr contains user-visible output
+    return result.stderr.strip(), action, dest, result.returncode
+
+
+def run_generate_gyroflow(
+    file_path: Path,
+    preset_json: str,
+    apply: bool
+) -> tuple[str, int]:
+    """Run generate-gyroflow.py on a file.
+
+    stderr passes through to user. stdout captured for @@key=value parsing.
+
+    Returns:
+        tuple of (action, return_code)
+        action is parsed from @@action=X in stdout
+    """
+    cmd = [
+        sys.executable, str(SCRIPT_DIR / "generate-gyroflow.py"),
+        str(file_path),
+        "--preset", preset_json,
+    ]
+
+    if apply:
+        cmd.append("--apply")
+
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, text=True)
+
+    action = ""
     for line in result.stdout.split("\n"):
         if line.startswith("@@action="):
             action = line.split("=", 1)[1]
 
-    # stderr contains user-visible output
-    return result.stderr.strip(), action, result.returncode
+    return action, result.returncode
 
 
 def process_file(
@@ -181,7 +206,8 @@ def process_file(
     group: str,
     location_args: list[str],
     apply: bool,
-    verbose: bool
+    verbose: bool,
+    gyroflow_config: Optional[dict] = None
 ) -> dict:
     """Process a single file through the pipeline.
 
@@ -225,7 +251,7 @@ def process_file(
     print("📁 Organizing by date...")
 
     template = f"{{{{YYYY}}}}/{group}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
-    output, action, rc = run_organize_by_date(file_path, target_dir, template, apply, verbose)
+    output, action, dest, rc = run_organize_by_date(file_path, target_dir, template, apply, verbose)
 
     # Print stderr output (user-visible messages)
     if output:
@@ -241,6 +267,23 @@ def process_file(
 
     if action in ("copied", "moved", "overwrote"):
         file_changed = True
+
+    # Step 4: Generate gyroflow project (if enabled)
+    gyroflow_enabled = profile.get("gyroflow_enabled", False) if profile else False
+    if gyroflow_enabled and gyroflow_config:
+        print("🎥 Generating gyroflow project...")
+
+        # Use the dest path from organize (file may have moved)
+        gyroflow_file = Path(dest) if dest else file_path
+        preset = gyroflow_config.get("preset", {})
+        preset_json = json.dumps(preset)
+
+        gf_action, rc = run_generate_gyroflow(gyroflow_file, preset_json, apply)
+
+        if rc != 0:
+            print(f"   ⚠️  Gyroflow generation failed for {file_path.name} (non-fatal)")
+        elif gf_action == "generated":
+            file_changed = True
 
     result["changed"] = file_changed
     return result
@@ -292,23 +335,24 @@ def main():
 
     # Load profile if specified
     profile = None
+    full_config = {}
     if args.profile:
-        profile = load_profile(args.profile)
+        profile, full_config = load_config(args.profile)
 
     # Determine source and target directories from profile or CLI args
     source_dir = args.source
     target_dir = args.target
 
     if profile:
+        import_dir = profile.get("import_dir")
         ready_dir = profile.get("ready_dir")
-        if ready_dir and ready_dir != "None":
-            if not source_dir:
-                source_dir = ready_dir
-            if not target_dir:
-                target_dir = ready_dir
+        if not source_dir and import_dir and import_dir != "None":
+            source_dir = import_dir
+        if not target_dir and ready_dir and ready_dir != "None":
+            target_dir = ready_dir
 
     if not source_dir:
-        print("ERROR: --source is required (or use --profile with ready_dir)", file=sys.stderr)
+        print("ERROR: --source is required (or use --profile with import_dir)", file=sys.stderr)
         sys.exit(1)
 
     if not target_dir:
@@ -397,6 +441,8 @@ def main():
         "failed_files": []
     }
 
+    gyroflow_config = full_config.get("gyroflow")
+
     for i, file_path in enumerate(files, 1):
         stats["processed"] += 1
         base = file_path.name
@@ -410,7 +456,8 @@ def main():
             args.group,
             location_args,
             args.apply,
-            args.verbose
+            args.verbose,
+            gyroflow_config=gyroflow_config
         )
 
         if result["failed"]:

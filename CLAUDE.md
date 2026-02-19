@@ -54,16 +54,20 @@
     - .DS_Store files should be deleted if they're the only thing preventing directory cleanup
     - the shell script entry point to each py file imports the required venv
 - WORKFLOWS
-  - import-media.py: copies from SD card (import_dir) to ready_dir, uses --copy mode, tags after copy
-  - media-pipeline.py: processes files already in ready_dir, uses move mode, fixes timestamps then organizes
+  - import-media.py: copies from SD card (source_dir) to import_dir, uses --copy mode, tags after copy
+  - media-pipeline.py: processes files in import_dir, organizes into ready_dir, uses move mode, fixes timestamps then organizes
   - both use organize-by-date.py which outputs `@@dest=` and `@@action=` to stdout for parent to parse
 - MEDIA-PIPELINE ARCHITECTURE
-  - flow per file: tag-media.py → fix-media-timestamp.py → organize-by-date.py
-  - reads media-profiles.yaml to get: ready_dir (target), file_extensions, tags, exif make/model
+  - flow per file: tag-media.py → fix-media-timestamp.py → organize-by-date.py → generate-gyroflow.py (if gyroflow_enabled)
+  - reads media-profiles.yaml to get: import_dir (source), ready_dir (target), file_extensions, tags, exif make/model, gyroflow_enabled
+  - top-level `gyroflow` section in media-profiles.yaml: binary path and preset (stabilization settings)
   - CLI args: --profile NAME, --source DIR, --target DIR, --timezone +HHMM, --group NAME, --apply
   - --group is embedded into the organize template: `{{YYYY}}/GROUP/{{YYYY}}-{{MM}}-{{DD}}`
   - finds files using profile's file_extensions (e.g., [".mp4", ".insv"]), processes alphabetically
   - checks for stale exiftool_tmp directories at startup (exiftool fails silently if these exist)
+  - generate-gyroflow.py: generates .gyroflow project files for Gyroflow Toolbox FCP plugin, non-fatal if no gyro data
+  - batch-generate-gyroflow.py: batch wrapper that scans a directory and runs generate-gyroflow.py on each file
+  - shared utilities in lib/filesystem.py: find_media_files(), parse_machine_output(), cleanup_empty_parent_dirs()
   - summary at end: total processed, succeeded, changed, unchanged, failed (with list)
 - CAMERA QUIRKS
   - GoPro: FAT filesystem stores modification time in camera's local timezone (no TZ info). If camera is set to +02:00 but Mac is +09:00, birth/modify times will be 7 hours off. MediaCreateDate is UTC and correct.

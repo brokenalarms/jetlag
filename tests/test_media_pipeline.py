@@ -488,16 +488,16 @@ class TestCLIArguments:
         assert result.returncode != 0
         assert "--group" in result.output or "required" in result.output.lower()
 
-    def test_source_defaults_to_profile_ready_dir(self, temp_workspace, test_profile):
-        """Without --source, uses profile's ready_dir."""
-        target = temp_workspace["target"]
-        create_test_video(target / "test.mp4")
+    def test_source_defaults_to_profile_import_dir(self, temp_workspace, test_profile):
+        """Without --source, uses profile's import_dir."""
+        source = temp_workspace["source"]
+        create_test_video(source / "test.mp4")
 
         result = run_pipeline(
             ["--profile", test_profile, "--timezone", "+0900", "--group", "Test"],
         )
 
-        assert str(target) in result.stdout
+        assert str(source) in result.stdout
         assert "Found 1 video file(s)" in result.stdout
 
     def test_target_from_profile_ready_dir(self, temp_workspace, test_profile):
