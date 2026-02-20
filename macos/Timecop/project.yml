@@ -29,3 +29,14 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.video
         CODE_SIGN_ENTITLEMENTS: Timecop/Timecop.entitlements
+    postBuildScripts:
+      - name: Bundle scripts
+        script: |
+          set -e
+          rsync -a --delete \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='.venv' \
+            --exclude='tests' \
+            "${SRCROOT}/../../scripts/" \
+            "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/scripts/"
