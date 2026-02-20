@@ -12,7 +12,7 @@ import shutil
 from pathlib import Path
 import pytest
 
-SCRIPT_DIR = Path(__file__).parent.parent
+SCRIPT_DIR = Path(__file__).parent.parent / "scripts"
 
 # Import the formatting functions from backup script
 sys.path.insert(0, str(SCRIPT_DIR))

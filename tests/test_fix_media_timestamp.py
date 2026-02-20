@@ -15,7 +15,7 @@ import pytest
 
 # Test fixtures directory
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
-SCRIPT_DIR = Path(__file__).parent.parent
+SCRIPT_DIR = Path(__file__).parent.parent / "scripts"
 
 
 class TestFixMediaTimestamp:
