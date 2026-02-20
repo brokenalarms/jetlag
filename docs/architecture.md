@@ -1,5 +1,28 @@
 # Architecture
 
+## Monorepo layout
+
+This repo has two independent components that each work standalone:
+
+```
+/                         ← repo root
+├── *.py / *.sh           ← Python/shell scripts (CLI pipeline tools)
+├── lib/                  ← shared Python library
+├── tests/                ← test suite
+├── media-profiles.yaml   ← shared config (used by both scripts and app)
+├── macos/Timecop/        ← macOS SwiftUI app (separate, bundles scripts on distribution)
+└── docs/                 ← documentation
+```
+
+Scripts live at the repo root — not in a `scripts/` subdirectory. `macos/` is a
+peer of the scripts, not nested inside them.
+
+When distributed as a DMG, the app bundles the scripts into
+`Timecop.app/Contents/Resources/scripts/` via an rsync build phase. In development
+(`DEBUG`), `AppState.scriptsDirectory` points directly to the repo root on disk.
+
+---
+
 ## System overview
 
 Two layers that share the same profile config:

@@ -34,9 +34,14 @@ targets:
         script: |
           set -e
           rsync -a --delete \
+            --exclude='.git' \
+            --exclude='macos' \
+            --exclude='docs' \
+            --exclude='tests' \
+            --exclude='*.md' \
+            --exclude='.env*' \
             --exclude='__pycache__' \
             --exclude='*.pyc' \
             --exclude='.venv' \
-            --exclude='tests' \
-            "${SRCROOT}/../../scripts/" \
+            "${SRCROOT}/../../" \
             "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/scripts/"
