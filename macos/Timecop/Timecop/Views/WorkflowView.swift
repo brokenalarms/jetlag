@@ -284,9 +284,15 @@ struct WorkflowView: View {
     // MARK: - Actions
 
     private func updateEnabledSteps() {
-        let available = Set(state.availableSteps)
-        state.enabledSteps = state.enabledSteps.intersection(available).union(available)
+        state.enabledSteps = state.enabledSteps.intersection(Set(state.availableSteps))
     }
+
+    private let pipelineTaskNames: [PipelineStep: String] = [
+        .tag: "tag",
+        .fixTimezone: "fix-timestamp",
+        .organize: "organize",
+        .gyroflow: "gyroflow"
+    ]
 
     private func runWorkflow() {
         state.clearLog()
@@ -302,6 +308,13 @@ struct WorkflowView: View {
         if hasImport {
             if state.skipCompanion { args.append("--skip-companion") }
             if !state.sourceDir.isEmpty { args.append(state.sourceDir) }
+        } else {
+            let taskArgs = state.availableSteps
+                .filter { $0 != .importFromCard && steps.contains($0) }
+                .compactMap { pipelineTaskNames[$0] }
+            if !taskArgs.isEmpty {
+                args += ["--tasks"] + taskArgs
+            }
         }
         if steps.contains(.fixTimezone) && !state.timezone.isEmpty {
             args += ["--timezone", state.timezone]

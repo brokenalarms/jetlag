@@ -21,7 +21,7 @@ import pytest
 
 SCRIPT_DIR = Path(__file__).parent.parent
 BASELINE_FILE = Path(__file__).parent / "perf_baseline.json"
-REGRESSION_THRESHOLD = 0.30  # 30% slower than baseline = regression
+REGRESSION_THRESHOLD = 0.05  # 5% slower than baseline = regression
 TIMED_RUNS = 3
 
 
