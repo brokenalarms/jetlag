@@ -34,10 +34,16 @@
 - batch files always pass through all args transparently
 - don't reference Claude or Claude.md
 - TESTING
-  - tests should be run as part of validating feature changes
+  - every commit that changes code for a feature or bug fix must be backed by a test covering that change
+  - tests must be run before committing any code change — do not commit if tests fail
+  - always run tests with fail fast: `pytest -x` (stop on first failure and address one at a time before continuing)
   - tests should not be updated without explicit confirmation, unless we use TDD to make the change, confirm that the the tests now break in the way expected, then update the test accordingly. Otherwise tests at this stage should not break from a change unless there is a regression, and the test should be used to identify this regression.
   - testing that returncode is 0 is not testing the actual behavior or effect of the code, just that it ran without error, so would make for a useless test
   - simarly testing result.stdout reveals nothing but what the logs said, which could lie. the changes to the fake test file need to be recorded before and after with actual/expected human readable messages.
+- COMMITS
+  - commits should be atomic: one feature change or bug fix per commit where possible
+  - related atomic commits may be grouped into a single PR
+  - never commit without first running tests with `pytest -x` and confirming they pass
 - SCENARIO/REGRESSION TESTS:
   - fix-media-timestamp:
     - if --overwrite-datetimeoriginal is specified, --timezone must be provided
