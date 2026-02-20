@@ -7,7 +7,7 @@ Update this file at the end of the session.
 
 ## Done recently
 
-- Added Timecop macOS SwiftUI app (`macos/Timecop/`) — profile editor, workflow runner, timezone picker, log output
+- Added Timecop macOS SwiftUI app (`app/macos/`) — profile editor, workflow runner, timezone picker, log output
 - Added `generate-gyroflow.py` / `batch-generate-gyroflow.py` for Gyroflow Toolbox FCP plugin
 - Integrated gyroflow step into `media-pipeline.py`
 - Extracted shared `lib/filesystem.py` utilities (find_media_files, parse_machine_output, cleanup_empty_parent_dirs)
