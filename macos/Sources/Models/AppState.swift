@@ -59,14 +59,6 @@ struct LogLine: Identifiable {
     }
 }
 
-enum DevConfig {
-    #if DEBUG
-    static let scriptsDirectory: String? = "\(NSHomeDirectory())/Developer/scripts"
-    #else
-    static let scriptsDirectory: String? = nil
-    #endif
-}
-
 @Observable
 final class AppState {
     var selectedTab: SidebarTab = .workflow
@@ -101,12 +93,8 @@ final class AppState {
     var currentProcess: Process?
 
     init() {
-        if let devPath = DevConfig.scriptsDirectory {
-            self.scriptsDirectory = devPath
-        } else {
-            self.scriptsDirectory = (Bundle.main.resourcePath! as NSString)
-                .appendingPathComponent("scripts")
-        }
+        self.scriptsDirectory = (Bundle.main.resourcePath! as NSString)
+            .appendingPathComponent("scripts")
         self.profilesFilePath = UserDefaults.standard.string(forKey: "profilesFilePath") ?? ""
     }
 

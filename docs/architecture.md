@@ -1,11 +1,32 @@
 # Architecture
 
+## Layout
+
+```
+/                         ← repo root
+├── scripts/              ← Python/shell scripts (work standalone, no knowledge of app)
+│   ├── *.py / *.sh
+│   ├── lib/              ← shared Python utilities
+│   ├── media-profiles.yaml  ← shared config (used by both scripts and app)
+│   └── tests/            ← script test suite (belongs with the scripts)
+├── macos/                ← macOS SwiftUI app (sibling to scripts/, not nested inside)
+│   ├── Sources/          ← Swift source files
+│   └── project.yml       ← XcodeGen project spec
+└── docs/                 ← documentation
+```
+
+`scripts/` and `macos/` are independent components that share `media-profiles.yaml`. The app reads config from and launches scripts in `scripts/`; the scripts have no knowledge of the app.
+
+At build time, the `Bundle scripts` build phase copies `scripts/` into `Contents/Resources/scripts/` inside the app bundle. `AppState.scriptsDirectory` always points to this bundled copy.
+
+---
+
 ## System overview
 
 Two layers that share the same profile config:
 
 1. **Python scripts** — CLI tools for timestamp fixing, tagging, organizing, gyroflow generation. Run standalone or via shell wrappers.
-2. **Timecop macOS app** (`macos/Timecop/`) — SwiftUI wrapper that reads the same `media-profiles.yaml`, edits profiles, and launches the scripts via `ScriptRunner`.
+2. **Jetlag macOS app** (`macos/`) — SwiftUI wrapper that reads the same `media-profiles.yaml`, edits profiles, and launches the scripts via `ScriptRunner`.
 
 ---
 
@@ -96,7 +117,7 @@ From ExifTool docs: integer QuickTime date/time fields should be UTC but cameras
 
 ---
 
-## macOS app (`macos/Timecop/`)
+## macOS app (`macos/`)
 
 ### State management
 
@@ -140,10 +161,10 @@ Profile editing tracks name separately from the model: `editingProfile: (name: S
 
 ## Testing
 
-Tests live in `tests/`. Run via `run-tests.py` (manages venv activation and pytest invocation).
+Tests live in `scripts/tests/`. Run via `run-tests.py` at the repo root.
 
 - **Regression tests** (`test_fix_media_timestamp.py` etc.) — assert actual file state before and after, not just exit codes or stdout. Structured as "record before → run script → compare after" with human-readable expected vs actual diffs.
-- **Performance tests** (`test_performance.py`) — snapshot harness. Measures median wall-clock time over 3 runs per script, compares to a saved baseline (`tests/perf_baseline.json`). Threshold: **5% slower than baseline = regression**. Delete `perf_baseline.json` to re-record after intentional perf improvements.
+- **Performance tests** (`test_performance.py`) — snapshot harness. Measures median wall-clock time over 3 runs per script, compares to a saved baseline (`scripts/tests/perf_baseline.json`). Threshold: **5% slower than baseline = regression**. Delete `perf_baseline.json` to re-record after intentional perf improvements.
 
 Testing rules:
 - Testing `returncode == 0` is not testing behavior — it only confirms the script didn't crash.

@@ -2,6 +2,10 @@
   - docs/architecture.md: system overview, two-layer architecture, script flow, media-pipeline, data flow (@@), shared utilities
   - docs/DEVELOPMENT.md: development principles, source of truth hierarchy, timezone handling, exiftool best practices
   - TODO.md: sliding context window — current work in progress, known bugs, next tasks (read at session start)
+- LAYOUT — two sibling components at repo root:
+  - scripts/ — Python/shell scripts, lib/, media-profiles.yaml, tests/. Work standalone with no knowledge of the app.
+  - macos/ — SwiftUI app. Sibling to scripts/, NOT nested inside it. Reads media-profiles.yaml and launches scripts.
+  - docs/ — documentation. CLAUDE.md, README.md, TODO.md live at repo root.
 - the goal of these scripts are to manage workflow for importing videos from different cameras, so that they all appear interleaved with each other in Final Cut Pro (FCP) at the time at which they were initially filmed.
 - the time doesn't have to look the same as if I shot it, but the goal is for the files to maintain time relative to each other
 - timezone is the timezone a group of videos is shot in, but is a concern unrelated to the profiles in media-profiles which are camera profiles and could be shot in any number of timezones.
@@ -78,7 +82,7 @@
   - checks for stale exiftool_tmp directories at startup (exiftool fails silently if these exist)
   - generate-gyroflow.py: generates .gyroflow project files for Gyroflow Toolbox FCP plugin, non-fatal if no gyro data
   - batch-generate-gyroflow.py: batch wrapper that scans a directory and runs generate-gyroflow.py on each file
-  - shared utilities in lib/filesystem.py: find_media_files(), parse_machine_output(), cleanup_empty_parent_dirs()
+  - shared utilities in scripts/lib/filesystem.py: find_media_files(), parse_machine_output(), cleanup_empty_parent_dirs()
   - summary at end: total processed, succeeded, changed, unchanged, failed (with list)
 - CAMERA QUIRKS
   - GoPro: FAT filesystem stores modification time in camera's local timezone (no TZ info). If camera is set to +02:00 but Mac is +09:00, birth/modify times will be 7 hours off. MediaCreateDate is UTC and correct.
