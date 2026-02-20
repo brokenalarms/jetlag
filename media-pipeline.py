@@ -207,7 +207,8 @@ def process_file(
     location_args: list[str],
     apply: bool,
     verbose: bool,
-    gyroflow_config: Optional[dict] = None
+    gyroflow_config: Optional[dict] = None,
+    tasks: Optional[set] = None
 ) -> dict:
     """Process a single file through the pipeline.
 
@@ -218,7 +219,7 @@ def process_file(
     file_changed = False
 
     # Step 1: Tag media (if profile has tags/make/model)
-    if profile:
+    if (tasks is None or "tag" in tasks) and profile:
         tags = ",".join(profile.get("tags", []))
         exif = profile.get("exif", {})
         make = exif.get("make", "")
@@ -233,44 +234,47 @@ def process_file(
                 file_changed = True
 
     # Step 2: Fix video timestamp
-    print("🔧 Fixing timestamp...")
-    output, changed, rc = run_fix_timestamp(file_path, location_args, apply, verbose)
-    for line in output.split("\n"):
-        print(f"  {line}")
+    if tasks is None or "fix-timestamp" in tasks:
+        print("🔧 Fixing timestamp...")
+        output, changed, rc = run_fix_timestamp(file_path, location_args, apply, verbose)
+        for line in output.split("\n"):
+            print(f"  {line}")
 
-    if rc != 0:
-        print(f"   ❌ Timestamp fix failed for {file_path.name}")
-        result["failed"] = True
-        result["error"] = "Timestamp fix failed"
-        return result
+        if rc != 0:
+            print(f"   ❌ Timestamp fix failed for {file_path.name}")
+            result["failed"] = True
+            result["error"] = "Timestamp fix failed"
+            return result
 
-    if changed:
-        file_changed = True
+        if changed:
+            file_changed = True
 
     # Step 3: Organize by date
-    print("📁 Organizing by date...")
+    dest = ""
+    if tasks is None or "organize" in tasks:
+        print("📁 Organizing by date...")
 
-    template = f"{{{{YYYY}}}}/{group}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
-    output, action, dest, rc = run_organize_by_date(file_path, target_dir, template, apply, verbose)
+        template = f"{{{{YYYY}}}}/{group}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
+        output, action, dest, rc = run_organize_by_date(file_path, target_dir, template, apply, verbose)
 
-    # Print stderr output (user-visible messages)
-    if output:
-        for line in output.split("\n"):
-            if line.strip():
-                print(line)
+        # Print stderr output (user-visible messages)
+        if output:
+            for line in output.split("\n"):
+                if line.strip():
+                    print(line)
 
-    if rc != 0:
-        print(f"   ❌ Organization failed for {file_path.name}")
-        result["failed"] = True
-        result["error"] = "Organization failed"
-        return result
+        if rc != 0:
+            print(f"   ❌ Organization failed for {file_path.name}")
+            result["failed"] = True
+            result["error"] = "Organization failed"
+            return result
 
-    if action in ("copied", "moved", "overwrote"):
-        file_changed = True
+        if action in ("copied", "moved", "overwrote"):
+            file_changed = True
 
     # Step 4: Generate gyroflow project (if enabled)
     gyroflow_enabled = profile.get("gyroflow_enabled", False) if profile else False
-    if gyroflow_enabled and gyroflow_config:
+    if (tasks is None or "gyroflow" in tasks) and gyroflow_enabled and gyroflow_config:
         print("🎥 Generating gyroflow project...")
 
         # Use the dest path from organize (file may have moved)
@@ -330,6 +334,11 @@ def main():
     parser.add_argument("--group", help="Group name for organizing dates (required)")
     parser.add_argument("--apply", action="store_true", help="Apply changes (default: dry run)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed processing info")
+    parser.add_argument(
+        "--tasks", nargs="+",
+        choices=["tag", "fix-timestamp", "organize", "gyroflow"],
+        help="Pipeline steps to run (default: all)"
+    )
 
     args = parser.parse_args()
 
@@ -442,6 +451,7 @@ def main():
     }
 
     gyroflow_config = full_config.get("gyroflow")
+    tasks = set(args.tasks) if args.tasks else None
 
     for i, file_path in enumerate(files, 1):
         stats["processed"] += 1
@@ -457,7 +467,8 @@ def main():
             location_args,
             args.apply,
             args.verbose,
-            gyroflow_config=gyroflow_config
+            gyroflow_config=gyroflow_config,
+            tasks=tasks
         )
 
         if result["failed"]:

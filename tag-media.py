@@ -52,9 +52,8 @@ def apply_finder_tags(file_path: str, tags: List[str], dry_run: bool = False) ->
 
         # Use tag command to add only missing tags (unless dry run)
         if not dry_run:
-            for tag in tags_to_add:
-                subprocess.run(['tag', '--add', tag, file_path],
-                              capture_output=True, check=True)
+            subprocess.run(['tag', '--add', ','.join(tags_to_add), file_path],
+                          capture_output=True, check=True)
         return True, tags_to_add
     except subprocess.CalledProcessError as e:
         print(f"Warning: Failed to apply tags to {file_path}: {e}", file=sys.stderr)

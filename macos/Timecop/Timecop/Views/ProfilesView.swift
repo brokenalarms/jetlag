@@ -3,7 +3,7 @@ import SwiftUI
 struct ProfilesView: View {
     @Bindable var state: AppState
     @State private var selectedProfile: String?
-    @State private var editingProfile: MediaProfile?
+    @State private var editingProfile: (name: String, profile: MediaProfile)?
     @State private var isCreatingNew = false
     @State private var showDeleteConfirmation = false
 
@@ -14,11 +14,12 @@ struct ProfilesView: View {
 
             Divider()
 
-            if let editingProfile {
+            if let (name, profile) = editingProfile {
                 ProfileEditorView(
-                    profile: editingProfile,
+                    profileName: name,
+                    profile: profile,
                     isNew: isCreatingNew,
-                    onSave: { saved in saveProfile(saved) },
+                    onSave: { savedName, savedProfile in saveProfile(name: savedName, profile: savedProfile) },
                     onCancel: { self.editingProfile = nil; isCreatingNew = false }
                 )
                 .frame(maxWidth: .infinity)
@@ -63,9 +64,8 @@ struct ProfilesView: View {
             }
             .onChange(of: selectedProfile) { _, newValue in
                 guard !isCreatingNew else { return }
-                if let name = newValue, var profile = state.profile(named: name) {
-                    profile.name = name
-                    editingProfile = profile
+                if let name = newValue, let profile = state.profile(named: name) {
+                    editingProfile = (name: name, profile: profile)
                 }
             }
 
@@ -74,7 +74,7 @@ struct ProfilesView: View {
                 Button {
                     isCreatingNew = true
                     selectedProfile = nil
-                    editingProfile = MediaProfile(name: "new-profile")
+                    editingProfile = (name: "new-profile", profile: MediaProfile())
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -107,21 +107,21 @@ struct ProfilesView: View {
         }
     }
 
-    private func saveProfile(_ profile: MediaProfile) {
+    private func saveProfile(name: String, profile: MediaProfile) {
         guard state.profilesConfig != nil else { return }
 
         if isCreatingNew {
-            state.profilesConfig?.profiles[profile.name] = profile
+            state.profilesConfig?.profiles[name] = profile
         } else if let oldName = selectedProfile {
-            if oldName != profile.name {
+            if oldName != name {
                 state.profilesConfig?.profiles.removeValue(forKey: oldName)
             }
-            state.profilesConfig?.profiles[profile.name] = profile
+            state.profilesConfig?.profiles[name] = profile
         }
 
         writeProfiles()
-        selectedProfile = profile.name
-        editingProfile = profile
+        selectedProfile = name
+        editingProfile = (name: name, profile: profile)
         isCreatingNew = false
     }
 
@@ -147,9 +147,10 @@ struct ProfilesView: View {
 }
 
 struct ProfileEditorView: View {
+    @State var profileName: String
     @State var profile: MediaProfile
     let isNew: Bool
-    let onSave: (MediaProfile) -> Void
+    let onSave: (String, MediaProfile) -> Void
     let onCancel: () -> Void
 
     var body: some View {
@@ -157,7 +158,7 @@ struct ProfileEditorView: View {
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
                 GridRow {
                     Text("Name").gridColumnAlignment(.trailing)
-                    TextField("profile-name", text: $profile.name)
+                    TextField("profile-name", text: $profileName)
                         .textFieldStyle(.roundedBorder)
                 }
 
@@ -234,10 +235,10 @@ struct ProfileEditorView: View {
                 Spacer()
                 Button("Cancel") { onCancel() }
                     .keyboardShortcut(.escape)
-                Button(isNew ? "Create" : "Update") { onSave(profile) }
+                Button(isNew ? "Create" : "Update") { onSave(profileName, profile) }
                     .keyboardShortcut(.return, modifiers: .command)
                     .buttonStyle(.borderedProminent)
-                    .disabled(profile.name.isEmpty)
+                    .disabled(profileName.isEmpty)
             }
             .padding()
             .background(.bar)

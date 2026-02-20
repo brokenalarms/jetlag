@@ -73,3 +73,7 @@
   - GoPro: FAT filesystem stores modification time in camera's local timezone (no TZ info). If camera is set to +02:00 but Mac is +09:00, birth/modify times will be 7 hours off. MediaCreateDate is UTC and correct.
   - macOS: when copying from SD card, birth time is often preserved from source FAT filesystem (not reset to copy time). This means birth time reflects camera's wrong timezone.
   - birth time shift of ~7 hours (or other non-standard offset) indicates camera timezone mismatch, not a bug
+- TODO.md
+  - TODO.md is a sliding context window for fresh agents — it captures current work in progress, known bugs, and next tasks
+  - at the start of each session, read TODO.md to understand the current state and pick ONE task from it to work on
+  - update TODO.md at the end of a session to reflect what was done and what remains

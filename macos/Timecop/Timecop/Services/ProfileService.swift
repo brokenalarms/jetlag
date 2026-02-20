@@ -73,12 +73,7 @@ struct ProfileService {
             )
         }
 
-        var result = config
-        for (name, _) in result.profiles {
-            result.profiles[name]?.name = name
-        }
-
-        return result
+        return config
     }
 
     static func write(_ config: ProfilesConfig, to path: String) throws {

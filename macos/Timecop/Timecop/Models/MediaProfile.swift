@@ -63,10 +63,7 @@ enum MediaType: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-struct MediaProfile: Codable, Identifiable {
-    var id: String { name }
-
-    var name: String = ""
+struct MediaProfile: Codable {
     var type: MediaType?
     var sourceDir: String?
     var importDir: String?

@@ -310,6 +310,19 @@ def get_file_system_timestamps(file_path: str) -> Dict[str, str]:
     except subprocess.CalledProcessError:
         return {"birth": "", "modify": ""}
 
+def write_exif_fields(file_path: str, field_args: list) -> bool:
+    """Write multiple EXIF fields in a single exiftool call."""
+    try:
+        cmd = ["exiftool", "-P", "-overwrite_original"] + field_args + [file_path]
+        subprocess.run(cmd, capture_output=True, check=True)
+        if file_path in _exif_cache:
+            del _exif_cache[file_path]
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error writing EXIF fields: {e}", file=sys.stderr)
+        return False
+
+
 def write_datetime_original(file_path: str, datetime_with_tz: str) -> bool:
     """Write DateTimeOriginal to file if missing"""
     try:
@@ -1083,23 +1096,29 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
         (overwrite_datetimeoriginal and current_data["datetime_original_str"])
     )
 
+    if should_write_datetime_original and overwrite_datetimeoriginal and current_data["exif"].get("DateTimeOriginal"):
+        print("   ⚠️  Overwriting existing DateTimeOriginal (--overwrite-datetimeoriginal flag)")
+
+    # Build all EXIF writes and apply in one exiftool call
+    field_args = []
     if should_write_datetime_original:
-        if overwrite_datetimeoriginal and current_data["exif"].get("DateTimeOriginal"):
-            print("   ⚠️  Overwriting existing DateTimeOriginal (--overwrite-datetimeoriginal flag)")
-        if not write_datetime_original(file_path, current_data["datetime_original_str"]):
-            print("   ❌ Failed to write DateTimeOriginal")
-            success = False
-
-    # Write Keys:CreationDate if needed (always uses original timezone)
+        field_args.append(f"-DateTimeOriginal={current_data['datetime_original_str']}")
     if changes.get("keys_creationdate"):
-        if not write_keys_creationdate(file_path, datetime_original):
-            print("   ❌ Failed to write Keys:CreationDate")
-            success = False
-
-    # Heal QuickTime CreateDate if needed
+        keys_value = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
+        keys_value = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', keys_value)
+        field_args.append(f"-Keys:CreationDate={keys_value}")
     if changes.get("quicktime_createdate"):
-        if not write_quicktime_createdate(file_path, datetime_original):
-            print("   ❌ Failed to heal QuickTime CreateDate")
+        utc_time = datetime_original.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
+        field_args.append(f"-QuickTime:CreateDate={utc_time}")
+        field_args.append(f"-QuickTime:MediaCreateDate={utc_time}")
+    if field_args:
+        if not write_exif_fields(file_path, field_args):
+            if should_write_datetime_original:
+                print("   ❌ Failed to write DateTimeOriginal")
+            if changes.get("keys_creationdate"):
+                print("   ❌ Failed to write Keys:CreationDate")
+            if changes.get("quicktime_createdate"):
+                print("   ❌ Failed to heal QuickTime CreateDate")
             success = False
 
     # Update file system timestamps if needed
