@@ -48,6 +48,7 @@
   - commits should be atomic: one feature change or bug fix per commit where possible
   - related atomic commits may be grouped into a single PR
   - never commit without first running tests with `pytest -x` and confirming they pass
+  - one branch per PR — never reuse a branch that has already been merged into main; create a new branch for each new PR
 - SCENARIO/REGRESSION TESTS:
   - fix-media-timestamp:
     - if --overwrite-datetimeoriginal is specified, --timezone must be provided
