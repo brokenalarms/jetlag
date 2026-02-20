@@ -161,7 +161,7 @@ Profile editing tracks name separately from the model: `editingProfile: (name: S
 
 ## Testing
 
-Tests live in `scripts/tests/`. Run via `run-tests.py` at the repo root.
+Tests live in `scripts/tests/`. Run via `scripts/run-tests.py`.
 
 - **Regression tests** (`test_fix_media_timestamp.py` etc.) — assert actual file state before and after, not just exit codes or stdout. Structured as "record before → run script → compare after" with human-readable expected vs actual diffs.
 - **Performance tests** (`test_performance.py`) — snapshot harness. Measures median wall-clock time over 3 runs per script, compares to a saved baseline (`scripts/tests/perf_baseline.json`). Threshold: **5% slower than baseline = regression**. Delete `perf_baseline.json` to re-record after intentional perf improvements.
