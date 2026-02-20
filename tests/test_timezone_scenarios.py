@@ -12,19 +12,19 @@ import subprocess
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 # Import hyphenated module name
 import importlib.util
 spec = importlib.util.spec_from_file_location(
     "fix_media_timestamp",
-    str(Path(__file__).parent.parent / "fix-media-timestamp.py")
+    str(Path(__file__).parent.parent / "scripts" / "fix-media-timestamp.py")
 )
 fmt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fmt)
 
 
-SCRIPT_DIR = Path(__file__).parent.parent
+SCRIPT_DIR = Path(__file__).parent.parent / "scripts"
 
 
 class TestTimezoneScenarios:

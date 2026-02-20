@@ -1,3 +1,7 @@
+- DOCS — reference docs in docs/ for deeper context; add to agent context as needed:
+  - docs/architecture.md: system overview, two-layer architecture, script flow, media-pipeline, data flow (@@), shared utilities
+  - docs/DEVELOPMENT.md: development principles, source of truth hierarchy, timezone handling, exiftool best practices
+  - docs/TODO.md: sliding context window — current work in progress, known bugs, next tasks (read at session start)
 - the goal of these scripts are to manage workflow for importing videos from different cameras, so that they all appear interleaved with each other in Final Cut Pro (FCP) at the time at which they were initially filmed.
 - the time doesn't have to look the same as if I shot it, but the goal is for the files to maintain time relative to each other
 - timezone is the timezone a group of videos is shot in, but is a concern unrelated to the profiles in media-profiles which are camera profiles and could be shot in any number of timezones.

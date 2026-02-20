@@ -1,0 +1,31 @@
+name: Timecop
+options:
+  bundleIdPrefix: com.daniellawrence
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  minimumXcodeGenVersion: "2.38.0"
+packages:
+  Yams:
+    url: https://github.com/jpsim/Yams
+    from: "5.0.0"
+targets:
+  Timecop:
+    type: application
+    platform: macOS
+    sources:
+      - Timecop
+    dependencies:
+      - package: Yams
+      - sdk: MapKit.framework
+      - sdk: CoreLocation.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.daniellawrence.Timecop
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.video
+        CODE_SIGN_ENTITLEMENTS: Timecop/Timecop.entitlements

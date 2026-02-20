@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 
-SCRIPT_DIR = Path(__file__).parent.parent
+SCRIPT_DIR = Path(__file__).parent.parent / "scripts"
 
 
 class TestOrganizeByDate:
