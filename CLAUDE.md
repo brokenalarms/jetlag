@@ -49,6 +49,7 @@
   - testing that returncode is 0 is not testing the actual behavior or effect of the code, just that it ran without error, so would make for a useless test
   - simarly testing result.stdout reveals nothing but what the logs said, which could lie. the changes to the fake test file need to be recorded before and after with actual/expected human readable messages.
 - COMMITS
+  - before committing, always fetch and review the current state of the branch (`git fetch origin <branch>` then `git log origin/main..origin/<branch>`) to understand what has already been pushed — never re-push changes that are already on the remote
   - commits should be atomic: one feature change or bug fix per commit where possible
   - related atomic commits may be grouped into a single PR
   - never commit without first running tests with `pytest -x` and confirming they pass
