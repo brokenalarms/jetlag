@@ -35,7 +35,7 @@ targets:
           set -e
           rsync -a --delete \
             --exclude='.git' \
-            --exclude='macos' \
+            --exclude='app' \
             --exclude='docs' \
             --exclude='tests' \
             --exclude='*.md' \
