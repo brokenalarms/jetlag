@@ -14,7 +14,7 @@ targets:
     type: application
     platform: macOS
     sources:
-      - Timecop
+      - Jetlag
     dependencies:
       - package: Yams
       - sdk: MapKit.framework
@@ -28,14 +28,14 @@ targets:
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.video
-        CODE_SIGN_ENTITLEMENTS: Timecop/Timecop.entitlements
+        CODE_SIGN_ENTITLEMENTS: Jetlag/Jetlag.entitlements
     postBuildScripts:
       - name: Bundle scripts
         script: |
           set -e
           rsync -a --delete \
             --exclude='.git' \
-            --exclude='app' \
+            --exclude='macos' \
             --exclude='docs' \
             --exclude='tests' \
             --exclude='*.md' \
@@ -43,5 +43,5 @@ targets:
             --exclude='__pycache__' \
             --exclude='*.pyc' \
             --exclude='.venv' \
-            "${SRCROOT}/../../" \
+            "${SRCROOT}/../" \
             "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/scripts/"

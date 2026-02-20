@@ -10,15 +10,15 @@ This repo has two independent components that each work standalone:
 ├── lib/                  ← shared Python library
 ├── tests/                ← test suite
 ├── media-profiles.yaml   ← shared config (used by both scripts and app)
-├── app/macos/            ← macOS SwiftUI app (separate, bundles scripts on distribution)
+├── macos/                ← macOS SwiftUI app (separate, bundles scripts on distribution)
 └── docs/                 ← documentation
 ```
 
-Scripts live at the repo root — not in a `scripts/` subdirectory. `app/macos/` is a
+Scripts live at the repo root — not in a `scripts/` subdirectory. `macos/` is a
 peer of the scripts, not nested inside them.
 
 When distributed as a DMG, the app bundles the scripts into
-`Timecop.app/Contents/Resources/scripts/` via an rsync build phase. In development
+`Jetlag.app/Contents/Resources/scripts/` via an rsync build phase. In development
 (`DEBUG`), `AppState.scriptsDirectory` points directly to the repo root on disk.
 
 ---
@@ -28,7 +28,7 @@ When distributed as a DMG, the app bundles the scripts into
 Two layers that share the same profile config:
 
 1. **Python scripts** — CLI tools for timestamp fixing, tagging, organizing, gyroflow generation. Run standalone or via shell wrappers.
-2. **Timecop macOS app** (`app/macos/`) — SwiftUI wrapper that reads the same `media-profiles.yaml`, edits profiles, and launches the scripts via `ScriptRunner`.
+2. **Jetlag macOS app** (`macos/`) — SwiftUI wrapper that reads the same `media-profiles.yaml`, edits profiles, and launches the scripts via `ScriptRunner`.
 
 ---
 
@@ -119,7 +119,7 @@ From ExifTool docs: integer QuickTime date/time fields should be UTC but cameras
 
 ---
 
-## macOS app (`app/macos/`)
+## macOS app (`macos/`)
 
 ### State management
 

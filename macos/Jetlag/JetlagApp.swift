@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct TimcopApp: App {
+struct JetlagApp: App {
     @State private var state = AppState()
 
     var body: some Scene {
