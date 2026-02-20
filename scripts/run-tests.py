@@ -11,14 +11,14 @@ from pathlib import Path
 def main():
     """Run all tests"""
     script_dir = Path(__file__).parent
-    tests_dir = script_dir / "tests"
+    tests_dir = script_dir / "scripts" / "tests"
 
     # Check if pytest is available
     try:
         import pytest
     except ImportError:
         print("Error: pytest not found. Install with:")
-        print("  pip install -r tests/requirements.txt")
+        print("  pip install -r scripts/tests/requirements.txt")
         return 1
 
     # Run pytest
