@@ -1,4 +1,4 @@
-name: Timecop
+name: Jetlag
 options:
   bundleIdPrefix: com.daniellawrence
   deploymentTarget:
@@ -10,7 +10,7 @@ packages:
     url: https://github.com/jpsim/Yams
     from: "5.0.0"
 targets:
-  Timecop:
+  Jetlag:
     type: application
     platform: macOS
     sources:
@@ -21,7 +21,7 @@ targets:
       - sdk: CoreLocation.framework
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.daniellawrence.Timecop
+        PRODUCT_BUNDLE_IDENTIFIER: com.daniellawrence.Jetlag
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
