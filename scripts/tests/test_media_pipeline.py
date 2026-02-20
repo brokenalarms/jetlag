@@ -17,7 +17,7 @@ from typing import Optional
 import pytest
 import yaml
 
-SCRIPT_DIR = Path(__file__).parent.parent / "scripts"
+SCRIPT_DIR = Path(__file__).parent.parent
 MEDIA_PIPELINE = SCRIPT_DIR / "media-pipeline.sh"
 VENV_ACTIVATE = SCRIPT_DIR / "media-import" / "bin" / "activate"
 

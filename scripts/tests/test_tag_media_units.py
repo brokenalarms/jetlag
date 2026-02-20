@@ -12,13 +12,13 @@ import subprocess
 from pathlib import Path
 
 # Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import hyphenated module name
 import importlib.util
 spec = importlib.util.spec_from_file_location(
     "tag_media",
-    str(Path(__file__).parent.parent / "scripts" / "tag-media.py")
+    str(Path(__file__).parent.parent / "tag-media.py")
 )
 tm = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tm)

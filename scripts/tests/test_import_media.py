@@ -12,13 +12,13 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from lib.filesystem import cleanup_empty_parent_dirs
 
 import importlib.util
 spec = importlib.util.spec_from_file_location(
     "import_media",
-    str(Path(__file__).parent.parent / "scripts" / "import-media.py")
+    str(Path(__file__).parent.parent / "import-media.py")
 )
 im = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(im)
