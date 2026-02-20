@@ -1,3 +1,7 @@
+- DOCS — reference docs in docs/ for deeper context; add to agent context as needed:
+  - docs/architecture.md: system overview, two-layer architecture, script flow, media-pipeline, data flow (@@), shared utilities
+  - docs/DEVELOPMENT.md: development principles, source of truth hierarchy, timezone handling, exiftool best practices
+  - TODO.md: sliding context window — current work in progress, known bugs, next tasks (read at session start)
 - the goal of these scripts are to manage workflow for importing videos from different cameras, so that they all appear interleaved with each other in Final Cut Pro (FCP) at the time at which they were initially filmed.
 - the time doesn't have to look the same as if I shot it, but the goal is for the files to maintain time relative to each other
 - timezone is the timezone a group of videos is shot in, but is a concern unrelated to the profiles in media-profiles which are camera profiles and could be shot in any number of timezones.
@@ -44,6 +48,7 @@
   - commits should be atomic: one feature change or bug fix per commit where possible
   - related atomic commits may be grouped into a single PR
   - never commit without first running tests with `pytest -x` and confirming they pass
+  - one branch per PR — never reuse a branch that has already been merged into main; create a new branch for each new PR
 - SCENARIO/REGRESSION TESTS:
   - fix-media-timestamp:
     - if --overwrite-datetimeoriginal is specified, --timezone must be provided
