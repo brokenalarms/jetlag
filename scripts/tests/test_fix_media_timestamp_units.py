@@ -14,13 +14,13 @@ import subprocess
 import pytest
 
 # Add parent directory to path to import the script
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import hyphenated module name
 import importlib.util
 spec = importlib.util.spec_from_file_location(
     "fix_media_timestamp",
-    str(Path(__file__).parent.parent / "scripts" / "fix-media-timestamp.py")
+    str(Path(__file__).parent.parent / "fix-media-timestamp.py")
 )
 fmt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fmt)

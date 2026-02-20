@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-SCRIPT_DIR = Path(__file__).parent.parent / "scripts"
+SCRIPT_DIR = Path(__file__).parent.parent
 GENERATE_GYROFLOW = SCRIPT_DIR / "generate-gyroflow.sh"
 VENV_ACTIVATE = SCRIPT_DIR / "media-import" / "bin" / "activate"
 PROFILES_FILE = SCRIPT_DIR / "media-profiles.yaml"
