@@ -133,6 +133,21 @@ final class AppState {
         return steps
     }
 
+    func resetWorkflowFields(for profileName: String) {
+        subfolder = ""
+        timezone = ""
+        useTimezonePicker = true
+        skipCompanion = false
+        preserveSource = true
+        applyMode = false
+        if let profile = profile(named: profileName) {
+            sourceDir = profile.sourceDir ?? ""
+        } else {
+            sourceDir = ""
+        }
+        enabledSteps = Set(availableSteps)
+    }
+
     func clearLog() {
         logOutput = []
     }

@@ -21,17 +21,15 @@ struct WorkflowView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 16) {
-                    profileSelector
-                    if !state.selectedProfile.isEmpty {
-                        stepsPipeline
-                        stepOptions
-                        executionBar
-                    }
+            VStack(spacing: 16) {
+                profileSelector
+                if !state.selectedProfile.isEmpty {
+                    stepsPipeline
+                    stepOptions
+                    executionBar
                 }
-                .padding()
             }
+            .padding()
 
             LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
         }
@@ -83,11 +81,7 @@ struct WorkflowView: View {
                 Text("Profile").gridColumnAlignment(.trailing)
                 ProfilePicker(selection: $state.selectedProfile, state: state)
                     .onChange(of: state.selectedProfile) { _, newValue in
-                        if let profile = state.profile(named: newValue),
-                           let sourceDir = profile.sourceDir {
-                            state.sourceDir = sourceDir
-                        }
-                        updateEnabledSteps()
+                        state.resetWorkflowFields(for: newValue)
                     }
             }
         }
@@ -298,10 +292,6 @@ struct WorkflowView: View {
     }
 
     // MARK: - Actions
-
-    private func updateEnabledSteps() {
-        state.enabledSteps = state.enabledSteps.intersection(Set(state.availableSteps))
-    }
 
     private let pipelineTaskNames: [PipelineStep: String] = [
         .tag: "tag",
