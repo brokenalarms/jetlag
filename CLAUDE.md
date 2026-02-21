@@ -49,8 +49,7 @@
   - testing that returncode is 0 is not testing the actual behavior or effect of the code, just that it ran without error, so would make for a useless test
   - simarly testing result.stdout reveals nothing but what the logs said, which could lie. the changes to the fake test file need to be recorded before and after with actual/expected human readable messages.
 - COMMITS
-  - before doing ANY work on a branch, check if it's already been merged: `git fetch origin <branch>` then `git branch -r --merged origin/main | grep <branch>` — if the branch appears in the output it is already merged; stop and ask for a new branch name before proceeding
-  - after confirming the branch is not merged, review what's already on it: `git log origin/main..origin/<branch>` — understand what's already pushed before writing any code or making any commits
+  - before committing, always fetch and check the branch: `git fetch origin <branch>` then `git log origin/main..origin/<branch>` to see what's already pushed, and `git branch -r --merged origin/main | grep <branch>` to confirm it hasn't been merged — if it has, create a new branch before committing
   - commits should be atomic: one feature change or bug fix per commit where possible
   - related atomic commits may be grouped into a single PR
   - never commit without first running tests with `pytest -x` and confirming they pass
