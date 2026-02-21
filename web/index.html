@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Jetlag — Multi-camera sync for Final Cut Pro</title>
-  <meta name="description" content="Jetlag automatically fixes timestamps across GoPro, iPhone, Insta360 and more so your footage lands in perfect order in Final Cut Pro.">
+  <title>Jetlag — Multi-camera timestamp sync for video editors</title>
+  <meta name="description" content="Jetlag fixes timestamps across GoPro, iPhone, Insta360 and more so your footage lands in perfect chronological order in Final Cut Pro, Premiere Pro, DaVinci Resolve, or any NLE.">
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -271,6 +271,11 @@
       <span class="cam-badge"><span class="cam-dot bg-blue"></span>iPhone</span>
       <span class="cam-badge"><span class="cam-dot bg-[#d2a8ff]"></span>Insta360</span>
       <span class="cam-badge"><span class="cam-dot bg-[#f78166]"></span>Any camera</span>
+      <span class="cam-badge" style="border-color:#3fb95044;color:#6e7681">→</span>
+      <span class="cam-badge"><span class="cam-dot bg-[#3fb950]"></span>Final Cut Pro</span>
+      <span class="cam-badge"><span class="cam-dot bg-[#e8a87c]"></span>Premiere Pro</span>
+      <span class="cam-badge"><span class="cam-dot bg-[#58a6ff]"></span>DaVinci Resolve</span>
+      <span class="cam-badge"><span class="cam-dot bg-[#8b949e]"></span>Any NLE</span>
     </div>
 
     <!-- Large icon -->
@@ -328,7 +333,8 @@
     </h1>
     <p class="text-lg sm:text-xl text-muted max-w-2xl mx-auto mb-10 animate-fade-up3">
       Jetlag fixes timestamps across every camera in your kit — GoPro, iPhone, Insta360, and more —
-      so your footage lands in the right order the moment you import into Final Cut Pro.
+      so your footage lands in the right order the moment you import into your editor —
+      Final Cut Pro, Premiere Pro, DaVinci Resolve, or anything else that reads file timestamps.
     </p>
 
     <!-- CTA buttons -->
@@ -366,7 +372,7 @@
 <span class="kw">→</span> GH010044.MP4    <span class="ok">✓ fixed +02:00→+09:00  born 2024-03-15 11:02:58</span>
 
 <span class="hl">Done.</span>  6 processed · 4 changed · 2 unchanged · <span class="ok">0 failed</span>
-<span class="cmt"># Import into FCP — clips appear in chronological order ✓</span>
+<span class="cmt"># Import into your editor — clips appear in chronological order ✓</span>
 </pre>
     </div>
   </section>
@@ -392,8 +398,8 @@
         <div class="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center mb-4">
           <svg width="20" height="20" viewBox="0 0 16 16" fill="#3fb950"><path d="M1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25v-8.5C0 2.784.784 2 1.75 2ZM1.5 12.251c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V5.809L8.38 9.397a.75.75 0 0 1-.76 0L1.5 5.809v6.442Zm13-8.181v-.32a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25v.32L8 7.88l6.5-3.81Z"/></svg>
         </div>
-        <h3 class="font-semibold text-fg mb-2">Final Cut Pro native</h3>
-        <p class="text-sm text-muted leading-relaxed">Sets <span class="tc text-xs text-fg/80">Keys:CreationDate</span> and file birth time so FCP's "Content Created" field is always correct — no manual sorting, no timecode drift.</p>
+        <h3 class="font-semibold text-fg mb-2">Works with any NLE</h3>
+        <p class="text-sm text-muted leading-relaxed">Fixes file birth time, <span class="tc text-xs text-fg/80">DateTimeOriginal</span>, and QuickTime UTC fields — the timestamp data every editor reads. Deep FCP support (<span class="tc text-xs text-fg/80">Keys:CreationDate</span>) included.</p>
       </div>
 
       <!-- Feature 3 -->
@@ -411,7 +417,7 @@
           <svg width="20" height="20" viewBox="0 0 16 16" fill="#f78166"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm4.879-2.773 4.264 2.559a.25.25 0 0 1 0 .428l-4.264 2.559A.25.25 0 0 1 6 10.559V5.442a.25.25 0 0 1 .379-.215Z"/></svg>
         </div>
         <h3 class="font-semibold text-fg mb-2">Gyroflow integration</h3>
-        <p class="text-sm text-muted leading-relaxed">Automatically generates <span class="tc text-xs text-fg/80">.gyroflow</span> project files for every clip with gyro data, ready for the Gyroflow Toolbox FCP plugin.</p>
+        <p class="text-sm text-muted leading-relaxed">Automatically generates <span class="tc text-xs text-fg/80">.gyroflow</span> project files for every clip with gyro data, ready for Gyroflow Toolbox (FCP) or standalone Gyroflow.</p>
       </div>
 
       <!-- Feature 5 -->
@@ -476,8 +482,8 @@
         <div class="flex gap-5 items-start">
           <div class="step-num">4</div>
           <div>
-            <h3 class="font-semibold text-fg mb-1">Import into Final Cut Pro</h3>
-            <p class="text-sm text-muted leading-relaxed">Drag your folder into FCP. "Content Created" is set correctly for every clip. Multicam clips, smart collections, and timeline sorting all work with zero manual intervention.</p>
+            <h3 class="font-semibold text-fg mb-1">Import into your editor</h3>
+            <p class="text-sm text-muted leading-relaxed">Drag your folder into Final Cut Pro, Premiere Pro, DaVinci Resolve, or any NLE. File timestamps are correct, so clips sort chronologically with zero manual intervention.</p>
           </div>
         </div>
 
@@ -485,7 +491,7 @@
 
       <!-- Timeline visual -->
       <div class="mt-16 card-glow p-6">
-        <p class="text-xs text-muted mb-4 tc">FCP timeline after Jetlag — three cameras, chronological order</p>
+        <p class="text-xs text-muted mb-4 tc">Timeline after Jetlag — three cameras, chronological order</p>
         <div class="space-y-3">
           <!-- GoPro row -->
           <div class="flex items-center gap-3">
@@ -699,7 +705,7 @@ python3 media-pipeline.py --profile gopro --timezone +0900 --apply</pre>
         </svg>
         <span>Jetlag</span>
         <span class="text-border">·</span>
-        <span>macOS app for video timestamp sync</span>
+        <span>macOS app for multi-camera timestamp sync</span>
       </div>
       <div class="flex gap-5">
         <a href="https://github.com/brokenalarms/Jetlag" target="_blank" rel="noopener" class="hover:text-fg transition-colors">GitHub</a>
