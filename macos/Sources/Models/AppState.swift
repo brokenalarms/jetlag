@@ -34,6 +34,17 @@ enum PipelineStep: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Neon accent colour for each step's icon — sourced from design/tokens.json via Assets.xcassets.
+    var iconColor: Color {
+        switch self {
+        case .importFromCard: Color("NeonCyan")
+        case .tag:            Color("NeonPink")
+        case .fixTimezone:    Color("NeonYellow")
+        case .organize:       Color.accentColor
+        case .gyroflow:       Color("NeonPurple")
+        }
+    }
+
     var help: String {
         switch self {
         case .importFromCard: "Copy files from source (memory card) to import directory"

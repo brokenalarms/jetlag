@@ -114,12 +114,13 @@ struct WorkflowView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: step.systemImage)
                                     .font(.system(size: 10))
+                                    .foregroundStyle(isEnabled ? step.iconColor : .tertiary)
                                 Text(step.rawValue)
                                     .font(.system(size: 11, weight: .medium))
                             }
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(isEnabled ? Color.accentColor.opacity(0.15) : .clear)
+                            .background(isEnabled ? step.iconColor.opacity(0.12) : .clear)
                             .foregroundStyle(isEnabled ? .primary : .tertiary)
                         }
                         .buttonStyle(.plain)
@@ -138,7 +139,7 @@ struct WorkflowView: View {
                                 bottomTrailingRadius: isLast ? 6 : 0,
                                 topTrailingRadius: isLast ? 6 : 0
                             )
-                            .strokeBorder(isEnabled ? AnyShapeStyle(Color.accentColor.opacity(0.3)) : AnyShapeStyle(.quaternary), lineWidth: 1)
+                            .strokeBorder(isEnabled ? AnyShapeStyle(step.iconColor.opacity(0.4)) : AnyShapeStyle(.quaternary), lineWidth: 1)
                         )
                         .help(step.help)
 
@@ -159,6 +160,7 @@ struct WorkflowView: View {
         } label: {
             Label("Pipeline", systemImage: "arrow.triangle.branch")
                 .font(.headline)
+                .foregroundStyle(Color.accentColor)
         }
     }
 
