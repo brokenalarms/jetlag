@@ -1,9 +1,11 @@
 export function renderHero() {
   return /* html */`
-    <section class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pt-24 pb-16">
-      <!-- Background glow -->
+    <section class="vhs-scanlines relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pt-24 pb-16">
+      <!-- Background glows: lime centre, pink lower-left, cyan upper-right -->
       <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
         <div class="h-[600px] w-[600px] rounded-full bg-amber-500/8 blur-3xl"></div>
+        <div class="absolute h-[400px] w-[400px] rounded-full bg-neon-pink/5 blur-3xl -translate-x-48 translate-y-32"></div>
+        <div class="absolute h-[300px] w-[300px] rounded-full bg-neon-cyan/4 blur-3xl translate-x-48 -translate-y-16"></div>
       </div>
 
       <!-- Badge -->

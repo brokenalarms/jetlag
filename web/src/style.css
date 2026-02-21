@@ -4,8 +4,12 @@
 
 @layer base {
   :root {
-    --amber: #f59e0b;
-    --amber-light: #fbbf24;
+    --accent:       #39ff14;
+    --accent-light: #7fff4f;
+    --neon-pink:    #ff2d78;
+    --neon-yellow:  #fff200;
+    --neon-cyan:    #00f5ff;
+    --neon-purple:  #bf00ff;
   }
 
   html {
@@ -13,7 +17,7 @@
   }
 
   ::selection {
-    background-color: rgba(245, 158, 11, 0.3);
+    background-color: rgba(57, 255, 20, 0.25);
   }
 }
 
@@ -40,15 +44,33 @@
 }
 
 @layer utilities {
+  /* Lime → yellow → pink gradient — applied to hero headline and other key text */
   .text-gradient {
-    background: linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.6) 100%);
+    background: linear-gradient(135deg, #39ff14 0%, #fff200 50%, #ff2d78 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
+  /* Neon lime glow — used on featured cards and CTA areas */
   .glow-amber {
-    box-shadow: 0 0 60px rgba(245, 158, 11, 0.15);
+    box-shadow: 0 0 60px rgba(57, 255, 20, 0.12), 0 0 120px rgba(255, 45, 120, 0.06);
+  }
+
+  /* VHS scanline texture overlay — add class to a relative-positioned element */
+  .vhs-scanlines::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.06) 2px,
+      rgba(0, 0, 0, 0.06) 4px
+    );
+    pointer-events: none;
+    z-index: 10;
   }
 
   .border-white\/8 {
