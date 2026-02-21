@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --amber: #f59e0b;
+    --amber-light: #fbbf24;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  ::selection {
+    background-color: rgba(245, 158, 11, 0.3);
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center gap-2 rounded-xl bg-amber-500 px-6 py-3 text-sm font-semibold text-neutral-950 transition-all hover:bg-amber-400 active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 rounded-xl border border-white/15 px-6 py-3 text-sm font-semibold text-white/90 transition-all hover:border-white/30 hover:bg-white/5 active:scale-95;
+  }
+
+  .section-label {
+    @apply inline-block rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-amber-400;
+  }
+
+  .card {
+    @apply rounded-2xl border border-white/8 bg-white/4 p-6 backdrop-blur-sm;
+  }
+
+  .feature-icon {
+    @apply flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    background: linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.6) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glow-amber {
+    box-shadow: 0 0 60px rgba(245, 158, 11, 0.15);
+  }
+
+  .border-white\/8 {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .bg-white\/4 {
+    background-color: rgba(255, 255, 255, 0.04);
+  }
+}
