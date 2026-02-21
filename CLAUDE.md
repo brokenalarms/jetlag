@@ -57,10 +57,11 @@
   - never commit without first running tests with `pytest -x` and confirming they pass
   - one branch per PR — never reuse a branch that has already been merged into main; create a new branch for each new PR
 - PULL REQUESTS
-  - after pushing, always output a pre-filled GitHub compare URL so the user can open a PR with one click:
-    `https://github.com/brokenalarms/Jetlag/compare/<branch>?expand=1&title=<url-encoded-title>&body=<url-encoded-body>`
-  - URL encoding rules for the link to render fully clickable in markdown: use `%20` for spaces (NOT `+`), encode `(` as `%28` and `)` as `%29`, no literal newlines or unencoded special chars
-  - keep the URL body to one short plain sentence — no newlines, no bullets — long URLs break markdown link rendering and get truncated. GitHub will override with the commit body anyway for single-commit branches.
+  - after pushing, always output a pre-filled GitHub compare URL so the user can open a PR with one click; generate it with python so every character is properly escaped:
+    ```
+    python3 -c "import urllib.parse; t='<title>'; b='<one sentence body>'; print('https://github.com/brokenalarms/Jetlag/compare/<branch>?expand=1&title='+urllib.parse.quote(t,safe='')+'&body='+urllib.parse.quote(b,safe=''))"
+    ```
+  - keep the URL body to one short plain sentence with no newlines and no trailing period — dots at the end of URLs get stripped by markdown parsers. GitHub will override with the commit body anyway for single-commit branches
   - title: imperative sentence, lowercase, no period — what changed, not what you did
 - SCENARIO/REGRESSION TESTS:
   - fix-media-timestamp:
