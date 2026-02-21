@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Use "developer-id" for direct distribution (requires Developer ID Application cert).
+         Change to "mac-application" for App Store distribution.
+         Change to "development" for testing on your own machines only. -->
+    <key>method</key>
+    <string>developer-id</string>
+
+    <!-- Automatic: Xcode picks the cert from Keychain matching your team.
+         Set to "manual" if you need to specify provisioningProfiles below. -->
+    <key>signingStyle</key>
+    <string>automatic</string>
+
+    <!-- Remove Swift standard library symbols that are re-exported by the OS.
+         Reduces binary size. -->
+    <key>stripSwiftSymbols</key>
+    <true/>
+
+    <!-- Hardened Runtime is required for notarization. -->
+    <key>hardened-runtime</key>
+    <true/>
+</dict>
+</plist>

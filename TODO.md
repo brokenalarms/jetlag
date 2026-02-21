@@ -16,6 +16,7 @@ Update this file at the end of the session.
 - Removed `name` field from `MediaProfile` — profile name is the YAML dict key, read/written as such; no injection loop needed
 - Fixed `updateEnabledSteps()` in `WorkflowView` — was always resetting to all available steps; now correctly intersects with current enabled set
 - Added `--tasks [tag fix-timestamp organize gyroflow]` to `media-pipeline.py` — defaults to all; `WorkflowView` passes enabled steps
+- **DMG build + venv portability**: added `Makefile` (generate/build/archive/dmg targets), `macos/ExportOptions.plist`; replaced inline venv checks in 6 `.sh` wrappers with `lib/ensure-venv.sh` which auto-creates the venv from `requirements.txt` on first run; added `PyYAML` to `requirements.txt` (was missing despite yaml imports); item 3 (scripts not bundled for release) is already handled by `project.yml` `postBuildScripts` + `AppState` using `Bundle.main.resourcePath` — not a live issue
 
 ---
 
@@ -27,7 +28,7 @@ Update this file at the end of the session.
 
 2. **`ScriptRunner` stream race condition** — `terminationHandler` calls `continuation.finish()` immediately when the process exits, but `readabilityHandler` callbacks may not have flushed all buffered data yet. Final lines of script output can be lost. Fix: drain both pipes explicitly before finishing the continuation (read until EOF on both file handles before calling `continuation.finish()`).
 
-3. **Scripts not bundled for release builds** — release Xcode build has no copy phase for `scripts/` into the app bundle. `DevConfig.scriptsDirectory` returns `nil` in release, and `Bundle.main.resourcePath + "/scripts"` will not exist.
+3. ~~**Scripts not bundled for release builds**~~ — `project.yml` `postBuildScripts` copies `scripts/` for all configurations; `AppState` uses `Bundle.main.resourcePath` unconditionally. Not a live issue.
 
 4. **MapKit / CoreLocation linked but unused** — `project.yml` links `MapKit.framework` and `CoreLocation.framework` but `TimezonePickerView` only uses `TimeZone.knownTimeZoneIdentifiers`. Remove the unused framework dependencies unless a map-based picker is planned.
 
