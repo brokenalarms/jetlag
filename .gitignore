@@ -6,7 +6,6 @@ __pycache__
 
 # Python dependencies (installed locally by ensure-venv.sh; pre-bundled into app at build time)
 scripts/site-packages/
-scripts/media-import/
 
 # Environment files with secrets
 .env.local
