@@ -51,15 +51,16 @@
 - COMMITS
   - before **every** commit, always fetch and check the branch: `git fetch origin <branch> main` then `git log origin/main --oneline | head -10` to confirm the branch hasn't been merged since the last commit. **`git branch -r --merged` does NOT detect squash merges (which GitHub uses by default) — never rely on it.** If a recent main commit title matches the PR/branch (e.g. `Claude/create swift UI pr (#5)`), the branch was squash-merged — create a new branch before committing.
   - commits should be atomic: one feature change or bug fix per commit where possible
+  - every commit message must have a subject line AND a body separated by a blank line — GitHub uses the subject as PR title and body as PR description when the user clicks "Create PR" on the branch
+  - commit body should cover: what changed, why, and how it was tested
   - related atomic commits may be grouped into a single PR
   - never commit without first running tests with `pytest -x` and confirming they pass
   - one branch per PR — never reuse a branch that has already been merged into main; create a new branch for each new PR
 - PULL REQUESTS
-  - title: imperative sentence, lowercase, no period — describe what changed, not what you did (e.g. `fix timestamp offset for GoPro files`, not `Fixed some bugs`)
-  - description must include:
-    - **What**: one or two sentences on what changed and why
-    - **Changes**: bullet list of files/scripts modified and what each does differently
-    - **Test plan**: how the change was tested (e.g. `pytest -x passed`, specific scenario tested)
+  - after pushing, always output a pre-filled GitHub compare URL so the user can open a PR with one click:
+    `https://github.com/brokenalarms/Jetlag/compare/<branch>?expand=1&title=<url-encoded-title>&body=<url-encoded-body>`
+  - title: imperative sentence, lowercase, no period — what changed, not what you did
+  - body: what changed and why, bullet list of files/scripts affected, how it was tested
 - SCENARIO/REGRESSION TESTS:
   - fix-media-timestamp:
     - if --overwrite-datetimeoriginal is specified, --timezone must be provided
