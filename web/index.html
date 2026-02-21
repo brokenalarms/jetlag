@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jetlag — Multi-camera sync for Final Cut Pro</title>
+  <meta name="description" content="Jetlag automatically fixes timestamps across GoPro, iPhone, Insta360 and more so your footage lands in perfect order in Final Cut Pro.">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ["'SF Mono'", "'Fira Code'", "'Courier New'", "monospace"],
+          },
+          colors: {
+            canvas:  "#0d1117",
+            surface: "#161b22",
+            border:  "#30363d",
+            muted:   "#8b949e",
+            subtle:  "#6e7681",
+            fg:      "#e6edf3",
+            blue:    "#58a6ff",
+            red:     "#f78166",
+            green:   "#3fb950",
+          },
+          keyframes: {
+            "fade-up": {
+              "0%":   { opacity: "0", transform: "translateY(20px)" },
+              "100%": { opacity: "1", transform: "translateY(0)" },
+            },
+            blink: {
+              "0%, 100%": { opacity: "1" },
+              "50%":      { opacity: "0" },
+            },
+          },
+          animation: {
+            "fade-up":  "fade-up 0.6s ease both",
+            "fade-up2": "fade-up 0.6s 0.15s ease both",
+            "fade-up3": "fade-up 0.6s 0.3s ease both",
+            blink:      "blink 1.2s step-start infinite",
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    body { background-color: #0d1117; color: #e6edf3; }
+
+    /* Noise texture overlay */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Glow card */
+    .card-glow {
+      position: relative;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .card-glow:hover {
+      border-color: #58a6ff44;
+      box-shadow: 0 0 24px #58a6ff18;
+    }
+
+    /* Timecode font */
+    .tc { font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace; }
+
+    /* Timeline bar */
+    .timeline-bar {
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #58a6ff88, transparent);
+      position: relative;
+    }
+    .timeline-bar::after {
+      content: "";
+      position: absolute;
+      top: -6px;
+      left: 62%;
+      width: 2px;
+      height: 14px;
+      background: #f78166;
+      border-radius: 1px;
+    }
+    .timeline-bar::before {
+      content: "";
+      position: absolute;
+      top: -10px;
+      left: calc(62% - 4px);
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 5px solid #f78166;
+    }
+
+    /* Camera badge */
+    .cam-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 999px;
+      font-size: 12px;
+      color: #8b949e;
+    }
+    .cam-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+    /* Download button */
+    .dl-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 32px;
+      background: #58a6ff;
+      color: #0d1117;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 16px;
+      text-decoration: none;
+      transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+    }
+    .dl-btn:hover {
+      background: #79b8ff;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px #58a6ff44;
+    }
+    .dl-btn:active { transform: translateY(0); }
+
+    /* Outline button */
+    .out-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 13px 28px;
+      background: transparent;
+      color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 16px;
+      text-decoration: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .out-btn:hover {
+      border-color: #58a6ff;
+      background: #58a6ff11;
+    }
+
+    /* Step number */
+    .step-num {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #161b22;
+      border: 1px solid #30363d;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: #58a6ff;
+      flex-shrink: 0;
+    }
+
+    /* Code block */
+    pre.code-block {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px 20px;
+      font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 13px;
+      color: #8b949e;
+      overflow-x: auto;
+    }
+    pre.code-block .kw  { color: #ff7b72; }
+    pre.code-block .str { color: #a5d6ff; }
+    pre.code-block .cmt { color: #6e7681; }
+    pre.code-block .ok  { color: #3fb950; }
+    pre.code-block .hl  { color: #e6edf3; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0d1117; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+  </style>
+</head>
+
+<body class="relative z-10 min-h-screen antialiased">
+
+  <!-- ── Nav ────────────────────────────────────────────────────────────── -->
+  <nav class="fixed top-0 inset-x-0 z-50 flex items-center justify-between px-6 py-4 border-b border-border/60 backdrop-blur-md bg-canvas/80">
+    <div class="flex items-center gap-3">
+      <!-- Inline icon (small) -->
+      <svg width="32" height="32" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" class="rounded-lg">
+        <defs>
+          <linearGradient id="n-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#0d1117"/>
+            <stop offset="100%" style="stop-color:#161b22"/>
+          </linearGradient>
+          <linearGradient id="n-jet" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#e6edf3"/>
+            <stop offset="100%" style="stop-color:#8b949e"/>
+          </linearGradient>
+          <linearGradient id="n-tc" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#58a6ff;stop-opacity:0.2"/>
+            <stop offset="50%" style="stop-color:#58a6ff;stop-opacity:0.8"/>
+            <stop offset="100%" style="stop-color:#58a6ff;stop-opacity:0.2"/>
+          </linearGradient>
+          <filter id="n-glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <rect width="512" height="512" rx="100" fill="url(#n-bg)"/>
+        <rect x="48" y="308" width="416" height="2" rx="1" fill="url(#n-tc)"/>
+        <rect x="48"  y="298" width="2" height="12" rx="1" fill="#58a6ff" opacity="0.5"/>
+        <rect x="152" y="298" width="2" height="12" rx="1" fill="#58a6ff" opacity="0.5"/>
+        <rect x="256" y="298" width="2" height="12" rx="1" fill="#58a6ff" opacity="0.5"/>
+        <rect x="360" y="298" width="2" height="12" rx="1" fill="#58a6ff" opacity="0.5"/>
+        <rect x="462" y="298" width="2" height="12" rx="1" fill="#58a6ff" opacity="0.5"/>
+        <rect x="282" y="285" width="2" height="38" rx="1" fill="#f78166" opacity="0.9"/>
+        <polygon points="276,285 290,285 283,294" fill="#f78166" opacity="0.9"/>
+        <rect x="144" y="340" width="224" height="52" rx="8" fill="#0d1117" stroke="#30363d" stroke-width="1.5"/>
+        <text x="256" y="376" font-family="'SF Mono','Courier New',monospace" font-size="30" font-weight="600" fill="#58a6ff" text-anchor="middle" filter="url(#n-glow)" letter-spacing="2">01:42:07:14</text>
+        <g transform="translate(256,190) rotate(-32) scale(1.15)">
+          <ellipse cx="0" cy="0" rx="80" ry="16" fill="url(#n-jet)"/>
+          <path d="M80,0 Q105,-6 120,0 Q105,6 80,0Z" fill="#c9d1d9"/>
+          <path d="M-70,-16 L-55,0 L-70,0Z" fill="#8b949e"/>
+          <path d="M-60,-16 Q-30,-38 -10,-16Z" fill="#8b949e"/>
+          <path d="M-20,-16 Q30,-62 55,-16Z" fill="#c9d1d9"/>
+          <path d="M-20,16 Q30,62 55,16Z" fill="#c9d1d9"/>
+          <ellipse cx="20" cy="-24" rx="18" ry="7" fill="#6e7681"/>
+          <ellipse cx="20" cy="24" rx="18" ry="7" fill="#6e7681"/>
+          <ellipse cx="-78" cy="0" rx="10" ry="5" fill="#ff7b72" opacity="0.7"/>
+        </g>
+        <line x1="90" y1="235" x2="148" y2="212" stroke="#8b949e" stroke-width="1.5" opacity="0.35" stroke-linecap="round"/>
+        <line x1="78" y1="243" x2="140" y2="219" stroke="#8b949e" stroke-width="1" opacity="0.2" stroke-linecap="round"/>
+      </svg>
+      <span class="font-bold text-fg text-lg tracking-tight">Jetlag</span>
+    </div>
+    <div class="hidden sm:flex items-center gap-6 text-sm text-muted">
+      <a href="#features" class="hover:text-fg transition-colors">Features</a>
+      <a href="#how-it-works" class="hover:text-fg transition-colors">How it works</a>
+      <a href="#pricing" class="hover:text-fg transition-colors">Pricing</a>
+      <a href="#register" class="hover:text-fg transition-colors">Register</a>
+    </div>
+    <a href="#download" class="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-blue text-canvas text-sm font-semibold rounded-md hover:bg-[#79b8ff] transition-colors">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Zm-1-5.232L7.22 13.53a.75.75 0 0 0 1.06 0l5.47-4.762a.75.75 0 0 0-.53-1.268H9.75V2.75a.75.75 0 0 0-1.5 0v4.75H4.28a.75.75 0 0 0-.53 1.268Z"/></svg>
+      Download free
+    </a>
+  </nav>
+
+  <!-- ── Hero ───────────────────────────────────────────────────────────── -->
+  <section class="relative pt-32 pb-24 px-6 text-center overflow-hidden">
+    <!-- Radial glow backdrop -->
+    <div class="absolute inset-0 pointer-events-none" aria-hidden="true">
+      <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] rounded-full bg-blue/5 blur-3xl"></div>
+    </div>
+
+    <!-- Camera badges row -->
+    <div class="flex flex-wrap justify-center gap-2 mb-8 animate-fade-up">
+      <span class="cam-badge"><span class="cam-dot bg-[#3fb950]"></span>GoPro</span>
+      <span class="cam-badge"><span class="cam-dot bg-blue"></span>iPhone</span>
+      <span class="cam-badge"><span class="cam-dot bg-[#d2a8ff]"></span>Insta360</span>
+      <span class="cam-badge"><span class="cam-dot bg-[#f78166]"></span>Any camera</span>
+    </div>
+
+    <!-- Large icon -->
+    <div class="flex justify-center mb-10 animate-fade-up2">
+      <div class="relative">
+        <div class="absolute inset-0 rounded-[28%] bg-blue/10 blur-2xl scale-110"></div>
+        <svg width="140" height="140" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" class="relative rounded-[28%] shadow-2xl">
+          <defs>
+            <linearGradient id="h-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#0d1117"/>
+              <stop offset="100%" style="stop-color:#161b22"/>
+            </linearGradient>
+            <linearGradient id="h-jet" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#e6edf3"/>
+              <stop offset="100%" style="stop-color:#8b949e"/>
+            </linearGradient>
+            <linearGradient id="h-tc" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" style="stop-color:#58a6ff;stop-opacity:0.2"/>
+              <stop offset="50%" style="stop-color:#58a6ff;stop-opacity:0.8"/>
+              <stop offset="100%" style="stop-color:#58a6ff;stop-opacity:0.2"/>
+            </linearGradient>
+            <filter id="h-glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            <filter id="h-jglow"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          </defs>
+          <rect width="512" height="512" rx="100" fill="url(#h-bg)"/>
+          <rect x="48" y="308" width="416" height="2" rx="1" fill="url(#h-tc)"/>
+          <rect x="48"  y="298" width="2" height="12" rx="1" fill="#58a6ff" opacity="0.5"/>
+          <rect x="152" y="298" width="2" height="12" rx="1" fill="#58a6ff" opacity="0.5"/>
+          <rect x="256" y="298" width="2" height="12" rx="1" fill="#58a6ff" opacity="0.5"/>
+          <rect x="360" y="298" width="2" height="12" rx="1" fill="#58a6ff" opacity="0.5"/>
+          <rect x="462" y="298" width="2" height="12" rx="1" fill="#58a6ff" opacity="0.5"/>
+          <rect x="282" y="285" width="2" height="38" rx="1" fill="#f78166" opacity="0.9"/>
+          <polygon points="276,285 290,285 283,294" fill="#f78166" opacity="0.9"/>
+          <rect x="144" y="340" width="224" height="52" rx="8" fill="#0d1117" stroke="#30363d" stroke-width="1.5"/>
+          <text x="256" y="376" font-family="'SF Mono','Courier New',monospace" font-size="30" font-weight="600" fill="#58a6ff" text-anchor="middle" filter="url(#h-glow)" letter-spacing="2">01:42:07:14</text>
+          <g transform="translate(256,190) rotate(-32) scale(1.15)" filter="url(#h-jglow)">
+            <ellipse cx="0" cy="0" rx="80" ry="16" fill="url(#h-jet)"/>
+            <path d="M80,0 Q105,-6 120,0 Q105,6 80,0Z" fill="#c9d1d9"/>
+            <path d="M-70,-16 L-55,0 L-70,0Z" fill="#8b949e"/>
+            <path d="M-60,-16 Q-30,-38 -10,-16Z" fill="#8b949e"/>
+            <path d="M-20,-16 Q30,-62 55,-16Z" fill="#c9d1d9"/>
+            <path d="M-20,16 Q30,62 55,16Z" fill="#c9d1d9"/>
+            <ellipse cx="20" cy="-24" rx="18" ry="7" fill="#6e7681"/>
+            <ellipse cx="20" cy="24" rx="18" ry="7" fill="#6e7681"/>
+            <ellipse cx="-78" cy="0" rx="10" ry="5" fill="#ff7b72" opacity="0.7"/>
+          </g>
+          <line x1="90" y1="235" x2="148" y2="212" stroke="#8b949e" stroke-width="1.5" opacity="0.35" stroke-linecap="round"/>
+          <line x1="78" y1="243" x2="140" y2="219" stroke="#8b949e" stroke-width="1" opacity="0.2" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <h1 class="text-5xl sm:text-6xl font-extrabold tracking-tight text-fg leading-tight mb-5 animate-fade-up2">
+      All your cameras,<br class="hidden sm:block"/> in&nbsp;sync.
+    </h1>
+    <p class="text-lg sm:text-xl text-muted max-w-2xl mx-auto mb-10 animate-fade-up3">
+      Jetlag fixes timestamps across every camera in your kit — GoPro, iPhone, Insta360, and more —
+      so your footage lands in the right order the moment you import into Final Cut Pro.
+    </p>
+
+    <!-- CTA buttons -->
+    <div class="flex flex-col sm:flex-row gap-4 justify-center animate-fade-up3" id="download">
+      <a href="#download-link" class="dl-btn">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Zm-1-5.232L7.22 13.53a.75.75 0 0 0 1.06 0l5.47-4.762a.75.75 0 0 0-.53-1.268H9.75V2.75a.75.75 0 0 0-1.5 0v4.75H4.28a.75.75 0 0 0-.53 1.268Z"/></svg>
+        Download free
+      </a>
+      <a href="#how-it-works" class="out-btn">See how it works</a>
+    </div>
+
+    <p class="text-sm text-subtle mt-5 animate-fade-up3">
+      macOS 13+&nbsp;&nbsp;·&nbsp;&nbsp;Free up to 50 files/run&nbsp;&nbsp;·&nbsp;&nbsp;Pro license for unlimited
+    </p>
+  </section>
+
+  <!-- ── Terminal demo ───────────────────────────────────────────────────── -->
+  <section class="max-w-3xl mx-auto px-6 pb-20">
+    <div class="card-glow overflow-hidden">
+      <!-- Toolbar -->
+      <div class="flex items-center gap-2 px-4 py-3 border-b border-border/60">
+        <span class="w-3 h-3 rounded-full bg-[#ff5f57]"></span>
+        <span class="w-3 h-3 rounded-full bg-[#febc2e]"></span>
+        <span class="w-3 h-3 rounded-full bg-[#28c840]"></span>
+        <span class="ml-3 tc text-xs text-muted">media-pipeline — Jetlag</span>
+      </div>
+      <pre class="code-block rounded-none border-none text-xs leading-relaxed sm:text-sm">
+<span class="cmt"># Processing 3 cameras · Tokyo trip · +0900</span>
+
+<span class="kw">→</span> GH010042.MP4    <span class="ok">✓ fixed +02:00→+09:00  born 2024-03-15 08:14:22</span>
+<span class="kw">→</span> GH010043.MP4    <span class="ok">✓ fixed +02:00→+09:00  born 2024-03-15 08:27:05</span>
+<span class="kw">→</span> IMG_4821.MOV    <span class="ok">✓ unchanged             born 2024-03-15 09:03:47</span>
+<span class="kw">→</span> VID_20240315_091200.insv  <span class="ok">✓ filename→timestamp   born 2024-03-15 09:12:00</span>
+<span class="kw">→</span> IMG_4835.MOV    <span class="ok">✓ unchanged             born 2024-03-15 10:44:13</span>
+<span class="kw">→</span> GH010044.MP4    <span class="ok">✓ fixed +02:00→+09:00  born 2024-03-15 11:02:58</span>
+
+<span class="hl">Done.</span>  6 processed · 4 changed · 2 unchanged · <span class="ok">0 failed</span>
+<span class="cmt"># Import into FCP — clips appear in chronological order ✓</span>
+</pre>
+    </div>
+  </section>
+
+  <!-- ── Features ───────────────────────────────────────────────────────── -->
+  <section id="features" class="max-w-6xl mx-auto px-6 pb-24">
+    <h2 class="text-3xl font-bold text-fg text-center mb-3">Built for multi-camera shoots</h2>
+    <p class="text-muted text-center mb-14 max-w-xl mx-auto">Every camera has its own quirks. Jetlag knows them all.</p>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+
+      <!-- Feature 1 -->
+      <div class="card-glow p-6">
+        <div class="w-10 h-10 rounded-lg bg-blue/10 flex items-center justify-center mb-4">
+          <svg class="text-blue" width="20" height="20" viewBox="0 0 16 16" fill="#58a6ff"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm7-3.25v2.992l2.028.812a.75.75 0 0 1-.557 1.392l-2.5-1A.751.751 0 0 1 7 8.25v-3.5a.75.75 0 0 1 1.5 0Z"/></svg>
+        </div>
+        <h3 class="font-semibold text-fg mb-2">Camera-aware timestamp fixing</h3>
+        <p class="text-sm text-muted leading-relaxed">Understands how GoPro, iPhone, and Insta360 each store time. Corrects timezone mismatches, FAT filesystem quirks, and missing timezone info.</p>
+      </div>
+
+      <!-- Feature 2 -->
+      <div class="card-glow p-6">
+        <div class="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center mb-4">
+          <svg width="20" height="20" viewBox="0 0 16 16" fill="#3fb950"><path d="M1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25v-8.5C0 2.784.784 2 1.75 2ZM1.5 12.251c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V5.809L8.38 9.397a.75.75 0 0 1-.76 0L1.5 5.809v6.442Zm13-8.181v-.32a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25v.32L8 7.88l6.5-3.81Z"/></svg>
+        </div>
+        <h3 class="font-semibold text-fg mb-2">Final Cut Pro native</h3>
+        <p class="text-sm text-muted leading-relaxed">Sets <span class="tc text-xs text-fg/80">Keys:CreationDate</span> and file birth time so FCP's "Content Created" field is always correct — no manual sorting, no timecode drift.</p>
+      </div>
+
+      <!-- Feature 3 -->
+      <div class="card-glow p-6">
+        <div class="w-10 h-10 rounded-lg bg-[#d2a8ff]/10 flex items-center justify-center mb-4">
+          <svg width="20" height="20" viewBox="0 0 16 16" fill="#d2a8ff"><path d="M2 1.75C2 .784 2.784 0 3.75 0h5.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 12.25 16h-8.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 8 4.25V1.5Zm6.75.062V4.25c0 .138.112.25.25.25h2.688Z"/></svg>
+        </div>
+        <h3 class="font-semibold text-fg mb-2">Profile-based workflow</h3>
+        <p class="text-sm text-muted leading-relaxed">Define camera profiles once in <span class="tc text-xs text-fg/80">media-profiles.yaml</span>. Run the same pipeline shoot after shoot with one command or one click.</p>
+      </div>
+
+      <!-- Feature 4 -->
+      <div class="card-glow p-6">
+        <div class="w-10 h-10 rounded-lg bg-[#f78166]/10 flex items-center justify-center mb-4">
+          <svg width="20" height="20" viewBox="0 0 16 16" fill="#f78166"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm4.879-2.773 4.264 2.559a.25.25 0 0 1 0 .428l-4.264 2.559A.25.25 0 0 1 6 10.559V5.442a.25.25 0 0 1 .379-.215Z"/></svg>
+        </div>
+        <h3 class="font-semibold text-fg mb-2">Gyroflow integration</h3>
+        <p class="text-sm text-muted leading-relaxed">Automatically generates <span class="tc text-xs text-fg/80">.gyroflow</span> project files for every clip with gyro data, ready for the Gyroflow Toolbox FCP plugin.</p>
+      </div>
+
+      <!-- Feature 5 -->
+      <div class="card-glow p-6">
+        <div class="w-10 h-10 rounded-lg bg-blue/10 flex items-center justify-center mb-4">
+          <svg width="20" height="20" viewBox="0 0 16 16" fill="#58a6ff"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25ZM7.25 8a.75.75 0 0 1-.22.53l-2.25 2.25a.749.749 0 1 1-1.06-1.06L5.44 8 3.72 6.28a.749.749 0 1 1 1.06-1.06l2.25 2.25c.141.14.22.331.22.53Zm1.5 1.5h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1 0-1.5Z"/></svg>
+        </div>
+        <h3 class="font-semibold text-fg mb-2">SwiftUI native app</h3>
+        <p class="text-sm text-muted leading-relaxed">A clean macOS menu-bar companion: pick a profile, set a timezone, hit Run. No Terminal required — but the scripts work standalone too.</p>
+      </div>
+
+      <!-- Feature 6 -->
+      <div class="card-glow p-6">
+        <div class="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center mb-4">
+          <svg width="20" height="20" viewBox="0 0 16 16" fill="#3fb950"><path d="M5.75 7.5a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 .75-.75Zm4.5 0a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 .75-.75ZM8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2ZM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Z"/></svg>
+        </div>
+        <h3 class="font-semibold text-fg mb-2">Auto-organize by date</h3>
+        <p class="text-sm text-muted leading-relaxed">Moves files into <span class="tc text-xs text-fg/80">YYYY/Group/YYYY-MM-DD</span> folders after fixing. Alphabetical, interrupt-safe, idempotent.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── How it works ────────────────────────────────────────────────────── -->
+  <section id="how-it-works" class="bg-surface/40 border-y border-border/60 py-24 px-6">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl font-bold text-fg text-center mb-3">How it works</h2>
+      <p class="text-muted text-center mb-14 max-w-xl mx-auto">Four stages, one pipeline. Run them together or individually.</p>
+
+      <div class="space-y-8">
+
+        <div class="flex gap-5 items-start">
+          <div class="step-num">1</div>
+          <div>
+            <h3 class="font-semibold text-fg mb-1">Tag & identify</h3>
+            <p class="text-sm text-muted leading-relaxed">Each file is matched to a camera profile by EXIF Make/Model. The right fix strategy — GoPro FAT quirks, iPhone timezone string, Insta360 filename parsing — is applied per-camera.</p>
+          </div>
+        </div>
+
+        <div class="relative ml-[18px] border-l-2 border-border/40 h-6"></div>
+
+        <div class="flex gap-5 items-start">
+          <div class="step-num">2</div>
+          <div>
+            <h3 class="font-semibold text-fg mb-1">Fix timestamps</h3>
+            <p class="text-sm text-muted leading-relaxed"><span class="tc text-xs text-fg/80">DateTimeOriginal</span> is the source of truth (never modified). UTC fields, <span class="tc text-xs text-fg/80">Keys:CreationDate</span>, and file birth time are all corrected to agree — one exiftool read + one write per file.</p>
+          </div>
+        </div>
+
+        <div class="relative ml-[18px] border-l-2 border-border/40 h-6"></div>
+
+        <div class="flex gap-5 items-start">
+          <div class="step-num">3</div>
+          <div>
+            <h3 class="font-semibold text-fg mb-1">Organize into folders</h3>
+            <p class="text-sm text-muted leading-relaxed">Files are moved into <span class="tc text-xs text-fg/80">YYYY/Group/YYYY-MM-DD</span> directories. Empty folders are cleaned up. If the run is interrupted, it resumes safely from where it stopped.</p>
+          </div>
+        </div>
+
+        <div class="relative ml-[18px] border-l-2 border-border/40 h-6"></div>
+
+        <div class="flex gap-5 items-start">
+          <div class="step-num">4</div>
+          <div>
+            <h3 class="font-semibold text-fg mb-1">Import into Final Cut Pro</h3>
+            <p class="text-sm text-muted leading-relaxed">Drag your folder into FCP. "Content Created" is set correctly for every clip. Multicam clips, smart collections, and timeline sorting all work with zero manual intervention.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Timeline visual -->
+      <div class="mt-16 card-glow p-6">
+        <p class="text-xs text-muted mb-4 tc">FCP timeline after Jetlag — three cameras, chronological order</p>
+        <div class="space-y-3">
+          <!-- GoPro row -->
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-muted w-20 tc shrink-0">GoPro</span>
+            <div class="flex-1 h-5 bg-canvas rounded flex items-center gap-px overflow-hidden px-px">
+              <div class="h-4 rounded-sm" style="background:#3fb950;width:12%;opacity:0.8"></div>
+              <div class="h-4 rounded-sm" style="background:#3fb950;width:10%;opacity:0.8;margin-left:38%"></div>
+              <div class="h-4 rounded-sm" style="background:#3fb950;width:14%;opacity:0.8;margin-left:8%"></div>
+            </div>
+          </div>
+          <!-- iPhone row -->
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-muted w-20 tc shrink-0">iPhone</span>
+            <div class="flex-1 h-5 bg-canvas rounded flex items-center gap-px overflow-hidden px-px">
+              <div class="h-4 rounded-sm" style="background:#58a6ff;width:8%;opacity:0.8;margin-left:11%"></div>
+              <div class="h-4 rounded-sm" style="background:#58a6ff;width:16%;opacity:0.8;margin-left:6%"></div>
+              <div class="h-4 rounded-sm" style="background:#58a6ff;width:9%;opacity:0.8;margin-left:22%"></div>
+            </div>
+          </div>
+          <!-- Insta360 row -->
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-muted w-20 tc shrink-0">Insta360</span>
+            <div class="flex-1 h-5 bg-canvas rounded flex items-center gap-px overflow-hidden px-px">
+              <div class="h-4 rounded-sm" style="background:#d2a8ff;width:6%;opacity:0.8;margin-left:23%"></div>
+              <div class="h-4 rounded-sm" style="background:#d2a8ff;width:11%;opacity:0.8;margin-left:14%"></div>
+              <div class="h-4 rounded-sm" style="background:#d2a8ff;width:7%;opacity:0.8;margin-left:30%"></div>
+            </div>
+          </div>
+          <!-- Time ruler -->
+          <div class="flex items-center gap-3 pt-1">
+            <span class="text-xs text-subtle w-20 shrink-0"></span>
+            <div class="flex-1">
+              <div class="timeline-bar"></div>
+              <div class="flex justify-between mt-1 tc text-[10px] text-subtle">
+                <span>08:00</span><span>09:00</span><span>10:00</span><span>11:00</span><span>12:00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Pricing ─────────────────────────────────────────────────────────── -->
+  <section id="pricing" class="max-w-4xl mx-auto px-6 py-24">
+    <h2 class="text-3xl font-bold text-fg text-center mb-3">Simple pricing</h2>
+    <p class="text-muted text-center mb-14 max-w-xl mx-auto">Start free. Upgrade when you're hooked.</p>
+
+    <div class="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+
+      <!-- Free tier -->
+      <div class="card-glow p-7">
+        <p class="text-xs text-muted uppercase tracking-widest mb-3">Free</p>
+        <p class="text-4xl font-extrabold text-fg mb-1">$0</p>
+        <p class="text-sm text-muted mb-6">No credit card. No time limit.</p>
+        <ul class="space-y-3 mb-8">
+          <li class="flex items-start gap-2 text-sm text-muted">
+            <svg class="mt-0.5 shrink-0 text-green" width="16" height="16" viewBox="0 0 16 16" fill="#3fb950"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/></svg>
+            Up to 50 files per run
+          </li>
+          <li class="flex items-start gap-2 text-sm text-muted">
+            <svg class="mt-0.5 shrink-0 text-green" width="16" height="16" viewBox="0 0 16 16" fill="#3fb950"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/></svg>
+            All camera profiles
+          </li>
+          <li class="flex items-start gap-2 text-sm text-muted">
+            <svg class="mt-0.5 shrink-0 text-green" width="16" height="16" viewBox="0 0 16 16" fill="#3fb950"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/></svg>
+            macOS app + CLI scripts
+          </li>
+          <li class="flex items-start gap-2 text-sm text-muted">
+            <svg class="mt-0.5 shrink-0 text-green" width="16" height="16" viewBox="0 0 16 16" fill="#3fb950"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/></svg>
+            Gyroflow project generation
+          </li>
+        </ul>
+        <a href="#download-link" class="block text-center py-3 border border-border rounded-lg text-sm font-semibold text-muted hover:border-blue hover:text-blue transition-colors">
+          Download free
+        </a>
+      </div>
+
+      <!-- Pro tier -->
+      <div class="relative card-glow p-7 border-blue/40 shadow-[0_0_32px_#58a6ff18]">
+        <span class="absolute -top-3 left-6 px-3 py-1 bg-blue text-canvas text-xs font-bold rounded-full">PRO</span>
+        <p class="text-xs text-blue uppercase tracking-widest mb-3">Pro</p>
+        <p class="text-4xl font-extrabold text-fg mb-1">$29</p>
+        <p class="text-sm text-muted mb-6">One-time purchase. All future updates.</p>
+        <ul class="space-y-3 mb-8">
+          <li class="flex items-start gap-2 text-sm text-muted">
+            <svg class="mt-0.5 shrink-0" width="16" height="16" viewBox="0 0 16 16" fill="#58a6ff"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/></svg>
+            <strong class="text-fg">Unlimited</strong>&nbsp;files per run
+          </li>
+          <li class="flex items-start gap-2 text-sm text-muted">
+            <svg class="mt-0.5 shrink-0" width="16" height="16" viewBox="0 0 16 16" fill="#58a6ff"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/></svg>
+            Everything in Free
+          </li>
+          <li class="flex items-start gap-2 text-sm text-muted">
+            <svg class="mt-0.5 shrink-0" width="16" height="16" viewBox="0 0 16 16" fill="#58a6ff"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/></svg>
+            License key — activate in app or on this page
+          </li>
+          <li class="flex items-start gap-2 text-sm text-muted">
+            <svg class="mt-0.5 shrink-0" width="16" height="16" viewBox="0 0 16 16" fill="#58a6ff"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/></svg>
+            Email support
+          </li>
+        </ul>
+        <a href="#buy-link" class="dl-btn block text-center py-3 justify-center">
+          Buy Pro — $29
+        </a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── License Registration ────────────────────────────────────────────── -->
+  <section id="register" class="bg-surface/40 border-y border-border/60 py-20 px-6">
+    <div class="max-w-xl mx-auto text-center">
+      <h2 class="text-3xl font-bold text-fg mb-3">Activate your license</h2>
+      <p class="text-muted mb-10">Enter your license key here or open <strong class="text-fg">Jetlag → Preferences → License</strong> inside the app.</p>
+
+      <div class="card-glow p-6 text-left">
+        <label class="block text-sm font-medium text-muted mb-2" for="license-key">License key</label>
+        <div class="flex gap-3">
+          <input
+            id="license-key"
+            type="text"
+            placeholder="JETLAG-XXXX-XXXX-XXXX"
+            class="flex-1 bg-canvas border border-border rounded-lg px-4 py-3 tc text-sm text-fg placeholder-subtle focus:outline-none focus:border-blue focus:ring-1 focus:ring-blue/40 transition-colors"
+          />
+          <button
+            onclick="activateLicense()"
+            class="px-5 py-3 bg-blue text-canvas font-semibold text-sm rounded-lg hover:bg-[#79b8ff] transition-colors whitespace-nowrap"
+          >
+            Activate
+          </button>
+        </div>
+        <div id="license-msg" class="mt-3 text-sm hidden"></div>
+        <p class="mt-4 text-xs text-subtle">
+          Your key is stored locally. No account needed.
+          <a href="mailto:support@example.com" class="text-blue hover:underline">Need help?</a>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Download ────────────────────────────────────────────────────────── -->
+  <section class="py-24 px-6 text-center" id="download-link">
+    <div class="max-w-lg mx-auto">
+      <div class="mb-6 text-5xl">
+        <!-- Icon repeated small -->
+        <svg width="64" height="64" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" class="mx-auto rounded-2xl">
+          <defs>
+            <linearGradient id="d-bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#0d1117"/><stop offset="100%" style="stop-color:#161b22"/></linearGradient>
+            <linearGradient id="d-jet" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#e6edf3"/><stop offset="100%" style="stop-color:#8b949e"/></linearGradient>
+            <linearGradient id="d-tc" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#58a6ff;stop-opacity:0.2"/><stop offset="50%" style="stop-color:#58a6ff;stop-opacity:0.8"/><stop offset="100%" style="stop-color:#58a6ff;stop-opacity:0.2"/></linearGradient>
+            <filter id="d-glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          </defs>
+          <rect width="512" height="512" rx="100" fill="url(#d-bg)"/>
+          <rect x="48" y="308" width="416" height="2" rx="1" fill="url(#d-tc)"/>
+          <rect x="48" y="298" width="2" height="12" rx="1" fill="#58a6ff" opacity="0.5"/>
+          <rect x="152" y="298" width="2" height="12" rx="1" fill="#58a6ff" opacity="0.5"/>
+          <rect x="256" y="298" width="2" height="12" rx="1" fill="#58a6ff" opacity="0.5"/>
+          <rect x="360" y="298" width="2" height="12" rx="1" fill="#58a6ff" opacity="0.5"/>
+          <rect x="462" y="298" width="2" height="12" rx="1" fill="#58a6ff" opacity="0.5"/>
+          <rect x="282" y="285" width="2" height="38" rx="1" fill="#f78166" opacity="0.9"/>
+          <polygon points="276,285 290,285 283,294" fill="#f78166" opacity="0.9"/>
+          <rect x="144" y="340" width="224" height="52" rx="8" fill="#0d1117" stroke="#30363d" stroke-width="1.5"/>
+          <text x="256" y="376" font-family="'SF Mono','Courier New',monospace" font-size="30" font-weight="600" fill="#58a6ff" text-anchor="middle" filter="url(#d-glow)" letter-spacing="2">01:42:07:14</text>
+          <g transform="translate(256,190) rotate(-32) scale(1.15)">
+            <ellipse cx="0" cy="0" rx="80" ry="16" fill="url(#d-jet)"/>
+            <path d="M80,0 Q105,-6 120,0 Q105,6 80,0Z" fill="#c9d1d9"/>
+            <path d="M-70,-16 L-55,0 L-70,0Z" fill="#8b949e"/>
+            <path d="M-60,-16 Q-30,-38 -10,-16Z" fill="#8b949e"/>
+            <path d="M-20,-16 Q30,-62 55,-16Z" fill="#c9d1d9"/>
+            <path d="M-20,16 Q30,62 55,16Z" fill="#c9d1d9"/>
+            <ellipse cx="20" cy="-24" rx="18" ry="7" fill="#6e7681"/>
+            <ellipse cx="20" cy="24" rx="18" ry="7" fill="#6e7681"/>
+            <ellipse cx="-78" cy="0" rx="10" ry="5" fill="#ff7b72" opacity="0.7"/>
+          </g>
+          <line x1="90" y1="235" x2="148" y2="212" stroke="#8b949e" stroke-width="1.5" opacity="0.35" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h2 class="text-3xl font-bold text-fg mb-3">Download Jetlag</h2>
+      <p class="text-muted mb-8">macOS 13 Ventura or later. Apple Silicon &amp; Intel.</p>
+
+      <a href="#" class="dl-btn inline-flex mx-auto mb-4">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Zm-1-5.232L7.22 13.53a.75.75 0 0 0 1.06 0l5.47-4.762a.75.75 0 0 0-.53-1.268H9.75V2.75a.75.75 0 0 0-1.5 0v4.75H4.28a.75.75 0 0 0-.53 1.268Z"/></svg>
+        Download Jetlag.dmg
+      </a>
+      <p class="text-xs text-subtle">Version 1.0&nbsp;&nbsp;·&nbsp;&nbsp;Free&nbsp;&nbsp;·&nbsp;&nbsp;No sign-in required</p>
+
+      <div class="mt-10 text-left card-glow p-5">
+        <p class="text-xs text-muted mb-3 font-semibold uppercase tracking-wider">Or run from source</p>
+        <pre class="tc text-xs text-muted leading-relaxed overflow-x-auto whitespace-pre-wrap">git clone https://github.com/brokenalarms/Jetlag
+cd Jetlag/scripts
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python3 media-pipeline.py --profile gopro --timezone +0900 --apply</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ──────────────────────────────────────────────────────────── -->
+  <footer class="border-t border-border/60 py-10 px-6">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-subtle">
+      <div class="flex items-center gap-2">
+        <svg width="20" height="20" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" class="rounded-md opacity-70">
+          <rect width="512" height="512" rx="100" fill="#161b22"/>
+          <g transform="translate(256,220) rotate(-32) scale(0.9)">
+            <ellipse cx="0" cy="0" rx="80" ry="16" fill="#8b949e"/>
+            <path d="M80,0 Q105,-6 120,0 Q105,6 80,0Z" fill="#6e7681"/>
+            <path d="M-20,-16 Q30,-62 55,-16Z" fill="#6e7681"/>
+            <path d="M-20,16 Q30,62 55,16Z" fill="#6e7681"/>
+          </g>
+        </svg>
+        <span>Jetlag</span>
+        <span class="text-border">·</span>
+        <span>macOS app for video timestamp sync</span>
+      </div>
+      <div class="flex gap-5">
+        <a href="https://github.com/brokenalarms/Jetlag" target="_blank" rel="noopener" class="hover:text-fg transition-colors">GitHub</a>
+        <a href="mailto:support@example.com" class="hover:text-fg transition-colors">Support</a>
+        <a href="#pricing" class="hover:text-fg transition-colors">Pricing</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    function activateLicense() {
+      const key = document.getElementById('license-key').value.trim();
+      const msg = document.getElementById('license-msg');
+      msg.classList.remove('hidden', 'text-green', 'text-red');
+
+      if (!key) {
+        msg.textContent = 'Please enter a license key.';
+        msg.classList.add('text-red-400', 'text-[#f78166]');
+        msg.classList.remove('hidden');
+        return;
+      }
+
+      // Placeholder — real validation would call a backend endpoint.
+      if (/^JETLAG-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(key)) {
+        msg.innerHTML = '&#10003; License activated. Restart Jetlag to unlock Pro features.';
+        msg.style.color = '#3fb950';
+      } else {
+        msg.innerHTML = '&#10007; Invalid key format. Keys look like <span class="tc">JETLAG-XXXX-XXXX-XXXX</span>.';
+        msg.style.color = '#f78166';
+      }
+      msg.classList.remove('hidden');
+    }
+
+    // Allow Enter key in license input
+    document.getElementById('license-key').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') activateLicense();
+    });
+  </script>
+
+</body>
+</html>
