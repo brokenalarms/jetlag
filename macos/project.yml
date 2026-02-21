@@ -28,7 +28,7 @@ targets:
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.video
-        INFOPLIST_KEY_NSHumanReadableCopyright: "© 2025 Daniel Lawrence"
+        INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 Daniel Lawrence"
         CODE_SIGN_ENTITLEMENTS: Sources/App.entitlements
     postBuildScripts:
       - name: Bundle scripts
