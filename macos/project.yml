@@ -37,3 +37,5 @@ targets:
           DEST="${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/scripts"
           rm -rf "$DEST"
           cp -r "${SRCROOT}/../scripts/" "$DEST"
+          rm -rf "$DEST/site-packages"
+          python3 -m pip install --quiet --target "$DEST/site-packages" -r "$DEST/requirements.txt"

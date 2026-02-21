@@ -16,14 +16,13 @@ import yaml
 
 SCRIPT_DIR = Path(__file__).parent.parent
 GENERATE_GYROFLOW = SCRIPT_DIR / "generate-gyroflow.sh"
-VENV_ACTIVATE = SCRIPT_DIR / "media-import" / "bin" / "activate"
 PROFILES_FILE = SCRIPT_DIR / "media-profiles.yaml"
 
 
 def run_generate_gyroflow(args: list[str]) -> subprocess.CompletedProcess:
     """Run generate-gyroflow.sh with given args."""
     quoted_args = " ".join(shlex.quote(arg) for arg in args)
-    cmd = f"source {VENV_ACTIVATE} && {GENERATE_GYROFLOW} {quoted_args}"
+    cmd = f"{GENERATE_GYROFLOW} {quoted_args}"
     return subprocess.run(
         cmd,
         shell=True,
