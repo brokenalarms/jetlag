@@ -59,8 +59,8 @@
 - PULL REQUESTS
   - after pushing, always output a pre-filled GitHub compare URL so the user can open a PR with one click:
     `https://github.com/brokenalarms/Jetlag/compare/<branch>?expand=1&title=<url-encoded-title>&body=<url-encoded-body>`
+  - keep the URL body to one short plain sentence — no newlines, no bullets — long URLs break markdown link rendering and get truncated. GitHub will override with the commit body anyway for single-commit branches.
   - title: imperative sentence, lowercase, no period — what changed, not what you did
-  - body: what changed and why, bullet list of files/scripts affected, how it was tested
 - SCENARIO/REGRESSION TESTS:
   - fix-media-timestamp:
     - if --overwrite-datetimeoriginal is specified, --timezone must be provided
