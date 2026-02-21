@@ -11,7 +11,7 @@
 - timezone is the timezone a group of videos is shot in, but is a concern unrelated to the profiles in media-profiles which are camera profiles and could be shot in any number of timezones.
 - PYTHON
   - each script is in Python over bash because it enables a more functional composition for readability - coding best practices are to use functional building blocks to build up a declarative picture of what needs to be read, what needs to be set, what needs to be done etc, then do it in the last step
-  - all new Python scripts will need to load the venv media-import to get the library deps before continuing.
+  - all new Python scripts source `lib/ensure-venv.sh` (via their `.sh` wrapper) which sets `PYTHONPATH` to `scripts/site-packages/`, installing deps there on first run.
 - FINAL CUT PRO
   - FCP uses file birth date to populate 'Content Created' field on import screen, but Keys:CreationDate for "Content Created" once imported. It will fall back to file birth time if Keys:CreationDate is not set.
   - therefore birth time is an essential part of the fix. setfile -d is used to set birth time. modification time is NOT set since it naturally reflects when the file was last modified (e.g., by exiftool metadata writes).
@@ -77,7 +77,7 @@
     - directories that were left empty as the result of a file being moved from it are deleted as soon as that last file is removed from it
     - directories that were already empty and didn't become so from files being moved are left
     - .DS_Store files should be deleted if they're the only thing preventing directory cleanup
-    - the shell script entry point to each py file imports the required venv
+    - the shell script entry point to each py file sources `lib/ensure-venv.sh` to set up `PYTHONPATH`
 - WORKFLOWS
   - import-media.py: copies from SD card (source_dir) to import_dir, uses --copy mode, tags after copy
   - media-pipeline.py: processes files in import_dir, organizes into ready_dir, uses move mode, fixes timestamps then organizes
@@ -99,6 +99,6 @@
   - macOS: when copying from SD card, birth time is often preserved from source FAT filesystem (not reset to copy time). This means birth time reflects camera's wrong timezone.
   - birth time shift of ~7 hours (or other non-standard offset) indicates camera timezone mismatch, not a bug
 - TODO.md
-  - TODO.md is a sliding context window for fresh agents — it captures current work in progress, known bugs, and next tasks
+  - TODO.md is a sliding context window for fresh agents — open tasks only; completed work belongs in commit messages, not here
   - at the start of each session, read TODO.md to understand the current state and pick ONE task from it to work on
-  - update TODO.md at the end of a session to reflect what was done and what remains
+  - at the end of a session, remove completed tasks and add any newly discovered ones; never add a "Done" section
