@@ -16,8 +16,8 @@ const steps = [
   },
   {
     number: '04',
-    title: 'Import to Final Cut Pro',
-    description: 'Drag your organized folder into FCP. The "Content Created" column shows the corrected shoot times and your multi-camera timeline just… works.',
+    title: 'Import to your editor',
+    description: 'Drag your organized folder into your video editor. The "Content Created" column shows the corrected shoot times and your multi-camera timeline just… works.',
   },
 ]
 

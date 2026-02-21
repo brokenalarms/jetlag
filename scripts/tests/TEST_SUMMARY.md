@@ -44,7 +44,7 @@ Comprehensive test suite for media timestamp fixing, tagging, and organization s
   - **Timezone boundary date changes** (crossing midnight)
   - **Negative timezones** (e.g., New York -05:00)
   - **UTC to local conversion** (files with only UTC timestamps)
-  - **Final Cut Pro specific behavior** (birth time for import, Keys:CreationDate for timeline)
+  - **Video editor compatibility** (birth time for import, Keys:CreationDate for timeline)
   - **End-to-end workflow** (import → fix → organize)
 
 ### Integration Tests (Testing Complete Workflows)
@@ -142,7 +142,7 @@ These tests lock in current behavior for:
 2. **Idempotency** - Running scripts twice is safe
 3. **Birth time only** - Modification time not artificially set
 4. **Check before write** - Tags/EXIF only written when needed
-5. **FCP compatibility** - Birth time for import, Keys:CreationDate for timeline
+5. **Video editor compatibility** - Birth time for import, Keys:CreationDate for timeline
 6. **Template substitution** - {{YYYY}}-{{MM}}-{{DD}} works correctly
 7. **Dry run mode** - Shows what will change without changing anything
 
@@ -163,7 +163,7 @@ $ python3 run-tests.py test_timezone_scenarios.py -v
 test_timezone_scenarios.py::TestTimezoneScenarios::test_scenario_viewing_in_japan_shot_in_taiwan PASSED
 test_timezone_scenarios.py::TestTimezoneScenarios::test_scenario_preserve_wallclock_shooting_time PASSED
 test_timezone_scenarios.py::TestTimezoneScenarios::test_scenario_timezone_boundary_date_change PASSED
-test_timezone_scenarios.py::TestFinalCutProBehavior::test_fcp_import_screen_uses_birth_time PASSED
+test_timezone_scenarios.py::TestVideoEditorBehavior::test_import_screen_uses_birth_time PASSED
 test_timezone_scenarios.py::TestRealWorldWorkflow::test_workflow_import_fix_organize PASSED
 
 ================================ 5 passed in 12.34s ================================

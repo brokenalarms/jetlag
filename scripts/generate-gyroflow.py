@@ -6,7 +6,7 @@ Generates a .gyroflow project file for a video with gyroscope data.
 Usage: generate-gyroflow.py FILE --preset '{"stabilization": {...}}' [--apply]
 
 The .gyroflow project file is placed next to the video by Gyroflow CLI.
-Used by Gyroflow Toolbox plugin in Final Cut Pro for real-time stabilization.
+Used by the Gyroflow Toolbox plugin for real-time stabilization.
 """
 
 import argparse

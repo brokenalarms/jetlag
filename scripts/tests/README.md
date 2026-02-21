@@ -17,7 +17,7 @@ Test real-world timezone scenarios and workflows.
   - Viewing in different timezones than shooting timezone
   - Preserve wallclock time vs display time modes
   - UTC conversions and date boundary crossing
-  - Final Cut Pro specific behavior
+  - Video editor compatibility behavior
   - End-to-end workflows
 
 ### Integration Tests

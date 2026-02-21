@@ -6,13 +6,13 @@
   - scripts/ — Python/shell scripts, lib/, media-profiles.yaml, tests/. Work standalone with no knowledge of the app.
   - macos/ — SwiftUI app. Sibling to scripts/, NOT nested inside it. Reads media-profiles.yaml and launches scripts.
   - docs/ — documentation. CLAUDE.md, README.md, TODO.md live at repo root.
-- the goal of these scripts are to manage workflow for importing videos from different cameras, so that they all appear interleaved with each other in Final Cut Pro (FCP) at the time at which they were initially filmed.
+- the goal of these scripts are to manage workflow for importing videos from different cameras, so that they all appear interleaved with each other in your video editor at the time at which they were initially filmed.
 - the time doesn't have to look the same as if I shot it, but the goal is for the files to maintain time relative to each other
 - timezone is the timezone a group of videos is shot in, but is a concern unrelated to the profiles in media-profiles which are camera profiles and could be shot in any number of timezones.
 - PYTHON
   - each script is in Python over bash because it enables a more functional composition for readability - coding best practices are to use functional building blocks to build up a declarative picture of what needs to be read, what needs to be set, what needs to be done etc, then do it in the last step
   - all new Python scripts source `lib/ensure-venv.sh` (via their `.sh` wrapper) which sets `PYTHONPATH` to `scripts/site-packages/`, installing deps there on first run.
-- FINAL CUT PRO
+- VIDEO EDITORS
   - FCP uses file birth date to populate 'Content Created' field on import screen, but Keys:CreationDate for "Content Created" once imported. It will fall back to file birth time if Keys:CreationDate is not set.
   - therefore birth time is an essential part of the fix. setfile -d is used to set birth time. modification time is NOT set since it naturally reflects when the file was last modified (e.g., by exiftool metadata writes).
   - Keys:CreationDate behavior: can be written with Z for UTC or with timezone. iPhone files are saved with TZ. FCP converts the field's timezone to UTC, then displays in current system timezone. So 08:07:22+08:00 becomes 00:07:22 UTC, then displays as 09:07:22 in Japan (+09:00).
@@ -22,7 +22,7 @@
   - exiftool should only be called (in each script) once max on each file read with needed values cached, then once on write, for performance. 
   - from ExifTool docs: "According to the specification, integer-format QuickTime date/time tags should be stored as UTC. Unfortunately, digital cameras often store local time values instead (presumably because they don't know the time zone). For this reason, by default ExifTool does not assume a time zone for these values. However, if the API QuickTimeUTC option is set, then ExifTool will assume these values are properly stored as UTC, and will convert them to local time when extracting."
   - our devices DO write UTC time to Media CreateDate and quicktime fields, and so we should interpret them as such (verifying that they are correct by adding the timezone encapsulated in DateTimeOriginal and checking it matches). We should generally avoid using the ExifTool QuicktimeUTC flag to handle this conversion for us since it's more complicated.
-    - there is no such thing as writing to UTC field as wall-clock time and having Final Cut Pro recognize it's not UTC anymore. FCP will take an integer QT UTC field as UTC, or a string field with 'Z' as UTC or with timezone.
+    - there is no such thing as writing to UTC field as wall-clock time and having video editors (like Final Cut Pro) recognize it's not UTC anymore. They will take an integer QT UTC field as UTC, or a string field with 'Z' as UTC or with timezone.
     - for performance, for each file in each script, exiftool should be called once to get requirements, then writing requirements are built in memory, then exiftool is again called once to write out the built up requirements.
 - YAMLFORMAT
   - In media-profiles.yaml, use inline array format `[item1, item2]` for short lists like file_extensions, companion_extensions, and tags
@@ -90,7 +90,7 @@
   - --group is embedded into the organize template: `{{YYYY}}/GROUP/{{YYYY}}-{{MM}}-{{DD}}`
   - finds files using profile's file_extensions (e.g., [".mp4", ".insv"]), processes alphabetically
   - checks for stale exiftool_tmp directories at startup (exiftool fails silently if these exist)
-  - generate-gyroflow.py: generates .gyroflow project files for Gyroflow Toolbox FCP plugin, non-fatal if no gyro data
+  - generate-gyroflow.py: generates .gyroflow project files for the Gyroflow Toolbox plugin, non-fatal if no gyro data
   - batch-generate-gyroflow.py: batch wrapper that scans a directory and runs generate-gyroflow.py on each file
   - shared utilities in scripts/lib/filesystem.py: find_media_files(), parse_machine_output(), cleanup_empty_parent_dirs()
   - summary at end: total processed, succeeded, changed, unchanged, failed (with list)

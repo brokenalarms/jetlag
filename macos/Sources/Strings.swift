@@ -11,7 +11,7 @@ enum Strings {
         static let preserveSource = String(localized: "workflow.preserveSource.help",
             defaultValue: "When enabled, files are copied from the memory card (leaving originals intact). When disabled, files are moved (deleted from card after successful copy).")
         static let timezone = String(localized: "workflow.timezone.help",
-            defaultValue: "Timezone the footage was shot in, used to fix timestamps for Final Cut Pro")
+            defaultValue: "Timezone the footage was shot in, used to fix timestamps for your video editor")
         static let timezoneManual = String(localized: "workflow.timezoneManual.help",
             defaultValue: "Enter timezone manually in +HHMM or -HHMM format (e.g. +0900 for Japan)")
         static let dryRun = String(localized: "workflow.dryRun.help",

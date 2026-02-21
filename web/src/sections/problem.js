@@ -11,7 +11,7 @@ export function renderProblem() {
             </h2>
             <p class="mt-4 text-base leading-relaxed text-white/55">
               GoPro stores timestamps in FAT filesystem time — no timezone info. Your iPhone records in UTC.
-              Your drone adds a different offset. By the time you import to Final Cut Pro, every clip is
+              Your drone adds a different offset. By the time you import to your video editor, every clip is
               hours apart in the timeline, even though they were all rolling at the same moment.
             </p>
             <p class="mt-4 text-base leading-relaxed text-white/55">

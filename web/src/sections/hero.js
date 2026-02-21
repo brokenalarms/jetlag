@@ -22,7 +22,7 @@ export function renderHero() {
       <!-- Subheadline -->
       <p class="animate-fade-up opacity-0 mx-auto mt-6 max-w-xl text-center text-lg leading-relaxed text-white/55" style="animation-delay: 0.35s">
         Jetlag fixes timestamps across GoPro, iPhone, drone, and cinema cameras so your footage lands in
-        the right place in Final Cut Pro — automatically.
+        the right place in your video editor — automatically.
       </p>
 
       <!-- CTAs -->
