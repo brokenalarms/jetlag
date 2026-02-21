@@ -4,6 +4,9 @@ struct WorkflowView: View {
     @Bindable var state: AppState
     @State private var sourceDirError: String?
     @FocusState private var sourceDirFocused: Bool
+    @State private var showUpgradeSheet = false
+    @State private var detectedFileCount = 0
+    private var licenseStore: LicenseStore { LicenseStore.shared }
 
     private var companionExtensions: String {
         state.activeProfile?.companionExtensions?.joined(separator: ", ") ?? ""
@@ -33,6 +36,17 @@ struct WorkflowView: View {
             LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
         }
         .navigationTitle("Workflow")
+        .sheet(isPresented: $showUpgradeSheet) {
+            UpgradeView(
+                fileCount: detectedFileCount,
+                store: licenseStore,
+                onDismiss: { showUpgradeSheet = false },
+                onUnlocked: {
+                    showUpgradeSheet = false
+                    runWorkflow()
+                }
+            )
+        }
     }
 
     // MARK: - Profile selection
@@ -294,7 +308,33 @@ struct WorkflowView: View {
         .gyroflow: "gyroflow"
     ]
 
+    private func countMediaFiles() -> Int {
+        guard let profile = state.activeProfile else { return 0 }
+        let extensions = (profile.fileExtensions ?? []).map {
+            $0.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        }
+        guard !extensions.isEmpty else { return 0 }
+        let dir = state.enabledSteps.contains(.importFromCard) ? state.sourceDir : (profile.importDir ?? "")
+        guard !dir.isEmpty else { return 0 }
+        guard let enumerator = FileManager.default.enumerator(
+            at: URL(fileURLWithPath: dir),
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return 0 }
+        return enumerator.reduce(0) { count, item in
+            guard let url = item as? URL else { return count }
+            return extensions.contains(url.pathExtension.lowercased()) ? count + 1 : count
+        }
+    }
+
     private func runWorkflow() {
+        let fileCount = countMediaFiles()
+        if fileCount > licenseStore.fileLimit {
+            detectedFileCount = fileCount
+            showUpgradeSheet = true
+            return
+        }
+
         state.clearLog()
         state.isRunning = true
 
