@@ -13,9 +13,9 @@
   - each script is in Python over bash because it enables a more functional composition for readability - coding best practices are to use functional building blocks to build up a declarative picture of what needs to be read, what needs to be set, what needs to be done etc, then do it in the last step
   - all new Python scripts source `lib/ensure-venv.sh` (via their `.sh` wrapper) which sets `PYTHONPATH` to `scripts/site-packages/`, installing deps there on first run.
 - VIDEO EDITORS
-  - Video editors use file birth date to populate 'Content Created' field on import screen, but Keys:CreationDate for "Content Created" once imported. It will fall back to file birth time if Keys:CreationDate is not set.
+  - FCP uses file birth date to populate 'Content Created' field on import screen, but Keys:CreationDate for "Content Created" once imported. It will fall back to file birth time if Keys:CreationDate is not set.
   - therefore birth time is an essential part of the fix. setfile -d is used to set birth time. modification time is NOT set since it naturally reflects when the file was last modified (e.g., by exiftool metadata writes).
-  - Keys:CreationDate behavior: can be written with Z for UTC or with timezone. iPhone files are saved with TZ. Video editors convert the field's timezone to UTC, then display in current system timezone. So 08:07:22+08:00 becomes 00:07:22 UTC, then displays as 09:07:22 in Japan (+09:00).
+  - Keys:CreationDate behavior: can be written with Z for UTC or with timezone. iPhone files are saved with TZ. FCP converts the field's timezone to UTC, then displays in current system timezone. So 08:07:22+08:00 becomes 00:07:22 UTC, then displays as 09:07:22 in Japan (+09:00).
   - iPhone footage records to Keys:CreationDate with timezone, so should match DateTimeOriginal
 - EXIF INFO and EXIFTOOL
   - DateTimeOriginal is the source of truth since it has both local time + datetime, so should never be modified (or written once if blank).

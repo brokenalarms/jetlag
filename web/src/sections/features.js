@@ -7,7 +7,7 @@ const features = [
   {
     icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 5V4a1 1 0 011-1h6a1 1 0 011 1v1" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v4M8 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
     title: '"Content Created" sync',
-    description: 'Sets both the EXIF Keys:CreationDate field and the macOS file birth time — the exact two fields video editors read on the import screen and in the browser.',
+    description: 'Sets both the EXIF Keys:CreationDate field and the macOS file birth time — the two timestamps that populate "Content Created" on import and in the media browser.',
   },
   {
     icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h4v4H4zM12 4h4v4h-4zM4 12h4v4H4zM12 12h4v4h-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
