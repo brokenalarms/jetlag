@@ -59,6 +59,7 @@
 - PULL REQUESTS
   - after pushing, always output a pre-filled GitHub compare URL so the user can open a PR with one click:
     `https://github.com/brokenalarms/Jetlag/compare/<branch>?expand=1&title=<url-encoded-title>&body=<url-encoded-body>`
+  - URL encoding rules for the link to render fully clickable in markdown: use `%20` for spaces (NOT `+`), encode `(` as `%28` and `)` as `%29`, no literal newlines or unencoded special chars
   - keep the URL body to one short plain sentence — no newlines, no bullets — long URLs break markdown link rendering and get truncated. GitHub will override with the commit body anyway for single-commit branches.
   - title: imperative sentence, lowercase, no period — what changed, not what you did
 - SCENARIO/REGRESSION TESTS:
