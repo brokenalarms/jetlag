@@ -157,7 +157,8 @@ struct ProfileEditorView: View {
         ScrollView {
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
                 GridRow {
-                    Text("Name").gridColumnAlignment(.trailing)
+                    Text("Name")
+                        .gridColumnAlignment(.trailing)
                     TextField("profile-name", text: $profileName)
                         .textFieldStyle(.roundedBorder)
                 }
@@ -322,16 +323,18 @@ struct HelpButton: View {
     }
 
     var body: some View {
-        Image(systemName: "questionmark.circle")
-            .foregroundStyle(.secondary)
-            .onTapGesture { showHelp.toggle() }
-            .popover(isPresented: $showHelp, arrowEdge: .bottom) {
-                Text(text)
-                    .font(.caption)
-                    .padding(10)
-                    .frame(width: 240, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+        Button { showHelp.toggle() } label: {
+            Image(systemName: "questionmark.circle")
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showHelp, arrowEdge: .bottom) {
+            Text(text)
+                .font(.caption)
+                .padding(10)
+                .frame(width: 240, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 

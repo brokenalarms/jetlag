@@ -57,9 +57,12 @@ struct TimezonePickerView: View {
                                 .font(.system(.body, design: .monospaced))
                         }
                     }
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.bordered)
             .popover(isPresented: $showingPopover, arrowEdge: .bottom) {
                 VStack(spacing: 0) {
                     HStack {

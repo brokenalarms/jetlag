@@ -24,10 +24,13 @@ struct WorkflowView: View {
                     if !state.selectedProfile.isEmpty {
                         stepsPipeline
                         stepOptions
-                        executionBar
                     }
                 }
                 .padding()
+            }
+
+            if !state.selectedProfile.isEmpty {
+                executionBar
             }
 
             LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
@@ -151,7 +154,7 @@ struct WorkflowView: View {
     private var enabledStepsSummary: String {
         let enabled = state.availableSteps.filter { state.enabledSteps.contains($0) }
         if enabled.isEmpty { return "No steps selected" }
-        return enabled.map(\.help).joined(separator: " → ")
+        return enabled.map(\.rawValue).joined(separator: " → ")
     }
 
     // MARK: - Step-specific options
@@ -219,7 +222,8 @@ struct WorkflowView: View {
 
             if state.enabledSteps.contains(.fixTimezone) {
                 GridRow {
-                    Text("Timezone").gridColumnAlignment(.trailing)
+                    HelpLabel("Timezone", help: Strings.Workflow.timezone)
+                        .gridColumnAlignment(.trailing)
                     HStack(spacing: 6) {
                         if !state.useTimezonePicker {
                             TextField("+HHMM", text: $state.timezone)
@@ -250,34 +254,37 @@ struct WorkflowView: View {
     // MARK: - Execution
 
     private var executionBar: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
-            Divider().gridCellUnsizedAxes(.horizontal)
-            GridRow {
-                Text("Mode").gridColumnAlignment(.trailing)
-                HStack(spacing: 12) {
-                    Picker("", selection: $state.applyMode) {
-                        Text("Dry Run").tag(false)
-                        Text("Apply").tag(true)
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 160)
-
-                    Button(state.isRunning ? "Running..." : "Run") { runWorkflow() }
-                        .disabled(
-                            state.isRunning
-                            || state.selectedProfile.isEmpty
-                            || state.enabledSteps.isEmpty
-                            || !timezoneIsValid
-                        )
-                        .keyboardShortcut(.return, modifiers: .command)
-                        .buttonStyle(.borderedProminent)
-
-                    if state.isRunning {
-                        Button("Cancel", role: .destructive) { state.cancelRunning() }
-                    }
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 12) {
+                HelpLabel("Mode", help: Strings.Workflow.dryRun)
+                    .foregroundStyle(.secondary)
+                Picker("", selection: $state.applyMode) {
+                    Text("Dry Run").tag(false)
+                    Text("Apply").tag(true)
                 }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 160)
+
+                Spacer()
+
+                if state.isRunning {
+                    Button("Cancel", role: .destructive) { state.cancelRunning() }
+                }
+                Button(state.isRunning ? "Running..." : "Run") { runWorkflow() }
+                    .disabled(
+                        state.isRunning
+                        || state.selectedProfile.isEmpty
+                        || state.enabledSteps.isEmpty
+                        || !timezoneIsValid
+                    )
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .buttonStyle(.borderedProminent)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.bar)
         }
     }
 
