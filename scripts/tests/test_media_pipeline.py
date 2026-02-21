@@ -19,7 +19,6 @@ import yaml
 
 SCRIPT_DIR = Path(__file__).parent.parent
 MEDIA_PIPELINE = SCRIPT_DIR / "media-pipeline.sh"
-VENV_ACTIVATE = SCRIPT_DIR / "media-import" / "bin" / "activate"
 
 
 @dataclass
@@ -44,7 +43,7 @@ def run_pipeline(args: list[str], cwd: Optional[Path] = None) -> PipelineResult:
     - combined: use result.output for full output
     """
     quoted_args = " ".join(shlex.quote(arg) for arg in args)
-    cmd = f"source {VENV_ACTIVATE} && {MEDIA_PIPELINE} {quoted_args}"
+    cmd = f"{MEDIA_PIPELINE} {quoted_args}"
     result = subprocess.run(
         cmd,
         shell=True,

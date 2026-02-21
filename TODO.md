@@ -1,21 +1,7 @@
 # TODO — sliding context window
 
 Read this at the start of each session. Pick ONE task and work on it.
-Update this file at the end of the session.
-
----
-
-## Done recently
-
-- Added Jetlag macOS SwiftUI app (`macos/`) — profile editor, workflow runner, timezone picker, log output
-- Added `generate-gyroflow.py` / `batch-generate-gyroflow.py` for Gyroflow Toolbox FCP plugin
-- Integrated gyroflow step into `media-pipeline.py`
-- Extracted shared `lib/filesystem.py` utilities (find_media_files, parse_machine_output, cleanup_empty_parent_dirs)
-- Performance fixes: batched `tag --add` calls in `tag-media.py` (was looping per tag); batched exiftool writes in `fix-media-timestamp.py` (was 3 separate subprocess calls, now 1)
-- Added `tests/test_performance.py` — snapshot harness with regression detection (threshold 5%)
-- Removed `name` field from `MediaProfile` — profile name is the YAML dict key, read/written as such; no injection loop needed
-- Fixed `updateEnabledSteps()` in `WorkflowView` — was always resetting to all available steps; now correctly intersects with current enabled set
-- Added `--tasks [tag fix-timestamp organize gyroflow]` to `media-pipeline.py` — defaults to all; `WorkflowView` passes enabled steps
+Update this file at the end of the session. Completed work is recorded in commit messages — do not add a "Done" section here.
 
 ---
 
@@ -27,7 +13,7 @@ Update this file at the end of the session.
 
 2. **`ScriptRunner` stream race condition** — `terminationHandler` calls `continuation.finish()` immediately when the process exits, but `readabilityHandler` callbacks may not have flushed all buffered data yet. Final lines of script output can be lost. Fix: drain both pipes explicitly before finishing the continuation (read until EOF on both file handles before calling `continuation.finish()`).
 
-3. **Scripts not bundled for release builds** — release Xcode build has no copy phase for `scripts/` into the app bundle. `DevConfig.scriptsDirectory` returns `nil` in release, and `Bundle.main.resourcePath + "/scripts"` will not exist.
+3. ~~**Scripts not bundled for release builds**~~ — `project.yml` `postBuildScripts` copies `scripts/` for all configurations; `AppState` uses `Bundle.main.resourcePath` unconditionally. Not a live issue.
 
 4. **MapKit / CoreLocation linked but unused** — `project.yml` links `MapKit.framework` and `CoreLocation.framework` but `TimezonePickerView` only uses `TimeZone.knownTimeZoneIdentifiers`. Remove the unused framework dependencies unless a map-based picker is planned.
 
