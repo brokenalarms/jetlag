@@ -2,10 +2,9 @@ import SwiftUI
 
 struct TimezonePickerView: View {
     @Binding var selectedTimezone: String
-    @State private var searchText = ""
-    @State private var showingPopover = false
+    @State private var showingPicker = false
 
-    private static let timezones: [(id: String, label: String, offset: String)] = {
+    fileprivate static let timezones: [(id: String, label: String, offset: String)] = {
         TimeZone.knownTimeZoneIdentifiers.sorted().compactMap { id in
             guard let tz = TimeZone(identifier: id) else { return nil }
             let seconds = tz.secondsFromGMT()
@@ -19,10 +18,60 @@ struct TimezonePickerView: View {
         }
     }()
 
+    var body: some View {
+        Button {
+            showingPicker = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "globe")
+                if selectedTimezone.isEmpty {
+                    Text("Select timezone...")
+                        .foregroundStyle(.secondary)
+                } else {
+                    let match = Self.timezones.first { $0.offset == selectedTimezone }
+                    if let match {
+                        Text(match.label.components(separatedBy: "/").last ?? match.label)
+                        Text(match.offset)
+                            .font(.system(.body, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(selectedTimezone)
+                            .font(.system(.body, design: .monospaced))
+                    }
+                }
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(minWidth: 180)
+            .background(.background)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(.separator, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showingPicker) {
+            TimezonePickerSheet(
+                selectedTimezone: $selectedTimezone,
+                isPresented: $showingPicker
+            )
+        }
+    }
+}
+
+private struct TimezonePickerSheet: View {
+    @Binding var selectedTimezone: String
+    @Binding var isPresented: Bool
+    @State private var searchText = ""
+
     private var filtered: [(id: String, label: String, offset: String)] {
-        if searchText.isEmpty { return Self.timezones }
+        if searchText.isEmpty { return TimezonePickerView.timezones }
         let query = searchText.lowercased()
-        return Self.timezones.filter {
+        return TimezonePickerView.timezones.filter {
             $0.label.lowercased().contains(query) || $0.offset.contains(query)
         }
     }
@@ -35,70 +84,45 @@ struct TimezonePickerView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Button {
-                showingPopover.toggle()
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "globe")
-                        .foregroundStyle(.secondary)
-                    if selectedTimezone.isEmpty {
-                        Text("Select timezone...")
-                            .foregroundStyle(.tertiary)
-                    } else {
-                        let match = Self.timezones.first { $0.offset == selectedTimezone }
-                        if let match {
-                            Text(match.label.components(separatedBy: "/").last ?? match.label)
-                            Text(match.offset)
-                                .font(.system(.body, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text(selectedTimezone)
-                                .font(.system(.body, design: .monospaced))
-                        }
-                    }
+        VStack(spacing: 0) {
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Search timezones...", text: $searchText)
+                    .textFieldStyle(.plain)
+                Spacer()
+                Button("Done") {
+                    isPresented = false
                 }
             }
-            .buttonStyle(.plain)
-            .popover(isPresented: $showingPopover, arrowEdge: .bottom) {
-                VStack(spacing: 0) {
-                    HStack {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundStyle(.secondary)
-                        TextField("Search timezones...", text: $searchText)
-                            .textFieldStyle(.plain)
-                    }
-                    .padding(8)
+            .padding(8)
 
-                    Divider()
+            Divider()
 
-                    List {
-                        ForEach(grouped, id: \.region) { group in
-                            Section(group.region) {
-                                ForEach(group.items, id: \.id) { item in
-                                    Button {
-                                        selectedTimezone = item.offset
-                                        showingPopover = false
-                                        searchText = ""
-                                    } label: {
-                                        HStack {
-                                            Text(item.label.components(separatedBy: "/").dropFirst().joined(separator: " / "))
-                                                .lineLimit(1)
-                                            Spacer()
-                                            Text(item.offset)
-                                                .font(.system(.caption, design: .monospaced))
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                    .buttonStyle(.plain)
+            List {
+                ForEach(grouped, id: \.region) { group in
+                    Section(group.region) {
+                        ForEach(group.items, id: \.id) { item in
+                            Button {
+                                selectedTimezone = item.offset
+                                isPresented = false
+                            } label: {
+                                HStack {
+                                    Text(item.label.components(separatedBy: "/").dropFirst().joined(separator: " / "))
+                                        .lineLimit(1)
+                                    Spacer()
+                                    Text(item.offset)
+                                        .font(.system(.caption, design: .monospaced))
+                                        .foregroundStyle(.secondary)
                                 }
                             }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .listStyle(.plain)
                 }
-                .frame(width: 320, height: 300)
             }
+            .listStyle(.plain)
         }
+        .frame(width: 320, height: 380)
     }
 }
