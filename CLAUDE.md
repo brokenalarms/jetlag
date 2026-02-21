@@ -49,7 +49,7 @@
   - testing that returncode is 0 is not testing the actual behavior or effect of the code, just that it ran without error, so would make for a useless test
   - simarly testing result.stdout reveals nothing but what the logs said, which could lie. the changes to the fake test file need to be recorded before and after with actual/expected human readable messages.
 - COMMITS
-  - before committing, always fetch and check the branch: `git fetch origin <branch> main` then `git log origin/main..origin/<branch>` to see what's already pushed. **`git branch -r --merged` does NOT detect squash merges (which GitHub uses by default) — never rely on it.** Instead, check `git log origin/main --oneline | head -10` to see if a recent commit title matches the PR/branch (e.g. `Claude/create swift UI pr (#5)`). If main has advanced past the branch's merge-base and the content is in main, the branch was squash-merged — create a new branch before committing.
+  - before **every** commit, always fetch and check the branch: `git fetch origin <branch> main` then `git log origin/main --oneline | head -10` to confirm the branch hasn't been merged since the last commit. **`git branch -r --merged` does NOT detect squash merges (which GitHub uses by default) — never rely on it.** If a recent main commit title matches the PR/branch (e.g. `Claude/create swift UI pr (#5)`), the branch was squash-merged — create a new branch before committing.
   - commits should be atomic: one feature change or bug fix per commit where possible
   - related atomic commits may be grouped into a single PR
   - never commit without first running tests with `pytest -x` and confirming they pass
