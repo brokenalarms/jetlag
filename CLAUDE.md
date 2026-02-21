@@ -54,6 +54,12 @@
   - related atomic commits may be grouped into a single PR
   - never commit without first running tests with `pytest -x` and confirming they pass
   - one branch per PR — never reuse a branch that has already been merged into main; create a new branch for each new PR
+- PULL REQUESTS
+  - title: imperative sentence, lowercase, no period — describe what changed, not what you did (e.g. `fix timestamp offset for GoPro files`, not `Fixed some bugs`)
+  - description must include:
+    - **What**: one or two sentences on what changed and why
+    - **Changes**: bullet list of files/scripts modified and what each does differently
+    - **Test plan**: how the change was tested (e.g. `pytest -x passed`, specific scenario tested)
 - SCENARIO/REGRESSION TESTS:
   - fix-media-timestamp:
     - if --overwrite-datetimeoriginal is specified, --timezone must be provided
