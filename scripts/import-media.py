@@ -434,7 +434,7 @@ Examples:
     parser.add_argument('--group',
                        help='Group name for organizing dates (e.g., "Japan", "Wedding")')
     parser.add_argument('--skip-companion', action='store_true',
-                       help='Skip companion files (.lrv, .thm) - saves space, recommended for FCP workflows')
+                       help='Skip companion files (.lrv, .thm) - saves space, recommended for video editor workflows')
     parser.add_argument('--profiles-file',
                        help='Path to profiles configuration file')
     parser.add_argument('--apply', action='store_true',

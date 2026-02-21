@@ -192,7 +192,7 @@ set_file_timestamps() {
   exiftool_args+=("-FileAccessDate=$corrected_timestamp")
   has_metadata_changes=1
   
-  # Remove CreationDate if it exists (FCP misinterprets this field)
+  # Remove CreationDate if it exists (misinterpreted by video editors on import)
   if [[ -n "$KEYS_CREATION_DATE" ]]; then
     exiftool_args+=("-Keys:CreationDate=")
     has_metadata_changes=1

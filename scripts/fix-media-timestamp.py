@@ -700,7 +700,7 @@ def check_file_system_timestamps_need_update(file_path: str, datetime_original: 
     except ValueError:
         return True  # Can't parse expected time, assume update needed
 
-    # Check birth time (essential for FCP import screen)
+    # Check birth time (essential for video editor import)
     if current_fs.get("birth"):
         try:
             current_birth = datetime.strptime(current_fs["birth"], '%Y:%m:%d %H:%M:%S')

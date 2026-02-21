@@ -32,7 +32,7 @@ Some scripts require environment variables for sensitive information (credential
 ### Video Timestamp Processing
 
 This is primarily to correct Insta360 exports (prefixed `VID_`), where the raw 360 files have correct timestamps but the exports made at some point later don't.
-We can rewrite the timestamps using the original datetime parsed from the filename to ensure these files show up in order in your Final Cut Pro or the like.
+We can rewrite the timestamps using the original datetime parsed from the filename to ensure these files show up in the correct order in your video editor.
 
 - `fix-video-timestamp.sh` - Process single video file timestamps
 - `batch-fix-video-timestamps.sh` - Batch process multiple video files  

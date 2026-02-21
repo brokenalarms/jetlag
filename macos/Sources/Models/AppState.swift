@@ -38,7 +38,7 @@ enum PipelineStep: String, CaseIterable, Identifiable {
         switch self {
         case .importFromCard: "Copy files from source (memory card) to import directory"
         case .tag: "Apply Finder tags and EXIF metadata from profile"
-        case .fixTimezone: "Correct timestamps for Final Cut Pro using the selected timezone"
+        case .fixTimezone: "Correct timestamps for your video editor using the selected timezone"
         case .organize: "Sort files into date-based folder structure in the ready directory"
         case .gyroflow: "Generate Gyroflow stabilization project files (requires gyro data)"
         }

@@ -96,12 +96,12 @@ In `ProfilesView`, the name being edited is tracked as a separate `String` along
 1. **Filename** — `YYYYMMDD_HHMMSS` pattern in the filename is the highest priority source of truth. Never modify filenames.
 2. **`DateTimeOriginal`** — contains local time + timezone offset. This is the source of truth for the shoot time. Never modify it unless `--overwrite-datetimeoriginal` is explicitly passed.
 3. **QuickTime UTC fields** (`MediaCreateDate`, etc.) — integer fields that should store UTC. Our devices write real UTC here. Interpret as UTC and verify by cross-checking against `DateTimeOriginal + timezone`.
-4. **File birth time** — set via `setfile -d`. FCP uses this as the fallback for "Content Created" on import.
+4. **File birth time** — set via `setfile -d`. Video editors use this as the fallback for "Content Created" on import.
 
-### What FCP reads
+### What video editors read
 
 - **Import screen** ("Content Created"): reads file birth time.
-- **After import** (`Keys:CreationDate`): FCP converts the stored timezone to UTC, then displays in the system timezone. A value of `08:07:22+08:00` is stored, converted to `00:07:22 UTC`, displayed as `09:07:22` in Japan (+09:00).
+- **After import** (`Keys:CreationDate`): Video editors convert the stored timezone to UTC, then display in the system timezone. A value of `08:07:22+08:00` is stored, converted to `00:07:22 UTC`, displayed as `09:07:22` in Japan (+09:00).
 - iPhone records `Keys:CreationDate` with timezone — this should match `DateTimeOriginal`.
 - Modification time is **not set** by these scripts (it naturally reflects when the file was last written, e.g. by exiftool).
 

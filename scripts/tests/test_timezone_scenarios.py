@@ -104,7 +104,7 @@ class TestTimezoneScenarios:
         - DateTimeOriginal: 2025:06:18 07:25:21+08:00 (preserved, source of truth)
         - Keys:CreationDate: 2025:06:18 07:25:21+08:00 (matches DateTimeOriginal)
         - QuickTime CreateDate: 2025:06:17 23:25:21 (UTC)
-        - File birth time: Should make FCP show 08:25:21 when viewing in Japan
+        - File birth time: Should display as 08:25:21 when viewing in Japan
         """
         # Create video shot at 07:25:21 in Taiwan (+08:00)
         video_path = self.create_video_shot_in_timezone(
@@ -332,11 +332,11 @@ class TestTimezoneScenarios:
         assert "2025:06:17 17:30:00" in qt2
 
 
-class TestFinalCutProBehavior:
+class TestVideoEditorBehavior:
     """
-    Test expected behavior in Final Cut Pro specifically
+    Test expected behavior in video editors
 
-    FCP uses:
+    Video editors use:
     - Keys:CreationDate for timeline ordering after import
     - File birth time for "Content Created" on import screen
     """
@@ -348,13 +348,13 @@ class TestFinalCutProBehavior:
         shutil.rmtree(self.temp_dir)
         fmt._exif_cache.clear()
 
-    def test_fcp_import_screen_uses_birth_time(self):
+    def test_import_screen_uses_birth_time(self):
         """
-        Verify that file birth time is set correctly for FCP import screen
+        Verify that file birth time is set correctly for video editor import screen
 
-        FCP import screen shows "Content Created" from file birth time
+        Video editors show "Content Created" from file birth time on the import screen
         """
-        video_path = os.path.join(self.temp_dir, "fcp_test.mp4")
+        video_path = os.path.join(self.temp_dir, "nle_test.mp4")
 
         subprocess.run([
             "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
@@ -385,13 +385,13 @@ class TestFinalCutProBehavior:
         assert birth_dt.year == 2025
         assert birth_dt.month == 6
 
-    def test_fcp_timeline_uses_keys_creationdate(self):
+    def test_timeline_uses_keys_creationdate(self):
         """
-        Verify Keys:CreationDate is set for FCP timeline ordering
+        Verify Keys:CreationDate is set for video editor timeline ordering
 
-        FCP uses Keys:CreationDate for "Content Created" after import
+        Video editors use Keys:CreationDate for "Content Created" after import
         """
-        video_path = os.path.join(self.temp_dir, "fcp_timeline.mp4")
+        video_path = os.path.join(self.temp_dir, "nle_timeline.mp4")
 
         subprocess.run([
             "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
@@ -445,7 +445,7 @@ class TestRealWorldWorkflow:
         1. Copying GoPro files from SD card
         2. Running fix-media-timestamp
         3. Running organize-by-date
-        4. Verifying Final Cut Pro will show correct times
+        4. Verifying video editor will show correct times
         """
         # Create GoPro-style video
         video_path = os.path.join(self.source_dir, "GX010123.MP4")
