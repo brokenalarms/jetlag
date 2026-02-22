@@ -1,2 +1,3 @@
 humanize
 PyYAML
+pytest

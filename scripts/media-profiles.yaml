@@ -24,8 +24,13 @@ profiles:
     exif:
       make: Insta360
       model: X4
-    file_extensions: [.mp4, .insv]
-    companion_extensions: [.lrv, .thm, .list]
+    file_extensions:
+    - .mp4
+    - .insv
+    companion_extensions:
+    - .lrv
+    - .thm
+    - .list
   gopro:
     type: video
     source_dir: /Volumes/Untitled/DCIM
@@ -40,8 +45,12 @@ profiles:
     exif:
       make: GoPro
       model: HERO12 Black
-    file_extensions: [.mp4]
-    companion_extensions: [.thm, .lrv, .sav]
+    file_extensions:
+    - .mp4
+    companion_extensions:
+    - .thm
+    - .lrv
+    - .sav
   dji-mini-4-pro-video:
     type: video
     source_dir: /Volumes/Untitled/DCIM
@@ -56,8 +65,13 @@ profiles:
     exif:
       make: DJI
       model: Mini 4 Pro
-    file_extensions: [.mp4, .mov]
-    companion_extensions: [.lrf, .thm, .srt]
+    file_extensions:
+    - .mp4
+    - .mov
+    companion_extensions:
+    - .lrf
+    - .thm
+    - .srt
   dji-mini-4-pro-photo:
     type: photo
     source_dir: /Volumes/Untitled/DCIM
@@ -70,7 +84,9 @@ profiles:
     exif:
       make: DJI
       model: Mini 4 Pro
-    file_extensions: [.dng, .jpg]
+    file_extensions:
+    - .dng
+    - .jpg
     companion_extensions: []
   sony-a7iv-photo:
     type: photo
@@ -85,8 +101,13 @@ profiles:
     exif:
       make: Sony
       model: ILCE-7M4
-    file_extensions: [.arw, .jpg, .hif, .xmp]
-    companion_extensions: [.xml]
+    file_extensions:
+    - .arw
+    - .jpg
+    - .hif
+    - .xmp
+    companion_extensions:
+    - .xml
   sony-a7iv-video:
     type: video
     source_dir: /Volumes/Untitled/PRIVATE
@@ -101,8 +122,13 @@ profiles:
     exif:
       make: Sony
       model: ILCE-7M4
-    file_extensions: [.mp4, .mov]
-    companion_extensions: [.xml, .bin, .jpg]
+    file_extensions:
+    - .mp4
+    - .mov
+    companion_extensions:
+    - .xml
+    - .bin
+    - .jpg
   sony-a7v-photo:
     type: photo
     source_dir: /Volumes/Untitled/DCIM
@@ -116,8 +142,13 @@ profiles:
     exif:
       make: Sony
       model: ILCE-7M5
-    file_extensions: [.arw, .jpg, .hif, .xmp]
-    companion_extensions: [.xml]
+    file_extensions:
+    - .arw
+    - .jpg
+    - .hif
+    - .xmp
+    companion_extensions:
+    - .xml
   sony-a7v-video:
     type: video
     source_dir: /Volumes/Untitled/PRIVATE
@@ -132,8 +163,13 @@ profiles:
     exif:
       make: Sony
       model: ILCE-7M5
-    file_extensions: [.mp4, .mov]
-    companion_extensions: [.xml, .bin, .jpg]
+    file_extensions:
+    - .mp4
+    - .mov
+    companion_extensions:
+    - .xml
+    - .bin
+    - .jpg
   iphone-16-pro:
     type: video
     source_dir: /Volumes/Untitled/DCIM
@@ -148,5 +184,7 @@ profiles:
     exif:
       make: Apple
       model: iPhone 16 Pro
-    file_extensions: [.mov, .mp4]
+    file_extensions:
+    - .mov
+    - .mp4
     companion_extensions: []

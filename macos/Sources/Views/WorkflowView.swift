@@ -147,109 +147,122 @@ struct WorkflowView: View {
     @ViewBuilder
     private var stepOptions: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Subfolder field (always shown)
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
-                GridRow {
-                    HelpLabel("Subfolder", help: Strings.Workflow.subfolder)
-                        .gridColumnAlignment(.trailing)
-                    TextField("Optional", text: $state.subfolder)
-                        .textFieldStyle(.roundedBorder)
-                }
-            }
-
-            // Import from card options
+            subfolderField
+            
             if state.enabledSteps.contains(.importFromCard) {
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 12) {
-                        // Source directory
-                        HStack(spacing: 6) {
-                            Text("Source:")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .frame(width: 60, alignment: .trailing)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 6) {
-                                    TextField("SD card or directory path", text: $state.sourceDir)
-                                        .textFieldStyle(.roundedBorder)
-                                        .focused($sourceDirFocused)
-                                        .onChange(of: sourceDirFocused) { _, focused in
-                                            if !focused { validateSourceDir() }
-                                        }
-                                        .onChange(of: state.sourceDir) { _, _ in
-                                            sourceDirError = nil
-                                        }
-                                    Button("Browse...") { pickSourceDir() }
-                                        .controlSize(.small)
-                                }
-                                if let error = sourceDirError {
-                                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                                        .font(.caption)
-                                        .foregroundStyle(.red)
-                                }
-                            }
-                        }
-                        
-                        Divider()
-                        
-                        // Import actions
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 4) {
-                                Toggle(isOn: $state.skipCompanion) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Skip companion files")
-                                        if !companionExtensions.isEmpty {
-                                            Text(companionExtensions)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                }
-                                HelpButton(Strings.Workflow.skipCompanion)
-                            }
-                            
-                            HStack(spacing: 4) {
-                                Toggle("Leave source files in place", isOn: $state.preserveSource)
-                                HelpButton(Strings.Workflow.preserveSource)
-                            }
-                        }
-                    }
-                    .padding(4)
-                } label: {
-                    Label("Memory Card / Source Actions", systemImage: "sdcard")
-                        .font(.headline)
-                        .foregroundStyle(Color("NeonCyan"))
-                }
+                importCardOptions
             }
 
-            // Timezone field
             if state.enabledSteps.contains(.fixTimezone) {
-                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
-                    GridRow {
-                        Text("Timezone").gridColumnAlignment(.trailing)
-                        HStack(spacing: 6) {
-                            if !state.useTimezonePicker {
-                                TextField("+HHMM", text: $state.timezone)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(width: 90)
-                                    .foregroundColor(timezoneIsValid ? .primary : .red)
-                                if !timezoneIsValid {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .foregroundStyle(.yellow)
-                                        .help("Expected format: +HHMM or -HHMM")
-                                }
-                            } else {
-                                TimezonePickerView(selectedTimezone: $state.timezone)
-                            }
-                            Spacer()
-                            Button {
-                                state.useTimezonePicker.toggle()
-                            } label: {
-                                Image(systemName: state.useTimezonePicker ? "keyboard" : "globe")
-                            }
-                            .help(state.useTimezonePicker ? "Type manually" : "Pick from list")
+                timezoneField
+            }
+        }
+    }
+    
+    private var subfolderField: some View {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
+            GridRow {
+                HelpLabel("Subfolder", help: Strings.Workflow.subfolder)
+                    .gridColumnAlignment(.trailing)
+                TextField("Optional", text: $state.subfolder)
+                    .textFieldStyle(.roundedBorder)
+            }
+        }
+    }
+    
+    private var importCardOptions: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 12) {
+                sourceDirectoryField
+                Divider()
+                importActionToggles
+            }
+            .padding(4)
+        } label: {
+            Label("Memory Card / Source Actions", systemImage: "sdcard")
+                .font(.headline)
+                .foregroundStyle(Color("NeonCyan"))
+        }
+    }
+    
+    private var sourceDirectoryField: some View {
+        HStack(spacing: 6) {
+            Text("Source:")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(width: 60, alignment: .trailing)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    TextField("SD card or directory path", text: $state.sourceDir)
+                        .textFieldStyle(.roundedBorder)
+                        .focused($sourceDirFocused)
+                        .onChange(of: sourceDirFocused) { _, focused in
+                            if !focused { validateSourceDir() }
+                        }
+                        .onChange(of: state.sourceDir) { _, _ in
+                            sourceDirError = nil
+                        }
+                    Button("Browse...") { pickSourceDir() }
+                        .controlSize(.small)
+                }
+                if let error = sourceDirError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+    }
+    
+    private var importActionToggles: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 4) {
+                Toggle(isOn: $state.skipCompanion) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Skip companion files")
+                        if !companionExtensions.isEmpty {
+                            Text(companionExtensions)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
+                }
+                HelpButton(Strings.Workflow.skipCompanion)
+            }
+            
+            HStack(spacing: 4) {
+                Toggle("Leave source files in place", isOn: $state.preserveSource)
+                HelpButton(Strings.Workflow.preserveSource)
+            }
+        }
+    }
+    
+    private var timezoneField: some View {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
+            GridRow {
+                Text("Timezone").gridColumnAlignment(.trailing)
+                HStack(spacing: 6) {
+                    if !state.useTimezonePicker {
+                        TextField("+HHMM", text: $state.timezone)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 90)
+                            .foregroundColor(timezoneIsValid ? .primary : .red)
+                        if !timezoneIsValid {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.yellow)
+                                .help("Expected format: +HHMM or -HHMM")
+                        }
+                    } else {
+                        TimezonePickerView(selectedTimezone: $state.timezone)
+                    }
+                    Spacer()
+                    Button {
+                        state.useTimezonePicker.toggle()
+                    } label: {
+                        Image(systemName: state.useTimezonePicker ? "keyboard" : "globe")
+                    }
+                    .help(state.useTimezonePicker ? "Type manually" : "Pick from list")
                 }
             }
         }
