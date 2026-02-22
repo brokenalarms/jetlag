@@ -15,7 +15,9 @@ export function renderHero() {
 
       <!-- Headline -->
       <div class="headline-wrap animate-fade-up opacity-0" style="animation-delay: 0.2s">
-        <h1 class="vhs-scanlines spray-paint vhs-glitch mx-auto max-w-3xl text-center text-5xl font-bold leading-tight tracking-tight sm:text-6xl lg:text-7xl">
+        <!-- Vignette glow: large soft orb behind the text, bleeds into surrounding bg -->
+        <div class="pointer-events-none absolute -inset-16 rounded-full bg-neon-pink/10 blur-3xl" style="z-index: -1;"></div>
+        <h1 class="vhs-scanlines spray-paint vhs-glitch relative mx-auto max-w-3xl text-center text-5xl font-bold leading-tight tracking-tight sm:text-6xl lg:text-7xl">
           Every camera.<br>
           <span class="text-gradient">One timeline.</span>
         </h1>
