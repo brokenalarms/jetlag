@@ -15,6 +15,7 @@ struct JetlagApp: App {
                 .frame(minWidth: 700, minHeight: 500)
                 .onAppear { loadProfiles() }
         }
+        .defaultSize(width: 780, height: 720)
         .commands {
             // Single-window utility — no New Window or Open Recent
             CommandGroup(replacing: .newItem) {}
