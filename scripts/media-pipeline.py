@@ -3,8 +3,8 @@
 media-pipeline.py
 Orchestrates video timestamp fixing and organization into date-based folders.
 
-Usage: media-pipeline.py --profile PROFILE --group GROUP [OPTIONS]
-       media-pipeline.py --source DIR --target DIR --group GROUP [OPTIONS]
+Usage: media-pipeline.py --profile PROFILE [--subfolder SUBFOLDER] [OPTIONS]
+       media-pipeline.py --source DIR --target DIR [--subfolder SUBFOLDER] [OPTIONS]
 
 Processes all video files in SOURCE, fixes timestamps, then organizes by date into TARGET.
 """
@@ -203,7 +203,7 @@ def process_file(
     file_path: Path,
     profile: Optional[dict],
     target_dir: str,
-    group: str,
+    subfolder: Optional[str],
     location_args: list[str],
     apply: bool,
     verbose: bool,
@@ -254,7 +254,10 @@ def process_file(
     if tasks is None or "organize" in tasks:
         print("📁 Organizing by date...")
 
-        template = f"{{{{YYYY}}}}/{group}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
+        if subfolder:
+            template = f"{{{{YYYY}}}}/{subfolder}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
+        else:
+            template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
         output, action, dest, rc = run_organize_by_date(file_path, target_dir, template, apply, verbose)
 
         # Print stderr output (user-visible messages)
@@ -331,7 +334,7 @@ def main():
     parser.add_argument("--target", help="Target directory for organized files")
     parser.add_argument("--location", help="Location name/code for timezone lookup")
     parser.add_argument("--timezone", help="Timezone in +HHMM format (e.g., +0800)")
-    parser.add_argument("--group", help="Group name for organizing dates (required)")
+    parser.add_argument("--subfolder", help="Optional subfolder name inserted between year and date (e.g., 'Japan Trip' → YYYY/Japan Trip/YYYY-MM-DD)")
     parser.add_argument("--apply", action="store_true", help="Apply changes (default: dry run)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed processing info")
     parser.add_argument(
@@ -370,11 +373,6 @@ def main():
 
     if not os.path.isdir(source_dir):
         print(f"ERROR: Source directory not found: {source_dir}", file=sys.stderr)
-        sys.exit(1)
-
-    # Validate group is provided
-    if not args.group:
-        print("ERROR: --group is required", file=sys.stderr)
         sys.exit(1)
 
     # Validate timezone format if provided
@@ -463,7 +461,7 @@ def main():
             file_path,
             profile,
             target_dir,
-            args.group,
+            args.subfolder,
             location_args,
             args.apply,
             args.verbose,

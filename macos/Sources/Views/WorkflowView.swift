@@ -91,65 +91,49 @@ struct WorkflowView: View {
 
     private var stepsPipeline: some View {
         GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 2) {
-                    ForEach(state.availableSteps) { step in
-                        let isEnabled = state.enabledSteps.contains(step)
-                        let isFirst = step == state.availableSteps.first
-                        let isLast = step == state.availableSteps.last
-
-                        Button {
-                            if isEnabled {
-                                state.enabledSteps.remove(step)
-                            } else {
-                                state.enabledSteps.insert(step)
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: step.systemImage)
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(isEnabled ? step.iconColor : .tertiary)
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(state.availableSteps) { step in
+                    let isEnabled = state.enabledSteps.contains(step)
+                    
+                    Button {
+                        if isEnabled {
+                            state.enabledSteps.remove(step)
+                        } else {
+                            state.enabledSteps.insert(step)
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: step.systemImage)
+                                .font(.system(size: 12))
+                                .foregroundStyle(isEnabled ? step.iconColor : Color.secondary)
+                                .frame(width: 16)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text(step.rawValue)
-                                    .font(.system(size: 11, weight: .medium))
+                                    .font(.system(size: 12, weight: .medium))
+                                Text(step.help)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
                             }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(isEnabled ? step.iconColor.opacity(0.12) : .clear)
-                            .foregroundStyle(isEnabled ? .primary : .tertiary)
+                            
+                            Spacer()
+                            
+                            Image(systemName: isEnabled ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(isEnabled ? step.iconColor : .tertiary)
                         }
-                        .buttonStyle(.plain)
-                        .clipShape(
-                            UnevenRoundedRectangle(
-                                topLeadingRadius: isFirst ? 6 : 0,
-                                bottomLeadingRadius: isFirst ? 6 : 0,
-                                bottomTrailingRadius: isLast ? 6 : 0,
-                                topTrailingRadius: isLast ? 6 : 0
-                            )
-                        )
-                        .overlay(
-                            UnevenRoundedRectangle(
-                                topLeadingRadius: isFirst ? 6 : 0,
-                                bottomLeadingRadius: isFirst ? 6 : 0,
-                                bottomTrailingRadius: isLast ? 6 : 0,
-                                topTrailingRadius: isLast ? 6 : 0
-                            )
-                            .strokeBorder(isEnabled ? AnyShapeStyle(step.iconColor.opacity(0.4)) : AnyShapeStyle(.quaternary), lineWidth: 1)
-                        )
-                        .help(step.help)
-
-                        if step != state.availableSteps.last {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 8))
-                                .foregroundStyle(.quaternary)
-                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(isEnabled ? step.iconColor.opacity(0.08) : .clear)
+                        .foregroundStyle(isEnabled ? .primary : .secondary)
                     }
-                    Spacer()
+                    .buttonStyle(.plain)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .strokeBorder(isEnabled ? step.iconColor.opacity(0.3) : Color.quaternary.opacity(0.5), lineWidth: 1)
+                    )
                 }
-
-                Text(enabledStepsSummary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
             }
         } label: {
             Label("Pipeline", systemImage: "arrow.triangle.branch")
@@ -158,99 +142,113 @@ struct WorkflowView: View {
         }
     }
 
-    private var enabledStepsSummary: String {
-        let enabled = state.availableSteps.filter { state.enabledSteps.contains($0) }
-        if enabled.isEmpty { return "No steps selected" }
-        return enabled.map(\.help).joined(separator: " → ")
-    }
-
     // MARK: - Step-specific options
 
     @ViewBuilder
     private var stepOptions: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
-            GridRow {
-                HelpLabel("Subfolder", help: Strings.Workflow.subfolder)
-                    .gridColumnAlignment(.trailing)
-                TextField("Optional", text: $state.subfolder)
-                    .textFieldStyle(.roundedBorder)
+        VStack(alignment: .leading, spacing: 12) {
+            // Subfolder field (always shown)
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
+                GridRow {
+                    HelpLabel("Subfolder", help: Strings.Workflow.subfolder)
+                        .gridColumnAlignment(.trailing)
+                    TextField("Optional", text: $state.subfolder)
+                        .textFieldStyle(.roundedBorder)
+                }
             }
 
+            // Import from card options
             if state.enabledSteps.contains(.importFromCard) {
-                GridRow {
-                    HelpLabel("Source", help: Strings.Workflow.sourceDir)
-                        .gridColumnAlignment(.trailing)
-                    VStack(alignment: .leading, spacing: 4) {
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Source directory
                         HStack(spacing: 6) {
-                            TextField("SD card or directory path", text: $state.sourceDir)
-                                .textFieldStyle(.roundedBorder)
-                                .focused($sourceDirFocused)
-                                .onChange(of: sourceDirFocused) { _, focused in
-                                    if !focused { validateSourceDir() }
+                            Text("Source:")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 60, alignment: .trailing)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    TextField("SD card or directory path", text: $state.sourceDir)
+                                        .textFieldStyle(.roundedBorder)
+                                        .focused($sourceDirFocused)
+                                        .onChange(of: sourceDirFocused) { _, focused in
+                                            if !focused { validateSourceDir() }
+                                        }
+                                        .onChange(of: state.sourceDir) { _, _ in
+                                            sourceDirError = nil
+                                        }
+                                    Button("Browse...") { pickSourceDir() }
+                                        .controlSize(.small)
                                 }
-                                .onChange(of: state.sourceDir) { _, _ in
-                                    sourceDirError = nil
+                                if let error = sourceDirError {
+                                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(.red)
                                 }
-                            Button("Browse...") { pickSourceDir() }
-                                .controlSize(.small)
+                            }
                         }
-                        if let error = sourceDirError {
-                            Label(error, systemImage: "exclamationmark.triangle.fill")
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                    }
-                }
-
-                GridRow {
-                    Text("")
-                    HStack(spacing: 12) {
-                        HStack(spacing: 4) {
-                            Toggle(isOn: $state.skipCompanion) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Skip companion files")
-                                    if !companionExtensions.isEmpty {
-                                        Text(companionExtensions)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
+                        
+                        Divider()
+                        
+                        // Import actions
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 4) {
+                                Toggle(isOn: $state.skipCompanion) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Skip companion files")
+                                        if !companionExtensions.isEmpty {
+                                            Text(companionExtensions)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
                                     }
                                 }
+                                HelpButton(Strings.Workflow.skipCompanion)
                             }
-                            HelpButton(Strings.Workflow.skipCompanion)
-                        }
-
-                        HStack(spacing: 4) {
-                            Toggle("Preserve files on card", isOn: $state.preserveSource)
-                            HelpButton(Strings.Workflow.preserveSource)
+                            
+                            HStack(spacing: 4) {
+                                Toggle("Leave source files in place", isOn: $state.preserveSource)
+                                HelpButton(Strings.Workflow.preserveSource)
+                            }
                         }
                     }
+                    .padding(4)
+                } label: {
+                    Label("Memory Card / Source Actions", systemImage: "sdcard")
+                        .font(.headline)
+                        .foregroundStyle(Color("NeonCyan"))
                 }
             }
 
+            // Timezone field
             if state.enabledSteps.contains(.fixTimezone) {
-                GridRow {
-                    Text("Timezone").gridColumnAlignment(.trailing)
-                    HStack(spacing: 6) {
-                        if !state.useTimezonePicker {
-                            TextField("+HHMM", text: $state.timezone)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 90)
-                                .foregroundColor(timezoneIsValid ? .primary : .red)
-                            if !timezoneIsValid {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundStyle(.yellow)
-                                    .help("Expected format: +HHMM or -HHMM")
+                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
+                    GridRow {
+                        Text("Timezone").gridColumnAlignment(.trailing)
+                        HStack(spacing: 6) {
+                            if !state.useTimezonePicker {
+                                TextField("+HHMM", text: $state.timezone)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 90)
+                                    .foregroundColor(timezoneIsValid ? .primary : .red)
+                                if !timezoneIsValid {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundStyle(.yellow)
+                                        .help("Expected format: +HHMM or -HHMM")
+                                }
+                            } else {
+                                TimezonePickerView(selectedTimezone: $state.timezone)
                             }
-                        } else {
-                            TimezonePickerView(selectedTimezone: $state.timezone)
+                            Spacer()
+                            Button {
+                                state.useTimezonePicker.toggle()
+                            } label: {
+                                Image(systemName: state.useTimezonePicker ? "keyboard" : "globe")
+                            }
+                            .help(state.useTimezonePicker ? "Type manually" : "Pick from list")
                         }
-                        Spacer()
-                        Button {
-                            state.useTimezonePicker.toggle()
-                        } label: {
-                            Image(systemName: state.useTimezonePicker ? "keyboard" : "globe")
-                        }
-                        .help(state.useTimezonePicker ? "Type manually" : "Pick from list")
                     }
                 }
             }
@@ -336,7 +334,12 @@ struct WorkflowView: View {
         let script = hasImport ? "import-media.sh" : "media-pipeline.sh"
         var args: [String] = []
         args += ["--profile", state.selectedProfile]
-        if !state.subfolder.isEmpty { args += ["--group", state.subfolder] }
+        
+        // Only add --group if subfolder is not empty
+        if !state.subfolder.isEmpty {
+            args += ["--group", state.subfolder]
+        }
+        
         if hasImport {
             if state.skipCompanion { args.append("--skip-companion") }
             if !state.sourceDir.isEmpty { args.append(state.sourceDir) }

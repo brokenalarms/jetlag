@@ -9,7 +9,13 @@ enum Strings {
         static let skipCompanion = String(localized: "workflow.skipCompanion.help",
             defaultValue: "Companion files are sidecar files generated alongside the main media — e.g. .thm (thumbnail), .lrv (low-res proxy), .srt (subtitles/telemetry). When skipped, only the primary media files are imported. The companion files remain on the source and are not deleted.")
         static let preserveSource = String(localized: "workflow.preserveSource.help",
-            defaultValue: "When enabled, files are copied from the memory card (leaving originals intact). When disabled, files are moved (deleted from card after successful copy).")
+            defaultValue: """
+When enabled, original are left in place on the memory card after copying.
+
+When disabled, files are archived on the card (e.g., moved into 'DCIM - copied 2026-01-01' after successful copy).
+
+Files will not be deleted from the memory card in either case.
+""")
         static let timezone = String(localized: "workflow.timezone.help",
             defaultValue: "Timezone the footage was shot in, used to fix timestamps for your video editor")
         static let timezoneManual = String(localized: "workflow.timezoneManual.help",
