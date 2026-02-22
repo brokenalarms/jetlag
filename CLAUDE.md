@@ -2,6 +2,11 @@
   - docs/architecture.md: system overview, two-layer architecture, script flow, media-pipeline, data flow (@@), shared utilities
   - docs/DEVELOPMENT.md: development principles, source of truth hierarchy, timezone handling, exiftool best practices
   - TODO.md: sliding context window — current work in progress, known bugs, next tasks (read at session start)
+- SESSION START — before any other action, every session:
+  1. `git fetch origin main` then `git log origin/main --oneline | head -10`
+  2. If a recent main commit title matches the session-assigned branch name or task (squash-merged indicator), the old branch is dead — **immediately** `git checkout -b claude/<new-descriptive-name>-<session-token> origin/main` before touching any files
+  3. Never do any work on a branch that was squash-merged; GitHub closes that branch's PR and new commits become inaccessible through it
+  4. **`git branch -r --merged` does NOT detect squash merges** — always use the commit title comparison method above
 - LAYOUT — two sibling components at repo root:
   - scripts/ — Python/shell scripts, lib/, media-profiles.yaml, tests/. Work standalone with no knowledge of the app.
   - macos/ — SwiftUI app. Sibling to scripts/, NOT nested inside it. Reads media-profiles.yaml and launches scripts.
@@ -55,7 +60,7 @@
   - testing that returncode is 0 is not testing the actual behavior or effect of the code, just that it ran without error, so would make for a useless test
   - simarly testing result.stdout reveals nothing but what the logs said, which could lie. the changes to the fake test file need to be recorded before and after with actual/expected human readable messages.
 - COMMITS
-  - before **every** commit, always fetch and check the branch: `git fetch origin <branch> main` then `git log origin/main --oneline | head -10` to confirm the branch hasn't been merged since the last commit. **`git branch -r --merged` does NOT detect squash merges (which GitHub uses by default) — never rely on it.** If a recent main commit title matches the PR/branch (e.g. `Claude/create swift UI pr (#5)`), the branch was squash-merged — create a new branch before committing.
+  - before **every** commit, repeat the session-start branch check (see SESSION START above) — merges can land between commits
   - commits should be atomic: one feature change or bug fix per commit where possible
   - every commit message must have a subject line AND a body separated by a blank line — GitHub uses the subject as PR title and body as PR description when the user clicks "Create PR" on the branch
   - commit body should cover: what changed, why, and how it was tested

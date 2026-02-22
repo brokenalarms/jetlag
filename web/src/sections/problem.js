@@ -1,65 +1,29 @@
+import { renderTimelineCard } from '../components/timeline.js'
+
 export function renderProblem() {
-  const colorMap = {
-    blue:   { bar: 'bg-blue-500/30 border-blue-400/20',   text: 'text-blue-300/70' },
-    green:  { bar: 'bg-green-500/30 border-green-400/20', text: 'text-green-300/70' },
-    purple: { bar: 'bg-purple-500/30 border-purple-400/20', text: 'text-purple-300/70' },
-  }
-
-  const renderClip = (clip) => {
-    const c = colorMap[clip.color]
-    const tzClass = clip.correct ? 'text-white/25' : 'text-red-400/70'
-    return /* html */`
-      <div class="flex items-center gap-3">
-        <div class="w-28 text-right font-mono leading-tight flex-shrink-0">
-          <div class="text-xs text-white/35">${clip.time}</div>
-          <div class="text-[10px] ${tzClass}">${clip.tz}</div>
-        </div>
-        <div class="h-7 rounded ${c.bar} ${c.text} border flex items-center px-2.5 text-[11px] overflow-hidden"
-             style="width:${clip.width}px; margin-left:${clip.offset}px; flex-shrink:0">${clip.file}</div>
-      </div>
-    `
-  }
-
-  const renderCard = (card, isAfter) => {
-    const dot        = isAfter ? 'bg-neon-pink'       : 'bg-red-400'
-    const labelClass = isAfter ? 'text-neon-pink/80'  : 'text-red-400/80'
-    const label      = isAfter ? 'After Jetlag'       : 'Before Jetlag'
-    const cardClass  = isAfter ? 'card border-neon-pink/20 bg-neon-pink/5' : 'card'
-    const capClass   = isAfter ? 'text-neon-pink/60'  : 'text-white/30'
-    return /* html */`
-      <div class="${cardClass}">
-        <div class="mb-3 flex items-center gap-2">
-          <div class="h-2 w-2 rounded-full ${dot}"></div>
-          <span class="text-xs font-semibold uppercase tracking-widest ${labelClass}">${label}</span>
-        </div>
-        <div class="space-y-3">
-          ${card.clips.map(renderClip).join('')}
-        </div>
-        <p class="mt-3 text-xs ${capClass}">${card.caption}</p>
-      </div>
-    `
-  }
-
-  // Timeline uses a 24-hour scale mapped to ~250px usable width.
-  // offset = Math.round((h*60+m) / 1440 * 250)
+  // Clip fields: time (HH:MM), day (0-based, 0=same day as first clip),
+  // tz (display string), correct (bool), file (label), color (blue|green|purple).
+  // Bar positions are derived automatically by the timeline component.
   const scenarios = [
     {
       num: '01',
-      title: 'Crossed a timezone, forgot to update the camera',
-      body: `Flying from Amsterdam (+02:00) to Seoul (+09:00) for the next leg of a food trip, you forget to update the GoPro. Day two footage shot at 09:07am Seoul time reads as 02:07am in your editor — appearing to have been shot in the middle of the previous night, before clips from the day before.`,
+      title: 'Filmed in Amsterdam, flew to Seoul, shot the next morning',
+      body: `You film in Amsterdam at 2pm (+02:00), fly overnight to Seoul (+09:00), and shoot the next morning at 9am — but the GoPro was never updated. Seoul's 9am stores as 02:07 Amsterdam time: it lands on the right day but 7 hours too early, as if you filmed in the middle of the night.`,
       before: {
+        // GoPro still on +02:00: Seoul 09:07 local = 02:07 Amsterdam time, day 1 (next day)
         clips: [
-          { time: '14:12', tz: '[+02:00]',    correct: true,  file: 'amsterdam_day1.MP4', color: 'blue',  width: 130, offset: 148 },
-          { time: '02:07', tz: '[+02:00  ✗]', correct: false, file: 'seoul_day2.MP4',     color: 'green', width: 110, offset: 22  },
+          { day: 0, time: '14:12', tz: '[+02:00]',    correct: true,  file: 'amsterdam_day1.MP4', color: 'blue'  },
+          { day: 1, time: '02:07', tz: '[+02:00  ✗]', correct: false, file: 'seoul_day2.MP4',     color: 'green' },
         ],
-        caption: 'Seoul footage appears at 2am — camera clock never left Amsterdam',
+        caption: 'Seoul appears 7 hours too early — camera clock never left +02:00',
       },
       after: {
+        // Corrected: Seoul day 1 (next day), 09:07 +09:00
         clips: [
-          { time: '14:12', tz: '[+02:00]', correct: true, file: 'amsterdam_day1.MP4', color: 'blue',  width: 130, offset: 148 },
-          { time: '09:07', tz: '[+09:00]', correct: true, file: 'seoul_day2.MP4',     color: 'green', width: 110, offset: 95  },
+          { day: 0, time: '14:12', tz: '[+02:00]', correct: true, file: 'amsterdam_day1.MP4', color: 'blue'  },
+          { day: 1, time: '09:07', tz: '[+09:00]', correct: true, file: 'seoul_day2.MP4',     color: 'green' },
         ],
-        caption: 'Jetlag applies +09:00 — Seoul footage correctly placed in the morning',
+        caption: 'Seoul correctly placed: 9am the next morning, after Amsterdam',
       },
     },
     {
@@ -68,15 +32,15 @@ export function renderProblem() {
       body: `You shoot a market stall on your iPhone at 08:00, then pull out the GoPro ten minutes later. GoPro doesn't embed a timezone in DateTimeOriginal. Your editor falls back to the file's birth time, which gets set to whenever you copied the SD card — hours after the fact. The right time is in the file; it just needs pairing with your timezone.`,
       before: {
         clips: [
-          { time: '08:00', tz: '[+08:00]',  correct: true,  file: 'IMG_0812.MOV', color: 'green', width: 115, offset: 83  },
-          { time: '15:43', tz: '[no tz  ✗]', correct: false, file: 'GH012345.MP4', color: 'blue',  width: 115, offset: 164 },
+          { day: 0, time: '08:00', tz: '[+08:00]',   correct: true,  file: 'IMG_0812.MOV', color: 'green' },
+          { day: 0, time: '15:43', tz: '[no tz  ✗]', correct: false, file: 'GH012345.MP4', color: 'blue'  },
         ],
         caption: '7h 43m gap — GoPro birth time set at copy, not at capture',
       },
       after: {
         clips: [
-          { time: '08:00', tz: '[+08:00]', correct: true, file: 'IMG_0812.MOV', color: 'green', width: 115, offset: 83 },
-          { time: '08:10', tz: '[+08:00]', correct: true, file: 'GH012345.MP4', color: 'blue',  width: 115, offset: 85 },
+          { day: 0, time: '08:00', tz: '[+08:00]', correct: true, file: 'IMG_0812.MOV', color: 'green' },
+          { day: 0, time: '08:10', tz: '[+08:00]', correct: true, file: 'GH012345.MP4', color: 'blue'  },
         ],
         caption: 'GoPro lands 10 minutes after iPhone, exactly as shot',
       },
@@ -87,15 +51,15 @@ export function renderProblem() {
       body: `DJI drones store MediaCreateDate in UTC. Many editors read that integer field and treat it as local time. Shoot at sunset (18:07) in Tokyo (+09:00) and the clip lands at 09:07 — nine hours early, as if filmed before dawn. The same issue affects any camera that correctly stores UTC but whose timezone context is then lost on import.`,
       before: {
         clips: [
-          { time: '18:07', tz: '[+09:00]',       correct: true,  file: 'iphone_sunset.MOV', color: 'green',  width: 115, offset: 189 },
-          { time: '09:07', tz: '[UTC→local  ✗]', correct: false, file: 'DJI_0011.MP4',       color: 'purple', width: 100, offset: 95  },
+          { day: 0, time: '18:07', tz: '[+09:00]',       correct: true,  file: 'iphone_sunset.MOV', color: 'green'  },
+          { day: 0, time: '09:07', tz: '[UTC→local  ✗]', correct: false, file: 'DJI_0011.MP4',       color: 'purple' },
         ],
         caption: 'Drone appears 9 hours early — UTC timestamp misread as local time',
       },
       after: {
         clips: [
-          { time: '18:07', tz: '[+09:00]', correct: true, file: 'iphone_sunset.MOV', color: 'green',  width: 115, offset: 189 },
-          { time: '18:09', tz: '[+09:00]', correct: true, file: 'DJI_0011.MP4',      color: 'purple', width: 100, offset: 191 },
+          { day: 0, time: '18:07', tz: '[+09:00]', correct: true, file: 'iphone_sunset.MOV', color: 'green'  },
+          { day: 0, time: '18:09', tz: '[+09:00]', correct: true, file: 'DJI_0011.MP4',      color: 'purple' },
         ],
         caption: 'Drone and iPhone land at the same sunset moment',
       },
@@ -131,8 +95,8 @@ export function renderProblem() {
                 </div>
               </div>
               <div class="grid gap-4 sm:grid-cols-2 overflow-x-auto">
-                ${renderCard(s.before, false)}
-                ${renderCard(s.after, true)}
+                ${renderTimelineCard(s.before, false)}
+                ${renderTimelineCard(s.after, true)}
               </div>
             </div>
           `).join('')}
