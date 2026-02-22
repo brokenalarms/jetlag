@@ -67,7 +67,7 @@ export function renderFeatures() {
         </div>
 
         <!-- Import by reference callout -->
-        <div class="mt-10 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-6">
+        <div class="mt-10 rounded-2xl border border-neon-pink/20 bg-neon-pink/5 p-6">
           <div class="flex gap-4 items-start">
             <div class="feature-icon flex-shrink-0">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

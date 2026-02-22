@@ -2,7 +2,7 @@ export function renderDownload() {
   return /* html */`
     <section id="download" class="py-24 px-6">
       <div class="mx-auto max-w-2xl text-center">
-        <div class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-400 mb-6">
+        <div class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-neon-pink/15 text-neon-pink mb-6">
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M16 4v16M8 13l8 8 8-8M6 26h20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
