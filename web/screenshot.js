@@ -17,7 +17,7 @@ import { dirname, join } from 'path'
 import { mkdirSync } from 'fs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const screenshotsDir = join(__dirname, 'screenshots')
+const screenshotsDir = '/screenshots'
 mkdirSync(screenshotsDir, { recursive: true })
 
 const sectionArg = process.argv.includes('--section')
@@ -45,7 +45,9 @@ await new Promise((resolve, reject) => {
   server.on('error', reject)
 })
 
-const browser = await chromium.launch()
+// Use a pre-installed Chromium if the bundled headless shell is absent
+const chromiumPath = '/root/.cache/ms-playwright/chromium-1194/chrome-linux/chrome'
+const browser = await chromium.launch({ executablePath: chromiumPath })
 const page = await browser.newPage()
 await page.setViewportSize({ width: 1440, height: 900 })
 await page.goto('http://localhost:4173')

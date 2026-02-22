@@ -29,11 +29,6 @@ const features = [
     title: 'Gyroflow project generation',
     description: 'Automatically creates .gyroflow project files for the Gyroflow Toolbox plugin on footage with embedded gyro data. Non-fatal when gyro data is absent.',
   },
-  {
-    icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3v10M6 9l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
-    title: 'Files preserved exactly as shot',
-    description: 'Jetlag writes only timestamp metadata — it never re-encodes your video. Import by reference in your editor to keep files as Jetlag left them, with gyro stabilisation data and lens metadata intact.',
-  },
 ]
 
 export function renderFeatures() {
@@ -83,11 +78,12 @@ export function renderFeatures() {
             <div>
               <h3 class="text-base font-semibold text-white mb-1.5">Always import by reference in your video editor</h3>
               <p class="text-sm leading-relaxed text-white/50">
-                Some editors — including Final Cut Pro with Sony MP4s — re-encode footage during a
-                standard library import. This strips embedded gyro stabilisation data and lens metadata
-                that Gyroflow Toolbox and other plugins depend on. Import by reference instead
-                (uncheck <span class="text-white/70 font-medium">"Copy to Library"</span> in FCP's import dialog)
-                to keep your files exactly as shot, with all metadata intact.
+                Jetlag only writes timestamp metadata — it never re-encodes your video. Keep it that way
+                in your editor too: some editors, including Final Cut Pro with Sony MP4s, re-encode footage
+                during a standard library import, silently stripping embedded gyro stabilisation data and
+                lens metadata that Gyroflow Toolbox and other plugins depend on. Import by reference instead
+                (uncheck <span class="text-white/70 font-medium">"Copy to Library"</span> in FCP's import
+                dialog) to keep your files exactly as shot, with all metadata intact.
               </p>
             </div>
           </div>
