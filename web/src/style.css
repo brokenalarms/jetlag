@@ -96,13 +96,9 @@
     background-color: rgba(255, 255, 255, 0.04);
   }
 
-  /* Vignette glow via box-shadow: paints in the element's own pass, no separate
-     compositor layer, safe from filter/stacking issues on Safari iOS */
+  /* Vignette container: positioned so the absolute blur div centres on the heading */
   .headline-wrap {
     position: relative;
-    box-shadow:
-      0 0 80px 40px  rgba(255, 45, 120, 0.18),
-      0 0 200px 80px rgba(255, 45, 120, 0.10);
   }
 
   /* VHS / glitch burst — fires every ~4 s, multi-directional X+Y jitter + RGB split */
