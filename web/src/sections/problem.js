@@ -1,4 +1,4 @@
-import { renderTimelineCard } from '../components/timeline.js'
+import { renderScenarioCards } from '../components/timeline.js'
 
 export function renderProblem() {
   // Clip fields: time (HH:MM), day (0-based, 0=same day as first clip),
@@ -95,8 +95,7 @@ export function renderProblem() {
                 </div>
               </div>
               <div class="grid gap-4 sm:grid-cols-2 overflow-x-auto">
-                ${renderTimelineCard(s.before, false)}
-                ${renderTimelineCard(s.after, true)}
+                ${renderScenarioCards(s.before, s.after)}
               </div>
             </div>
           `).join('')}

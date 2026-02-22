@@ -98,18 +98,16 @@ function renderAxis(scale) {
   `
 }
 
-export function renderTimelineCard(card, isAfter) {
+function renderCard(card, isAfter, scale) {
   const dot        = isAfter ? 'bg-neon-pink'              : 'bg-red-400'
   const labelClass = isAfter ? 'text-neon-pink/80'         : 'text-red-400/80'
   const label      = isAfter ? 'After Jetlag'              : 'Before Jetlag'
   const cardClass  = isAfter ? 'card border-neon-pink/20 bg-neon-pink/5' : 'card'
   const capClass   = isAfter ? 'text-neon-pink/60'         : 'text-white/30'
 
-  // Only show "Day N" labels when the card contains clips across multiple days.
+  // Show "Day N" labels when this card's clips span multiple days.
   const days     = new Set(card.clips.map(c => c.day ?? 0))
   const multiDay = days.size > 1
-
-  const scale = buildScale(card.clips)
 
   return /* html */`
     <div class="${cardClass}">
@@ -123,5 +121,16 @@ export function renderTimelineCard(card, isAfter) {
       ${renderAxis(scale)}
       <p class="mt-3 text-xs ${capClass}">${card.caption}</p>
     </div>
+  `
+}
+
+// Render both cards for a scenario sharing one scale derived from all clips
+// combined. This ensures clip positions are comparable across before/after:
+// Amsterdam lands at the same x in both cards; only Seoul's bar moves.
+export function renderScenarioCards(before, after) {
+  const sharedScale = buildScale([...before.clips, ...after.clips])
+  return `
+    ${renderCard(before, false, sharedScale)}
+    ${renderCard(after,  true,  sharedScale)}
   `
 }
