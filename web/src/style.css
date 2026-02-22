@@ -73,6 +73,9 @@
       rgba(0, 0, 0, 0.22) 3px,
       rgba(0, 0, 0, 0.22) 4px
     );
+    /* Fade scanlines at edges so the h1 box boundary disappears into the background */
+    -webkit-mask-image: radial-gradient(ellipse 90% 85% at 50% 50%, black 15%, transparent 72%);
+    mask-image:         radial-gradient(ellipse 90% 85% at 50% 50%, black 15%, transparent 72%);
     pointer-events: none;
     z-index: 9999;
   }
@@ -91,5 +94,117 @@
 
   .bg-white\/4 {
     background-color: rgba(255, 255, 255, 0.04);
+  }
+
+  /* Vignette behind the hero headline — stacking context only; glow is a sibling div */
+  .headline-wrap {
+    position: relative;
+    isolation: isolate;
+  }
+
+  /* VHS / glitch burst — fires every ~4 s, multi-directional X+Y jitter + RGB split */
+  @keyframes vhs-glitch {
+    0%, 77% {
+      transform: none;
+      opacity: 1;
+      filter:
+        drop-shadow(0 0 5px rgba(255, 45, 120, 0.95))
+        drop-shadow(0 0 15px rgba(255, 45, 120, 0.60))
+        drop-shadow(0 0 38px rgba(57, 255, 20, 0.35));
+    }
+    /* burst 1 — cyan channel shifts right+up */
+    77.3% {
+      transform: translate(4px, -2px) skewX(-1deg);
+      opacity: 1;
+      filter:
+        drop-shadow(5px 0 0 rgba(0, 245, 255, 0.85))
+        drop-shadow(-5px 0 0 rgba(255, 45, 120, 0.70))
+        drop-shadow(0 0 12px rgba(255, 45, 120, 0.50));
+    }
+    /* burst 2 — green channel shifts left+down */
+    77.7% {
+      transform: translate(-3px, 2px) skewY(0.5deg);
+      opacity: 1;
+      filter:
+        drop-shadow(-4px 0 0 rgba(57, 255, 20, 0.85))
+        drop-shadow(4px 0 0 rgba(255, 45, 120, 0.70))
+        drop-shadow(0 0 18px rgba(57, 255, 20, 0.40));
+    }
+    /* burst 3 — strong cross jitter */
+    78.1% {
+      transform: translate(5px, -3px) skewX(0.8deg);
+      opacity: 1;
+      filter:
+        drop-shadow(6px 2px 0 rgba(0, 245, 255, 0.75))
+        drop-shadow(-3px -1px 0 rgba(57, 255, 20, 0.65))
+        drop-shadow(0 0 10px rgba(255, 45, 120, 0.45));
+    }
+    /* burst 4 — snap left+up */
+    78.5% {
+      transform: translate(-4px, 1px) skewY(-0.4deg);
+      opacity: 1;
+      filter:
+        drop-shadow(-5px 0 0 rgba(255, 45, 120, 0.85))
+        drop-shadow(3px 0 0 rgba(0, 245, 255, 0.65))
+        drop-shadow(0 0 20px rgba(57, 255, 20, 0.35));
+    }
+    /* flicker — slight dim, minor residual displacement */
+    78.9% {
+      transform: translate(1px, -1px);
+      opacity: 0.82;
+      filter:
+        drop-shadow(0 0 5px rgba(255, 45, 120, 0.95))
+        drop-shadow(0 0 15px rgba(255, 45, 120, 0.60))
+        drop-shadow(0 0 38px rgba(57, 255, 20, 0.35));
+    }
+    79.3% {
+      transform: translate(0, 2px);
+      opacity: 0.80;
+      filter:
+        drop-shadow(0 0 5px rgba(255, 45, 120, 0.95))
+        drop-shadow(0 0 15px rgba(255, 45, 120, 0.60))
+        drop-shadow(0 0 38px rgba(57, 255, 20, 0.35));
+    }
+    /* snap back */
+    79.8% {
+      transform: none;
+      opacity: 1;
+      filter:
+        drop-shadow(0 0 5px rgba(255, 45, 120, 0.95))
+        drop-shadow(0 0 15px rgba(255, 45, 120, 0.60))
+        drop-shadow(0 0 38px rgba(57, 255, 20, 0.35));
+    }
+    100% {
+      transform: none;
+      opacity: 1;
+      filter:
+        drop-shadow(0 0 5px rgba(255, 45, 120, 0.95))
+        drop-shadow(0 0 15px rgba(255, 45, 120, 0.60))
+        drop-shadow(0 0 38px rgba(57, 255, 20, 0.35));
+    }
+  }
+
+  /* Scanlines scroll through during the glitch burst, synced to vhs-glitch timing */
+  @keyframes scanline-scroll {
+    0%, 77%  { background-position-y: 0px; }
+    77.3%    { background-position-y: 14px; }
+    77.7%    { background-position-y: 4px; }
+    78.1%    { background-position-y: 22px; }
+    78.5%    { background-position-y: 8px; }
+    78.9%    { background-position-y: 30px; }
+    79.3%    { background-position-y: 6px; }
+    79.8%    { background-position-y: 0px; }
+    100%     { background-position-y: 0px; }
+  }
+
+  .vhs-glitch {
+    animation: vhs-glitch 4s linear infinite;
+    animation-delay: 1.5s;
+  }
+
+  /* Drive the scanlines pseudo-element on the same element */
+  .vhs-glitch::before {
+    animation: scanline-scroll 4s linear infinite;
+    animation-delay: 1.5s;
   }
 }
