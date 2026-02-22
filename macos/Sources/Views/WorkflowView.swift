@@ -120,7 +120,7 @@ struct WorkflowView: View {
                             Spacer()
                             
                             Image(systemName: isEnabled ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(isEnabled ? step.iconColor : .tertiary)
+                                .foregroundStyle(isEnabled ? step.iconColor : Color.secondary)
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
@@ -128,10 +128,11 @@ struct WorkflowView: View {
                         .foregroundStyle(isEnabled ? .primary : .secondary)
                     }
                     .buttonStyle(.plain)
+                    .contentShape(Rectangle())
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(isEnabled ? step.iconColor.opacity(0.3) : Color.quaternary.opacity(0.5), lineWidth: 1)
+                            .strokeBorder(isEnabled ? step.iconColor.opacity(0.3) : Color.secondary.opacity(0.5), lineWidth: 1)
                     )
                 }
             }
