@@ -222,13 +222,18 @@ struct WorkflowView: View {
                 Toggle(isOn: $state.skipCompanion) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Skip companion files")
-                        if !companionExtensions.isEmpty {
+                        if companionExtensions.isEmpty {
+                            Text("No companion files noted for this device")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
                             Text(companionExtensions)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
+                .disabled(companionExtensions.isEmpty)
                 HelpButton(Strings.Workflow.skipCompanion)
             }
             
