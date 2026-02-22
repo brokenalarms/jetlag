@@ -39,11 +39,11 @@ export function renderHowItWorks() {
           <div class="space-y-8">
             ${steps.map((step, i) => /* html */`
               <div class="flex gap-6 group">
-                <div class="relative flex-shrink-0">
-                  <div class="flex h-[52px] w-[52px] items-center justify-center rounded-xl border font-mono z-10 relative text-sm font-bold
+                <div class="relative flex-shrink-0 z-10">
+                  <div class="flex h-[52px] w-[52px] items-center justify-center rounded-xl border font-mono text-sm font-bold bg-neutral-950
                     ${i % 2 === 0
-                      ? 'border-neon-pink/30 bg-neon-pink/10 text-neon-pink'
-                      : 'border-amber-500/30 bg-amber-500/10 text-amber-400'}">
+                      ? 'border-neon-pink/50 text-neon-pink'
+                      : 'border-amber-500/50 text-amber-400'}">
                     ${step.number}
                   </div>
                 </div>
