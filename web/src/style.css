@@ -96,9 +96,12 @@
     background-color: rgba(255, 255, 255, 0.04);
   }
 
-  /* Vignette container: positioned so the absolute blur div centres on the heading */
+  /* CRT-screen box: dark background, heavy corner radius, generous padding */
   .headline-wrap {
     position: relative;
+    padding: 2.5rem 3.5rem;
+    background: rgba(4, 4, 4, 0.65);
+    border-radius: 5rem;
   }
 
   /* VHS / glitch burst — fires every ~4 s, multi-directional X+Y jitter + RGB split */
