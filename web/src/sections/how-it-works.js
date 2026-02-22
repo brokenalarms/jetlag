@@ -27,7 +27,7 @@ export function renderHowItWorks() {
       <div class="mx-auto max-w-5xl">
         <div class="text-center mb-14">
           <span class="section-label">How it works</span>
-          <h2 class="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 class="vhs-scanlines mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
             From card to cut in four steps
           </h2>
         </div>

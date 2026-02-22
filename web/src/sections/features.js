@@ -37,7 +37,7 @@ export function renderFeatures() {
       <div class="mx-auto max-w-6xl">
         <div class="text-center mb-14">
           <span class="section-label">Features</span>
-          <h2 class="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 class="vhs-scanlines mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
             Everything your pipeline needs
           </h2>
           <p class="mt-4 mx-auto max-w-xl text-base text-white/50">
