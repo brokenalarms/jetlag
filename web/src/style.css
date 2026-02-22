@@ -96,10 +96,9 @@
     background-color: rgba(255, 255, 255, 0.04);
   }
 
-  /* Vignette behind the hero headline — stacking context only; glow is a sibling div */
+  /* Vignette container: positioned so the absolute blur div centres on the heading */
   .headline-wrap {
     position: relative;
-    isolation: isolate;
   }
 
   /* VHS / glitch burst — fires every ~4 s, multi-directional X+Y jitter + RGB split */
