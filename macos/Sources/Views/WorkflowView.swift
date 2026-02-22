@@ -262,7 +262,9 @@ struct WorkflowView: View {
                         state.useTimezonePicker.toggle()
                     } label: {
                         Image(systemName: state.useTimezonePicker ? "keyboard" : "globe")
+                            .padding(4)
                     }
+                    .contentShape(Rectangle())
                     .help(state.useTimezonePicker ? "Type manually" : "Pick from list")
                 }
             }
