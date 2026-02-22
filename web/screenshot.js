@@ -63,6 +63,7 @@ const sections = [
   { name: 'hero',         selector: 'section:nth-of-type(1)' },
   { name: 'problem',      selector: 'section:nth-of-type(2)' },
   { name: 'features',     selector: '#features' },
+  { name: 'audience',     selector: '#audience' },
   { name: 'how-it-works', selector: '#how-it-works' },
 ]
 
