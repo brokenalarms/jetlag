@@ -4,6 +4,7 @@ import { renderNav } from './sections/nav.js'
 import { renderHero } from './sections/hero.js'
 import { renderProblem } from './sections/problem.js'
 import { renderFeatures } from './sections/features.js'
+import { renderAudience } from './sections/audience.js'
 import { renderHowItWorks } from './sections/how-it-works.js'
 import { renderPricing } from './sections/pricing.js'
 import { renderDownload } from './sections/download.js'
@@ -18,6 +19,7 @@ function mount() {
     renderHero(),
     renderProblem(),
     renderFeatures(),
+    renderAudience(),
     renderHowItWorks(),
     renderPricing(),
     renderDownload(),
