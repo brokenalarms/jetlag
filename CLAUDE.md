@@ -5,7 +5,13 @@
 - LAYOUT — two sibling components at repo root:
   - scripts/ — Python/shell scripts, lib/, media-profiles.yaml, tests/. Work standalone with no knowledge of the app.
   - macos/ — SwiftUI app. Sibling to scripts/, NOT nested inside it. Reads media-profiles.yaml and launches scripts.
+  - web/ — Vite + Tailwind marketing site. Sections live in web/src/sections/.
   - docs/ — documentation. CLAUDE.md, README.md, TODO.md live at repo root.
+- WEB — after every change to files under web/:
+  - take screenshots before committing: `npm run screenshot --prefix web` (or `cd web && npm run screenshot`)
+  - this builds the site, starts a preview server, captures hero/problem/features/how-it-works sections plus a full-page shot, overwrites PNGs in design/screenshots/ (fixed names so each commit shows a visual diff)
+  - read and share each saved screenshot image with the user using the Read tool before committing, so they can review the rendered output
+  - if the Playwright browser is missing: `npx playwright install chromium` inside web/
 - the goal of these scripts are to manage workflow for importing videos from different cameras, so that they all appear interleaved with each other in your video editor at the time at which they were initially filmed.
 - the time doesn't have to look the same as if I shot it, but the goal is for the files to maintain time relative to each other
 - timezone is the timezone a group of videos is shot in, but is a concern unrelated to the profiles in media-profiles which are camera profiles and could be shot in any number of timezones.
