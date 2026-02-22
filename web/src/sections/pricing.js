@@ -13,9 +13,9 @@ const proFeatures = [
   'All future updates included',
 ]
 
-function checkIcon(color = 'amber') {
+function checkIcon(color = 'pink') {
   const colors = {
-    amber: 'text-amber-400',
+    pink:  'text-neon-pink',
     white: 'text-white/60',
   }
   return /* html */`
@@ -71,9 +71,9 @@ export function renderPricing() {
           </div>
 
           <!-- Pro tier -->
-          <div class="relative rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/8 to-transparent p-6 flex flex-col glow-amber">
+          <div class="relative rounded-2xl border border-neon-pink/30 bg-gradient-to-b from-neon-pink/8 to-transparent p-6 flex flex-col glow-amber">
             <div class="absolute -top-3 left-6">
-              <span class="rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-neutral-950 uppercase tracking-wide">Most popular</span>
+              <span class="rounded-full bg-neon-pink px-3 py-1 text-xs font-bold text-white uppercase tracking-wide">Most popular</span>
             </div>
 
             <div class="mb-6 mt-2">
@@ -88,7 +88,7 @@ export function renderPricing() {
             <ul class="flex-1 space-y-3 mb-8">
               ${proFeatures.map(f => /* html */`
                 <li class="flex items-start gap-3 text-sm text-white/75">
-                  ${checkIcon('amber')}
+                  ${checkIcon('pink')}
                   <span>${f}</span>
                 </li>
               `).join('')}

@@ -21,11 +21,11 @@ export function renderProblem() {
   }
 
   const renderCard = (card, isAfter) => {
-    const dot        = isAfter ? 'bg-amber-400'      : 'bg-red-400'
-    const labelClass = isAfter ? 'text-amber-400/80' : 'text-red-400/80'
-    const label      = isAfter ? 'After Jetlag'      : 'Before Jetlag'
-    const cardClass  = isAfter ? 'card border-amber-500/20 bg-amber-500/5' : 'card'
-    const capClass   = isAfter ? 'text-amber-400/60' : 'text-white/30'
+    const dot        = isAfter ? 'bg-neon-pink'       : 'bg-red-400'
+    const labelClass = isAfter ? 'text-neon-pink/80'  : 'text-red-400/80'
+    const label      = isAfter ? 'After Jetlag'       : 'Before Jetlag'
+    const cardClass  = isAfter ? 'card border-neon-pink/20 bg-neon-pink/5' : 'card'
+    const capClass   = isAfter ? 'text-neon-pink/60'  : 'text-white/30'
     return /* html */`
       <div class="${cardClass}">
         <div class="mb-3 flex items-center gap-2">
@@ -124,7 +124,7 @@ export function renderProblem() {
           ${scenarios.map(s => /* html */`
             <div>
               <div class="mb-5 flex gap-3 items-start">
-                <span class="mt-0.5 flex-shrink-0 font-mono text-xs font-bold text-amber-500/60 border border-amber-500/20 rounded px-1.5 py-0.5 leading-tight">${s.num}</span>
+                <span class="mt-0.5 flex-shrink-0 font-mono text-xs font-bold text-amber-400/80 border border-amber-500/25 rounded px-1.5 py-0.5 leading-tight">${s.num}</span>
                 <div>
                   <h3 class="text-base font-semibold text-white mb-1.5">${s.title}</h3>
                   <p class="text-sm leading-relaxed text-white/50 max-w-2xl">${s.body}</p>

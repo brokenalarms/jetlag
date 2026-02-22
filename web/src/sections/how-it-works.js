@@ -34,13 +34,16 @@ export function renderHowItWorks() {
 
         <div class="relative">
           <!-- Connecting line -->
-          <div class="absolute left-[26px] top-12 bottom-12 w-px bg-gradient-to-b from-amber-500/40 via-amber-500/20 to-transparent hidden sm:block"></div>
+          <div class="absolute left-[26px] top-12 bottom-12 w-px bg-gradient-to-b from-neon-pink/50 via-amber-500/30 to-transparent hidden sm:block"></div>
 
           <div class="space-y-8">
             ${steps.map((step, i) => /* html */`
               <div class="flex gap-6 group">
                 <div class="relative flex-shrink-0">
-                  <div class="flex h-[52px] w-[52px] items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10 text-sm font-bold text-amber-400 font-mono z-10 relative">
+                  <div class="flex h-[52px] w-[52px] items-center justify-center rounded-xl border font-mono z-10 relative text-sm font-bold
+                    ${i % 2 === 0
+                      ? 'border-neon-pink/30 bg-neon-pink/10 text-neon-pink'
+                      : 'border-amber-500/30 bg-amber-500/10 text-amber-400'}">
                     ${step.number}
                   </div>
                 </div>
@@ -58,7 +61,10 @@ export function renderHowItWorks() {
           <p class="text-xs uppercase tracking-widest text-white/30 font-medium mb-4">Pipeline overview</p>
           <div class="flex flex-wrap items-center gap-2 text-sm">
             ${['Import from card', 'Tag', 'Fix timestamps', 'Organize by date', 'Generate Gyroflow'].map((step, i, arr) => /* html */`
-              <span class="rounded-lg border border-amber-500/20 bg-amber-500/8 px-3 py-1.5 text-xs font-medium text-amber-300/80">${step}</span>
+              <span class="rounded-lg border px-3 py-1.5 text-xs font-medium
+                ${i % 2 === 0
+                  ? 'border-neon-pink/20 bg-neon-pink/8 text-neon-pink/80'
+                  : 'border-amber-500/20 bg-amber-500/8 text-amber-300/80'}">${step}</span>
               ${i < arr.length - 1 ? '<span class="text-white/20 text-xs">→</span>' : ''}
             `).join('')}
           </div>

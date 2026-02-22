@@ -1,11 +1,11 @@
 export function renderHero() {
   return /* html */`
-    <section class="vhs-scanlines relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pt-24 pb-16">
-      <!-- Background glows: lime centre, pink lower-left, cyan upper-right -->
+    <section class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pt-24 pb-16">
+      <!-- Background glows: pink centre, green lower-left, pink upper-right -->
       <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div class="h-[600px] w-[600px] rounded-full bg-amber-500/8 blur-3xl"></div>
-        <div class="absolute h-[400px] w-[400px] rounded-full bg-neon-pink/5 blur-3xl -translate-x-48 translate-y-32"></div>
-        <div class="absolute h-[300px] w-[300px] rounded-full bg-neon-cyan/4 blur-3xl translate-x-48 -translate-y-16"></div>
+        <div class="h-[600px] w-[600px] rounded-full bg-neon-pink/10 blur-3xl"></div>
+        <div class="absolute h-[400px] w-[400px] rounded-full bg-amber-500/10 blur-3xl -translate-x-48 translate-y-32"></div>
+        <div class="absolute h-[300px] w-[300px] rounded-full bg-neon-pink/8 blur-3xl translate-x-48 -translate-y-16"></div>
       </div>
 
       <!-- Badge -->
@@ -14,7 +14,7 @@ export function renderHero() {
       </div>
 
       <!-- Headline -->
-      <h1 class="animate-fade-up opacity-0 mx-auto max-w-3xl text-center text-5xl font-bold leading-tight tracking-tight sm:text-6xl lg:text-7xl" style="animation-delay: 0.2s">
+      <h1 class="spray-paint animate-fade-up opacity-0 mx-auto max-w-3xl text-center text-5xl font-bold leading-tight tracking-tight sm:text-6xl lg:text-7xl" style="animation-delay: 0.2s">
         Every camera.<br>
         <span class="text-gradient">One timeline.</span>
       </h1>
@@ -57,9 +57,9 @@ export function renderHero() {
           <div class="grid grid-cols-[180px_1fr] min-h-[240px]">
             <!-- Sidebar -->
             <div class="border-r border-white/8 p-4 space-y-1">
-              <div class="flex items-center gap-2 rounded-lg bg-amber-500/15 px-3 py-2">
-                <div class="h-4 w-4 rounded bg-amber-500/50"></div>
-                <span class="text-xs text-amber-300 font-medium">Workflow</span>
+              <div class="flex items-center gap-2 rounded-lg bg-neon-pink/15 px-3 py-2">
+                <div class="h-4 w-4 rounded bg-neon-pink/50"></div>
+                <span class="text-xs text-neon-pink font-medium">Workflow</span>
               </div>
               <div class="flex items-center gap-2 rounded-lg px-3 py-2">
                 <div class="h-4 w-4 rounded bg-white/15"></div>
@@ -79,7 +79,7 @@ export function renderHero() {
                 <div class="text-xs text-white/30 uppercase tracking-widest font-medium">Pipeline</div>
                 <div class="flex items-center gap-1">
                   ${['Import', 'Tag', 'Fix Time', 'Organize', 'Gyroflow'].map((step, i) => /* html */`
-                    <div class="rounded px-2 py-1 text-xs font-medium ${i < 4 ? 'bg-amber-500/20 text-amber-300' : 'bg-white/5 text-white/30'}">${step}</div>
+                    <div class="rounded px-2 py-1 text-xs font-medium ${i === 0 || i === 2 ? 'bg-neon-pink/20 text-neon-pink' : i < 4 ? 'bg-amber-500/20 text-amber-300' : 'bg-white/5 text-white/30'}">${step}</div>
                     ${i < 4 ? '<div class="text-white/20 text-xs">›</div>' : ''}
                   `).join('')}
                 </div>
@@ -88,7 +88,7 @@ export function renderHero() {
                 <span class="text-green-400/80">✓</span> GH012345.MP4 &nbsp; birth → 2024-03-15 08:07:22 +0800<br>
                 <span class="text-green-400/80">✓</span> IMG_0923.MOV &nbsp; birth → 2024-03-15 08:09:44 +0800<br>
                 <span class="text-green-400/80">✓</span> DJI_0011.MP4 &nbsp; birth → 2024-03-15 08:11:03 +0800<br>
-                <span class="text-amber-400/60">→</span> 3 files processed, 0 errors
+                <span class="text-neon-pink/60">→</span> 3 files processed, 0 errors
               </div>
             </div>
           </div>
