@@ -17,7 +17,7 @@ import { dirname, join } from 'path'
 import { mkdirSync } from 'fs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const screenshotsDir = '/screenshots'
+const screenshotsDir = join(__dirname, '..', 'design', 'screenshots')
 mkdirSync(screenshotsDir, { recursive: true })
 
 const sectionArg = process.argv.includes('--section')
@@ -57,13 +57,12 @@ await page.waitForLoadState('networkidle')
 await page.addStyleTag({ content: '*, *::before, *::after { animation-duration: 0s !important; transition-duration: 0s !important; opacity: 1 !important; }' })
 await page.waitForTimeout(300)
 
-const ts = new Date().toISOString().slice(0, 19).replace(/T/, '_').replace(/:/g, '-')
 const saved = []
 
 const sections = [
-  { name: 'hero',      selector: 'section:nth-of-type(1)' },
-  { name: 'problem',   selector: 'section:nth-of-type(2)' },
-  { name: 'features',  selector: '#features' },
+  { name: 'hero',         selector: 'section:nth-of-type(1)' },
+  { name: 'problem',      selector: 'section:nth-of-type(2)' },
+  { name: 'features',     selector: '#features' },
   { name: 'how-it-works', selector: '#how-it-works' },
 ]
 
@@ -75,7 +74,7 @@ for (const { name, selector } of toCapture) {
   const el = page.locator(selector).first()
   await el.scrollIntoViewIfNeeded()
   await page.waitForTimeout(100)
-  const outPath = join(screenshotsDir, `${ts}-${name}.png`)
+  const outPath = join(screenshotsDir, `${name}.png`)
   await page.screenshot({ path: outPath })
   saved.push(outPath)
   console.log(`  saved: ${outPath}`)
@@ -83,7 +82,7 @@ for (const { name, selector } of toCapture) {
 
 // Full page last (slow)
 if (!sectionArg) {
-  const fullPath = join(screenshotsDir, `${ts}-full.png`)
+  const fullPath = join(screenshotsDir, 'full.png')
   await page.screenshot({ path: fullPath, fullPage: true })
   saved.push(fullPath)
   console.log(`  saved: ${fullPath}`)

@@ -9,7 +9,7 @@
   - docs/ — documentation. CLAUDE.md, README.md, TODO.md live at repo root.
 - WEB — after every change to files under web/:
   - take screenshots before committing: `npm run screenshot --prefix web` (or `cd web && npm run screenshot`)
-  - this builds the site, starts a preview server, captures hero/problem/features/how-it-works sections plus a full-page shot, saves PNGs to /screenshots/ with a timestamp prefix
+  - this builds the site, starts a preview server, captures hero/problem/features/how-it-works sections plus a full-page shot, overwrites PNGs in design/screenshots/ (fixed names so each commit shows a visual diff)
   - read and share each saved screenshot image with the user using the Read tool before committing, so they can review the rendered output
   - if the Playwright browser is missing: `npx playwright install chromium` inside web/
 - the goal of these scripts are to manage workflow for importing videos from different cameras, so that they all appear interleaved with each other in your video editor at the time at which they were initially filmed.
