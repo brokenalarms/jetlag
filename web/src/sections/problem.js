@@ -73,7 +73,7 @@ export function renderProblem() {
         <!-- Section header -->
         <div class="mb-16 text-center">
           <span class="section-label">The Problem</span>
-          <h2 class="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 class="vhs-scanlines mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
             Cameras lie about time
           </h2>
           <p class="mt-4 mx-auto max-w-2xl text-base leading-relaxed text-white/55">

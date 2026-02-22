@@ -14,7 +14,7 @@ export function renderHero() {
       </div>
 
       <!-- Headline -->
-      <h1 class="spray-paint animate-fade-up opacity-0 mx-auto max-w-3xl text-center text-5xl font-bold leading-tight tracking-tight sm:text-6xl lg:text-7xl" style="animation-delay: 0.2s">
+      <h1 class="vhs-scanlines spray-paint animate-fade-up opacity-0 mx-auto max-w-3xl text-center text-5xl font-bold leading-tight tracking-tight sm:text-6xl lg:text-7xl" style="animation-delay: 0.2s">
         Every camera.<br>
         <span class="text-gradient">One timeline.</span>
       </h1>

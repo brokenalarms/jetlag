@@ -31,7 +31,7 @@ export function renderPricing() {
       <div class="mx-auto max-w-5xl">
         <div class="text-center mb-14">
           <span class="section-label">Pricing</span>
-          <h2 class="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 class="vhs-scanlines mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
             Simple, honest pricing
           </h2>
           <p class="mt-4 mx-auto max-w-md text-base text-white/50">
