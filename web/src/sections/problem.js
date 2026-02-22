@@ -11,6 +11,7 @@ export function renderProblem() {
     return /* html */`
       <div class="flex items-center gap-3">
         <div class="w-28 text-right font-mono leading-tight flex-shrink-0">
+          ${clip.day ? `<div class="text-[9px] text-white/20 mb-0.5">${clip.day}</div>` : ''}
           <div class="text-xs text-white/35">${clip.time}</div>
           <div class="text-[10px] ${tzClass}">${clip.tz}</div>
         </div>
@@ -45,21 +46,22 @@ export function renderProblem() {
   const scenarios = [
     {
       num: '01',
-      title: 'Crossed a timezone, forgot to update the camera',
-      body: `Flying from Amsterdam (+02:00) to Seoul (+09:00) for the next leg of a food trip, you forget to update the GoPro. Day two footage shot at 09:07am Seoul time reads as 02:07am in your editor — appearing to have been shot in the middle of the previous night, before clips from the day before.`,
+      title: 'Filmed in Amsterdam, flew to Seoul, shot the next morning',
+      body: `You film in Amsterdam at 2pm (+02:00), fly overnight to Seoul (+09:00), and shoot the next morning at 9am — but the GoPro was never updated. Seoul's 9am stores as 02:07 Amsterdam time. In your editor, next-day footage lands before yesterday's Amsterdam clips.`,
       before: {
         clips: [
-          { time: '14:12', tz: '[+02:00]',    correct: true,  file: 'amsterdam_day1.MP4', color: 'blue',  width: 130, offset: 148 },
-          { time: '02:07', tz: '[+02:00  ✗]', correct: false, file: 'seoul_day2.MP4',     color: 'green', width: 110, offset: 22  },
+          { day: 'Day 1', time: '14:12', tz: '[+02:00]',    correct: true,  file: 'amsterdam_day1.MP4', color: 'blue',  width: 130, offset: 148 },
+          { day: 'Day 2', time: '02:07', tz: '[+02:00  ✗]', correct: false, file: 'seoul_day2.MP4',     color: 'green', width: 110, offset: 22  },
         ],
-        caption: 'Seoul footage appears at 2am — camera clock never left Amsterdam',
+        caption: 'Seoul Day 2 reads as 02:07 — before Amsterdam Day 1 in your timeline',
       },
       after: {
+        // Two-day scale: 150 px per day. Day 1 14:12 → 89. Day 2 09:07 → 150+57=207.
         clips: [
-          { time: '14:12', tz: '[+02:00]', correct: true, file: 'amsterdam_day1.MP4', color: 'blue',  width: 130, offset: 148 },
-          { time: '09:07', tz: '[+09:00]', correct: true, file: 'seoul_day2.MP4',     color: 'green', width: 110, offset: 95  },
+          { day: 'Day 1', time: '14:12', tz: '[+02:00]', correct: true, file: 'amsterdam_day1.MP4', color: 'blue',  width: 100, offset: 89  },
+          { day: 'Day 2', time: '09:07', tz: '[+09:00]', correct: true, file: 'seoul_day2.MP4',     color: 'green', width: 90,  offset: 207 },
         ],
-        caption: 'Jetlag applies +09:00 — Seoul footage correctly placed in the morning',
+        caption: 'Seoul correctly placed: 9am the next morning, after Amsterdam',
       },
     },
     {
