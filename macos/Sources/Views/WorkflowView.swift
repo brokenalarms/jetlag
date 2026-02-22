@@ -126,9 +126,9 @@ struct WorkflowView: View {
                         .padding(.vertical, 8)
                         .background(isEnabled ? step.iconColor.opacity(0.08) : .clear)
                         .foregroundStyle(isEnabled ? .primary : .secondary)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .contentShape(Rectangle())
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
