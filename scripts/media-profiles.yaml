@@ -37,7 +37,7 @@ profiles:
     import_dir: /Volumes/Extreme GRN/Videos/Source Video/GoPro/Import
     ready_dir: /Volumes/Extreme GRN/Videos/Source Video/GoPro/Ready
     backup_enabled: true
-    gyroflow_enabled: false
+    gyroflow_enabled: true
     backup_dir: /Volumes/Extreme GRN/Videos/Source Video/GoPro/Ready
     backup_exclude_subdirs: []
     tags:
@@ -176,7 +176,7 @@ profiles:
     import_dir: /Volumes/Extreme GRN/Videos/Source Video/iPhone/Import
     ready_dir: /Volumes/Extreme GRN/Videos/Source Video/iPhone/Ready
     backup_enabled: false
-    gyroflow_enabled: true
+    gyroflow_enabled: false
     backup_dir: /Volumes/Extreme GRN/Videos/Source Video/iPhone
     backup_exclude_subdirs: []
     tags:
