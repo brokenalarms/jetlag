@@ -254,7 +254,10 @@ def process_file(
     if tasks is None or "organize" in tasks:
         print("📁 Organizing by date...")
 
-        if subfolder:
+        folder_template = profile.get("folder_template") if profile else None
+        if folder_template:
+            template = folder_template.replace("{{SUBFOLDER}}", subfolder) if subfolder else folder_template
+        elif subfolder:
             template = f"{{{{YYYY}}}}/{subfolder}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
         else:
             template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
@@ -334,7 +337,7 @@ def main():
     parser.add_argument("--target", help="Target directory for organized files")
     parser.add_argument("--location", help="Location name/code for timezone lookup")
     parser.add_argument("--timezone", help="Timezone in +HHMM format (e.g., +0800)")
-    parser.add_argument("--subfolder", help="Optional subfolder name inserted between year and date (e.g., 'Japan Trip' → YYYY/Japan Trip/YYYY-MM-DD)")
+    parser.add_argument("--subfolder", help="Optional subfolder name substituted for {{SUBFOLDER}} in the profile's folder_template, or inserted between year and date by default (e.g., 'Japan Trip' → YYYY/Japan Trip/YYYY-MM-DD)")
     parser.add_argument("--apply", action="store_true", help="Apply changes (default: dry run)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed processing info")
     parser.add_argument(

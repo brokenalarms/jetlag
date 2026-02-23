@@ -356,9 +356,8 @@ struct WorkflowView: View {
         var args: [String] = []
         args += ["--profile", state.selectedProfile]
         
-        // Only add --group if subfolder is not empty
         if !state.subfolder.isEmpty {
-            args += ["--group", state.subfolder]
+            args += ["--subfolder", state.subfolder]
         }
         
         if hasImport {

@@ -342,6 +342,50 @@ class TestSubfolderTemplate:
         expected = target / "2025" / "2025-08-15" / "test.mp4"
         assert expected.exists(), f"Expected: {expected}\nActual files: {actual_files}\nStdout: {result.stdout[-500:]}\nStderr: {result.stderr}"
 
+    def test_folder_template_with_subfolder(self, temp_workspace, test_profile):
+        """Profile folder_template with {{SUBFOLDER}} token substitutes the subfolder value."""
+        profiles_path = SCRIPT_DIR / "media-profiles.yaml"
+        with open(profiles_path) as f:
+            profiles = yaml.safe_load(f)
+        profiles["profiles"]["_test"]["folder_template"] = "{{YYYY}}/{{MM}}/{{SUBFOLDER}}/{{YYYY}}-{{MM}}-{{DD}}"
+        with open(profiles_path, "w") as f:
+            yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
+
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:08:15 03:00:00")
+
+        result = run_pipeline(
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Japan", "--apply"],
+        )
+
+        actual_files = list(target.rglob("*.mp4"))
+        expected = target / "2025" / "08" / "Japan" / "2025-08-15" / "test.mp4"
+        assert expected.exists(), f"Expected: {expected}\nActual files: {actual_files}\nStdout: {result.stdout[-500:]}\nStderr: {result.stderr}"
+
+    def test_folder_template_without_subfolder(self, temp_workspace, test_profile):
+        """Profile folder_template used as-is when no --subfolder given."""
+        profiles_path = SCRIPT_DIR / "media-profiles.yaml"
+        with open(profiles_path) as f:
+            profiles = yaml.safe_load(f)
+        profiles["profiles"]["_test"]["folder_template"] = "{{YYYY}}/{{MM}}/{{SUBFOLDER}}/{{YYYY}}-{{MM}}-{{DD}}"
+        with open(profiles_path, "w") as f:
+            yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
+
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:08:15 03:00:00")
+
+        result = run_pipeline(
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--apply"],
+        )
+
+        actual_files = list(target.rglob("*.mp4"))
+        expected = target / "2025" / "08" / "{{SUBFOLDER}}" / "2025-08-15" / "test.mp4"
+        assert expected.exists(), f"Expected: {expected}\nActual files: {actual_files}\nStdout: {result.stdout[-500:]}\nStderr: {result.stderr}"
+
 
 class TestTimezoneHandling:
     """Tests for timezone parameter handling."""
