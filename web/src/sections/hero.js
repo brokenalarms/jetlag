@@ -9,22 +9,17 @@ export function renderHero() {
       </div>
 
       <!-- Badge -->
-      <div class="mb-6 animate-fade-up opacity-0" style="animation-delay: 0.1s">
+      <div class="mb-6 animate-fade-up opacity-0" style="opacity:0;animation-delay:0.1s">
         <span class="section-label">macOS App</span>
       </div>
 
-      <!-- Headline: headline-wrap has no opacity animation so the vignette is always visible;
-           the h1 fades in via its own inner wrapper -->
-      <div class="headline-wrap">
-        <!-- Vignette: static blur orb, never inside an opacity-0 wrapper -->
-        <div class="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[400px] rounded-full bg-neon-pink/10 blur-3xl"></div>
-        <!-- Inner wrapper fades in; relative keeps it above the absolute blur div in paint order -->
-        <div class="relative animate-fade-up opacity-0" style="animation-delay: 0.2s">
-          <h1 class="vhs-scanlines spray-paint vhs-glitch relative mx-auto max-w-3xl text-center text-5xl font-bold leading-tight tracking-tight sm:text-6xl lg:text-7xl">
-            Every camera.<br>
-            <span class="text-gradient">One timeline.</span>
-          </h1>
-        </div>
+      <!-- Headline: headline-wrap IS the CRT screen (dark box, rounded, scanlines via vhs-scanlines).
+           h1 stays transparent so drop-shadow glows around the text only, inside the screen. -->
+      <div class="headline-wrap vhs-scanlines animate-fade-up opacity-0 mx-4 sm:mx-6" style="opacity:0;animation-delay:0.2s">
+        <h1 class="spray-paint vhs-glitch relative mx-auto max-w-3xl text-center text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-7xl">
+          Every camera.<br>
+          <span class="text-gradient">One timeline.</span>
+        </h1>
       </div>
 
       <!-- Subheadline -->
