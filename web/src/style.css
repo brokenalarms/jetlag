@@ -96,17 +96,23 @@
     background-color: rgba(255, 255, 255, 0.04);
   }
 
+  /* CRT screen box: headline-wrap carries the dark background + heavy rounding.
+     h1 inside stays transparent so drop-shadow (spray-paint) glows around the text
+     characters only — the glow stays inside the screen, not around the box exterior.
+     isolation:isolate keeps the scanlines' z-index:9999 contained within this element. */
   .headline-wrap {
     position: relative;
-  }
-
-  /* CRT-screen box: padding and heavy border-radius applied to the h1 itself so the
-     existing vhs-scanlines (overflow:hidden) and spray-paint (drop-shadow) already
-     wrap around the box shape — no extra wrapper needed */
-  .headline-wrap h1 {
-    padding: 2.5rem 3.5rem;
+    overflow: hidden;
+    isolation: isolate;
+    padding: 1rem 1.25rem;
     background: rgba(0, 0, 0, 0.75);
-    border-radius: 5rem;
+    border-radius: 2.5rem;
+  }
+  @media (min-width: 640px) {
+    .headline-wrap { padding: 2rem 2.5rem; border-radius: 4rem; }
+  }
+  @media (min-width: 1024px) {
+    .headline-wrap { padding: 2.5rem 3.5rem; border-radius: 5rem; }
   }
 
   /* VHS / glitch burst — fires every ~4 s, multi-directional X+Y jitter + RGB split */
@@ -209,8 +215,8 @@
     animation-delay: 1.5s;
   }
 
-  /* Drive the scanlines pseudo-element on the same element */
-  .vhs-glitch::before {
+  /* Drive the scanlines pseudo-element on the screen box (synced to vhs-glitch timing) */
+  .headline-wrap::before {
     animation: scanline-scroll 4s linear infinite;
     animation-delay: 1.5s;
   }

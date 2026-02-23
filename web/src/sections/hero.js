@@ -13,9 +13,10 @@ export function renderHero() {
         <span class="section-label">macOS App</span>
       </div>
 
-      <!-- Headline: dark CRT-screen box, fades in with the text -->
-      <div class="headline-wrap animate-fade-up opacity-0" style="animation-delay: 0.2s">
-        <h1 class="vhs-scanlines spray-paint vhs-glitch relative mx-auto max-w-3xl text-center text-5xl font-bold leading-tight tracking-tight sm:text-6xl lg:text-7xl">
+      <!-- Headline: headline-wrap IS the CRT screen (dark box, rounded, scanlines via vhs-scanlines).
+           h1 stays transparent so drop-shadow glows around the text only, inside the screen. -->
+      <div class="headline-wrap vhs-scanlines animate-fade-up opacity-0 mx-4 sm:mx-6" style="animation-delay: 0.2s">
+        <h1 class="spray-paint vhs-glitch relative mx-auto max-w-3xl text-center text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-7xl">
           Every camera.<br>
           <span class="text-gradient">One timeline.</span>
         </h1>
