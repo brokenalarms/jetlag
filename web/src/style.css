@@ -105,7 +105,7 @@
     overflow: hidden;
     isolation: isolate;
     padding: 1rem 1.25rem;
-    background: rgba(0, 0, 0, 0.75);
+    background: #0a0a0b;
     border-radius: 2.5rem;
   }
   @media (min-width: 640px) {
