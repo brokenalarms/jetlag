@@ -223,7 +223,7 @@ struct ProfileEditorView: View {
                 GridRow {
                     Text("")
                     HStack(spacing: 4) {
-                        Toggle("Gyroflow", isOn: gyroflowToggle)
+                        Toggle("Generate Gyroflow project files", isOn: gyroflowToggle)
                         HelpButton(Strings.Profiles.gyroflow)
                     }
                 }
