@@ -102,6 +102,8 @@ final class AppState {
     var isRunning: Bool = false
     var logOutput: [LogLine] = []
     var currentProcess: Process?
+    let fileResults = ProcessedFileAccumulator()
+    var showResultsView: Bool = true
 
     init() {
         self.scriptsDirectory = (Bundle.main.resourcePath! as NSString)
@@ -150,10 +152,12 @@ final class AppState {
 
     func clearLog() {
         logOutput = []
+        fileResults.reset()
     }
 
     func appendLog(_ line: LogLine) {
         logOutput.append(line)
+        fileResults.ingest(line)
     }
 
     func cancelRunning() {

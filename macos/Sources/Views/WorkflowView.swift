@@ -31,7 +31,7 @@ struct WorkflowView: View {
             }
             .padding()
 
-            LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
+            outputPanel
         }
         .navigationTitle("Workflow")
         .sheet(isPresented: $showUpgradeSheet) {
@@ -44,6 +44,31 @@ struct WorkflowView: View {
                     runWorkflow()
                 }
             )
+        }
+    }
+
+    // MARK: - Output panel (Results / Log toggle)
+
+    private var outputPanel: some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $state.showResultsView) {
+                Label("Results", systemImage: "chart.bar.xaxis").tag(true)
+                Label("Log", systemImage: "terminal").tag(false)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 200)
+            .padding(.top, 4)
+            .padding(.bottom, 2)
+
+            if state.showResultsView {
+                ResultsView(
+                    accumulator: state.fileResults,
+                    isRunning: state.isRunning
+                )
+            } else {
+                LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
+            }
         }
     }
 
