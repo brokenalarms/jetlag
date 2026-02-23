@@ -83,22 +83,31 @@ def clip_offset_px(clip, scale):
 
 
 def build_ticks(scale, bar_area):
-    """Hour-tick marks visible within the scale window."""
+    """
+    Return (major_ticks, minor_ticks) for the axis.
+
+    Major ticks (labelled)  — every major_interval hours.
+    Minor ticks (unlabelled) — every half-major-interval hours, between major ones.
+    """
     start, end, ppm = scale['start'], scale['end'], scale['ppm']
     duration = end - start
-    # Use 6-hour intervals when the span exceeds 8 hours (avoids label crowding)
-    interval = 6 if duration > 8 * 60 else 3 if duration > 6 * 60 else 2
-    ticks = []
+    # Use 6-hour major interval when span > 8 h (avoids label crowding at icon scale)
+    major_interval = 6 if duration > 8 * 60 else 3 if duration > 6 * 60 else 2
+    minor_interval = major_interval // 2
+
+    major_ticks = []
+    minor_ticks = []
     for h in range(math.ceil(start / 60), math.floor(end / 60) + 1):
-        if h % interval != 0:
-            continue
         px = round((h * 60 - start) * ppm)
         if px < 0 or px > bar_area:
             continue
-        disp_h    = h % 24
-        is_newday = (h % 24 == 0) and (h > 0)
-        ticks.append({'px': px, 'label': f'{disp_h:02d}:00', 'new_day': is_newday})
-    return ticks
+        if h % major_interval == 0:
+            disp_h    = h % 24
+            is_newday = (h % 24 == 0) and (h > 0)
+            major_ticks.append({'px': px, 'label': f'{disp_h:02d}:00', 'new_day': is_newday})
+        elif h % minor_interval == 0:
+            minor_ticks.append({'px': px})
+    return major_ticks, minor_ticks
 
 
 # ── Layout fractions  (these are the only design knobs) ───────────────────────
@@ -132,7 +141,8 @@ GLOW_EXPAND_FRAC   = 0.17      # rect expansion before Gaussian blur
 GLOW_RADIUS_FRAC   = 0.31      # Gaussian blur radius
 
 # Axis geometry as fractions of BAR_H
-TICK_H_FRAC        = 0.10      # tick-mark height
+TICK_H_FRAC        = 0.10      # major tick-mark height
+MINOR_TICK_H_FRAC  = 0.06      # minor tick-mark height (shorter, unlabelled)
 TICK_GAP_FRAC      = 0.13      # gap between tick bottom and label top
 
 # Label-column line spacing as fraction of ROW_H
@@ -173,8 +183,15 @@ AXIS_H    = round(BAR_H  * AXIS_BAR_FRAC)   # exactly fits tick + gap + label
 GLOW_EXPAND = round(BAR_H * GLOW_EXPAND_FRAC)
 GLOW_RADIUS = round(BAR_H * GLOW_RADIUS_FRAC)
 
-TICK_H    = round(BAR_H * TICK_H_FRAC)
-TICK_GAP  = round(BAR_H * TICK_GAP_FRAC)
+TICK_H       = round(BAR_H * TICK_H_FRAC)
+MINOR_TICK_H = round(BAR_H * MINOR_TICK_H_FRAC)
+TICK_GAP     = round(BAR_H * TICK_GAP_FRAC)
+
+# Staircase bar positioning: the two clip bars are placed as an adjacent pair
+# centred in the bar area, with the right edge of 'jet' flush with the left
+# edge of 'lag'. The time-axis retains its accurate scale.
+STAIRCASE_H_PAD = (BAR_AREA - 2 * CLIP_W) // 2
+BAR_OFFSETS     = [STAIRCASE_H_PAD, STAIRCASE_H_PAD + CLIP_W]
 
 FONT_BAR_SZ  = round(BAR_H * FONT_BAR_FRAC)
 FONT_TIME_SZ = round(BAR_H * FONT_TIME_FRAC)
@@ -243,11 +260,10 @@ def draw_row_card(img, row_y):
     return composite(img, overlay)
 
 
-def draw_clip_row(img, clip, row_y, scale, fill, border, text_color, glow_rgb, fonts):
+def draw_clip_row(img, clip, row_y, bar_offset, fill, border, text_color, glow_rgb, fonts):
     """Render one clip row: glow behind bar, bar rect, 'jet'/'lag' label centred inside."""
     font_bar, _, _ = fonts
-    offset = clip_offset_px(clip, scale)
-    bx0 = BAR_X + offset
+    bx0 = BAR_X + bar_offset
     bx1 = bx0 + CLIP_W
     by0 = row_y + (ROW_H - BAR_H) // 2
     by1 = by0 + BAR_H
@@ -312,14 +328,23 @@ def draw_time_labels(img, clip, row_y, fonts):
 
 
 def draw_axis(img, scale, fonts):
-    """Horizontal axis line with hour-tick marks and labels below the last row."""
+    """Horizontal axis line, minor ticks (unlabelled), major ticks with labels."""
     _, _, font_tick = fonts
     overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
     d = ImageDraw.Draw(overlay)
 
     d.line([(BAR_X, AXIS_Y), (BAR_END, AXIS_Y)], fill=AXIS_COLOR, width=1)
 
-    for tick in build_ticks(scale, BAR_AREA):
+    major_ticks, minor_ticks = build_ticks(scale, BAR_AREA)
+
+    # Minor ticks — shorter, no label
+    for tick in minor_ticks:
+        tx = BAR_X + tick['px']
+        d.line([(tx, AXIS_Y), (tx, AXIS_Y + MINOR_TICK_H)],
+               fill=(255, 255, 255, 20), width=1)
+
+    # Major ticks — taller, with hour label
+    for tick in major_ticks:
         tx     = BAR_X + tick['px']
         is_new = tick['new_day']
         t_col  = NEWDAY_COLOR if is_new else TICK_COLOR
@@ -345,19 +370,19 @@ def main():
 
     img = Image.new('RGBA', (SIZE, SIZE), (*BG_COLOR, 255))
 
-    # Row 1 — Amsterdam (blue, 'jet')
+    # Row 1 — Amsterdam (blue, 'jet') — staircase left position
     img = draw_row_card(img, ROW1_Y)
-    img = draw_clip_row(img, CLIPS[0], ROW1_Y, scale,
+    img = draw_clip_row(img, CLIPS[0], ROW1_Y, BAR_OFFSETS[0],
                         BLUE_FILL, BLUE_BORDER, BLUE_TEXT, (59, 130, 246), fonts)
     img = draw_time_labels(img, CLIPS[0], ROW1_Y, fonts)
 
-    # Row 2 — Seoul before Jetlag (green, 'lag', wrong timezone)
+    # Row 2 — Seoul before Jetlag (green, 'lag') — staircase right: starts where 'jet' ends
     img = draw_row_card(img, ROW2_Y)
-    img = draw_clip_row(img, CLIPS[1], ROW2_Y, scale,
+    img = draw_clip_row(img, CLIPS[1], ROW2_Y, BAR_OFFSETS[1],
                         GREEN_FILL, GREEN_BORDER, GREEN_TEXT, (34, 197, 94), fonts)
     img = draw_time_labels(img, CLIPS[1], ROW2_Y, fonts)
 
-    # Time axis
+    # Time axis (scale still derived from actual clip times)
     img = draw_axis(img, scale, fonts)
 
     # Save
