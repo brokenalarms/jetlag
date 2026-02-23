@@ -603,5 +603,124 @@ class TestBirthTimeCalculation:
             f"  After second: {birth_after_second}"
         )
 
+class TestMachineReadableFileOutput:
+    """
+    fix-media-timestamp.py should emit @@file=, @@original_time=, @@corrected_time=,
+    and @@status= to stdout for each processed file, so parent scripts and the app UI
+    can parse structured results.
+    """
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    def _create_test_video(self, path: str) -> None:
+        subprocess.run([
+            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
+            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
+            path
+        ], capture_output=True, check=True)
+
+    def _parse_machine_output(self, stdout: str) -> dict:
+        """Parse @@key=value lines from stdout into a dict."""
+        result = {}
+        for line in stdout.split('\n'):
+            if line.startswith('@@'):
+                key, _, value = line[2:].partition('=')
+                result[key] = value
+        return result
+
+    def test_emits_file_and_status_on_dry_run(self):
+        """Dry run emits @@file=, @@original_time=, @@corrected_time=, @@status="""
+        video_path = os.path.join(self.temp_dir, "GH012345.mp4")
+        self._create_test_video(video_path)
+
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-DateTimeOriginal=2025:06:18 07:25:21+08:00",
+            video_path
+        ], capture_output=True, check=True)
+
+        result = subprocess.run([
+            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        machine = self._parse_machine_output(result.stdout)
+
+        assert "file" in machine, f"Missing @@file= in stdout:\n{result.stdout}"
+        assert machine["file"] == "GH012345.mp4"
+
+        assert "original_time" in machine, f"Missing @@original_time= in stdout:\n{result.stdout}"
+        assert "2025:06:18 07:25:21" in machine["original_time"]
+
+        assert "corrected_time" in machine, f"Missing @@corrected_time= in stdout:\n{result.stdout}"
+        assert "2025:06:18 07:25:21" in machine["corrected_time"]
+        assert "+08:00" in machine["corrected_time"]
+
+        assert "status" in machine, f"Missing @@status= in stdout:\n{result.stdout}"
+        assert machine["status"] in ("changed", "unchanged")
+
+    def test_status_unchanged_on_idempotent_run(self):
+        """After apply, a second dry run should emit @@status=unchanged"""
+        video_path = os.path.join(self.temp_dir, "test_idempotent.mp4")
+        self._create_test_video(video_path)
+
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-DateTimeOriginal=2025:06:18 07:25:21+08:00",
+            video_path
+        ], capture_output=True, check=True)
+
+        # First run with --apply to fix timestamps
+        subprocess.run([
+            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path, "--apply"
+        ], capture_output=True, text=True, check=True)
+
+        fmt._exif_cache.clear()
+
+        # Second run (dry run) should report unchanged
+        result = subprocess.run([
+            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        machine = self._parse_machine_output(result.stdout)
+        assert machine.get("status") == "unchanged", (
+            f"Expected @@status=unchanged after idempotent run, got: {machine.get('status')}\n{result.stdout}"
+        )
+
+    def test_shift_emitted_when_birth_time_changes(self):
+        """@@shift= should be emitted when file birth time needs correction"""
+        video_path = os.path.join(self.temp_dir, "test_shift.mp4")
+        self._create_test_video(video_path)
+
+        # Set DateTimeOriginal far from current birth time to guarantee a shift
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-DateTimeOriginal=2020:01:01 12:00:00+09:00",
+            video_path
+        ], capture_output=True, check=True)
+
+        result = subprocess.run([
+            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        machine = self._parse_machine_output(result.stdout)
+
+        # Birth time was set at file creation (now), DateTimeOriginal is 2020,
+        # so there should be a large shift
+        assert machine.get("status") == "changed"
+        assert "shift" in machine, f"Missing @@shift= when birth time changes:\n{result.stdout}"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

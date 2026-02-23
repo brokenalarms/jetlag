@@ -238,7 +238,10 @@ def process_file(
         print("🔧 Fixing timestamp...")
         output, changed, rc = run_fix_timestamp(file_path, location_args, apply, verbose)
         for line in output.split("\n"):
-            print(f"  {line}")
+            if line.startswith("@@"):
+                print(line)  # Pass through machine-readable lines unindented
+            else:
+                print(f"  {line}")
 
         if rc != 0:
             print(f"   ❌ Timestamp fix failed for {file_path.name}")
@@ -262,6 +265,12 @@ def process_file(
         else:
             template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
         output, action, dest, rc = run_organize_by_date(file_path, target_dir, template, apply, verbose)
+
+        # Re-emit machine-readable output for app UI
+        if action:
+            print(f"@@action={action}")
+        if dest:
+            print(f"@@dest={dest}")
 
         # Print stderr output (user-visible messages)
         if output:

@@ -982,6 +982,9 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
                           If False (default), convert to current timezone for correct equivalent display
     """
 
+    filename = os.path.basename(file_path)
+    print(f"@@file={filename}")
+
     detected_tz = extract_metadata_timezone(file_path)
     if detected_tz:
         print(f"@@timezone={detected_tz}")
@@ -1008,6 +1011,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
                 print(f"   DateTimeOriginal has timezone: {existing_tz}")
                 print(f"   You provided timezone: {provided_tz}")
                 print(f"   Use --overwrite-datetimeoriginal to force overwrite with new timezone")
+                print("@@status=failed")
                 return False
 
     # Get all data
@@ -1024,8 +1028,10 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
             print("❌ File has CreateDate but no DateTimeOriginal")
             print(f"   CreateDate: {create_date}")
             print("   Use --timezone to specify timezone (e.g., --timezone +09:00)")
+            print("@@status=failed")
             return False
         print("❌ No valid DateTimeOriginal found")
+        print("@@status=failed")
         return False
 
     datetime_original = current_data["datetime_original"]
@@ -1072,6 +1078,15 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
     # Display changes
     change_desc = format_change_description(changes, timestamp_data, current_data, preserve_wallclock, datetime_original)
     has_changes = changes.get("keys_creationdate", False) or changes["file_timestamps"] or changes.get("quicktime_createdate", False)
+
+    # Emit machine-readable output for parent scripts / app UI
+    print(f"@@original_time={datetime_original_str}")
+    corrected_iso = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
+    corrected_iso = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', corrected_iso)
+    print(f"@@corrected_time={corrected_iso}")
+    print(f"@@status={'changed' if has_changes else 'unchanged'}")
+    if timestamp_data and timestamp_data.get("birth_delta_seconds"):
+        print(f"@@shift={format_time_delta(timestamp_data['birth_delta_seconds'])}")
 
     if dry_run and has_changes:
         print(f"📊 Change   : {change_desc} (DRY RUN)")
