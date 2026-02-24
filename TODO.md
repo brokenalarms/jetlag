@@ -1,12 +1,3 @@
-# TODO — sliding context window
-
-Pick ONE task and work on it. If not instructed to work on a specific task, determine the single highest-leverage, oldest, or most badly needed task.
-Update this file at the end of the session. Completed work is recorded in commit messages — do not add a "Done" section here.
-
-Tasks are grouped by subrepo. Cross-repo tasks appear under a combined heading — these need changes in multiple subrepos for a single valid PR.
-
----
-
 ## `scripts/`
 
 - (2026-02-20) **Performance baseline not yet recorded** — `tests/perf_baseline.json` does not exist yet. Run `pytest tests/test_performance.py -v -s` on the target macOS machine to generate it, then commit the file.
