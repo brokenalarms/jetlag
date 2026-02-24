@@ -28,6 +28,14 @@ except ImportError:
     print("Error: humanize library not found. Install with: pip install humanize", file=sys.stderr)
     sys.exit(1)
 
+if sys.platform == "darwin":
+    from lib.file_timestamps import (
+        get_file_system_timestamps,
+        set_file_system_timestamps,
+        check_file_system_timestamps_need_update,
+        get_expected_file_system_time,
+    )
+
 # Global cache for exiftool data to avoid reading same file multiple times
 _exif_cache: Dict[str, Dict[str, str]] = {}
 
@@ -289,27 +297,6 @@ def parse_filename_timestamp(file_path: str) -> Optional[str]:
 
     return None
 
-def get_file_system_timestamps(file_path: str) -> Dict[str, str]:
-    """Get file system timestamps (birth time and modification time)"""
-    try:
-        # Get birth time (creation time)
-        birth_result = subprocess.run(
-            ["stat", "-f", "%SB", "-t", "%Y:%m:%d %H:%M:%S", file_path],
-            capture_output=True, text=True, check=True
-        )
-        birth_time = birth_result.stdout.strip()
-
-        # Get modification time
-        mod_result = subprocess.run(
-            ["date", "-r", file_path, "+%Y:%m:%d %H:%M:%S"],
-            capture_output=True, text=True, check=True
-        )
-        mod_time = mod_result.stdout.strip()
-
-        return {"birth": birth_time, "modify": mod_time}
-    except subprocess.CalledProcessError:
-        return {"birth": "", "modify": ""}
-
 def write_exif_fields(file_path: str, field_args: list) -> bool:
     """Write multiple EXIF fields in a single exiftool call."""
     try:
@@ -422,7 +409,6 @@ def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None, ov
     - Ignores existing DateTimeOriginal (which may be corrupted)
     """
     exif_data = read_exif_data(file_path)
-    file_timestamps = get_file_system_timestamps(file_path)
     base = os.path.basename(file_path)
 
     # When overwriting, filename is first source of truth for Insta360/DJI files
@@ -471,11 +457,18 @@ def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None, ov
         if is_valid_timestamp(timestamp):
             return timestamp, "MediaCreateDate"
 
-    # Priority 6: File timestamps
-    if file_timestamps.get("birth"):
-        return file_timestamps["birth"], "file birthtime"
-    elif file_timestamps.get("modify"):
-        return file_timestamps["modify"], "file mtime"
+    # Priority 6: File timestamps (cross-platform via os.stat)
+    try:
+        st = os.stat(file_path)
+        try:
+            birth = datetime.fromtimestamp(st.st_birthtime).strftime('%Y:%m:%d %H:%M:%S')
+            return birth, "file birthtime"
+        except AttributeError:
+            pass
+        mtime = datetime.fromtimestamp(st.st_mtime).strftime('%Y:%m:%d %H:%M:%S')
+        return mtime, "file mtime"
+    except OSError:
+        pass
 
     return None, "no timestamps found"
 
@@ -490,7 +483,7 @@ def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None
     data = {
         "file_path": file_path,  # Store file path for filename parsing
         "exif": read_exif_data(file_path),
-        "file_system": get_file_system_timestamps(file_path),
+        "file_system": get_file_system_timestamps(file_path) if sys.platform == "darwin" else {"birth": "", "modify": ""},
         "datetime_original_str": "",
         "datetime_original": None,
         "timestamp_source": "",
@@ -593,62 +586,6 @@ def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None
 
     return data
 
-def get_expected_file_system_time(datetime_original: datetime, preserve_wallclock: bool = False) -> str:
-    """Calculate what file system timestamp should be
-
-    Default: Convert to current timezone for consistent display
-    Example: Shot at 10:29 in +08:00, viewing in +09:00 → file timestamp should be 11:29
-
-    With preserve_wallclock: Use shooting time directly
-    Example: Shot at 10:29 → file timestamp should be 10:29
-
-    Args:
-        datetime_original: datetime object with timezone info
-        preserve_wallclock: If True, preserve wall-clock shooting time
-
-    Returns:
-        Timestamp string in format "YYYY:MM:DD HH:MM:SS"
-    """
-    if preserve_wallclock:
-        # Use shooting time directly (wall-clock time)
-        return datetime_original.strftime('%Y:%m:%d %H:%M:%S')
-    else:
-        # Convert to current local timezone for consistent display
-        # This ensures file timestamp matches what Keys:CreationDate displays
-        local_dt = datetime_original.astimezone()
-        return local_dt.strftime('%Y:%m:%d %H:%M:%S')
-
-def set_file_system_timestamps(file_path: str, timestamp_str: str) -> bool:
-    """Set file system birth time
-
-    Note: Only sets birth time, not modification time. Modification time naturally
-    reflects when the file was last modified (e.g., by exiftool metadata writes).
-
-    Args:
-        file_path: Path to the file
-        timestamp_str: Timestamp in format "YYYY:MM:DD HH:MM:SS"
-
-    Returns:
-        True if successful, False otherwise
-    """
-    try:
-        # Parse the timestamp
-        dt = datetime.strptime(timestamp_str, '%Y:%m:%d %H:%M:%S')
-
-        # Set birth time using SetFile (macOS-specific, requires Xcode Command Line Tools)
-        # Format: "MM/DD/YYYY HH:MM:SS"
-        setfile_format = dt.strftime('%m/%d/%Y %H:%M:%S')
-        subprocess.run(
-            ["SetFile", "-d", setfile_format, file_path],
-            check=True,
-            capture_output=True
-        )
-
-        return True
-    except (subprocess.CalledProcessError, ValueError) as e:
-        print(f"Error setting file timestamps: {e}", file=sys.stderr)
-        return False
-
 def check_keys_creationdate_needs_update(file_path: str, datetime_original: datetime) -> bool:
     """Check if Keys:CreationDate needs updating
 
@@ -676,43 +613,6 @@ def check_keys_creationdate_needs_update(file_path: str, datetime_original: date
     expected_norm = normalize_exif_value(expected_value)
 
     return current_norm != expected_norm
-
-def check_file_system_timestamps_need_update(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False) -> bool:
-    """Check if file system birth time needs updating
-
-    Note: Only checks birth time. Modification time naturally changes when files are
-    modified (e.g., by exiftool) and shouldn't be artificially set.
-
-    Args:
-        file_path: Path to the media file
-        datetime_original: datetime object with timezone info
-        preserve_wallclock: If True, match wall-clock shooting time instead
-
-    Returns:
-        True if birth time needs updating, False otherwise
-    """
-    current_fs = get_file_system_timestamps(file_path)
-    expected_time = get_expected_file_system_time(datetime_original, preserve_wallclock)
-
-    # Parse expected timestamp
-    try:
-        expected_dt = datetime.strptime(expected_time, '%Y:%m:%d %H:%M:%S')
-    except ValueError:
-        return True  # Can't parse expected time, assume update needed
-
-    # Check birth time (essential for video editor import)
-    if current_fs.get("birth"):
-        try:
-            current_birth = datetime.strptime(current_fs["birth"], '%Y:%m:%d %H:%M:%S')
-            diff = abs((current_birth - expected_dt).total_seconds())
-            # Allow 60 second tolerance - matches bash version behavior
-            # Small differences from file copies or system timing shouldn't trigger updates
-            return diff > 60
-        except ValueError:
-            return True  # Can't parse, assume update needed
-
-    # Birth time missing or invalid
-    return True
 
 def check_quicktime_createdate_needs_update(file_path: str, datetime_original: datetime) -> bool:
     """Check if QuickTime CreateDate needs updating to match correct UTC"""
@@ -756,8 +656,9 @@ def determine_needed_changes(file_path: str, datetime_original: datetime, preser
     # Check if Keys:CreationDate needs updating (always uses original timezone)
     changes["keys_creationdate"] = check_keys_creationdate_needs_update(file_path, datetime_original)
 
-    # Check if file system timestamps need updating (preserve_wallclock affects this)
-    changes["file_timestamps"] = check_file_system_timestamps_need_update(file_path, datetime_original, preserve_wallclock)
+    # Check if file system timestamps need updating (macOS only)
+    if sys.platform == "darwin":
+        changes["file_timestamps"] = check_file_system_timestamps_need_update(file_path, datetime_original, preserve_wallclock)
 
     # Check if QuickTime CreateDate needs updating
     changes["quicktime_createdate"] = check_quicktime_createdate_needs_update(file_path, datetime_original)

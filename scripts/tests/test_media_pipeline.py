@@ -10,6 +10,7 @@ Run with: pytest tests/test_media_pipeline.py -v
 
 import shlex
 import subprocess
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -474,6 +475,7 @@ class TestExiftoolTmpDetection:
         assert "exiftool_tmp" in result.output
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags use the `tag` command")
 class TestTagging:
     """Tests for file tagging from profile."""
 

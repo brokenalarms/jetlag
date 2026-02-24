@@ -130,6 +130,7 @@ class TestPerformance:
             f"(threshold {REGRESSION_THRESHOLD*100:.0f}%)"
         )
 
+    @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags don't exist on Linux")
     def test_tag_media_apply(self, source_mp4, request):
         """tag-media.py: apply tags + EXIF to a single file."""
         elapsed = measure_script(
@@ -154,6 +155,7 @@ class TestPerformance:
         )
         self._check("fix_media_timestamp_apply", elapsed, request)
 
+    @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags don't exist on Linux")
     def test_tag_media_no_work(self, source_mp4, request):
         """tag-media.py: file already tagged correctly (check-before-write path)."""
         # Pre-tag the file once

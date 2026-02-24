@@ -15,6 +15,8 @@ import pytest
 
 SCRIPT_DIR = Path(__file__).parent.parent
 
+pytestmark = pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags don't exist on Linux")
+
 
 class TestTagMedia:
     """Test suite for tag-media.py"""
