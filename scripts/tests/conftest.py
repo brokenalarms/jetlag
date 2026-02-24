@@ -72,6 +72,10 @@ def pytest_addoption(parser):
         "--perf-baseline", action="store_true", default=False,
         help="Record performance baselines instead of comparing against them",
     )
+    parser.addoption(
+        "--perf-baseline-file", default=None,
+        help="Path to baseline JSON file (default: tests/perf_baseline.json)",
+    )
 
 
 def pytest_configure(config):
@@ -112,7 +116,7 @@ def pytest_collection_modifyitems(config, items):
     skip_marker = pytest.mark.skip(reason="requires macOS — Finder tags and birth time don't exist on Linux")
     for item in items:
         source = _get_test_source(item)
-        if source and _uses_macos_tools(source):
+        if source and _uses_macos_features(source):
             item.add_marker(skip_marker)
 
 
@@ -128,6 +132,7 @@ def _get_test_source(item):
         return None
 
 
-def _uses_macos_tools(source: str) -> bool:
-    """Check if source code references macOS-only tools."""
-    return '"tag"' in source or '"SetFile"' in source or "'tag'" in source or "'SetFile'" in source
+def _uses_macos_features(source: str) -> bool:
+    """Check if source code references macOS-only tools or APIs."""
+    macos_indicators = ['"tag"', "'tag'", '"SetFile"', "'SetFile'", "st_birthtime"]
+    return any(indicator in source for indicator in macos_indicators)

@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 SCRIPT_DIR = Path(__file__).parent.parent
-BASELINE_FILE = Path(__file__).parent / "perf_baseline.json"
+DEFAULT_BASELINE_FILE = Path(__file__).parent / "perf_baseline.json"
 REGRESSION_THRESHOLD = 0.05  # 5% slower than baseline = regression
 TIMED_RUNS = 3
 
@@ -75,14 +75,22 @@ def measure_script(cmd_template: list, source: Path, tmp_dir: Path, runs: int = 
     return statistics.median(times)
 
 
-def load_baseline() -> dict:
-    if BASELINE_FILE.exists():
-        return json.loads(BASELINE_FILE.read_text())
+def _baseline_path(config) -> Path:
+    custom = config.getoption("--perf-baseline-file", default=None)
+    return Path(custom) if custom else DEFAULT_BASELINE_FILE
+
+
+def load_baseline(config) -> dict:
+    path = _baseline_path(config)
+    if path.exists():
+        return json.loads(path.read_text())
     return {}
 
 
-def save_baseline(results: dict):
-    BASELINE_FILE.write_text(json.dumps(results, indent=2) + "\n")
+def save_baseline(config, results: dict):
+    path = _baseline_path(config)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(results, indent=2) + "\n")
 
 
 class TestPerformance:
@@ -94,12 +102,13 @@ class TestPerformance:
 
     def _check(self, name: str, elapsed: float, request):
         """Compare elapsed time against baseline, or record if --perf-baseline."""
-        baseline = load_baseline()
-        recording = request.config.getoption("--perf-baseline", default=False)
+        config = request.config
+        baseline = load_baseline(config)
+        recording = config.getoption("--perf-baseline", default=False)
 
         if recording:
             baseline[name] = round(elapsed, 3)
-            save_baseline(baseline)
+            save_baseline(config, baseline)
             print(f"\n  {name}: {elapsed:.2f}s (baseline recorded)")
             return
 

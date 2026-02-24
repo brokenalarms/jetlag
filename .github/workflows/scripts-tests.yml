@@ -1,0 +1,27 @@
+name: scripts tests
+
+on:
+  pull_request:
+    paths:
+      - "scripts/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg libimage-exiftool-perl
+
+      - name: Install Python deps
+        run: pip install pytest humanize pyyaml
+
+      - name: Run tests (excluding perf)
+        run: pytest scripts/tests/ -x -v --ignore=scripts/tests/test_performance.py

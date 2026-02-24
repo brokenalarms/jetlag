@@ -85,11 +85,8 @@ class TestTimestampCalculations:
         # Without preserve_wallclock, should convert to local timezone
         result = fmt.get_expected_file_system_time(dt, preserve_wallclock=False)
 
-        # Result should be a local time string
-        assert result is not None
-        assert "2025:06:18" in result
-        # Time will depend on system timezone, so just check format
-        assert len(result.split()) == 2  # "YYYY:MM:DD HH:MM:SS"
+        expected_local = dt.astimezone().strftime('%Y:%m:%d %H:%M:%S')
+        assert result == expected_local
 
     def test_get_expected_file_system_time_wallclock_mode(self):
         """Test file system time calculation in wallclock mode"""
