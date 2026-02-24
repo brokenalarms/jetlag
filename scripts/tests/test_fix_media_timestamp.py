@@ -79,7 +79,7 @@ class TestFixMediaTimestamp:
 
         # Run in dry run mode (no --apply)
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             test_video
         ], capture_output=True, text=True)
 
@@ -96,7 +96,7 @@ class TestFixMediaTimestamp:
         """Test that apply mode updates birth time"""
         # Run with --apply
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             test_video, "--apply"
         ], capture_output=True, text=True)
 
@@ -113,7 +113,7 @@ class TestFixMediaTimestamp:
         """Test that running twice doesn't change anything the second time"""
         # First run with --apply
         result1 = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             test_video, "--apply"
         ], capture_output=True, text=True)
 
@@ -125,7 +125,7 @@ class TestFixMediaTimestamp:
 
         # Second run should report "No change"
         result2 = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             test_video, "--apply"
         ], capture_output=True, text=True)
 
@@ -140,7 +140,7 @@ class TestFixMediaTimestamp:
         """Test --timezone flag adds timezone to DateTimeOriginal without timezone"""
         # File has DateTimeOriginal but no timezone - should add it
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             test_video_no_timezone,
             "--timezone", "+0800",
             "--apply"
@@ -161,7 +161,7 @@ class TestFixMediaTimestamp:
         """Test that Keys:CreationDate is written correctly"""
         # Run with --apply
         subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             test_video, "--apply"
         ], capture_output=True, check=True)
 
@@ -187,7 +187,7 @@ class TestFixMediaTimestamp:
 
         # Should use filename with provided timezone
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
             "--timezone", "+0800"
         ], capture_output=True, text=True)
@@ -199,7 +199,7 @@ class TestFixMediaTimestamp:
     def test_missing_timezone_error(self, test_video_no_timezone):
         """Test that missing timezone is reported correctly"""
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             test_video_no_timezone
         ], capture_output=True, text=True)
 
@@ -210,7 +210,7 @@ class TestFixMediaTimestamp:
     def test_output_formatting(self, test_video):
         """Test that output follows data/presentation separation"""
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             test_video
         ], capture_output=True, text=True)
 
@@ -228,7 +228,7 @@ class TestFixMediaTimestamp:
 
         # Run with --apply
         subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             test_video, "--apply"
         ], capture_output=True, check=True)
 
@@ -250,7 +250,7 @@ class TestFixMediaTimestamp:
 
         # Run fix
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             test_video, "--apply"
         ], capture_output=True, text=True)
 
@@ -299,7 +299,7 @@ class TestFixMediaTimestampIntegration:
         results = []
         for video in videos:
             result = subprocess.run([
-                "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+                sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
                 video, "--apply"
             ], capture_output=True, text=True)
             results.append(result)
