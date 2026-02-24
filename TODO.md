@@ -19,9 +19,9 @@
 - (2026-02-20) **`preserveSource` flag not passed to script** — `WorkflowView.runWorkflow()` binds a toggle to `state.preserveSource` but never adds a `--copy` / `--move` flag to the `import-media.sh` args. `import-media.py` doesn't currently expose this as a CLI flag — need to add it to the script first, then wire up in `WorkflowView`.
 
 - (2026-02-23) **Timezone suffix for group folder** — `--subfolder` / `folder_template` groundwork is done. Remaining:
-   - `scripts/`: rename `--subfolder` → `--group` in `media-pipeline.py`; when `--group` and `--timezone` are both provided, append the timezone offset to the group folder name, e.g. `Japan (+0900)`
-   - `macos/`: rename the "Subfolder" field label to "Group"; add help text noting that date-range names (e.g. `05-06 Korea`) don't work well when backing up mid-trip since the end date isn't known yet
-   - Tests: `--group Japan --timezone +0900` → folder named `Japan (+0900)`; `--group Japan` without `--timezone` → folder named `Japan`
+   - `scripts/`: rename `--subfolder` → `--group` in `media-pipeline.py`; add `--group-timezone` flag (positive opt-in) that appends timezone offset to the group folder name, e.g. `Japan (+0900)` — requires `--group` and `--timezone` to also be set
+   - `macos/`: rename the "Subfolder" field label to "Group"; add help text noting that date-range names (e.g. `05-06 Korea`) don't work well when backing up mid-trip since the end date isn't known yet; expose `--group-timezone` toggle
+   - Tests: `--group Japan --timezone +0900 --group-timezone` → folder named `Japan (+0900)`; `--group Japan --timezone +0900` (without `--group-timezone`) → folder named `Japan`
 
 - (2026-02-24) **Dry-run diff table** — During dry-run, replace raw log output with a structured table: file name, camera/profile, original timestamp, corrected timestamp, destination path. Color-code rows by camera profile.
    - `scripts/`: `fix-media-timestamp.py` needs to emit `@@original_time=` and `@@corrected_time=` in `@@` format alongside existing output
