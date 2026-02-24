@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
+from lib.exiftool import ExifToolStayOpen
 from lib.filesystem import cleanup_empty_parent_dirs
 
 
@@ -23,25 +24,32 @@ MONTH_ABBREVS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
-def get_file_date_for_organization(file_path: str) -> Optional[str]:
+def get_file_date_for_organization(file_path: str, et: 'ExifToolStayOpen | None' = None) -> Optional[str]:
     """Get date in YYYY-MM-DD format for file organization.
 
     Priority: DateTimeOriginal > filename patterns > file mtime
     """
     # Try DateTimeOriginal from exiftool
     try:
-        result = subprocess.run(
-            ['exiftool', '-fast2', '-s', '-DateTimeOriginal', file_path],
-            capture_output=True, text=True, check=True
-        )
-        for line in result.stdout.strip().split('\n'):
-            if ':' in line:
-                key, value = line.split(':', 1)
-                if key.strip() == 'DateTimeOriginal':
-                    dt_str = value.strip()
-                    if dt_str:
-                        date_part = dt_str.split(' ')[0]
-                        return date_part.replace(':', '-')
+        if et:
+            data = et.read_tags(file_path, ["DateTimeOriginal"])
+            dt_str = data.get("DateTimeOriginal", "")
+            if dt_str:
+                date_part = dt_str.split(' ')[0]
+                return date_part.replace(':', '-')
+        else:
+            result = subprocess.run(
+                ['exiftool', '-fast2', '-s', '-DateTimeOriginal', file_path],
+                capture_output=True, text=True, check=True
+            )
+            for line in result.stdout.strip().split('\n'):
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    if key.strip() == 'DateTimeOriginal':
+                        dt_str = value.strip()
+                        if dt_str:
+                            date_part = dt_str.split(' ')[0]
+                            return date_part.replace(':', '-')
     except (subprocess.CalledProcessError, OSError):
         pass
 
@@ -153,7 +161,7 @@ def _handle_existing_target(file_path, target_file, target_path, abs_target,
 
 def process_file(file_path: str, target_dir: str, template: str,
                  copy_mode: bool, overwrite: bool, apply: bool,
-                 verbose: bool) -> tuple[str, str]:
+                 verbose: bool, et: 'ExifToolStayOpen | None' = None) -> tuple[str, str]:
     """Process a single file for organization.
 
     Returns:
@@ -164,7 +172,7 @@ def process_file(file_path: str, target_dir: str, template: str,
     if verbose:
         print(f"Processing: {file_path}", file=sys.stderr)
 
-    file_date = get_file_date_for_organization(file_path)
+    file_date = get_file_date_for_organization(file_path, et=et)
     if not file_date:
         print(f"ERROR: Cannot determine date for {base}", file=sys.stderr)
         sys.exit(1)

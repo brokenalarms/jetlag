@@ -8,6 +8,7 @@ identically when run against a Python rewrite.
 Run with: pytest tests/test_media_pipeline.py -v
 """
 
+import os
 import shlex
 import subprocess
 import sys
@@ -441,6 +442,7 @@ class TestSummaryOutput:
         assert "Total files processed: 3" in result.stdout
         assert "Successfully completed: 3" in result.stdout
 
+    @pytest.mark.skipif(os.getuid() == 0, reason="chmod 0o000 does not restrict root access")
     def test_summary_shows_failed_files(self, temp_workspace, test_profile):
         """Summary lists files that failed processing."""
         source = temp_workspace["source"]

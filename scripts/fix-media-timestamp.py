@@ -13,7 +13,11 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from typing import Dict, Optional, Callable
+
+sys.path.insert(0, str(Path(__file__).parent))
+from lib.exiftool import ExifToolStayOpen
 
 # Handle Ctrl-C gracefully
 def signal_handler(sig, frame):
@@ -145,7 +149,7 @@ def get_country_name(input_country: str) -> str:
 # FileModifyDate and FileAccessDate are file system timestamps, not EXIF metadata
 # They are not modified by this script - video applications use Keys:CreationDate for timeline ordering
 
-def read_exif_data(file_path: str) -> Dict[str, str]:
+def read_exif_data(file_path: str, et: 'ExifToolStayOpen | None' = None) -> Dict[str, str]:
     """Read all relevant EXIF data with single exiftool call (cached)"""
     # Check cache first
     if file_path in _exif_cache:
@@ -156,25 +160,27 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
         "QuickTime:MediaCreateDate", "QuickTime:MediaModifyDate", "Keys:CreationDate"
     ]
 
-    cmd = ["exiftool", "-s"] + [f"-{field}" for field in fields] + [file_path]
-
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        if et:
+            raw_data = et.read_tags(file_path, fields)
+        else:
+            cmd = ["exiftool", "-s"] + [f"-{field}" for field in fields] + [file_path]
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            raw_data = {}
+            for line in result.stdout.strip().split('\n'):
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    raw_data[key.strip()] = value.strip()
 
-        # Parse exiftool output
+        # Normalize QuickTime field names for consistency
         data = {}
-        for line in result.stdout.strip().split('\n'):
-            if ':' in line:
-                key, value = line.split(':', 1)
-                key = key.strip()
-                value = value.strip()
-                # Normalize QuickTime field names for consistency
-                if key == "MediaCreateDate":
-                    data["MediaCreateDate"] = value
-                elif key == "MediaModifyDate":
-                    data["MediaModifyDate"] = value
-                else:
-                    data[key] = value
+        for key, value in raw_data.items():
+            if key == "MediaCreateDate":
+                data["MediaCreateDate"] = value
+            elif key == "MediaModifyDate":
+                data["MediaModifyDate"] = value
+            else:
+                data[key] = value
 
         # Cache the result
         _exif_cache[file_path] = data
@@ -297,14 +303,18 @@ def parse_filename_timestamp(file_path: str) -> Optional[str]:
 
     return None
 
-def write_exif_fields(file_path: str, field_args: list) -> bool:
+def write_exif_fields(file_path: str, field_args: list, et: 'ExifToolStayOpen | None' = None) -> bool:
     """Write multiple EXIF fields in a single exiftool call."""
     try:
-        cmd = ["exiftool", "-P", "-overwrite_original"] + field_args + [file_path]
-        subprocess.run(cmd, capture_output=True, check=True)
+        if et:
+            success = et.write_tags(file_path, field_args)
+        else:
+            cmd = ["exiftool", "-P", "-overwrite_original"] + field_args + [file_path]
+            subprocess.run(cmd, capture_output=True, check=True)
+            success = True
         if file_path in _exif_cache:
             del _exif_cache[file_path]
-        return True
+        return success
     except subprocess.CalledProcessError as e:
         print(f"Error writing EXIF fields: {e}", file=sys.stderr)
         return False
@@ -400,7 +410,7 @@ def write_quicktime_createdate(file_path: str, datetime_original: datetime) -> b
         return False
 
 
-def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False) -> tuple[Optional[str], str]:
+def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False, et: 'ExifToolStayOpen | None' = None) -> tuple[Optional[str], str]:
     """Get the best timestamp using 5-tier priority system from bash lib-timestamp.sh
     Returns: (timestamp_string, source_description)
 
@@ -408,7 +418,7 @@ def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None, ov
     - Filename is Priority 1 for Insta360/DJI files (source of truth at capture time)
     - Ignores existing DateTimeOriginal (which may be corrupted)
     """
-    exif_data = read_exif_data(file_path)
+    exif_data = read_exif_data(file_path, et=et)
     base = os.path.basename(file_path)
 
     # When overwriting, filename is first source of truth for Insta360/DJI files
@@ -472,7 +482,7 @@ def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None, ov
 
     return None, "no timestamps found"
 
-def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False) -> dict:
+def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False, et: 'ExifToolStayOpen | None' = None) -> dict:
     """Get all current timestamp data from file
 
     When overwrite_datetimeoriginal=True:
@@ -482,7 +492,7 @@ def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None
     """
     data = {
         "file_path": file_path,  # Store file path for filename parsing
-        "exif": read_exif_data(file_path),
+        "exif": read_exif_data(file_path, et=et),
         "file_system": get_file_system_timestamps(file_path) if sys.platform == "darwin" else {"birth": "", "modify": ""},
         "datetime_original_str": "",
         "datetime_original": None,
@@ -495,7 +505,7 @@ def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None
         raise ValueError("--overwrite-datetimeoriginal requires --timezone to be specified")
 
     # Use 5-tier priority system to find best timestamp
-    best_timestamp, source = get_best_timestamp(file_path, timezone_offset, overwrite_datetimeoriginal)
+    best_timestamp, source = get_best_timestamp(file_path, timezone_offset, overwrite_datetimeoriginal, et=et)
     data["timestamp_source"] = source
 
     if best_timestamp:
@@ -586,7 +596,7 @@ def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None
 
     return data
 
-def check_keys_creationdate_needs_update(file_path: str, datetime_original: datetime) -> bool:
+def check_keys_creationdate_needs_update(file_path: str, datetime_original: datetime, et: 'ExifToolStayOpen | None' = None) -> bool:
     """Check if Keys:CreationDate needs updating
 
     Args:
@@ -596,7 +606,7 @@ def check_keys_creationdate_needs_update(file_path: str, datetime_original: date
     Returns:
         True if Keys:CreationDate needs updating, False otherwise
     """
-    exif_data = read_exif_data(file_path)
+    exif_data = read_exif_data(file_path, et=et)
     current_creation_date = exif_data.get("CreationDate", "")
 
     if not current_creation_date:
@@ -614,9 +624,9 @@ def check_keys_creationdate_needs_update(file_path: str, datetime_original: date
 
     return current_norm != expected_norm
 
-def check_quicktime_createdate_needs_update(file_path: str, datetime_original: datetime) -> bool:
+def check_quicktime_createdate_needs_update(file_path: str, datetime_original: datetime, et: 'ExifToolStayOpen | None' = None) -> bool:
     """Check if QuickTime CreateDate needs updating to match correct UTC"""
-    exif_data = read_exif_data(file_path)
+    exif_data = read_exif_data(file_path, et=et)
     # Check MediaCreateDate as that's what we're actually writing
     current_create_date = exif_data.get("MediaCreateDate", "")
 
@@ -636,7 +646,7 @@ def check_quicktime_createdate_needs_update(file_path: str, datetime_original: d
         # Can't parse, assume needs update
         return True
 
-def determine_needed_changes(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False) -> dict:
+def determine_needed_changes(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False, et: 'ExifToolStayOpen | None' = None) -> dict:
     """Determine what changes are needed
 
     Args:
@@ -654,14 +664,14 @@ def determine_needed_changes(file_path: str, datetime_original: datetime, preser
     }
 
     # Check if Keys:CreationDate needs updating (always uses original timezone)
-    changes["keys_creationdate"] = check_keys_creationdate_needs_update(file_path, datetime_original)
+    changes["keys_creationdate"] = check_keys_creationdate_needs_update(file_path, datetime_original, et=et)
 
     # Check if file system timestamps need updating (macOS only)
     if sys.platform == "darwin":
         changes["file_timestamps"] = check_file_system_timestamps_need_update(file_path, datetime_original, preserve_wallclock)
 
     # Check if QuickTime CreateDate needs updating
-    changes["quicktime_createdate"] = check_quicktime_createdate_needs_update(file_path, datetime_original)
+    changes["quicktime_createdate"] = check_quicktime_createdate_needs_update(file_path, datetime_original, et=et)
 
     return changes
 
@@ -859,9 +869,9 @@ def format_change_description(changes: dict, timestamp_data: Optional[dict] = No
 
     return ", ".join(parts) if parts else "No change"
 
-def extract_metadata_timezone(file_path: str) -> Optional[str]:
+def extract_metadata_timezone(file_path: str, et: 'ExifToolStayOpen | None' = None) -> Optional[str]:
     """Extract timezone offset from DateTimeOriginal or CreationDate if present."""
-    exif_data = read_exif_data(file_path)
+    exif_data = read_exif_data(file_path, et=et)
     for field in ["DateTimeOriginal", "CreationDate"]:
         value = exif_data.get(field, "")
         if value:
@@ -871,7 +881,7 @@ def extract_metadata_timezone(file_path: str) -> Optional[str]:
     return None
 
 
-def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False, preserve_wallclock: bool = False) -> bool:
+def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False, preserve_wallclock: bool = False, et: 'ExifToolStayOpen | None' = None) -> bool:
     """Main function to fix media (photo/video) timestamps
 
     Args:
@@ -883,13 +893,13 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
                           If False (default), convert to current timezone for correct equivalent display
     """
 
-    detected_tz = extract_metadata_timezone(file_path)
+    detected_tz = extract_metadata_timezone(file_path, et=et)
     if detected_tz:
         print(f"@@timezone={detected_tz}")
 
     # Check for timezone mismatch before processing
     if timezone_offset and not overwrite_datetimeoriginal:
-        exif_data = read_exif_data(file_path)
+        exif_data = read_exif_data(file_path, et=et)
         datetime_original = exif_data.get("DateTimeOriginal", "")
 
         # Check if DateTimeOriginal has a timezone
@@ -912,7 +922,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
                 return False
 
     # Get all data
-    current_data = get_all_timestamp_data(file_path, timezone_offset, overwrite_datetimeoriginal)
+    current_data = get_all_timestamp_data(file_path, timezone_offset, overwrite_datetimeoriginal, et=et)
 
     # Display header
     filename = os.path.basename(file_path)
@@ -933,7 +943,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
     datetime_original_str = current_data["datetime_original_str"]
 
     # Determine needed changes
-    changes = determine_needed_changes(file_path, datetime_original, preserve_wallclock=preserve_wallclock)
+    changes = determine_needed_changes(file_path, datetime_original, preserve_wallclock=preserve_wallclock, et=et)
 
     # Format and display timestamps
     original_display = format_original_timestamps(current_data)
@@ -1013,7 +1023,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
         field_args.append(f"-QuickTime:CreateDate={utc_time}")
         field_args.append(f"-QuickTime:MediaCreateDate={utc_time}")
     if field_args:
-        if not write_exif_fields(file_path, field_args):
+        if not write_exif_fields(file_path, field_args, et=et):
             if should_write_datetime_original:
                 print("   ❌ Failed to write DateTimeOriginal")
             if changes.get("keys_creationdate"):

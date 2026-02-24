@@ -12,6 +12,9 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 import argparse
 
+sys.path.insert(0, str(Path(__file__).parent))
+from lib.exiftool import ExifToolStayOpen
+
 # Handle Ctrl-C gracefully
 def signal_handler(sig, frame):  # noqa: ARG001
     print("\n\nInterrupted by user", file=sys.stderr)
@@ -30,7 +33,7 @@ def get_existing_finder_tags(file_path: str) -> List[str]:
             return []
         existing_tags = [tag.strip() for tag in output.split(',') if tag.strip()]
         return existing_tags
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return []
 
 def apply_finder_tags(file_path: str, tags: List[str], dry_run: bool = False) -> Tuple[bool, List[str]]:
@@ -55,13 +58,15 @@ def apply_finder_tags(file_path: str, tags: List[str], dry_run: bool = False) ->
             subprocess.run(['tag', '--add', ','.join(tags_to_add), file_path],
                           capture_output=True, check=True)
         return True, tags_to_add
-    except subprocess.CalledProcessError as e:
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"Warning: Failed to apply tags to {file_path}: {e}", file=sys.stderr)
         return False, []
 
-def get_existing_exif_camera(file_path: str) -> dict:
+def get_existing_exif_camera(file_path: str, et: 'ExifToolStayOpen | None' = None) -> dict:
     """Get existing Make and Model from EXIF data"""
     try:
+        if et:
+            return et.read_tags(file_path, ["Make", "Model"])
         result = subprocess.run(['exiftool', '-s', '-Make', '-Model', file_path],
                               capture_output=True, check=True, text=True)
 
@@ -77,7 +82,7 @@ def get_existing_exif_camera(file_path: str) -> dict:
     except subprocess.CalledProcessError:
         return {}
 
-def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Optional[str] = None, dry_run: bool = False) -> Tuple[bool, List[str]]:
+def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Optional[str] = None, dry_run: bool = False, et: 'ExifToolStayOpen | None' = None) -> Tuple[bool, List[str]]:
     """Add camera info to EXIF Make and Model fields
 
     Returns:
@@ -96,18 +101,18 @@ def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Option
 
     try:
         # Check existing EXIF data
-        existing = get_existing_exif_camera(file_path)
+        existing = get_existing_exif_camera(file_path, et=et)
 
         # Determine what needs updating
         fields_to_update = []
-        cmd = ['exiftool', '-P', '-overwrite_original']
+        field_args = []
 
         if make and existing.get('Make') != make:
-            cmd.append(f'-Make={make}')
+            field_args.append(f'-Make={make}')
             fields_to_update.append('Make')
 
         if model and existing.get('Model') != model:
-            cmd.append(f'-Model={model}')
+            field_args.append(f'-Model={model}')
             fields_to_update.append('Model')
 
         if not fields_to_update:
@@ -115,8 +120,11 @@ def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Option
 
         # Only run exiftool if not dry run
         if not dry_run:
-            cmd.append(file_path)
-            subprocess.run(cmd, capture_output=True, check=True, text=True)
+            if et:
+                et.write_tags(file_path, field_args)
+            else:
+                cmd = ['exiftool', '-P', '-overwrite_original'] + field_args + [file_path]
+                subprocess.run(cmd, capture_output=True, check=True, text=True)
         return True, fields_to_update
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr.strip() if e.stderr else str(e)

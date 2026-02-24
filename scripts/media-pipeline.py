@@ -10,6 +10,7 @@ Processes all video files in SOURCE, fixes timestamps, then organizes by date in
 """
 
 import argparse
+import importlib.util
 import json
 import os
 import re
@@ -22,9 +23,19 @@ from typing import Optional
 import yaml
 
 sys.path.insert(0, str(Path(__file__).parent))
+from lib.exiftool import ExifToolStayOpen
 from lib.filesystem import find_media_files
 
 SCRIPT_DIR = Path(__file__).parent
+
+
+def _import_script(name: str):
+    """Import a hyphenated script name as a Python module."""
+    path = SCRIPT_DIR / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), str(path))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def signal_handler(sig, frame):
@@ -68,13 +79,55 @@ def run_tag_media(
     tags: Optional[str],
     make: Optional[str],
     model: Optional[str],
-    apply: bool
+    apply: bool,
+    et: 'ExifToolStayOpen | None' = None
 ) -> tuple[str, bool]:
     """Run tag-media.py on a file.
+
+    When et is provided, calls tag-media functions directly (stay_open mode).
+    Otherwise falls back to subprocess.
 
     Returns:
         tuple of (output_text, changed)
     """
+    if et:
+        import io
+        from contextlib import redirect_stdout, redirect_stderr
+        tag_media = _import_script("tag-media")
+
+        dry_run = not apply
+        finder_tags = tags.split(',') if tags else []
+        buf_out = io.StringIO()
+        buf_err = io.StringIO()
+        changed = False
+
+        with redirect_stdout(buf_out), redirect_stderr(buf_err):
+            if make or model:
+                success, fields_updated = tag_media.add_camera_to_exif(
+                    str(file_path), make=make, model=model, dry_run=dry_run, et=et)
+                if fields_updated:
+                    changed = True
+                    exif_parts = []
+                    if 'Make' in fields_updated and make:
+                        exif_parts.append(make)
+                    if 'Model' in fields_updated and model:
+                        exif_parts.append(model)
+                    dry_run_suffix = " (DRY RUN)" if dry_run else ""
+                    print(f"📌 Tagged: {file_path.name} (EXIF: {' / '.join(exif_parts)}){dry_run_suffix}")
+
+            if finder_tags:
+                success, tags_added = tag_media.apply_finder_tags(
+                    str(file_path), finder_tags, dry_run=dry_run)
+                if tags_added:
+                    changed = True
+
+            if not changed:
+                dry_run_suffix = " (DRY RUN)" if dry_run else ""
+                print(f"✓ {file_path.name}: Already tagged correctly{dry_run_suffix}")
+
+        output = (buf_out.getvalue() + buf_err.getvalue()).strip()
+        return output, changed
+
     cmd = [sys.executable, str(SCRIPT_DIR / "tag-media.py"), str(file_path)]
 
     if tags:
@@ -101,13 +154,70 @@ def run_fix_timestamp(
     file_path: Path,
     location_args: list[str],
     apply: bool,
-    verbose: bool
+    verbose: bool,
+    et: 'ExifToolStayOpen | None' = None
 ) -> tuple[str, bool, int]:
     """Run fix-media-timestamp.py on a file.
+
+    When et is provided, calls fix_media_timestamps directly (stay_open mode).
+    Otherwise falls back to subprocess.
 
     Returns:
         tuple of (output_text, changed, return_code)
     """
+    if et:
+        import io
+        from contextlib import redirect_stdout, redirect_stderr
+        fmt = _import_script("fix-media-timestamp")
+
+        # Parse location_args to extract timezone/country/flags
+        timezone_offset = None
+        country = None
+        overwrite_dto = False
+        preserve_wallclock = False
+        i = 0
+        while i < len(location_args):
+            if location_args[i] == "--timezone" and i + 1 < len(location_args):
+                timezone_offset = location_args[i + 1]
+                i += 2
+            elif location_args[i] == "--country" and i + 1 < len(location_args):
+                country = location_args[i + 1]
+                i += 2
+            elif location_args[i] == "--overwrite-datetimeoriginal":
+                overwrite_dto = True
+                i += 1
+            elif location_args[i] == "--preserve-wallclock-time":
+                preserve_wallclock = True
+                i += 1
+            else:
+                i += 1
+
+        if timezone_offset:
+            timezone_offset = fmt.normalize_timezone_input(timezone_offset)
+        if country and not timezone_offset:
+            timezone_offset = fmt.get_timezone_for_country(country)
+
+        buf_out = io.StringIO()
+        buf_err = io.StringIO()
+        with redirect_stdout(buf_out), redirect_stderr(buf_err):
+            success = fmt.fix_media_timestamps(
+                str(file_path),
+                dry_run=not apply,
+                timezone_offset=timezone_offset,
+                overwrite_datetimeoriginal=overwrite_dto,
+                preserve_wallclock=preserve_wallclock,
+                et=et
+            )
+
+        output = (buf_out.getvalue() + buf_err.getvalue()).strip()
+        changed = False
+        if ("✅" in output or "Updated" in output or "Written" in output) and "No change" not in output:
+            changed = True
+        if "Change   : " in output and "No change" not in output:
+            changed = True
+
+        return output, changed, 0 if success else 1
+
     cmd = [sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), str(file_path)]
     cmd.extend(location_args)
 
@@ -132,14 +242,33 @@ def run_organize_by_date(
     target_dir: str,
     template: str,
     apply: bool,
-    verbose: bool
+    verbose: bool,
+    et: 'ExifToolStayOpen | None' = None
 ) -> tuple[str, str, str, int]:
     """Run organize-by-date.py on a file.
+
+    When et is provided, calls organize-by-date functions directly (stay_open mode).
+    Otherwise falls back to subprocess.
 
     Returns:
         tuple of (stderr_output, action, dest_path, return_code)
         action and dest are parsed from @@key=value lines in stdout
     """
+    if et:
+        import io
+        from contextlib import redirect_stderr
+        organize_by_date = _import_script("organize-by-date")
+
+        buf_err = io.StringIO()
+        with redirect_stderr(buf_err):
+            dest, action = organize_by_date.process_file(
+                str(file_path), target_dir, template,
+                copy_mode=False, overwrite=False,
+                apply=apply, verbose=verbose, et=et
+            )
+
+        return buf_err.getvalue().strip(), action, dest, 0
+
     cmd = [
         str(SCRIPT_DIR / "organize-by-date.sh"),
         str(file_path),
@@ -208,7 +337,8 @@ def process_file(
     apply: bool,
     verbose: bool,
     gyroflow_config: Optional[dict] = None,
-    tasks: Optional[set] = None
+    tasks: Optional[set] = None,
+    et: 'ExifToolStayOpen | None' = None
 ) -> dict:
     """Process a single file through the pipeline.
 
@@ -227,7 +357,7 @@ def process_file(
 
         if tags or make or model:
             print("🏷️  Checking tags...")
-            output, changed = run_tag_media(file_path, tags or None, make or None, model or None, apply)
+            output, changed = run_tag_media(file_path, tags or None, make or None, model or None, apply, et=et)
             for line in output.split("\n"):
                 print(f"  {line}")
             if changed:
@@ -236,7 +366,7 @@ def process_file(
     # Step 2: Fix video timestamp
     if tasks is None or "fix-timestamp" in tasks:
         print("🔧 Fixing timestamp...")
-        output, changed, rc = run_fix_timestamp(file_path, location_args, apply, verbose)
+        output, changed, rc = run_fix_timestamp(file_path, location_args, apply, verbose, et=et)
         for line in output.split("\n"):
             print(f"  {line}")
 
@@ -261,7 +391,7 @@ def process_file(
             template = f"{{{{YYYY}}}}/{subfolder}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
         else:
             template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
-        output, action, dest, rc = run_organize_by_date(file_path, target_dir, template, apply, verbose)
+        output, action, dest, rc = run_organize_by_date(file_path, target_dir, template, apply, verbose, et=et)
 
         # Print stderr output (user-visible messages)
         if output:
@@ -454,33 +584,35 @@ def main():
     gyroflow_config = full_config.get("gyroflow")
     tasks = set(args.tasks) if args.tasks else None
 
-    for i, file_path in enumerate(files, 1):
-        stats["processed"] += 1
-        base = file_path.name
+    with ExifToolStayOpen() as et:
+        for i, file_path in enumerate(files, 1):
+            stats["processed"] += 1
+            base = file_path.name
 
-        print(f"[{i}/{total_files}] Processing: {base}")
+            print(f"[{i}/{total_files}] Processing: {base}")
 
-        result = process_file(
-            file_path,
-            profile,
-            target_dir,
-            args.subfolder,
-            location_args,
-            args.apply,
-            args.verbose,
-            gyroflow_config=gyroflow_config,
-            tasks=tasks
-        )
+            result = process_file(
+                file_path,
+                profile,
+                target_dir,
+                args.subfolder,
+                location_args,
+                args.apply,
+                args.verbose,
+                gyroflow_config=gyroflow_config,
+                tasks=tasks,
+                et=et
+            )
 
-        if result["failed"]:
-            stats["failed"] += 1
-            stats["failed_files"].append(base)
-        else:
-            stats["succeeded"] += 1
-            if result["changed"]:
-                stats["changed"] += 1
+            if result["failed"]:
+                stats["failed"] += 1
+                stats["failed_files"].append(base)
+            else:
+                stats["succeeded"] += 1
+                if result["changed"]:
+                    stats["changed"] += 1
 
-        print()  # Empty line between files
+            print()  # Empty line between files
 
     # Print summary
     print_summary(stats, args.apply)
