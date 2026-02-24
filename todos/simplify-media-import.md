@@ -63,8 +63,8 @@ Memory card and local directory sources are treated identically — both are rea
 
 **Common behavior across all modes:**
 - Action is per-file, taken only after that file's full pipeline completes. Provides resumability — unprocessed files remain in source.
-- When `--skip-companion` is off (default): companion files (matching profile `companion_extensions`) are also archived/deleted alongside the main file.
-- When `--skip-companion` is on: only main files are affected; companions stay in source.
+- When `--include-companions` (default): companion files (matching profile `companion_extensions`) are also archived/deleted alongside the main file.
+- When `--no-include-companions`: only main files are affected; companions stay in source.
 - If source is read-only (SD card write-protect, permissions): log `"Read-only source, couldn't <action>: <filename>"` and continue. Non-fatal.
 
 ### Companion files
@@ -73,7 +73,7 @@ Companion files (`.lrv`, `.thm`, `.srt`, etc. from profile `companion_extensions
 
 - They are **not** copied to working dir
 - They are **not** processed (no tagging, timestamping, or organizing)
-- When `--source-action` is `archive` or `delete`, they are handled alongside their main file (unless `--skip-companion`)
+- When `--source-action` is `archive` or `delete`, they are handled alongside their main file (default `--include-companions`; pass `--no-include-companions` to exclude)
 
 If a companion extension is actually useful in the editing workflow (e.g., `.srt` subtitle files), it should be in `file_extensions` instead — then it goes through the full pipeline like any other file.
 
@@ -86,7 +86,7 @@ If a companion extension is actually useful in the editing workflow (e.g., `.srt
 
 **New:**
 - `--source-action` — what to do with each source file after successful processing: `leave` (default), `archive`, `delete`.
-- `--skip-companion` — skip companion files during source-action. Only main files (matching `file_extensions`) are archived/deleted.
+- `--include-companions` / `--no-include-companions` — whether the source-action also applies to companion files (matching profile `companion_extensions`). Default: included. Uses `argparse.BooleanOptionalAction`.
 
 **Unchanged:**
 - `--profile`, `--subfolder`, `--timezone`, `--location`, `--apply`, `--verbose`
@@ -97,7 +97,7 @@ If a companion extension is actually useful in the editing workflow (e.g., `.srt
 
 - Add `copy_to_working_dir(source_file, working_dir)` function — flat `shutil.copy2()`
 - Add `handle_source_action(source_file, source_dir, action, archive_dir)` function — per-file leave/archive/delete with read-only fallback (log + continue)
-- Add `--source-action` and `--skip-companion` args
+- Add `--source-action` and `--include-companions` / `--no-include-companions` args
 - Update `--tasks` choices: remove `"organize"` (output is always on). Choices become `["tag", "fix-timestamp", "gyroflow"]`
 - In `main()`:
   - Always create temp working dir via `tempfile.mkdtemp()`
@@ -129,6 +129,7 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 
 - Add `SourceAction` enum: `.leave`, `.archive`, `.delete` with raw string values matching CLI args
 - Replace `preserveSource: Bool` with `sourceAction: SourceAction` (default `.leave`)
+- Rename `skipCompanion: Bool` → `includeCompanions: Bool` (default `true`)
 - `PipelineStep`: add computed property `isAlwaysOn` — true for `.importFromCard` and `.organize`
 - Update `.importFromCard` help text: `"Copy files from source to working directory for processing"`
 - Update `.organize` help text: `"Move processed files into date-based folders in ready directory"`
@@ -142,7 +143,7 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 - Always pass `--source` with `state.sourceDir`
 - Build `--tasks` from enabled optional steps only (exclude `.importFromCard` and `.organize`)
 - Pass `--source-action` with value from `state.sourceAction` (`leave`, `archive`, or `delete`)
-- Pass `--skip-companion` when `state.skipCompanion`
+- Pass `--no-include-companions` when `!state.includeCompanions`
 - `importCardOptions` section: always visible when profile selected (not gated on `.importFromCard` enabled, since import is always on). Rename GroupBox label from "Memory Card / Source Actions" to "Source"
 - Replace `preserveSource` toggle with `sourceAction` picker (leave / archive / delete). "Delete" option shows caution text: `"Permanently deletes source files after successful processing"`
 - `pipelineTaskNames`: remove `.organize` mapping (no longer a task choice). Keep `.tag`, `.fixTimezone`, `.gyroflow`. Do not add `.importFromCard` (not a task choice).
@@ -161,7 +162,7 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 - Test source-action archive: source file moved to archive folder after processing
 - Test source-action delete: source file deleted after processing
 - Test source-action with read-only source: logs warning, continues without error
-- Test skip-companion: companions not archived/deleted when flag is on
+- Test no-include-companions: companions not archived/deleted when excluded
 - Test resumability: pre-existing archive folder with some files, re-run processes only unarchived source files
 
 ### docs/scripts.md
