@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 import argparse
 
+from lib.exiftool import exiftool
+
 # Handle Ctrl-C gracefully
 def signal_handler(sig, frame):  # noqa: ARG001
     print("\n\nInterrupted by user", file=sys.stderr)
@@ -62,19 +64,8 @@ def apply_finder_tags(file_path: str, tags: List[str], dry_run: bool = False) ->
 def get_existing_exif_camera(file_path: str) -> dict:
     """Get existing Make and Model from EXIF data"""
     try:
-        result = subprocess.run(['exiftool', '-s', '-Make', '-Model', file_path],
-                              capture_output=True, check=True, text=True)
-
-        data = {}
-        for line in result.stdout.strip().split('\n'):
-            if ':' in line:
-                key, value = line.split(':', 1)
-                key = key.strip()
-                value = value.strip()
-                data[key] = value
-
-        return data
-    except subprocess.CalledProcessError:
+        return exiftool.read_tags(file_path, ["Make", "Model"])
+    except Exception:
         return {}
 
 def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Optional[str] = None, dry_run: bool = False) -> Tuple[bool, List[str]]:
@@ -95,32 +86,27 @@ def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Option
         return True, []  # Skip unsupported types silently
 
     try:
-        # Check existing EXIF data
         existing = get_existing_exif_camera(file_path)
 
-        # Determine what needs updating
         fields_to_update = []
-        cmd = ['exiftool', '-P', '-overwrite_original']
+        tag_args = []
 
         if make and existing.get('Make') != make:
-            cmd.append(f'-Make={make}')
+            tag_args.append(f'-Make={make}')
             fields_to_update.append('Make')
 
         if model and existing.get('Model') != model:
-            cmd.append(f'-Model={model}')
+            tag_args.append(f'-Model={model}')
             fields_to_update.append('Model')
 
         if not fields_to_update:
-            return True, []  # All fields already correct
+            return True, []
 
-        # Only run exiftool if not dry run
         if not dry_run:
-            cmd.append(file_path)
-            subprocess.run(cmd, capture_output=True, check=True, text=True)
+            exiftool.write_tags(file_path, tag_args)
         return True, fields_to_update
-    except subprocess.CalledProcessError as e:
-        error_msg = e.stderr.strip() if e.stderr else str(e)
-        print(f"Warning: Failed to add camera info to {file_path}: {error_msg}", file=sys.stderr)
+    except Exception as e:
+        print(f"Warning: Failed to add camera info to {file_path}: {e}", file=sys.stderr)
         return False, []
 
 def main():

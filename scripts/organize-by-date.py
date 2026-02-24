@@ -9,13 +9,13 @@ import argparse
 import os
 import re
 import shutil
-import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
+from lib.exiftool import exiftool
 from lib.filesystem import cleanup_empty_parent_dirs
 
 
@@ -28,21 +28,13 @@ def get_file_date_for_organization(file_path: str) -> Optional[str]:
 
     Priority: DateTimeOriginal > filename patterns > file mtime
     """
-    # Try DateTimeOriginal from exiftool
     try:
-        result = subprocess.run(
-            ['exiftool', '-fast2', '-s', '-DateTimeOriginal', file_path],
-            capture_output=True, text=True, check=True
-        )
-        for line in result.stdout.strip().split('\n'):
-            if ':' in line:
-                key, value = line.split(':', 1)
-                if key.strip() == 'DateTimeOriginal':
-                    dt_str = value.strip()
-                    if dt_str:
-                        date_part = dt_str.split(' ')[0]
-                        return date_part.replace(':', '-')
-    except (subprocess.CalledProcessError, OSError):
+        data = exiftool.read_tags(file_path, ["DateTimeOriginal"], extra_args=["-fast2"])
+        dt_str = data.get("DateTimeOriginal", "")
+        if dt_str:
+            date_part = dt_str.split(' ')[0]
+            return date_part.replace(':', '-')
+    except Exception:
         pass
 
     # Try filename patterns
