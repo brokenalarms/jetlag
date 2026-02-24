@@ -31,7 +31,7 @@ For each file matching profile `file_extensions` in `--source`:
 
 | Role | Source | Lifetime |
 |---|---|---|
-| **source** | `--source` or profile `source_dir` | Read-only during pipeline. Fate controlled by archive-source task at the end. |
+| **source** | `--source` or profile `source_dir` | Read-only during pipeline. Archive renames whole folder; delete removes only processed files + companions then cleans empty dirs. |
 | **working** | `tempfile.mkdtemp()` | Created per-run, cleaned up after. Internal, not user-facing. |
 | **ready** | profile `ready_dir` or `--target` | User-facing output. Watched folder for backup sync — files only land here when fully processed. |
 | **archive** | Sibling of source: `<source> - archived <date>` | Only exists when archive-source task runs with `--action archive`. Whole source folder renamed. |
@@ -40,7 +40,7 @@ Memory card and local directory sources are treated identically — both are rea
 
 ### Archive-source behavior
 
-`archive-source` is an optional task backed by `archive-source.py`. It runs after all files have been processed, operating on the source folder as a whole. If the task is not in `--tasks`, the source is left untouched (no script called).
+`archive-source` is an optional task backed by `archive-source.py`. It runs after all files have been processed. The pipeline passes it the list of processed files (and their companions). If the task is not in `--tasks`, the source is left untouched (no script called).
 
 **`--action archive`** (default)
 - Rename source folder: `<source>` → `<source> - archived <YYYY-MM-DD>`
@@ -48,19 +48,21 @@ Memory card and local directory sources are treated identically — both are rea
 - Good for: memory cards where you want a clear "done" marker, any source where you want a record of what was imported.
 
 **`--action delete`**
-- Remove source folder contents (`shutil.rmtree()`).
-- Good for: local copies where the source is already a duplicate and you want to reclaim space.
+- Delete processed files and their companions from the source folder.
+- After deletions, walk up from each file's parent to the source root, removing any now-empty directories.
+- Does NOT `rmtree` the source folder — only files the pipeline actually processed (plus companions) are removed. Other files in the source folder are left alone.
+- Good for: local copies where the source is already a duplicate and you want to reclaim space without nuking unrelated files.
 
 **Common behavior:**
-- Whole-folder operation, runs only after all per-file pipeline steps succeed. No per-file tracking needed — if the pipeline is interrupted before archive-source runs, source is untouched and a re-run reprocesses everything.
-- Companion files are handled implicitly — they're in the source folder, so they come along.
+- Runs only after all per-file pipeline steps succeed. If the pipeline is interrupted before archive-source runs, source is untouched and a re-run reprocesses everything.
+- Archive mode operates on the whole folder. Delete mode operates per-file (processed files + companions only), then cleans up empty dirs.
 - If source is read-only (SD card write-protect, permissions): log `"Read-only source, couldn't <action>: <source>"` and exit non-zero.
 
 ### Companion files
 
 Companion files (`.lrv`, `.thm`, `.srt`, etc. from profile `companion_extensions`) are camera artifacts that don't need processing but may be useful at the destination.
 
-**Source**: handled implicitly by archive-source — it operates on the whole folder, so companions come along automatically.
+**Source**: archive mode renames the whole folder so companions come along implicitly. Delete mode explicitly removes companions alongside their main files (the pipeline passes the file list to archive-source).
 
 **Destination**: controlled by `--copy-companion-files` (default: off).
 - When off: companions are not copied to working dir or output to ready_dir.
@@ -96,7 +98,7 @@ If a companion extension needs full processing (tagging, timestamping), it shoul
   - Scan `--source` (or profile `source_dir`) for files matching `file_extensions`
   - Resolve `ready_dir` from profile `ready_dir` or `--target`
   - Clean up temp working dir after all files processed
-  - If `archive-source` in `--tasks`: call `archive-source.py` with `--source` and `--action` after all files processed
+  - If `archive-source` in `--tasks`: call `archive-source.py` with `--source`, `--action`, and `--files` (list of processed files + their companions) after all files processed
 - In `process_file()`:
   - Step 0 (ingest): copy source file to working dir (always)
   - Steps 1-2 (tag, fix-timestamp): operate on working dir copy (unchanged logic, now conditional on `--tasks`)
@@ -111,9 +113,10 @@ Standalone subscript. Called by media-pipeline.py when `archive-source` is in `-
 
 - `--source` — source directory to act on (required)
 - `--action` — `leave` (default, no-op), `archive`, or `delete`
+- `--files` — file paths to delete (required for `delete`, ignored for `archive`/`leave`). Accepts multiple paths. The pipeline passes processed files + their companions.
 - `--apply` / `--verbose` — same dry-run semantics as other subscripts
 - Archive mode: `os.rename(source, f"{source} - archived {date}")`
-- Delete mode: `shutil.rmtree(source)`
+- Delete mode: remove each file in `--files`, then walk up from each file's parent dir to `--source`, calling `os.rmdir()` on empty directories (stops at `--source` itself — does not delete the source root unless it's empty too)
 - Read-only fallback: log error, exit non-zero
 
 ### scripts/media-profiles.yaml
@@ -148,7 +151,7 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 - Always pass `--source-action` with value from `state.sourceAction` (`leave`, `archive`, or `delete`)
 - Pass `--copy-companion-files` when `state.copyCompanionFiles`
 - `importCardOptions` section: always visible when profile selected (not gated on `.importFromCard` enabled, since import is always on). Rename GroupBox label from "Memory Card / Source Actions" to "Source"
-- Show `sourceAction` picker (leave / archive / delete). "Delete" option shows caution text: `"Permanently deletes source files after successful processing"`
+- Show `sourceAction` picker (leave / archive / delete). "Delete" option shows caution text: `"Deletes processed files and companions from source after successful processing"`
 - `pipelineTaskNames`: remove `.organize` mapping (no longer a task choice). Add `.archiveSource` → `"archive-source"`. Keep `.tag`, `.fixTimezone`, `.gyroflow`. Do not add `.importFromCard` (not a task choice).
 - `countMediaFiles()`: always count from `state.sourceDir` (remove the `hasImport ?` branch)
 
@@ -166,9 +169,11 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 
 ### scripts/tests/test_archive_source.py (new)
 
-- Test leave: source folder untouched (no-op)
+- Test leave: source folder and files untouched (no-op)
 - Test archive: source folder renamed to `<source> - archived <date>`
-- Test delete: source folder removed
+- Test delete: only files passed via `--files` are removed; other files in source survive
+- Test delete cleans empty dirs: after deleting files, empty parent dirs up to source root are removed
+- Test delete preserves non-empty dirs: parent dirs containing other files are not removed
 - Test read-only source: logs error, exits non-zero
 - Test dry-run: no changes when `--apply` not passed
 
