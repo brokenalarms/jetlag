@@ -9,10 +9,12 @@ Run with: pytest tests/test_media_pipeline.py -v
 """
 
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 import pytest
@@ -622,6 +624,183 @@ class TestCLIArguments:
         )
 
         assert str(target) in result.stdout
+
+
+@pytest.fixture
+def test_profile_with_companions(temp_workspace):
+    """Create a temporary test profile with companion_extensions for testing --copy-companion-files."""
+    profiles_path = SCRIPT_DIR / "media-profiles.yaml"
+
+    with open(profiles_path) as f:
+        profiles = yaml.safe_load(f)
+
+    profiles["profiles"]["_test_companion"] = {
+        "source_dir": str(temp_workspace["source"]),
+        "ready_dir": str(temp_workspace["target"]),
+        "file_extensions": [".mp4"],
+        "companion_extensions": [".lrv", ".thm"],
+        "tags": ["test-camera"],
+        "exif": {"make": "Test", "model": "Camera"},
+    }
+
+    with open(profiles_path, "w") as f:
+        yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
+
+    yield "_test_companion"
+
+    with open(profiles_path) as f:
+        profiles = yaml.safe_load(f)
+    if "_test_companion" in profiles.get("profiles", {}):
+        del profiles["profiles"]["_test_companion"]
+        with open(profiles_path, "w") as f:
+            yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
+
+
+class TestCompanionFiles:
+    """Tests for --copy-companion-files flag and companion file handling."""
+
+    def test_companions_copied_to_target_with_flag(self, temp_workspace, test_profile_with_companions):
+        """With --copy-companion-files --apply, companion files are copied to target alongside main file."""
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+        shutil.copy2(str(video), str(source / "test.lrv"))
+        shutil.copy2(str(video), str(source / "test.thm"))
+
+        run_pipeline([
+            "--profile", test_profile_with_companions,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--subfolder", "Test",
+            "--copy-companion-files",
+            "--apply",
+        ])
+
+        organized_mp4 = list(target.rglob("*.mp4"))
+        organized_lrv = list(target.rglob("*.lrv"))
+        organized_thm = list(target.rglob("*.thm"))
+
+        assert len(organized_mp4) == 1, f"Main file should be in target, found: {organized_mp4}"
+        assert len(organized_lrv) == 1, f"Companion .lrv should be in target, found: {organized_lrv}"
+        assert len(organized_thm) == 1, f"Companion .thm should be in target, found: {organized_thm}"
+
+    def test_companions_not_copied_without_flag(self, temp_workspace, test_profile_with_companions):
+        """Without --copy-companion-files, companion files are NOT in target."""
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+        shutil.copy2(str(video), str(source / "test.lrv"))
+        shutil.copy2(str(video), str(source / "test.thm"))
+
+        run_pipeline([
+            "--profile", test_profile_with_companions,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--subfolder", "Test",
+            "--apply",
+        ])
+
+        organized_mp4 = list(target.rglob("*.mp4"))
+        organized_lrv = list(target.rglob("*.lrv"))
+        organized_thm = list(target.rglob("*.thm"))
+
+        assert len(organized_mp4) == 1, "Main file should still be organized"
+        assert len(organized_lrv) == 0, "Companion .lrv should NOT be in target without flag"
+        assert len(organized_thm) == 0, "Companion .thm should NOT be in target without flag"
+
+    @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — EXIF tagging")
+    def test_companions_skip_tagging(self, temp_workspace, test_profile_with_companions):
+        """Companion files skip tagging — no profile EXIF make/model applied."""
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+        shutil.copy2(str(video), str(source / "test.lrv"))
+
+        run_pipeline([
+            "--profile", test_profile_with_companions,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--subfolder", "Test",
+            "--copy-companion-files",
+            "--apply",
+        ])
+
+        main_file = list(target.rglob("*.mp4"))[0]
+        assert get_exif_field(main_file, "Make") == "Test"
+        assert get_exif_field(main_file, "Model") == "Camera"
+
+        companion_file = list(target.rglob("*.lrv"))[0]
+        companion_make = get_exif_field(companion_file, "Make")
+        assert companion_make != "Test", f"Companion should not have profile Make, got: {companion_make}"
+
+
+class TestArchiveSourceIntegration:
+    """Tests for archive-source task integration in media-pipeline."""
+
+    def test_archive_action_renames_source_folder(self, temp_workspace, test_profile):
+        """With archive-source task and --source-action archive, source folder is renamed."""
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--subfolder", "Test",
+            "--tasks", "tag", "fix-timestamp", "archive-source",
+            "--source-action", "archive",
+            "--apply",
+        ])
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        archived = source.parent / f"{source.name} - archived {today}"
+
+        assert not source.exists(), "Original source should no longer exist"
+        assert archived.exists(), f"Source should be renamed to {archived}"
+
+    def test_delete_action_removes_only_processed_files(self, temp_workspace, test_profile):
+        """With --source-action delete, only processed files are removed from source."""
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+        unrelated = source / "readme.txt"
+        unrelated.write_text("keep me")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--subfolder", "Test",
+            "--tasks", "tag", "fix-timestamp", "archive-source",
+            "--source-action", "delete",
+            "--apply",
+        ])
+
+        assert not video.exists(), "Processed video should be deleted from source"
+        assert unrelated.exists(), "Non-video file should survive deletion"
+        assert source.exists(), "Source directory should still exist"
+
+    def test_source_untouched_without_archive_source_task(self, temp_workspace, test_profile):
+        """Without archive-source in --tasks, source is untouched."""
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--subfolder", "Test",
+            "--tasks", "tag", "fix-timestamp",
+            "--apply",
+        ])
+
+        assert source.exists(), "Source directory should still exist"
+        assert video.exists(), "Source file should still exist"
 
 
 if __name__ == "__main__":
