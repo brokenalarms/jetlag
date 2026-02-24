@@ -12,13 +12,23 @@
 
 - (2026-02-24) **Folder tree preview** — Collapsible tree view showing the destination folder structure that will be created during dry-run, with file counts per folder. Parse `@@dest=` paths into a tree model.
 
+- (2026-02-24) **Pipeline steps visual redesign** — Render pipeline steps as a connected horizontal chain with a line behind them. Always-on steps (ingest, output) shown in green, non-toggleable. Optional steps (tag, fix-timestamp, gyroflow, archive-source) are toggleable. Enabling a task in the chain causes its configuration options to appear as grouped rows below (e.g. enabling archive-source reveals source action picker: leave/archive/delete, with yellow accent).
+
 - (2026-02-24) **Timezone map in picker** — MapKit and CoreLocation are already linked in `project.yml` but unused. Replace or augment `TimezoneMapView` with an actual map showing timezone boundaries. When footage timezone differs from current system timezone, show both on the map with a visual arc.
 
 ## `scripts/` + `macos/`
 
-- (2026-02-24) **Unify media pipeline as single orchestrator** — media-pipeline.py becomes the single entry point; import is just another task. See [todos/simplify-media-import.md](todos/simplify-media-import.md)
+- (2026-02-24) **Media pipeline unification** — media-pipeline.py becomes the single entry point with always-on ingest/output and optional processing steps. Full spec: [todos/simplify-media-import.md](todos/simplify-media-import.md). Broken down into ordered PRs:
 
-- (2026-02-20) **`preserveSource` flag not passed to script** — `WorkflowView.runWorkflow()` binds a toggle to `state.preserveSource` but never adds a `--copy` / `--move` flag to the `import-media.sh` args. `import-media.py` doesn't currently expose this as a CLI flag — need to add it to the script first, then wire up in `WorkflowView`.
+  1. **Extract `archive-source.py` from `import-media.py`** (`scripts/` only) — standalone subscript with leave/archive/delete modes. Extract archive rename logic from `import-media.py`, reuse `cleanup_empty_parent_dirs` from `lib/filesystem.py` for delete mode. New `test_archive_source.py` covering: leave no-op, archive rename, delete only passed files, empty dir cleanup, non-empty dir preservation, read-only source error, dry-run no-op.
+
+  2. **`media-pipeline.py` core flow refactor** (`scripts/` only) — ingest step copies source → temp working dir (`tempfile.mkdtemp()`), output step always-on (remove `organize` from `--tasks`), `--source` reads from `source_dir` (no `import_dir` fallback — temp working dir replaces `import_dir` concept entirely). On success `os.rmdir()` the empty temp dir; on failure leave it as evidence. Update `test_media_pipeline.py` with ingest/output tests.
+
+  3. **`media-pipeline.py` new features** (`scripts/` only) — `--copy-companion-files` flag copies companions through ingest → output (skipping optional processing steps), `--source-action` arg passed through to `archive-source.py` after all files processed, `--tasks` adds `archive-source` choice. Tests for companion copying and archive-source integration.
+
+  4. **YAML + macOS app + docs** (`scripts/` + `macos/`) — remove `import_dir` from `media-profiles.yaml` (photo profiles: old `import_dir` value becomes `ready_dir`). `AppState.swift`: add `SourceAction` enum, rename `skipCompanion` → `copyCompanionFiles`, `PipelineStep` adds `.archiveSource` with `isAlwaysOn` for ingest/output. `WorkflowView.swift`: remove `hasImport` fork, always call `media-pipeline.sh`, build `--tasks` from optional steps only, always-on steps get distinct non-toggleable rendering. `ProfilesView.swift`: remove `import_dir` row. Swift tests: verify correct CLI args built for given UI state (test the interface boundary — never test script correctness from Swift). `docs/scripts.md`: update workflow design section.
+
+  - **Testing boundary**: Python tests verify script behavior (filesystem effects). Swift tests verify the app builds correct CLI args for a given UI state — never run scripts or verify their effects.
 
 - (2026-02-23) **Timezone suffix for group folder** — `--subfolder` / `folder_template` groundwork is done. Remaining:
    - `scripts/`: rename `--subfolder` → `--group` in `media-pipeline.py`; add `--group-timezone` flag (positive opt-in) that appends timezone offset to the group folder name, e.g. `Japan (+0900)` — requires `--group` and `--timezone` to also be set
