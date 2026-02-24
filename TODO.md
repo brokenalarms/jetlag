@@ -18,16 +18,6 @@
 
 ## `scripts/` + `macos/`
 
-- (2026-02-24) **Media pipeline unification** — media-pipeline.py becomes the single entry point with always-on ingest/output and optional processing steps. Full spec: [todos/simplify-media-import.md](todos/simplify-media-import.md). Broken down into ordered PRs:
-
-  1. ~~**`media-pipeline.py` core flow refactor** (`scripts/` only)~~ — done (PR #57)
-
-  2. ~~**`media-pipeline.py` new features** (`scripts/` only)~~ — done (PR #60)
-
-  3. ~~**YAML + macOS app + docs** (`scripts/` + `macos/`)~~ — done
-
-  - **Testing boundary**: Python tests verify script behavior (filesystem effects). Swift tests verify the app builds correct CLI args for a given UI state — never run scripts or verify their effects.
-
 - (2026-02-24) **Dry-run diff table** — During dry-run, replace raw log output with a structured table: file name, camera/profile, original timestamp, corrected timestamp, destination path. Color-code rows by camera profile.
    - `scripts/`: `fix-media-timestamp.py` needs to emit `@@original_time=` and `@@corrected_time=` in `@@` format alongside existing output
    - `macos/`: parse `@@` lines from `ScriptRunner` output into a `DiffTableView` model instead of `LogOutputView` text
