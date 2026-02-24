@@ -11,10 +11,10 @@ media-pipeline.py becomes the single entry point. The pipeline has a fixed frame
 ### Pipeline
 
 ```
-INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow] → [archive]
+INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow] → [source-action]
 ```
 
-**Ingest** and **output** are structural steps that always execute. **Tag**, **fix-timestamp**, and **gyroflow** are optional processing steps controlled by `--tasks`. **Archive** is controlled by `--archive`.
+**Ingest** and **output** are structural steps that always execute. **Tag**, **fix-timestamp**, and **gyroflow** are optional processing steps controlled by `--tasks`. **Source-action** is controlled by `--source-action`.
 
 ### Per-file flow
 
@@ -25,37 +25,55 @@ For each file matching profile `file_extensions` in `--source`:
 3. **Fix-timestamp** (if in `--tasks`): correct timestamps on the copy in working dir
 4. **Output**: move processed copy from working dir to `ready_dir` via organize-by-date (date-based folder structure using `--subfolder` template)
 5. **Gyroflow** (if in `--tasks`): generate stabilization project on the file now in `ready_dir`
-6. **Archive** (if `--archive`): move original source file to archive folder; also archive companion files unless `--skip-companion`
+6. **Source-action** (per `--source-action`):
+   - `leave` (default): source file untouched
+   - `archive`: move original source file to archive folder; also handle companion files (see below)
+   - `delete`: delete original source file; also handle companion files (see below)
 
-Per-file archive gives resumability — if the script is interrupted, unarchived files remain in source. Re-running picks up where it left off.
+All three modes are per-file (after successful processing), so all give resumability — only successfully-processed files are affected. If the script is interrupted, unprocessed files remain in source. Re-running picks up where it left off.
 
 ### Directory roles
 
 | Role | Source | Lifetime |
 |---|---|---|
-| **source** | `--source` or profile `source_dir` | Read-only to the pipeline. Never modified in-place. |
+| **source** | `--source` or profile `source_dir` | Never modified in-place. Post-processing fate controlled by `--source-action`. |
 | **working** | `tempfile.mkdtemp()` | Created per-run, cleaned up after. Internal, not user-facing. |
 | **ready** | profile `ready_dir` or `--target` | User-facing output. Watched folder for backup sync — files only land here when fully processed. |
-| **archive** | Sibling of source: `<source> - archived <date>` | Marks processed source files. Created on first successful archive. |
+| **archive** | Sibling of source: `<source> - archived <date>` | Only exists when `--source-action archive`. Marks processed source files. Created on first successful archive. |
 
 Memory card and local directory sources are treated identically — both are read-only inputs to the pipeline.
 
-### Archive behavior
+### Source-action behavior
 
-- Controlled by `--archive` flag. Off by default (source untouched).
-- Archive folder is a sibling of `--source` dir: `<basename> - archived <YYYY-MM-DD>`. Created on first successful archive.
-- Each source file is moved individually after its full pipeline completes (ingest → process → output). This provides resumability.
-- When `--archive` is on and `--skip-companion` is off (default): companion files (matching profile `companion_extensions`) are also archived alongside the main file.
-- When `--archive` is on and `--skip-companion` is on: only main files are archived; companions stay in source.
-- If source is read-only (SD card write-protect, permissions): log `"Read-only source, couldn't archive: <filename>"` and continue. Non-fatal.
+`--source-action` controls what happens to each source file after successful processing. Three modes:
+
+**`leave`** (default)
+- Source file untouched. Safest option.
+- Good for: memory cards (eject manually), precious originals, dry-run exploration.
+
+**`archive`**
+- Per-file move to archive folder: `<source_basename> - archived <YYYY-MM-DD>`, created as sibling of `--source` dir on first successful archive.
+- Preserves directory structure within archive relative to source root.
+- Good for: memory cards where you want a record of what was imported, any source where you want resumability with a clear "done" marker.
+
+**`delete`**
+- Per-file delete (`os.remove()`) after successful processing.
+- No archive folder, no clutter.
+- Good for: local copies where the source is already a duplicate and you want to reclaim space.
+
+**Common behavior across all modes:**
+- Action is per-file, taken only after that file's full pipeline completes. Provides resumability — unprocessed files remain in source.
+- When `--skip-companion` is off (default): companion files (matching profile `companion_extensions`) are also archived/deleted alongside the main file.
+- When `--skip-companion` is on: only main files are affected; companions stay in source.
+- If source is read-only (SD card write-protect, permissions): log `"Read-only source, couldn't <action>: <filename>"` and continue. Non-fatal.
 
 ### Companion files
 
-Companion files (`.lrv`, `.thm`, `.srt`, etc. from profile `companion_extensions`) are camera artifacts handled only during archive:
+Companion files (`.lrv`, `.thm`, `.srt`, etc. from profile `companion_extensions`) are camera artifacts handled only during the source-action step:
 
 - They are **not** copied to working dir
 - They are **not** processed (no tagging, timestamping, or organizing)
-- When `--archive` is on, they are archived alongside their main file (unless `--skip-companion`)
+- When `--source-action` is `archive` or `delete`, they are handled alongside their main file (unless `--skip-companion`)
 
 If a companion extension is actually useful in the editing workflow (e.g., `.srt` subtitle files), it should be in `file_extensions` instead — then it goes through the full pipeline like any other file.
 
@@ -67,8 +85,8 @@ If a companion extension is actually useful in the editing workflow (e.g., `.srt
 - `--tasks` — optional processing steps: `tag`, `fix-timestamp`, `gyroflow`. Default: all. Ingest and output always run regardless.
 
 **New:**
-- `--archive` — per-file: move source file (and companions) to archive folder after successful processing. Default: off.
-- `--skip-companion` — skip companion files during archive. Only main files (matching `file_extensions`) are archived.
+- `--source-action` — what to do with each source file after successful processing: `leave` (default), `archive`, `delete`.
+- `--skip-companion` — skip companion files during source-action. Only main files (matching `file_extensions`) are archived/deleted.
 
 **Unchanged:**
 - `--profile`, `--subfolder`, `--timezone`, `--location`, `--apply`, `--verbose`
@@ -78,21 +96,21 @@ If a companion extension is actually useful in the editing workflow (e.g., `.srt
 ### scripts/media-pipeline.py
 
 - Add `copy_to_working_dir(source_file, working_dir)` function — flat `shutil.copy2()`
-- Add `archive_source_file(source_file, source_dir, archive_dir)` function — per-file move with read-only fallback (log + continue)
-- Add `--archive` and `--skip-companion` args
+- Add `handle_source_action(source_file, source_dir, action, archive_dir)` function — per-file leave/archive/delete with read-only fallback (log + continue)
+- Add `--source-action` and `--skip-companion` args
 - Update `--tasks` choices: remove `"organize"` (output is always on). Choices become `["tag", "fix-timestamp", "gyroflow"]`
 - In `main()`:
   - Always create temp working dir via `tempfile.mkdtemp()`
   - Scan `--source` (or profile `source_dir`) for files matching `file_extensions`
   - Resolve `ready_dir` from profile `ready_dir` or `--target`
-  - Create archive dir on first successful archive (if `--archive`)
+  - Create archive dir on first successful archive (if `--source-action archive`)
   - Clean up temp working dir after all files processed
 - In `process_file()`:
   - Step 0 (ingest): copy source file to working dir (always)
   - Steps 1-2 (tag, fix-timestamp): operate on working dir copy (unchanged logic, now conditional on `--tasks`)
   - Step 3 (output): organize working dir copy to ready_dir (always, not conditional on tasks)
   - Step 4 (gyroflow): unchanged (operates on file in ready_dir)
-  - Step 5 (archive): move source file + companions to archive dir (if `--archive`)
+  - Step 5 (source-action): leave, archive, or delete source file + companions (per `--source-action`)
 - `--source` default changes from profile `import_dir` → profile `source_dir`
 
 ### scripts/media-profiles.yaml
@@ -109,6 +127,8 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 
 ### macos/Sources/Models/AppState.swift
 
+- Add `SourceAction` enum: `.leave`, `.archive`, `.delete` with raw string values matching CLI args
+- Replace `preserveSource: Bool` with `sourceAction: SourceAction` (default `.leave`)
 - `PipelineStep`: add computed property `isAlwaysOn` — true for `.importFromCard` and `.organize`
 - Update `.importFromCard` help text: `"Copy files from source to working directory for processing"`
 - Update `.organize` help text: `"Move processed files into date-based folders in ready directory"`
@@ -121,9 +141,10 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 - Always call `media-pipeline.sh` (remove the `hasImport ? "import-media.sh" : "media-pipeline.sh"` fork)
 - Always pass `--source` with `state.sourceDir`
 - Build `--tasks` from enabled optional steps only (exclude `.importFromCard` and `.organize`)
-- Pass `--archive` when `!state.preserveSource`
+- Pass `--source-action` with value from `state.sourceAction` (`leave`, `archive`, or `delete`)
 - Pass `--skip-companion` when `state.skipCompanion`
 - `importCardOptions` section: always visible when profile selected (not gated on `.importFromCard` enabled, since import is always on). Rename GroupBox label from "Memory Card / Source Actions" to "Source"
+- Replace `preserveSource` toggle with `sourceAction` picker (leave / archive / delete). "Delete" option shows caution text: `"Permanently deletes source files after successful processing"`
 - `pipelineTaskNames`: remove `.organize` mapping (no longer a task choice). Keep `.tag`, `.fixTimezone`, `.gyroflow`. Do not add `.importFromCard` (not a task choice).
 - `countMediaFiles()`: always count from `state.sourceDir` (remove the `hasImport ?` branch)
 
@@ -136,9 +157,11 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 
 - Test ingest: file copied from source to temp working dir
 - Test full pipeline: ingest → tag → output flow, verify file ends up in ready_dir with correct tags
-- Test archive: source file moved to archive folder after processing
-- Test archive with read-only source: logs warning, continues without error
-- Test skip-companion: companions not archived when flag is on
+- Test source-action leave: source file untouched after processing
+- Test source-action archive: source file moved to archive folder after processing
+- Test source-action delete: source file deleted after processing
+- Test source-action with read-only source: logs warning, continues without error
+- Test skip-companion: companions not archived/deleted when flag is on
 - Test resumability: pre-existing archive folder with some files, re-run processes only unarchived source files
 
 ### docs/scripts.md
