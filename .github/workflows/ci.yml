@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -49,8 +51,14 @@ jobs:
       - name: Install Python deps
         run: pip install -r scripts/requirements.txt
 
-      - name: Run tests (excluding perf)
-        run: pytest scripts/tests/ -x -v --ignore=scripts/tests/test_performance.py
+      - name: Record perf baseline from main
+        run: |
+          git checkout origin/main -- scripts/
+          pytest scripts/tests/test_performance.py --perf-baseline --perf-baseline-file /tmp/perf_baseline.json -v -s
+          git checkout ${{ github.sha }} -- scripts/
+
+      - name: Run tests
+        run: pytest scripts/tests/ -x -v --perf-baseline-file /tmp/perf_baseline.json
 
   gate:
     needs: [scripts-test]
