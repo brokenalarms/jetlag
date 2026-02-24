@@ -13,6 +13,8 @@ import pytest
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+from conftest import create_test_video
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import hyphenated module name
@@ -52,20 +54,7 @@ class TestFilenameSourceOfTruth:
         - Should ignore the corrupted DateTimeOriginal value
         """
         video_path = os.path.join(self.temp_dir, "VID_20250619_063809_00_002.mp4")
-
-        # Create video
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
-        # Set WRONG DateTimeOriginal (simulating corruption)
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:19 09:38:09+08:00",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(video_path, DateTimeOriginal="2025:06:19 09:38:09+08:00")
 
         # Run with --overwrite-datetimeoriginal to use filename as source of truth
         result = subprocess.run([
@@ -93,12 +82,7 @@ class TestFilenameSourceOfTruth:
         """
         original_filename = "VID_20250619_063809_00_002.mp4"
         video_path = os.path.join(self.temp_dir, original_filename)
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(video_path)
 
         # Run fix (even with wrong EXIF data)
         subprocess.run([
@@ -131,20 +115,8 @@ class TestDateTimeOriginalPreservation:
         Without --overwrite-datetimeoriginal, DateTimeOriginal should never change
         """
         video_path = os.path.join(self.temp_dir, "test_video.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
-        # Set DateTimeOriginal
         original_datetime = "2025:06:19 06:38:09+08:00"
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            f"-DateTimeOriginal={original_datetime}",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(video_path, DateTimeOriginal=original_datetime)
 
         # Run fix without --overwrite-datetimeoriginal
         subprocess.run([
@@ -176,12 +148,7 @@ class TestOverwriteDateTimeOriginalRequiresTimezone:
         --overwrite-datetimeoriginal without --timezone should fail with clear error
         """
         video_path = os.path.join(self.temp_dir, "VID_20250619_063809.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(video_path)
 
         # Try to run with --overwrite-datetimeoriginal but no --timezone
         result = subprocess.run([
@@ -214,19 +181,7 @@ class TestTimezoneMismatchDetection:
         Providing different --timezone than DateTimeOriginal should fail without --overwrite
         """
         video_path = os.path.join(self.temp_dir, "test_video.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
-        # Set DateTimeOriginal with +08:00 timezone
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:19 06:38:09+08:00",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(video_path, DateTimeOriginal="2025:06:19 06:38:09+08:00")
 
         # Try to run with DIFFERENT timezone +09:00
         result = subprocess.run([
@@ -246,19 +201,7 @@ class TestTimezoneMismatchDetection:
         With --overwrite-datetimeoriginal, timezone mismatch should be allowed
         """
         video_path = os.path.join(self.temp_dir, "test_video.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
-        # Set DateTimeOriginal with +08:00 timezone
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:19 06:38:09+08:00",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(video_path, DateTimeOriginal="2025:06:19 06:38:09+08:00")
 
         # Run with DIFFERENT timezone but with --overwrite-datetimeoriginal
         result = subprocess.run([
@@ -299,19 +242,7 @@ class TestTimezoneConversion:
         - Birth time should be 1 hour later (converted to viewing timezone)
         """
         video_path = os.path.join(self.temp_dir, "taiwan_video.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
-        # Set shot in Taiwan +08:00 at 06:38:09
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:19 06:38:09+08:00",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(video_path, DateTimeOriginal="2025:06:19 06:38:09+08:00")
 
         # Run fix
         subprocess.run([
@@ -350,14 +281,8 @@ class TestMissingDateTimeOriginalWithTimezoneChange:
         - Should update MediaCreateDate (UTC)
         - Should update Keys:CreationDate
         """
-        # Insta360 filename has timestamp
         video_path = os.path.join(self.temp_dir, "VID_20250619_063809.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(video_path)
 
         # No DateTimeOriginal initially
         fmt._exif_cache.clear()
@@ -404,11 +329,7 @@ class TestExtractMetadataTimezone:
         fmt._exif_cache.clear()
 
     def _create_test_video(self, path: str) -> None:
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            path
-        ], capture_output=True, check=True)
+        create_test_video(path)
 
     def test_extracts_timezone_from_datetimeoriginal(self):
         """When DateTimeOriginal has +08:00, extract_metadata_timezone returns it"""

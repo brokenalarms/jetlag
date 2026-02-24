@@ -5,14 +5,44 @@ Tests must never be skipped because a tool is missing. If a tool is required,
 install it automatically. macOS-only tests (tag/SetFile) are skipped on Linux.
 """
 
+import atexit
 import json
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from lib.exiftool import exiftool
+
+_template_video: Path | None = None
+
+
+def _ensure_template() -> Path:
+    global _template_video
+    if _template_video is None:
+        d = tempfile.mkdtemp(prefix="pytest_video_template_")
+        _template_video = Path(d) / "template.mp4"
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=0.04",
+            "-c:v", "libx264", "-t", "0.04", "-pix_fmt", "yuv420p",
+            str(_template_video)
+        ], capture_output=True, check=True)
+        atexit.register(lambda: shutil.rmtree(d, ignore_errors=True))
+    return _template_video
+
+
+def create_test_video(path, **exif_tags):
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(_ensure_template(), str(path))
+    if exif_tags:
+        tag_args = [f"-{field}={value}" for field, value in exif_tags.items()]
+        exiftool.write_tags(str(path), tag_args)
+
 
 # Map of required tool -> install commands by platform.
 # Each entry is {tool_name: {platform: [install_command]}}.

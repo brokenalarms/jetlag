@@ -12,6 +12,8 @@ import subprocess
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+from conftest import create_test_video
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import hyphenated module name
@@ -45,34 +47,8 @@ class TestTimezoneScenarios:
         fmt._exif_cache.clear()
 
     def create_video_shot_in_timezone(self, filename, shoot_time, shoot_tz_offset):
-        """
-        Create a video file simulating it was shot at specific time in specific timezone
-
-        Args:
-            filename: Name of video file
-            shoot_time: datetime object in shooting timezone (e.g., "2025-06-18 07:25:21")
-            shoot_tz_offset: Timezone offset string (e.g., "+0800")
-
-        Returns:
-            Path to created video
-        """
         video_path = os.path.join(self.temp_dir, filename)
-
-        # Create video
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
-        # Set DateTimeOriginal with shooting timezone
-        datetime_original = f"{shoot_time}{shoot_tz_offset}"
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            f"-DateTimeOriginal={datetime_original}",
-            video_path
-        ], capture_output=True, check=True)
-
+        create_test_video(video_path, DateTimeOriginal=f"{shoot_time}{shoot_tz_offset}")
         return video_path
 
     def get_keys_creationdate(self, file_path):
@@ -174,13 +150,7 @@ class TestTimezoneScenarios:
         - All other fields follow from this
         """
         video_path = os.path.join(self.temp_dir, "VID_20250618_072521.mp4")
-
-        # Create video with no EXIF metadata
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(video_path)
 
         # Run with timezone flag
         subprocess.run([
@@ -208,19 +178,7 @@ class TestTimezoneScenarios:
         - DateTimeOriginal: 2025:06:18 07:25:21+08:00 (converted from UTC + TZ)
         """
         video_path = os.path.join(self.temp_dir, "utc_video.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
-        # Set MediaCreateDate as UTC
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-QuickTime:MediaCreateDate=2025:06:17 23:25:21",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(video_path, **{"QuickTime:MediaCreateDate": "2025:06:17 23:25:21"})
 
         # Run with timezone - should convert UTC to local time
         subprocess.run([
@@ -340,18 +298,7 @@ class TestVideoEditorBehavior:
         Video editors use Keys:CreationDate for "Content Created" after import
         """
         video_path = os.path.join(self.temp_dir, "nle_timeline.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:18 07:25:21+08:00",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(video_path, DateTimeOriginal="2025:06:18 07:25:21+08:00")
 
         subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
@@ -395,23 +342,13 @@ class TestRealWorldWorkflow:
         3. Running organize-by-date
         4. Verifying video editor will show correct times
         """
-        # Create GoPro-style video
         video_path = os.path.join(self.source_dir, "GX010123.MP4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
-        # Set metadata as if from GoPro
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:18 10:30:45+08:00",
-            "-Make=GoPro",
-            "-Model=HERO12 Black",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(
+            video_path,
+            DateTimeOriginal="2025:06:18 10:30:45+08:00",
+            Make="GoPro",
+            Model="HERO12 Black",
+        )
 
         # Step 1: Fix timestamp
         result = subprocess.run([

@@ -51,19 +51,11 @@ def save_baseline(config, results: dict):
     path.write_text(json.dumps(results, indent=2) + "\n")
 
 
+from conftest import create_test_video as _create_video_raw
+
+
 def create_test_video(path: Path, media_create_date: str = "2025:10:05 01:00:00"):
-    """Create a minimal test video file with exif metadata."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run([
-        "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=16x16:d=0.04",
-        "-c:v", "libx264", "-t", "0.04", str(path)
-    ], capture_output=True, check=True)
-    subprocess.run([
-        "exiftool", "-overwrite_original",
-        f"-MediaCreateDate={media_create_date}",
-        f"-CreateDate={media_create_date}",
-        str(path)
-    ], capture_output=True, check=True)
+    _create_video_raw(path, MediaCreateDate=media_create_date, CreateDate=media_create_date)
 
 
 def run_pipeline(args: list[str]) -> subprocess.CompletedProcess:
