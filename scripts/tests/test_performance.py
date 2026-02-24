@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Performance snapshot harness for base scripts.
+Performance snapshot harness for media-pipeline.
 
-Measures wall-clock time for each script processing a single file and compares
-against a saved baseline to detect speed regressions.
+Measures wall-clock time for a full pipeline run (fix-timestamp + organize)
+and compares against a saved baseline to detect speed regressions.
 
 Usage:
     pytest tests/test_performance.py -v -s                  # compare against baseline
@@ -15,65 +15,22 @@ compare against it. Delete the file and re-record after intentional perf changes
 """
 
 import json
-import shutil
+import shlex
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
 import pytest
+import yaml
 
 SCRIPT_DIR = Path(__file__).parent.parent
+MEDIA_PIPELINE = SCRIPT_DIR / "media-pipeline.sh"
 DEFAULT_BASELINE_FILE = Path(__file__).parent / "perf_baseline.json"
 REGRESSION_THRESHOLD = 0.05  # 5% slower than baseline = regression
 TIMED_RUNS = 3
-
-
-@pytest.fixture(scope="module")
-def source_mp4(tmp_path_factory):
-    """Create a source test mp4 with DateTimeOriginal set (no Keys:CreationDate)."""
-    tmp = tmp_path_factory.mktemp("perf_src")
-    path = tmp / "source.mp4"
-    subprocess.run([
-        "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-        "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p", str(path)
-    ], capture_output=True, check=True)
-    # Set DateTimeOriginal with timezone so fix-media-timestamp has something to work from
-    subprocess.run([
-        "exiftool", "-overwrite_original",
-        "-DateTimeOriginal=2024:06:15 10:30:00+09:00",
-        str(path)
-    ], capture_output=True, check=True)
-    return path
-
-
-def fresh_copy(source: Path, dest_dir: Path, name: str) -> Path:
-    """Copy source file to a fresh path with no existing tags or timestamp fixes."""
-    dest = dest_dir / name
-    shutil.copy2(str(source), str(dest))
-    # Strip any Keys:CreationDate so timestamp fix always has work to do
-    subprocess.run([
-        "exiftool", "-overwrite_original", "-Keys:CreationDate=", str(dest)
-    ], capture_output=True)
-    return dest
-
-
-def measure_script(cmd_template: list, source: Path, tmp_dir: Path, runs: int = TIMED_RUNS) -> float:
-    """
-    Measure median wall-clock seconds for a script command across N runs.
-
-    cmd_template: list where the string "__FILE__" will be replaced with each fresh copy path.
-    """
-    times = []
-    for i in range(runs):
-        path = fresh_copy(source, tmp_dir, f"run_{i}.mp4")
-        cmd = [str(source) if c == "__SOURCE__" else c for c in cmd_template]
-        cmd = [str(path) if c == "__FILE__" else c for c in cmd]
-        t0 = time.perf_counter()
-        subprocess.run(cmd, capture_output=True)
-        times.append(time.perf_counter() - t0)
-    return statistics.median(times)
 
 
 def _baseline_path(config) -> Path:
@@ -94,12 +51,33 @@ def save_baseline(config, results: dict):
     path.write_text(json.dumps(results, indent=2) + "\n")
 
 
-class TestPerformance:
-    """Performance snapshot tests for base scripts."""
+def create_test_video(path: Path, media_create_date: str = "2025:10:05 01:00:00"):
+    """Create a minimal test video file with exif metadata."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run([
+        "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=16x16:d=0.04",
+        "-c:v", "libx264", "-t", "0.04", str(path)
+    ], capture_output=True, check=True)
+    subprocess.run([
+        "exiftool", "-overwrite_original",
+        f"-MediaCreateDate={media_create_date}",
+        f"-CreateDate={media_create_date}",
+        str(path)
+    ], capture_output=True, check=True)
 
-    @pytest.fixture(autouse=True)
-    def tmp(self, tmp_path):
-        self._tmp = tmp_path
+
+def run_pipeline(args: list[str]) -> subprocess.CompletedProcess:
+    """Run media-pipeline.sh with given args."""
+    quoted_args = " ".join(shlex.quote(arg) for arg in args)
+    cmd = f"{MEDIA_PIPELINE} {quoted_args}"
+    return subprocess.run(
+        cmd, shell=True, executable="/bin/bash",
+        capture_output=True, text=True, cwd=SCRIPT_DIR,
+    )
+
+
+class TestPerformance:
+    """Performance snapshot — pipeline-level end-to-end."""
 
     def _check(self, name: str, elapsed: float, request):
         """Compare elapsed time against baseline, or record if --perf-baseline."""
@@ -140,58 +118,48 @@ class TestPerformance:
             f"(threshold {REGRESSION_THRESHOLD*100:.0f}%)"
         )
 
-    @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags don't exist on Linux")
-    def test_tag_media_apply(self, source_mp4, request):
-        """tag-media.py: apply tags + EXIF to a single file."""
-        elapsed = measure_script(
-            [sys.executable, str(SCRIPT_DIR / "tag-media.py"),
-             "__FILE__",
-             "--tags", "gopro,action",
-             "--make", "GoPro",
-             "--model", "HERO12 Black",
-             "--apply"],
-            source_mp4, self._tmp
-        )
-        self._check("tag_media_apply", elapsed, request)
+    def test_media_pipeline_3_files(self, request):
+        """media-pipeline: fix-timestamp + organize on 3 files."""
+        profiles_path = SCRIPT_DIR / "media-profiles.yaml"
+        original_yaml = profiles_path.read_text()
 
-    def test_fix_media_timestamp_apply(self, source_mp4, request):
-        """fix-media-timestamp.py: apply timestamp fix to a single file."""
-        elapsed = measure_script(
-            [sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-             "__FILE__",
-             "--timezone", "+0900",
-             "--apply"],
-            source_mp4, self._tmp
-        )
-        self._check("fix_media_timestamp_apply", elapsed, request)
-
-    @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags don't exist on Linux")
-    def test_tag_media_no_work(self, source_mp4, request):
-        """tag-media.py: file already tagged correctly (check-before-write path)."""
-        # Pre-tag the file once
-        pre_tagged = fresh_copy(source_mp4, self._tmp, "pre_tagged.mp4")
-        subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
-            str(pre_tagged),
-            "--tags", "gopro",
-            "--make", "GoPro",
-            "--model", "HERO12 Black",
-            "--apply"
-        ], capture_output=True, check=True)
-
-        # Now measure the idempotent (no-op) run — still makes reads, skips writes
         times = []
-        for _ in range(TIMED_RUNS):
-            t0 = time.perf_counter()
-            subprocess.run([
-                sys.executable, str(SCRIPT_DIR / "tag-media.py"),
-                str(pre_tagged),
-                "--tags", "gopro",
-                "--make", "GoPro",
-                "--model", "HERO12 Black",
-                "--apply"
-            ], capture_output=True)
-            times.append(time.perf_counter() - t0)
-        elapsed = statistics.median(times)
+        try:
+            for _ in range(TIMED_RUNS):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    workspace = Path(tmpdir)
+                    source = workspace / "source"
+                    target = workspace / "target"
+                    source.mkdir()
+                    target.mkdir()
 
-        self._check("tag_media_no_work", elapsed, request)
+                    for j, ts in enumerate([
+                        "2025:10:05 01:00:00",
+                        "2025:10:06 02:00:00",
+                        "2025:10:07 03:00:00",
+                    ]):
+                        create_test_video(source / f"file_{j}.mp4", media_create_date=ts)
+
+                    with open(profiles_path) as f:
+                        profiles = yaml.safe_load(f)
+                    profiles["profiles"]["_perf_test"] = {
+                        "import_dir": str(source),
+                        "ready_dir": str(target),
+                        "file_extensions": [".mp4"],
+                    }
+                    with open(profiles_path, "w") as f:
+                        yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
+
+                    t0 = time.perf_counter()
+                    run_pipeline([
+                        "--profile", "_perf_test",
+                        "--source", str(source),
+                        "--timezone", "+0900",
+                        "--tasks", "fix-timestamp", "organize",
+                        "--apply",
+                    ])
+                    times.append(time.perf_counter() - t0)
+        finally:
+            profiles_path.write_text(original_yaml)
+
+        self._check("media_pipeline_3_files", statistics.median(times), request)

@@ -57,7 +57,7 @@ This dict-key-as-name constraint is shared between the Swift model and the Pytho
 Tests live in `scripts/tests/`.
 
 - **Regression tests** — assert actual file state before and after, not just exit codes or stdout. Structured as "record before → run script → compare after" with human-readable expected vs actual diffs.
-- **Performance tests** — snapshot harness. Measures median wall-clock time over 3 runs per script, compares to a saved baseline. Threshold: 5% slower than baseline = regression. Delete the baseline file to re-record after intentional perf improvements.
+- **Performance tests** — snapshot harness. Runs media-pipeline end-to-end (3 files, fix-timestamp + organize), measures median wall-clock time over 3 runs, compares to a saved baseline. Threshold: 5% slower than baseline = regression. Delete the baseline file to re-record after intentional perf improvements.
 
 Testing rules:
 - Testing `returncode == 0` is not testing behavior — it only confirms the script didn't crash.
