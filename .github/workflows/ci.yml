@@ -58,7 +58,7 @@ jobs:
           git checkout ${{ github.sha }} -- scripts/
 
       - name: Run tests
-        run: pytest scripts/tests/ -x -v --perf-baseline-file /tmp/perf_baseline.json --perf-results-file /tmp/perf_results.json
+        run: pytest scripts/tests/ -x --perf-baseline-file /tmp/perf_baseline.json --perf-results-file /tmp/perf_results.json
 
       - name: Performance summary
         if: always()
