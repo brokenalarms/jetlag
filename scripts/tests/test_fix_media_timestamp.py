@@ -6,6 +6,7 @@ Validates timestamp fixing behavior, idempotency, and edge cases
 
 import os
 import subprocess
+import sys
 import tempfile
 import shutil
 from datetime import datetime, timezone, timedelta
@@ -18,6 +19,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 SCRIPT_DIR = Path(__file__).parent.parent
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — script uses SetFile in apply mode")
 class TestFixMediaTimestamp:
     """Test suite for fix-media-timestamp.py"""
 
@@ -264,6 +266,7 @@ class TestFixMediaTimestamp:
         assert "2025:06:17 23:25:21" in exif_result.stdout
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — script uses SetFile in apply mode")
 class TestFixMediaTimestampIntegration:
     """Integration tests for fix-media-timestamp.py with various file types"""
 
