@@ -19,10 +19,12 @@ import shutil
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
 import pytest
+import yaml
 
 SCRIPT_DIR = Path(__file__).parent.parent
 DEFAULT_BASELINE_FILE = Path(__file__).parent / "perf_baseline.json"
@@ -185,3 +187,65 @@ class TestPerformance:
         elapsed = statistics.median(times)
 
         self._check("tag_media_no_work", elapsed, request)
+
+    def test_media_pipeline_3_files(self, source_mp4, request):
+        """media-pipeline: process 3 files through full pipeline (tag + timestamp + organize).
+
+        This is the key benchmark for stay_open — baseline (main) spawns
+        a fresh exiftool process for every operation; the stay_open branch
+        keeps one alive for the entire batch.
+        """
+        profiles_path = SCRIPT_DIR / "media-profiles.yaml"
+
+        times = []
+        for run_idx in range(TIMED_RUNS):
+            # Fresh workspace each run (--apply moves files)
+            workspace = Path(tempfile.mkdtemp())
+            source_dir = workspace / "source"
+            target_dir = workspace / "target"
+            source_dir.mkdir()
+            target_dir.mkdir()
+
+            # Create 3 fresh files
+            for i in range(3):
+                dest = source_dir / f"file_{i}.mp4"
+                shutil.copy2(str(source_mp4), str(dest))
+                subprocess.run([
+                    "exiftool", "-overwrite_original", "-Keys:CreationDate=", str(dest)
+                ], capture_output=True)
+
+            # Add temporary profile
+            with open(profiles_path) as f:
+                profiles = yaml.safe_load(f)
+            profiles["profiles"]["_perf_test"] = {
+                "import_dir": str(source_dir),
+                "ready_dir": str(target_dir),
+                "file_extensions": [".mp4"],
+                "exif": {"make": "PerfTest", "model": "Camera"},
+            }
+            with open(profiles_path, "w") as f:
+                yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
+
+            try:
+                t0 = time.perf_counter()
+                subprocess.run([
+                    str(SCRIPT_DIR / "media-pipeline.sh"),
+                    "--profile", "_perf_test",
+                    "--source", str(source_dir),
+                    "--timezone", "+0900",
+                    "--subfolder", "PerfTest",
+                    "--apply",
+                ], capture_output=True)
+                times.append(time.perf_counter() - t0)
+            finally:
+                # Remove temporary profile
+                with open(profiles_path) as f:
+                    profiles = yaml.safe_load(f)
+                if "_perf_test" in profiles.get("profiles", {}):
+                    del profiles["profiles"]["_perf_test"]
+                    with open(profiles_path, "w") as f:
+                        yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
+                shutil.rmtree(workspace, ignore_errors=True)
+
+        elapsed = statistics.median(times)
+        self._check("media_pipeline_3_files", elapsed, request)
