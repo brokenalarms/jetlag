@@ -51,23 +51,6 @@ def get_test_preset() -> str:
     return json.dumps({"stabilization": {"max_zoom": 105.0}})
 
 
-@pytest.fixture
-def gyroflow_binary_path():
-    """Get gyroflow binary path from config, skip if not installed."""
-    if not PROFILES_FILE.exists():
-        pytest.skip("media-profiles.yaml not found")
-
-    with open(PROFILES_FILE) as f:
-        data = yaml.safe_load(f)
-
-    config = data.get("gyroflow", {})
-    binary = config.get("binary", "")
-
-    if not binary or not Path(binary).is_file():
-        pytest.skip(f"Gyroflow binary not found at: {binary}")
-
-    return binary
-
 
 class TestNoMotionData:
     """Tests for videos without motion/gyro data streams."""

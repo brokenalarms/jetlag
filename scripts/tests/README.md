@@ -27,16 +27,36 @@ Test bash scripts and full workflows.
 - `test_fix_media_timestamp.py` - Full script execution tests
 - `test_tag_media.py` - Full tagging workflow tests
 
+## Required External Tools
+
+Tests must never be skipped because a tool is missing. `conftest.py` auto-installs missing tools before collection:
+
+| Tool | All platforms | macOS only | Install (manual fallback) |
+|------|:---:|:---:|---------|
+| ffmpeg | **auto-installed** | | `brew install ffmpeg` / `apt install ffmpeg` |
+| exiftool | **auto-installed** | | `brew install exiftool` / `apt install libimage-exiftool-perl` |
+| humanize (Python) | **auto-installed** | | `pip install humanize` |
+| tag | | **required** | `brew install tag` |
+| SetFile | | **required** | `xcode-select --install` |
+
+On Linux, tests that call macOS-only tools (`tag`, `SetFile`) are skipped automatically by `conftest.py`. All other tests must pass — no skipping.
+
+**Never use `pytest.skip()` for missing tools.** If a test needs a tool, add it to `conftest.py` so it gets installed automatically.
+
 ## Running Tests
 
 ### Prerequisites
 
 ```bash
-# Install test dependencies
+# Install Python dependencies
 pip install -r tests/requirements.txt
 
-# Ensure system dependencies are available
-which ffmpeg exiftool tag SetFile
+# Tools are auto-installed by conftest.py, but to verify manually:
+ffmpeg -version
+exiftool -ver
+
+# macOS only
+which tag SetFile
 ```
 
 ### Run All Tests
@@ -137,17 +157,8 @@ Tests create temporary files with controlled metadata to validate:
 ### Tests failing due to timezone
 Some tests depend on system timezone. If running in unexpected timezone, tests may need adjustment.
 
-### ffmpeg not found
-Install ffmpeg: `brew install ffmpeg`
-
-### exiftool not found
-Install exiftool: `brew install exiftool`
-
-### tag command not found
-Install tag: `brew install tag`
-
-### SetFile not found
-Install Xcode Command Line Tools: `xcode-select --install`
+### pytest refuses to start with "Required tools not installed"
+Install the missing tools listed in the error — see the Required External Tools table above.
 
 ## Adding New Tests
 
