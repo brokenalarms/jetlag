@@ -16,6 +16,8 @@
 
 ## `scripts/` + `macos/`
 
+- (2026-02-24) **Unify media pipeline as single orchestrator** — media-pipeline.py becomes the single entry point; import is just another task. See [todos/simplify-media-import.md](todos/simplify-media-import.md)
+
 - (2026-02-20) **`preserveSource` flag not passed to script** — `WorkflowView.runWorkflow()` binds a toggle to `state.preserveSource` but never adds a `--copy` / `--move` flag to the `import-media.sh` args. `import-media.py` doesn't currently expose this as a CLI flag — need to add it to the script first, then wire up in `WorkflowView`.
 
 - (2026-02-23) **Timezone suffix for group folder** — `--subfolder` / `folder_template` groundwork is done. Remaining:
