@@ -6,6 +6,7 @@ install it automatically. macOS-only tests (tag/SetFile) are skipped on Linux.
 """
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -114,6 +115,44 @@ def pytest_configure(config):
             )
 
     config._perf_results = []
+    config._quiet_mode = not os.environ.get("CI")
+    if config._quiet_mode:
+        config.option.verbose = -1
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_sessionstart(session):
+    if not getattr(session.config, "_quiet_mode", False):
+        return
+    terminal = session.config.pluginmanager.get_plugin("terminalreporter")
+    if terminal:
+        terminal._tw.line("running tests...")
+
+        def _quiet_summary_stats():
+            s = getattr(terminal, "_session", None)
+            if s and s.exitstatus == 0:
+                passed = len(terminal.stats.get("passed", []))
+                terminal._tw.line(f"all {passed} tests passed")
+
+        terminal.summary_stats = _quiet_summary_stats
+
+
+def pytest_report_teststatus(report, config):
+    if not getattr(config, "_quiet_mode", False):
+        return None
+    if report.when == "call":
+        if report.passed:
+            return "passed", "", ""
+        if report.failed:
+            return "failed", "", "FAILED"
+        if report.skipped:
+            return "skipped", "", ""
+    if report.when in ("setup", "teardown"):
+        if report.failed:
+            return "error", "", "ERROR"
+        if report.skipped:
+            return "skipped", "", ""
+        return "", "", ""
 
 
 @pytest.hookimpl(trylast=True)
