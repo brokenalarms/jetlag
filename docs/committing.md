@@ -19,6 +19,7 @@ Before any commit or push action, every session:
 - Every commit that changes code for a feature or bug fix must be backed by a test covering that change
 - Never commit without first running tests with `pytest -x` and confirming they pass
 - One branch per PR — never reuse a branch that has already been merged into main; create a new branch for each new PR
+- When a PR completes a step in a multi-step task tracked in `TODO.md` or `todos/`, include updates to those files in the same PR: mark completed sub-steps in the `todos/*.md` spec and strike/update the corresponding entry in `TODO.md`. The tracking files should always reflect reality after each merge, not only at the end of the full task.
 
 ## Pull requests
 
