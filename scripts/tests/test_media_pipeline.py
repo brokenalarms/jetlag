@@ -129,7 +129,7 @@ def test_profile(temp_workspace):
 
     # Add test profile
     profiles["profiles"]["_test"] = {
-        "import_dir": str(temp_workspace["source"]),
+        "source_dir": str(temp_workspace["source"]),
         "ready_dir": str(temp_workspace["target"]),
         "file_extensions": [".mp4"],
         "tags": ["test-camera"],
@@ -257,7 +257,7 @@ class TestApplyMode:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "TestGroup", "--apply"],
         )
 
-        assert not video.exists(), "Source file should be moved"
+        assert video.exists(), "Source file should be preserved"
         expected = target / "2025" / "TestGroup" / "2025-10-05" / "test.mp4"
         assert expected.exists(), f"File should be at {expected}"
 
@@ -514,22 +514,24 @@ class TestAlreadyProcessedFiles:
     """Tests for handling files that are already correctly processed."""
 
     def test_skips_already_organized_files(self, temp_workspace, test_profile):
-        """Files already in correct location are skipped."""
+        """Files already in correct target location remain unchanged."""
         target = temp_workspace["target"]
-        # Create file already in the correct organized location
         correct_path = target / "2025" / "Test" / "2025-10-05" / "test.mp4"
         create_test_video(correct_path, media_create_date="2025:10:05 01:00:00")
-        # Set DateTimeOriginal so it's "complete"
         subprocess.run(
             ["exiftool", "-overwrite_original", "-DateTimeOriginal=2025:10:05 10:00:00+09:00", str(correct_path)],
             capture_output=True,
         )
+        original_size = correct_path.stat().st_size
 
-        result = run_pipeline(
+        run_pipeline(
             ["--profile", test_profile, "--source", str(correct_path.parent), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
         )
 
-        assert "Already organized" in result.output or "No change" in result.output
+        assert correct_path.exists(), "File should still be at the organized location"
+        assert correct_path.stat().st_size == original_size, "File content should be unchanged"
+        all_mp4s = list(target.rglob("*.mp4"))
+        assert len(all_mp4s) == 1, f"Should be exactly one file in target, found: {all_mp4s}"
 
 
 class TestCLIArguments:
@@ -547,8 +549,8 @@ class TestCLIArguments:
         assert result.returncode == 0
         assert "Found 1 video file(s)" in result.stdout
 
-    def test_source_defaults_to_profile_import_dir(self, temp_workspace, test_profile):
-        """Without --source, uses profile's import_dir."""
+    def test_source_defaults_to_profile_source_dir(self, temp_workspace, test_profile):
+        """Without --source, uses profile's source_dir."""
         source = temp_workspace["source"]
         create_test_video(source / "test.mp4")
 
@@ -570,6 +572,74 @@ class TestCLIArguments:
         )
 
         assert str(target) in result.stdout
+
+
+class TestIngestIntegration:
+    """Tests for ingest step preserving source files."""
+
+    def test_source_file_preserved_after_apply(self, temp_workspace, test_profile):
+        """Source file remains after pipeline apply."""
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+        original_bytes = video.read_bytes()
+
+        run_pipeline(
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
+        )
+
+        assert video.exists(), "Source file should be preserved after pipeline"
+        assert video.read_bytes() == original_bytes, "Source file content should be unchanged"
+
+    def test_source_metadata_unchanged_after_apply(self, temp_workspace, test_profile):
+        """Source file metadata is not modified by pipeline apply."""
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        original_dto = get_exif_field(video, "DateTimeOriginal")
+
+        run_pipeline(
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
+        )
+
+        assert video.exists(), "Source file should exist"
+        assert get_exif_field(video, "DateTimeOriginal") == original_dto, \
+            "Source DateTimeOriginal should not be modified"
+
+
+class TestOutputAlwaysOn:
+    """Output (organize) always runs regardless of --tasks selection."""
+
+    def test_fix_timestamp_task_still_outputs(self, temp_workspace, test_profile):
+        """--tasks fix-timestamp still moves file to target."""
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        run_pipeline(
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900",
+             "--subfolder", "Test", "--tasks", "fix-timestamp", "--apply"],
+        )
+
+        output_files = list(target.rglob("*.mp4"))
+        assert len(output_files) == 1, f"File should be in target, found: {output_files}"
+
+    def test_tag_task_still_outputs(self, temp_workspace, test_profile):
+        """--tasks tag still moves file to target."""
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        run_pipeline(
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900",
+             "--subfolder", "Test", "--tasks", "tag", "--apply"],
+        )
+
+        output_files = list(target.rglob("*.mp4"))
+        assert len(output_files) == 1, f"File should be in target, found: {output_files}"
 
 
 if __name__ == "__main__":

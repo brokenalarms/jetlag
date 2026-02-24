@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
 media-pipeline.py
-Orchestrates video timestamp fixing and organization into date-based folders.
+Orchestrates media processing: ingest from source, process, output to target.
 
 Usage: media-pipeline.py --profile PROFILE [--subfolder SUBFOLDER] [OPTIONS]
        media-pipeline.py --source DIR --target DIR [--subfolder SUBFOLDER] [OPTIONS]
 
-Processes all video files in SOURCE, fixes timestamps, then organizes by date into TARGET.
+Pipeline: INGEST (always) → [tag] → [fix-timestamp] → [gyroflow] → OUTPUT (always)
+
+Source files are read-only inputs — ingest copies them to a working directory,
+all processing happens there, then output moves files to the target.
 """
 
 import argparse
@@ -167,6 +170,39 @@ def run_organize_by_date(
     return result.stderr.strip(), action, dest, result.returncode
 
 
+def run_ingest_media(
+    file_path: Path,
+    working_dir: str,
+    apply: bool
+) -> tuple[str, str, str, int]:
+    """Run ingest-media.py on a file.
+
+    Returns:
+        tuple of (stderr_output, action, dest_path, return_code)
+        action and dest are parsed from @@key=value lines in stdout
+    """
+    cmd = [
+        sys.executable, str(SCRIPT_DIR / "ingest-media.py"),
+        str(file_path),
+        "--target", working_dir
+    ]
+
+    if apply:
+        cmd.append("--apply")
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    action = ""
+    dest = ""
+    for line in result.stdout.split("\n"):
+        if line.startswith("@@action="):
+            action = line.split("=", 1)[1]
+        elif line.startswith("@@dest="):
+            dest = line.split("=", 1)[1]
+
+    return result.stderr.strip(), action, dest, result.returncode
+
+
 def run_generate_gyroflow(
     file_path: Path,
     preset_json: str,
@@ -203,6 +239,7 @@ def process_file(
     file_path: Path,
     profile: Optional[dict],
     target_dir: str,
+    working_dir: str,
     subfolder: Optional[str],
     location_args: list[str],
     apply: bool,
@@ -212,13 +249,33 @@ def process_file(
 ) -> dict:
     """Process a single file through the pipeline.
 
+    Flow: INGEST (always) → [tag] → [fix-timestamp] → [gyroflow] → OUTPUT (always)
+
     Returns:
         dict with keys: changed, failed, error
     """
     result = {"changed": False, "failed": False, "error": None}
     file_changed = False
 
-    # Step 1: Tag media (if profile has tags/make/model)
+    # INGEST (always): copy source file to working dir
+    print("📥 Ingesting...")
+    output, action, dest, rc = run_ingest_media(file_path, working_dir, apply)
+    if output:
+        for line in output.split("\n"):
+            if line.strip():
+                print(f"  {line}")
+
+    if rc != 0:
+        print(f"   ❌ Ingest failed for {file_path.name}")
+        result["failed"] = True
+        result["error"] = "Ingest failed"
+        return result
+
+    active_file = Path(dest) if action == "copied" else file_path
+    if action == "copied":
+        file_changed = True
+
+    # Tag media (if in tasks and profile has tags/make/model)
     if (tasks is None or "tag" in tasks) and profile:
         tags = ",".join(profile.get("tags", []))
         exif = profile.get("exif", {})
@@ -227,16 +284,16 @@ def process_file(
 
         if tags or make or model:
             print("🏷️  Checking tags...")
-            output, changed = run_tag_media(file_path, tags or None, make or None, model or None, apply)
+            output, changed = run_tag_media(active_file, tags or None, make or None, model or None, apply)
             for line in output.split("\n"):
                 print(f"  {line}")
             if changed:
                 file_changed = True
 
-    # Step 2: Fix video timestamp
+    # Fix video timestamp (if in tasks)
     if tasks is None or "fix-timestamp" in tasks:
         print("🔧 Fixing timestamp...")
-        output, changed, rc = run_fix_timestamp(file_path, location_args, apply, verbose)
+        output, changed, rc = run_fix_timestamp(active_file, location_args, apply, verbose)
         for line in output.split("\n"):
             print(f"  {line}")
 
@@ -249,51 +306,46 @@ def process_file(
         if changed:
             file_changed = True
 
-    # Step 3: Organize by date
-    dest = ""
-    if tasks is None or "organize" in tasks:
-        print("📁 Organizing by date...")
-
-        folder_template = profile.get("folder_template") if profile else None
-        if folder_template:
-            template = folder_template.replace("{{SUBFOLDER}}", subfolder) if subfolder else folder_template
-        elif subfolder:
-            template = f"{{{{YYYY}}}}/{subfolder}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
-        else:
-            template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
-        output, action, dest, rc = run_organize_by_date(file_path, target_dir, template, apply, verbose)
-
-        # Print stderr output (user-visible messages)
-        if output:
-            for line in output.split("\n"):
-                if line.strip():
-                    print(line)
-
-        if rc != 0:
-            print(f"   ❌ Organization failed for {file_path.name}")
-            result["failed"] = True
-            result["error"] = "Organization failed"
-            return result
-
-        if action in ("copied", "moved", "overwrote"):
-            file_changed = True
-
-    # Step 4: Generate gyroflow project (if enabled)
+    # Generate gyroflow project (if in tasks and enabled)
     gyroflow_enabled = profile.get("gyroflow_enabled", False) if profile else False
     if (tasks is None or "gyroflow" in tasks) and gyroflow_enabled and gyroflow_config:
         print("🎥 Generating gyroflow project...")
 
-        # Use the dest path from organize (file may have moved)
-        gyroflow_file = Path(dest) if dest else file_path
         preset = gyroflow_config.get("preset", {})
         preset_json = json.dumps(preset)
 
-        gf_action, rc = run_generate_gyroflow(gyroflow_file, preset_json, apply)
+        gf_action, rc = run_generate_gyroflow(active_file, preset_json, apply)
 
         if rc != 0:
             print(f"   ⚠️  Gyroflow generation failed for {file_path.name} (non-fatal)")
         elif gf_action == "generated":
             file_changed = True
+
+    # OUTPUT (always): organize active_file to target_dir
+    print("📁 Organizing by date...")
+
+    folder_template = profile.get("folder_template") if profile else None
+    if folder_template:
+        template = folder_template.replace("{{SUBFOLDER}}", subfolder) if subfolder else folder_template
+    elif subfolder:
+        template = f"{{{{YYYY}}}}/{subfolder}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
+    else:
+        template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
+    output, action, dest, rc = run_organize_by_date(active_file, target_dir, template, apply, verbose)
+
+    if output:
+        for line in output.split("\n"):
+            if line.strip():
+                print(line)
+
+    if rc != 0:
+        print(f"   ❌ Organization failed for {file_path.name}")
+        result["failed"] = True
+        result["error"] = "Organization failed"
+        return result
+
+    if action in ("copied", "moved", "overwrote"):
+        file_changed = True
 
     result["changed"] = file_changed
     return result
@@ -342,8 +394,13 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed processing info")
     parser.add_argument(
         "--tasks", nargs="+",
-        choices=["tag", "fix-timestamp", "organize", "gyroflow"],
-        help="Pipeline steps to run (default: all)"
+        choices=["tag", "fix-timestamp", "gyroflow"],
+        help="Optional pipeline steps to run (default: all). Ingest and output are always on."
+    )
+    parser.add_argument(
+        "--working-dir",
+        default=os.path.expanduser("~/Library/Application Support/Jetlag/working"),
+        help="Working directory for intermediate files (default: ~/Library/Application Support/Jetlag/working)"
     )
 
     args = parser.parse_args()
@@ -359,15 +416,15 @@ def main():
     target_dir = args.target
 
     if profile:
-        import_dir = profile.get("import_dir")
+        profile_source = profile.get("source_dir")
         ready_dir = profile.get("ready_dir")
-        if not source_dir and import_dir and import_dir != "None":
-            source_dir = import_dir
+        if not source_dir and profile_source and profile_source != "None":
+            source_dir = profile_source
         if not target_dir and ready_dir and ready_dir != "None":
             target_dir = ready_dir
 
     if not source_dir:
-        print("ERROR: --source is required (or use --profile with import_dir)", file=sys.stderr)
+        print("ERROR: --source is required (or use --profile with source_dir)", file=sys.stderr)
         sys.exit(1)
 
     if not target_dir:
@@ -413,8 +470,14 @@ def main():
             print("ERROR: Cannot proceed - exiftool will fail with these directories present", file=sys.stderr)
             sys.exit(1)
 
+    # Set up working directory
+    working_dir = args.working_dir
+    if args.apply:
+        os.makedirs(working_dir, exist_ok=True)
+
     # Display configuration
     print(f"→ Source:  {source_dir}")
+    print(f"→ Working: {working_dir}")
     print(f"→ Target:  {target_dir}")
     print(f"→ Mode:    {'APPLY (files will be processed)' if args.apply else 'DRY RUN (no changes)'}")
     if location_args:
@@ -464,6 +527,7 @@ def main():
             file_path,
             profile,
             target_dir,
+            working_dir,
             args.subfolder,
             location_args,
             args.apply,
@@ -481,6 +545,16 @@ def main():
                 stats["changed"] += 1
 
         print()  # Empty line between files
+
+    # Clean up working dir
+    if args.apply:
+        if stats["failed"] > 0:
+            print(f"⚠️  Working dir preserved for inspection: {working_dir}")
+        else:
+            try:
+                os.rmdir(working_dir)
+            except OSError:
+                pass
 
     # Print summary
     print_summary(stats, args.apply)
