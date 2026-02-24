@@ -27,6 +27,9 @@ import yaml
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.filesystem import find_media_files
 
+import importlib
+_ingest_mod = importlib.import_module("ingest-media")
+
 SCRIPT_DIR = Path(__file__).parent
 
 
@@ -175,32 +178,18 @@ def run_ingest_media(
     working_dir: str,
     apply: bool
 ) -> tuple[str, str, str, int]:
-    """Run ingest-media.py on a file.
+    """Copy a source file into the flat working directory.
+
+    Calls ingest-media.ingest_file() directly to avoid per-file subprocess overhead.
 
     Returns:
         tuple of (stderr_output, action, dest_path, return_code)
-        action and dest are parsed from @@key=value lines in stdout
     """
-    cmd = [
-        sys.executable, str(SCRIPT_DIR / "ingest-media.py"),
-        str(file_path),
-        "--target", working_dir
-    ]
-
-    if apply:
-        cmd.append("--apply")
-
-    result = subprocess.run(cmd, capture_output=True, text=True)
-
-    action = ""
-    dest = ""
-    for line in result.stdout.split("\n"):
-        if line.startswith("@@action="):
-            action = line.split("=", 1)[1]
-        elif line.startswith("@@dest="):
-            dest = line.split("=", 1)[1]
-
-    return result.stderr.strip(), action, dest, result.returncode
+    try:
+        dest, action = _ingest_mod.ingest_file(str(file_path), working_dir, apply)
+        return "", action, dest, 0
+    except Exception as e:
+        return str(e), "", "", 1
 
 
 def run_generate_gyroflow(

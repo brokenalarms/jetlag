@@ -14,6 +14,25 @@ import shutil
 import sys
 
 
+def ingest_file(source_file: str, target_dir: str, apply: bool) -> tuple[str, str]:
+    """Copy a single source file into a flat working directory.
+
+    Returns:
+        (dest_path, action) tuple
+    """
+    filename = os.path.basename(source_file)
+    dest = os.path.join(target_dir, filename)
+
+    if apply:
+        os.makedirs(target_dir, exist_ok=True)
+        shutil.copy2(source_file, dest)
+        print(f"Copied: {source_file} → {dest}", file=sys.stderr)
+        return dest, "copied"
+    else:
+        print(f"[DRY RUN] Would copy: {source_file} → {dest}", file=sys.stderr)
+        return dest, "would_copy"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Copy a single source file into a flat working directory."
@@ -26,26 +45,13 @@ def main():
 
     args = parser.parse_args()
 
-    source_file = args.file
-    target_dir = args.target
-
-    if not os.path.isfile(source_file):
-        print(f"ERROR: Source file not found: {source_file}", file=sys.stderr)
+    if not os.path.isfile(args.file):
+        print(f"ERROR: Source file not found: {args.file}", file=sys.stderr)
         sys.exit(1)
 
-    filename = os.path.basename(source_file)
-    dest = os.path.join(target_dir, filename)
-
-    if args.apply:
-        os.makedirs(target_dir, exist_ok=True)
-        shutil.copy2(source_file, dest)
-        print(f"Copied: {source_file} → {dest}", file=sys.stderr)
-        print(f"@@dest={dest}")
-        print(f"@@action=copied")
-    else:
-        print(f"[DRY RUN] Would copy: {source_file} → {dest}", file=sys.stderr)
-        print(f"@@dest={dest}")
-        print(f"@@action=would_copy")
+    dest, action = ingest_file(args.file, args.target, args.apply)
+    print(f"@@dest={dest}")
+    print(f"@@action={action}")
 
 
 if __name__ == "__main__":
