@@ -185,37 +185,6 @@ def pytest_report_teststatus(report, config):
         return "", "", ""
 
 
-@pytest.hookimpl(trylast=True)
-def pytest_sessionstart(session):
-    terminal = session.config.pluginmanager.get_plugin("terminalreporter")
-    if terminal:
-        terminal._tw.line("running tests...")
-
-        def _quiet_summary_stats():
-            s = getattr(terminal, "_session", None)
-            if s and s.exitstatus == 0:
-                passed = len(terminal.stats.get("passed", []))
-                terminal._tw.line(f"all {passed} tests passed")
-
-        terminal.summary_stats = _quiet_summary_stats
-
-
-def pytest_report_teststatus(report, config):
-    if report.when == "call":
-        if report.passed:
-            return "passed", "", ""
-        if report.failed:
-            return "failed", "", "FAILED"
-        if report.skipped:
-            return "skipped", "", ""
-    if report.when in ("setup", "teardown"):
-        if report.failed:
-            return "error", "", "ERROR"
-        if report.skipped:
-            return "skipped", "", ""
-        return "", "", ""
-
-
 def pytest_sessionfinish(session, exitstatus):
     results_path = session.config.getoption("--perf-results-file", default=None)
     results = getattr(session.config, "_perf_results", [])
