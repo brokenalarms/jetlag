@@ -72,7 +72,7 @@ Companion files (`.lrv`, `.thm`, `.srt`, etc. from profile `companion_extensions
 
 **Source-action**: companions are always included. When the main file is archived or deleted, its companions are too. No toggle — orphaning companions in source would never be useful.
 
-**Destination**: controlled by `--include-companions` (default: off).
+**Destination**: controlled by `--copy-companion-files` (default: off).
 - When off: companions are not copied to working dir or output to ready_dir. They only participate in source-action.
 - When on: companions are copied to working dir and output to ready_dir alongside their main file (but skip optional processing steps — no tagging, timestamping, or gyroflow).
 
@@ -89,7 +89,7 @@ If a companion extension needs full processing (tagging, timestamping), it shoul
 
 **New:**
 - `--source-action` — what to do with each source file after successful processing: `leave` (default), `archive`, `delete`. Companions always follow the main file.
-- `--include-companions` — also copy companion files (matching profile `companion_extensions`) to ready_dir. Default: off. Companions skip optional processing steps (tag, fix-timestamp, gyroflow).
+- `--copy-companion-files` — also copy companion files (matching profile `companion_extensions`) to ready_dir. Default: off. Companions skip optional processing steps (tag, fix-timestamp, gyroflow).
 
 **Unchanged:**
 - `--profile`, `--subfolder`, `--timezone`, `--location`, `--apply`, `--verbose`
@@ -100,7 +100,7 @@ If a companion extension needs full processing (tagging, timestamping), it shoul
 
 - Add `copy_to_working_dir(source_file, working_dir)` function — flat `shutil.copy2()`
 - Add `handle_source_action(source_file, source_dir, action, archive_dir)` function — per-file leave/archive/delete with read-only fallback (log + continue)
-- Add `--source-action` and `--include-companions` args
+- Add `--source-action` and `--copy-companion-files` args
 - Update `--tasks` choices: remove `"organize"` (output is always on). Choices become `["tag", "fix-timestamp", "gyroflow"]`
 - In `main()`:
   - Always create temp working dir via `tempfile.mkdtemp()`
@@ -114,7 +114,7 @@ If a companion extension needs full processing (tagging, timestamping), it shoul
   - Step 3 (output): organize working dir copy to ready_dir (always, not conditional on tasks)
   - Step 4 (gyroflow): unchanged (operates on file in ready_dir)
   - Step 5 (source-action): leave, archive, or delete source file + companions (per `--source-action`, companions always included)
-  - When `--include-companions`: also run ingest → output for each companion file (skip tag, fix-timestamp, gyroflow)
+  - When `--copy-companion-files`: for each main file, also ingest → output its companion files immediately after the main file's output step (before gyroflow). Companions skip optional processing (tag, fix-timestamp, gyroflow). Per-file, not batched — if interrupted, companions for completed files are already in ready_dir.
 - `--source` default changes from profile `import_dir` → profile `source_dir`
 
 ### scripts/media-profiles.yaml
@@ -133,7 +133,7 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 
 - Add `SourceAction` enum: `.leave`, `.archive`, `.delete` with raw string values matching CLI args
 - Replace `preserveSource: Bool` with `sourceAction: SourceAction` (default `.leave`)
-- Rename `skipCompanion: Bool` → `includeCompanions: Bool` (default `false`) — controls whether companions are also copied to ready_dir
+- Rename `skipCompanion: Bool` → `copyCompanionFiles: Bool` (default `false`) — controls whether companions are also copied to ready_dir
 - `PipelineStep`: add computed property `isAlwaysOn` — true for `.importFromCard` and `.organize`
 - Update `.importFromCard` help text: `"Copy files from source to working directory for processing"`
 - Update `.organize` help text: `"Move processed files into date-based folders in ready directory"`
@@ -147,7 +147,7 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 - Always pass `--source` with `state.sourceDir`
 - Build `--tasks` from enabled optional steps only (exclude `.importFromCard` and `.organize`)
 - Pass `--source-action` with value from `state.sourceAction` (`leave`, `archive`, or `delete`)
-- Pass `--include-companions` when `state.includeCompanions`
+- Pass `--copy-companion-files` when `state.copyCompanionFiles`
 - `importCardOptions` section: always visible when profile selected (not gated on `.importFromCard` enabled, since import is always on). Rename GroupBox label from "Memory Card / Source Actions" to "Source"
 - Replace `preserveSource` toggle with `sourceAction` picker (leave / archive / delete). "Delete" option shows caution text: `"Permanently deletes source files after successful processing"`
 - `pipelineTaskNames`: remove `.organize` mapping (no longer a task choice). Keep `.tag`, `.fixTimezone`, `.gyroflow`. Do not add `.importFromCard` (not a task choice).
