@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import create_test_video
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import hyphenated module name
@@ -44,18 +46,7 @@ class TestFileTimestamps:
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
         self.test_video = os.path.join(self.temp_dir, "test.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            self.test_video
-        ], capture_output=True, check=True)
-
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:18 07:25:21+08:00",
-            self.test_video
-        ], capture_output=True, check=True)
+        create_test_video(self.test_video, DateTimeOriginal="2025:06:18 07:25:21+08:00")
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
@@ -210,18 +201,7 @@ class TestBirthTimeCalculation:
         fmt._exif_cache.clear()
 
     def _create_test_video(self, path: str, datetime_with_tz: str) -> None:
-        """Create a test video with specific DateTimeOriginal"""
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            path
-        ], capture_output=True, check=True)
-
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            f"-DateTimeOriginal={datetime_with_tz}",
-            path
-        ], capture_output=True, check=True)
+        create_test_video(path, DateTimeOriginal=datetime_with_tz)
 
     def _get_birth_time_local(self, path: str) -> str:
         """Get file birth time in local timezone"""

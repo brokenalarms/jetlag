@@ -51,19 +51,11 @@ def save_baseline(config, results: dict):
     path.write_text(json.dumps(results, indent=2) + "\n")
 
 
+from conftest import create_test_video as _create_video_raw
+
+
 def create_test_video(path: Path, media_create_date: str = "2025:10:05 01:00:00"):
-    """Create a minimal test video file with exif metadata."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run([
-        "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=16x16:d=0.04",
-        "-c:v", "libx264", "-t", "0.04", str(path)
-    ], capture_output=True, check=True)
-    subprocess.run([
-        "exiftool", "-overwrite_original",
-        f"-MediaCreateDate={media_create_date}",
-        f"-CreateDate={media_create_date}",
-        str(path)
-    ], capture_output=True, check=True)
+    _create_video_raw(path, MediaCreateDate=media_create_date, CreateDate=media_create_date)
 
 
 def run_pipeline(args: list[str]) -> subprocess.CompletedProcess:
@@ -118,10 +110,16 @@ class TestPerformance:
             f"(threshold {REGRESSION_THRESHOLD*100:.0f}%)"
         )
 
-    def test_media_pipeline_3_files(self, request):
-        """media-pipeline: fix-timestamp + organize on 3 files."""
+    def test_media_pipeline(self, request):
+        """media-pipeline: fix-timestamp + organize on 17 files."""
         profiles_path = SCRIPT_DIR / "media-profiles.yaml"
         original_yaml = profiles_path.read_text()
+
+        file_count = 17
+        timestamps = [
+            f"2025:10:{5 + i:02d} {i:02d}:00:00"
+            for i in range(file_count)
+        ]
 
         times = []
         try:
@@ -133,11 +131,7 @@ class TestPerformance:
                     source.mkdir()
                     target.mkdir()
 
-                    for j, ts in enumerate([
-                        "2025:10:05 01:00:00",
-                        "2025:10:06 02:00:00",
-                        "2025:10:07 03:00:00",
-                    ]):
+                    for j, ts in enumerate(timestamps):
                         create_test_video(source / f"file_{j}.mp4", media_create_date=ts)
 
                     with open(profiles_path) as f:
@@ -162,4 +156,4 @@ class TestPerformance:
         finally:
             profiles_path.write_text(original_yaml)
 
-        self._check("media_pipeline_3_files", statistics.median(times), request)
+        self._check("media_pipeline", statistics.median(times), request)

@@ -11,6 +11,8 @@ import shutil
 from pathlib import Path
 import pytest
 
+from conftest import create_test_video
+
 
 SCRIPT_DIR = Path(__file__).parent.parent
 
@@ -29,21 +31,7 @@ class TestOrganizeByDate:
     def test_video_with_date(self, temp_dir):
         """Create test video with DateTimeOriginal"""
         video_path = os.path.join(temp_dir, "source", "test_video.mp4")
-        os.makedirs(os.path.dirname(video_path), exist_ok=True)
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
-        # Set DateTimeOriginal
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:18 07:25:21+08:00",
-            video_path
-        ], capture_output=True, check=True)
-
+        create_test_video(video_path, DateTimeOriginal="2025:06:18 07:25:21+08:00")
         return video_path
 
     def test_dry_run_no_move(self, test_video_with_date, temp_dir):
@@ -216,22 +204,10 @@ class TestOrganizeByDate:
         os.makedirs(source_dir, exist_ok=True)
         os.makedirs(target_dir, exist_ok=True)
 
-        # Create multiple videos
         videos = []
         for i in range(3):
             video_path = os.path.join(source_dir, f"test_{i}.mp4")
-            subprocess.run([
-                "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-                "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-                video_path
-            ], capture_output=True, check=True)
-
-            subprocess.run([
-                "exiftool", "-P", "-overwrite_original",
-                "-DateTimeOriginal=2025:06:18 07:25:21+08:00",
-                video_path
-            ], capture_output=True, check=True)
-
+            create_test_video(video_path, DateTimeOriginal="2025:06:18 07:25:21+08:00")
             videos.append(video_path)
 
         # Organize all videos
@@ -282,11 +258,7 @@ class TestOrganizeByDateEdgeCases:
         os.makedirs(source_dir, exist_ok=True)
 
         video_path = os.path.join(source_dir, "no_metadata.mp4")
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(video_path)
 
         # Should fail or use fallback (depending on implementation)
         result = subprocess.run([
@@ -307,17 +279,7 @@ class TestOrganizeByDateEdgeCases:
         os.makedirs(target_dir, exist_ok=True)
 
         video_path = os.path.join(source_dir, "test video with spaces.mp4")
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:18 07:25:21+08:00",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(video_path, DateTimeOriginal="2025:06:18 07:25:21+08:00")
 
         result = subprocess.run([
             "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
@@ -342,15 +304,7 @@ class TestCopyMode:
         shutil.rmtree(tmpdir)
 
     def _create_video(self, path):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p", path
-        ], capture_output=True, check=True)
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:18 07:25:21+08:00", path
-        ], capture_output=True, check=True)
+        create_test_video(path, DateTimeOriginal="2025:06:18 07:25:21+08:00")
 
     def test_copy_mode_preserves_source(self, temp_dir):
         """--copy leaves source file in place."""
@@ -395,15 +349,7 @@ class TestMachineOutput:
         shutil.rmtree(tmpdir)
 
     def _create_video(self, path):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p", path
-        ], capture_output=True, check=True)
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:18 07:25:21+08:00", path
-        ], capture_output=True, check=True)
+        create_test_video(path, DateTimeOriginal="2025:06:18 07:25:21+08:00")
 
     def test_move_action_output(self, temp_dir):
         """Move mode emits @@action=moved on stdout."""
@@ -523,15 +469,7 @@ class TestOverwriteMode:
         shutil.rmtree(tmpdir)
 
     def _create_video(self, path):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p", path
-        ], capture_output=True, check=True)
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:18 07:25:21+08:00", path
-        ], capture_output=True, check=True)
+        create_test_video(path, DateTimeOriginal="2025:06:18 07:25:21+08:00")
 
     def test_same_size_auto_skips(self, temp_dir):
         """Existing file with same size is auto-skipped."""
@@ -606,15 +544,7 @@ class TestSourceDirectoryPreservedAfterMove:
         shutil.rmtree(tmpdir)
 
     def _create_video(self, path):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p", path
-        ], capture_output=True, check=True)
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:18 07:25:21+08:00", path
-        ], capture_output=True, check=True)
+        create_test_video(path, DateTimeOriginal="2025:06:18 07:25:21+08:00")
 
     def test_empty_source_dir_preserved_after_move(self, temp_dir):
         """Source directory is not cleaned up after file is moved out."""

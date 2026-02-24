@@ -35,17 +35,7 @@ def run_generate_gyroflow(args: list[str]) -> subprocess.CompletedProcess:
     )
 
 
-def create_test_video(path: Path):
-    """Create a minimal test video file using ffmpeg (no motion data)."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(
-        [
-            "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=16x16:d=0.04",
-            "-c:v", "libx264", "-t", "0.04", str(path)
-        ],
-        capture_output=True,
-        check=True,
-    )
+from conftest import create_test_video
 
 
 def get_test_preset() -> str:

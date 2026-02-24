@@ -12,6 +12,8 @@ import subprocess
 from pathlib import Path
 import pytest
 
+from conftest import create_test_video
+
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -32,12 +34,7 @@ class TestGetExistingTags:
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
         self.test_video = os.path.join(self.temp_dir, "test.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            self.test_video
-        ], capture_output=True, check=True)
+        create_test_video(self.test_video)
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
@@ -82,12 +79,7 @@ class TestApplyFinderTags:
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
         self.test_video = os.path.join(self.temp_dir, "test.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            self.test_video
-        ], capture_output=True, check=True)
+        create_test_video(self.test_video)
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
@@ -177,12 +169,7 @@ class TestGetExistingExifCamera:
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
         self.test_video = os.path.join(self.temp_dir, "test.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            self.test_video
-        ], capture_output=True, check=True)
+        create_test_video(self.test_video)
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
@@ -218,12 +205,7 @@ class TestAddCameraToExif:
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
         self.test_video = os.path.join(self.temp_dir, "test.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            self.test_video
-        ], capture_output=True, check=True)
+        create_test_video(self.test_video)
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
@@ -366,12 +348,7 @@ class TestIdempotency:
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
         self.test_video = os.path.join(self.temp_dir, "test.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            self.test_video
-        ], capture_output=True, check=True)
+        create_test_video(self.test_video)
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
@@ -437,12 +414,7 @@ class TestDataPresentation:
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
         self.test_video = os.path.join(self.temp_dir, "test.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            self.test_video
-        ], capture_output=True, check=True)
+        create_test_video(self.test_video)
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)

@@ -12,6 +12,8 @@ import shutil
 from pathlib import Path
 import pytest
 
+from conftest import create_test_video
+
 
 SCRIPT_DIR = Path(__file__).parent.parent
 
@@ -32,13 +34,7 @@ class TestTagMedia:
     def test_video(self, temp_dir):
         """Create a test video file"""
         video_path = os.path.join(temp_dir, "test_video.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
+        create_test_video(video_path)
         return video_path
 
     def test_dry_run_no_changes(self, test_video):
@@ -335,11 +331,7 @@ class TestTagMedia:
         videos = []
         for i in range(3):
             video_path = os.path.join(temp_dir, f"test_{i}.mp4")
-            subprocess.run([
-                "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-                "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-                video_path
-            ], capture_output=True, check=True)
+            create_test_video(video_path)
             videos.append(video_path)
 
         # Process all files at once
@@ -365,13 +357,8 @@ class TestTagMedia:
         Actual: .lrv file gets tags but not EXIF
         Expected: Tags added, EXIF skipped for unsupported type
         """
-        # Create .lrv file (not supported for EXIF) by creating mp4 then renaming
         mp4_path = os.path.join(temp_dir, "test.mp4")
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            mp4_path
-        ], capture_output=True, check=True)
+        create_test_video(mp4_path)
 
         # Rename to .lrv
         lrv_path = os.path.join(temp_dir, "test.lrv")
@@ -492,11 +479,7 @@ class TestTagMediaDataPresentation:
     @pytest.fixture
     def test_video(self, temp_dir):
         video_path = os.path.join(temp_dir, "test.mp4")
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(video_path)
         return video_path
 
     def test_returns_what_changed(self, test_video):

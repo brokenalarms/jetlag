@@ -12,8 +12,9 @@ import shutil
 from pathlib import Path
 import pytest
 
+from conftest import create_test_video
 
-# Test fixtures directory
+
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 SCRIPT_DIR = Path(__file__).parent.parent
 
@@ -32,40 +33,14 @@ class TestFixMediaTimestamp:
     def test_video(self, temp_dir):
         """Create a test video file with known metadata"""
         video_path = os.path.join(temp_dir, "test_video.mp4")
-
-        # Create minimal valid MP4 file
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
-        # Set DateTimeOriginal with timezone
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:18 07:25:21+08:00",
-            video_path
-        ], capture_output=True, check=True)
-
+        create_test_video(video_path, DateTimeOriginal="2025:06:18 07:25:21+08:00")
         return video_path
 
     @pytest.fixture
     def test_video_no_timezone(self, temp_dir):
         """Create test video with DateTimeOriginal but no timezone"""
         video_path = os.path.join(temp_dir, "test_no_tz.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:18 07:25:21",
-            video_path
-        ], capture_output=True, check=True)
-
+        create_test_video(video_path, DateTimeOriginal="2025:06:18 07:25:21")
         return video_path
 
     def test_dry_run_no_changes(self, test_video):
@@ -147,13 +122,7 @@ class TestFixMediaTimestamp:
     def test_filename_pattern_parsing(self, temp_dir):
         """Test that filename patterns are recognized (e.g., VID_YYYYMMDD_HHMMSS)"""
         video_path = os.path.join(temp_dir, "VID_20250618_072521.mp4")
-
-        # Create minimal MP4 without metadata
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
+        create_test_video(video_path)
 
         # Should use filename with provided timezone
         result = subprocess.run([
@@ -232,18 +201,7 @@ class TestFixMediaTimestampIntegration:
         videos = []
         for i in range(3):
             video_path = os.path.join(temp_dir, f"test_{i}.mp4")
-            subprocess.run([
-                "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-                "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-                video_path
-            ], capture_output=True, check=True)
-
-            subprocess.run([
-                "exiftool", "-P", "-overwrite_original",
-                "-DateTimeOriginal=2025:06:18 07:25:21+08:00",
-                video_path
-            ], capture_output=True, check=True)
-
+            create_test_video(video_path, DateTimeOriginal="2025:06:18 07:25:21+08:00")
             videos.append(video_path)
 
         # Process all files
