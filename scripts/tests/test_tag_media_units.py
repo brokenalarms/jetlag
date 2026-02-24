@@ -10,6 +10,7 @@ import tempfile
 import shutil
 import subprocess
 from pathlib import Path
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -24,6 +25,7 @@ tm = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tm)
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags don't exist on Linux")
 class TestGetExistingTags:
     """Test get_existing_finder_tags function"""
 
@@ -73,6 +75,7 @@ class TestGetExistingTags:
         assert len(tags) == 0  # Should return empty list, not error
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags don't exist on Linux")
 class TestApplyFinderTags:
     """Test apply_finder_tags function - focus on return values"""
 
@@ -356,6 +359,7 @@ class TestAddCameraToExif:
         assert len(fields_updated) == 0
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags don't exist on Linux")
 class TestIdempotency:
     """Test idempotency - running twice should not change anything second time"""
 
@@ -426,6 +430,7 @@ class TestIdempotency:
         assert abs(mtime2 - mtime1) < 1  # Within 1 second
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags don't exist on Linux")
 class TestDataPresentation:
     """Test data/presentation separation principle"""
 

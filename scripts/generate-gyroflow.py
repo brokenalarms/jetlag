@@ -94,14 +94,6 @@ def main():
         print(f"ERROR: File not found: {file_path}", file=sys.stderr)
         sys.exit(1)
 
-    config = load_gyroflow_config()
-    binary = config["binary"]
-
-    if not os.path.isfile(binary):
-        print(f"ERROR: Gyroflow binary not found at: {binary}", file=sys.stderr)
-        print("Install Gyroflow or update the 'binary' path in media-profiles.yaml", file=sys.stderr)
-        sys.exit(1)
-
     gyroflow_path = file_path.with_suffix(".gyroflow")
     rel_path = os.path.join(".", os.path.relpath(gyroflow_path))
 
@@ -124,6 +116,14 @@ def main():
         print(f"@@gyroflow={gyroflow_path}")
         print(f"@@action=skipped")
         return
+
+    config = load_gyroflow_config()
+    binary = config["binary"]
+
+    if not os.path.isfile(binary):
+        print(f"ERROR: Gyroflow binary not found at: {binary}", file=sys.stderr)
+        print("Install Gyroflow or update the 'binary' path in media-profiles.yaml", file=sys.stderr)
+        sys.exit(1)
 
     preset_json = args.preset or json.dumps(config.get("preset", {}))
 

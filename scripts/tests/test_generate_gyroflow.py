@@ -6,8 +6,10 @@ Run with: pytest tests/test_generate_gyroflow.py -v
 """
 
 import json
+import os
 import shlex
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -172,6 +174,14 @@ class TestMissingBinary:
             video = Path(tmpdir) / "test.mp4"
             create_test_video(video)
 
+            # Fake ffprobe that reports motion data so the script reaches the binary check
+            fake_ffprobe = Path(tmpdir) / "ffprobe"
+            fake_ffprobe.write_text(
+                '#!/bin/bash\n'
+                'echo \'{"streams": [{"codec_type": "data", "tags": {"handler_name": "GoPro MET"}, "codec_tag_string": "gpmd"}]}\'\n'
+            )
+            fake_ffprobe.chmod(0o755)
+
             with open(PROFILES_FILE) as f:
                 original_config = f.read()
                 data = yaml.safe_load(original_config)
@@ -182,9 +192,14 @@ class TestMissingBinary:
                 with open(PROFILES_FILE, "w") as f:
                     yaml.dump(data, f, default_flow_style=False, sort_keys=False)
 
-                result = run_generate_gyroflow([
-                    str(video), "--preset", get_test_preset(), "--apply"
-                ])
+                env = os.environ.copy()
+                env["PATH"] = f"{tmpdir}:{env['PATH']}"
+
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPT_DIR / "generate-gyroflow.py"),
+                     str(video), "--preset", get_test_preset(), "--apply"],
+                    capture_output=True, text=True, env=env, cwd=SCRIPT_DIR,
+                )
 
                 assert result.returncode != 0
                 assert "not found" in result.stderr.lower() or "ERROR" in result.stderr

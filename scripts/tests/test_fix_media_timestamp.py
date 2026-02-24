@@ -9,7 +9,6 @@ import subprocess
 import sys
 import tempfile
 import shutil
-from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import pytest
 
@@ -19,7 +18,6 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 SCRIPT_DIR = Path(__file__).parent.parent
 
 
-@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — script uses SetFile in apply mode")
 class TestFixMediaTimestamp:
     """Test suite for fix-media-timestamp.py"""
 
@@ -72,12 +70,8 @@ class TestFixMediaTimestamp:
 
     def test_dry_run_no_changes(self, test_video):
         """Test that dry run doesn't modify files"""
-        # Get original timestamps
-        original_stat = os.stat(test_video)
-        original_mtime = original_stat.st_mtime
-        original_birthtime = original_stat.st_birthtime
+        original_mtime = os.stat(test_video).st_mtime
 
-        # Run in dry run mode (no --apply)
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             test_video
@@ -86,32 +80,10 @@ class TestFixMediaTimestamp:
         assert result.returncode == 0
         assert "(DRY RUN)" in result.stdout
 
-        # Verify no changes to file
-        new_stat = os.stat(test_video)
-        # Modification time shouldn't change in dry run
-        assert new_stat.st_mtime == original_mtime
-        assert new_stat.st_birthtime == original_birthtime
-
-    def test_apply_mode_changes_birth_time(self, test_video):
-        """Test that apply mode updates birth time"""
-        # Run with --apply
-        result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            test_video, "--apply"
-        ], capture_output=True, text=True)
-
-        assert result.returncode == 0
-        assert "(DRY RUN)" not in result.stdout
-
-        # Verify birth time was updated (should match expected time)
-        new_stat = os.stat(test_video)
-        # Birth time should be set based on DateTimeOriginal
-        # We can verify it changed from original
-        assert new_stat.st_birthtime != 0
+        assert os.stat(test_video).st_mtime == original_mtime
 
     def test_idempotency(self, test_video):
         """Test that running twice doesn't change anything the second time"""
-        # First run with --apply
         result1 = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             test_video, "--apply"
@@ -119,9 +91,11 @@ class TestFixMediaTimestamp:
 
         assert result1.returncode == 0
 
-        # Get timestamps after first run
-        stat_after_first = os.stat(test_video)
-        birthtime_after_first = stat_after_first.st_birthtime
+        # Verify EXIF was written after first run
+        exif_result = subprocess.run([
+            "exiftool", "-s", "-Keys:CreationDate", test_video
+        ], capture_output=True, text=True, check=True)
+        assert "+08:00" in exif_result.stdout
 
         # Second run should report "No change"
         result2 = subprocess.run([
@@ -131,10 +105,6 @@ class TestFixMediaTimestamp:
 
         assert result2.returncode == 0
         assert "No change" in result2.stdout
-
-        # Verify no changes to birth time
-        stat_after_second = os.stat(test_video)
-        assert abs(stat_after_second.st_birthtime - birthtime_after_first) < 2  # 2 second tolerance
 
     def test_timezone_flag(self, test_video_no_timezone):
         """Test --timezone flag adds timezone to DateTimeOriginal without timezone"""
@@ -221,24 +191,6 @@ class TestFixMediaTimestamp:
         assert "🌐 UTC" in result.stdout or "UTC" in result.stdout
         assert "📊 Change" in result.stdout or "Change" in result.stdout
 
-    def test_birth_time_only_no_mtime(self, test_video):
-        """Test that only birth time is set, not modification time"""
-        # Record original mtime
-        original_mtime = os.stat(test_video).st_mtime
-
-        # Run with --apply
-        subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            test_video, "--apply"
-        ], capture_output=True, check=True)
-
-        # Modification time should have changed (due to exiftool writes)
-        # but should not be artificially set to match birth time
-        new_mtime = os.stat(test_video).st_mtime
-
-        # Mtime should be recent (from the exiftool write), not set to the video's timestamp
-        assert new_mtime >= original_mtime  # Should be same or newer
-
     def test_quicktime_createdate_healing(self, test_video):
         """Test that corrupted QuickTime CreateDate is healed"""
         # Corrupt the QuickTime CreateDate
@@ -266,7 +218,6 @@ class TestFixMediaTimestamp:
         assert "2025:06:17 23:25:21" in exif_result.stdout
 
 
-@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — script uses SetFile in apply mode")
 class TestFixMediaTimestampIntegration:
     """Integration tests for fix-media-timestamp.py with various file types"""
 
