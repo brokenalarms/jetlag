@@ -57,11 +57,18 @@ Diagnostic knowledge for understanding unexpected timestamp offsets:
 
 ## Workflow design
 
-Why import-media and media-pipeline are separate scripts with different modes:
+`media-pipeline.py` is the single entry point for all media processing. The pipeline has a fixed frame — **ingest** and **output** always run — with optional processing steps in between:
 
-- **import-media** copies from SD card to import_dir (`--copy` mode), tags after copy. Tagging happens after copy because tagging the destination is much faster than tagging on a slow memory card — this is why import-media needs the dest path from organize-by-date.
-- **media-pipeline** processes files already in import_dir, organizes into ready_dir (move mode). Flow per file: tag → fix-timestamp → organize → gyroflow (if enabled).
-- Both use organize-by-date which outputs `@@dest=` and `@@action=` to stdout for the parent to parse.
+```
+INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow] → [archive-source]
+```
+
+- **Ingest** copies files from the source (SD card or local directory) to a temporary working directory. Source files are read-only inputs — never modified.
+- Optional steps (**tag**, **fix-timestamp**) operate on the working copy.
+- **Output** moves processed files from the working directory to `ready_dir` via organize-by-date (date-based folder structure).
+- **Gyroflow** generates stabilization projects on the file now in `ready_dir`.
+- **Archive-source** acts on the source folder after all files are processed (archive/rename or delete processed files).
+- `import-media.py` is deprecated (still present, not called by the app).
 
 ## Scenario test specs
 

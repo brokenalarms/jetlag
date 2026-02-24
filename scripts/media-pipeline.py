@@ -3,8 +3,8 @@
 media-pipeline.py
 Orchestrates media processing: ingest from source, process, output to target.
 
-Usage: media-pipeline.py --profile PROFILE [--subfolder SUBFOLDER] [OPTIONS]
-       media-pipeline.py --source DIR --target DIR [--subfolder SUBFOLDER] [OPTIONS]
+Usage: media-pipeline.py --profile PROFILE [--group GROUP] [OPTIONS]
+       media-pipeline.py --source DIR --target DIR [--group GROUP] [OPTIONS]
 
 Pipeline: INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow] → [archive-source]
 
@@ -263,7 +263,7 @@ def process_file(
     profile: Optional[dict],
     target_dir: str,
     working_dir: str,
-    subfolder: Optional[str],
+    group: Optional[str],
     location_args: list[str],
     apply: bool,
     verbose: bool,
@@ -347,9 +347,9 @@ def process_file(
 
     folder_template = profile.get("folder_template") if profile else None
     if folder_template:
-        template = folder_template.replace("{{SUBFOLDER}}", subfolder) if subfolder else folder_template
-    elif subfolder:
-        template = f"{{{{YYYY}}}}/{subfolder}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
+        template = folder_template.replace("{{GROUP}}", group) if group else folder_template
+    elif group:
+        template = f"{{{{YYYY}}}}/{group}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
     else:
         template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
     output, action, dest, rc = run_organize_by_date(active_file, target_dir, template, apply, verbose)
@@ -438,7 +438,8 @@ def main():
     parser.add_argument("--target", help="Target directory for organized files")
     parser.add_argument("--location", help="Location name/code for timezone lookup")
     parser.add_argument("--timezone", help="Timezone in +HHMM format (e.g., +0800)")
-    parser.add_argument("--subfolder", help="Optional subfolder name substituted for {{SUBFOLDER}} in the profile's folder_template, or inserted between year and date by default (e.g., 'Japan Trip' → YYYY/Japan Trip/YYYY-MM-DD)")
+    parser.add_argument("--group", help="Optional group folder name substituted for {{GROUP}} in the profile's folder_template, or inserted between year and date by default (e.g., 'Japan' → YYYY/Japan/YYYY-MM-DD)")
+    parser.add_argument("--append-timezone-to-group", action="store_true", help="Append timezone offset to the group folder name (e.g., 'Japan' + '+0900' → 'Japan (+0900)'). Requires --group and --timezone.")
     parser.add_argument("--apply", action="store_true", help="Apply changes (default: dry run)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed processing info")
     parser.add_argument(
@@ -500,6 +501,20 @@ def main():
         if not re.match(r'^[+-]\d{4}$', args.timezone):
             print("ERROR: --timezone must be in +HHMM or -HHMM format (e.g., +0800, -0500)", file=sys.stderr)
             sys.exit(1)
+
+    # Validate --append-timezone-to-group requirements
+    if args.append_timezone_to_group:
+        if not args.group:
+            print("ERROR: --append-timezone-to-group requires --group", file=sys.stderr)
+            sys.exit(1)
+        if not args.timezone:
+            print("ERROR: --append-timezone-to-group requires --timezone", file=sys.stderr)
+            sys.exit(1)
+
+    # Apply timezone suffix to group if requested
+    group = args.group
+    if group and args.append_timezone_to_group:
+        group = f"{group} ({args.timezone})"
 
     # Build location args for child scripts
     location_args = []
@@ -595,7 +610,7 @@ def main():
             profile,
             target_dir,
             working_dir,
-            args.subfolder,
+            group,
             location_args,
             args.apply,
             args.verbose,

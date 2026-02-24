@@ -18,21 +18,6 @@
 
 ## `scripts/` + `macos/`
 
-- (2026-02-24) **Media pipeline unification** — media-pipeline.py becomes the single entry point with always-on ingest/output and optional processing steps. Full spec: [todos/simplify-media-import.md](todos/simplify-media-import.md). Broken down into ordered PRs:
-
-  1. ~~**`media-pipeline.py` core flow refactor** (`scripts/` only)~~ — done (PR #57)
-
-  2. ~~**`media-pipeline.py` new features** (`scripts/` only)~~ — done (PR #60)
-
-  3. **YAML + macOS app + docs** (`scripts/` + `macos/`) — remove `import_dir` from `media-profiles.yaml` (photo profiles: old `import_dir` value becomes `ready_dir`). `AppState.swift`: add `SourceAction` enum, rename `skipCompanion` → `copyCompanionFiles`, `PipelineStep` adds `.archiveSource` with `isAlwaysOn` for ingest/output. `WorkflowView.swift`: remove `hasImport` fork, always call `media-pipeline.sh`, build `--tasks` from optional steps only, always-on steps get distinct non-toggleable rendering. `ProfilesView.swift`: remove `import_dir` row. Swift tests: verify correct CLI args built for given UI state (test the interface boundary — never test script correctness from Swift). `docs/scripts.md`: update workflow design section.
-
-  - **Testing boundary**: Python tests verify script behavior (filesystem effects). Swift tests verify the app builds correct CLI args for a given UI state — never run scripts or verify their effects.
-
-- (2026-02-23) **Timezone suffix for group folder** — `--subfolder` / `folder_template` groundwork is done. Remaining:
-   - `scripts/`: rename `--subfolder` → `--group` in `media-pipeline.py`; add `--group-timezone` flag (positive opt-in) that appends timezone offset to the group folder name, e.g. `Japan (+0900)` — requires `--group` and `--timezone` to also be set
-   - `macos/`: rename the "Subfolder" field label to "Group"; add help text noting that date-range names (e.g. `05-06 Korea`) don't work well when backing up mid-trip since the end date isn't known yet; expose `--group-timezone` toggle
-   - Tests: `--group Japan --timezone +0900 --group-timezone` → folder named `Japan (+0900)`; `--group Japan --timezone +0900` (without `--group-timezone`) → folder named `Japan`
-
 - (2026-02-24) **Dry-run diff table** — During dry-run, replace raw log output with a structured table: file name, camera/profile, original timestamp, corrected timestamp, destination path. Color-code rows by camera profile.
    - `scripts/`: `fix-media-timestamp.py` needs to emit `@@original_time=` and `@@corrected_time=` in `@@` format alongside existing output
    - `macos/`: parse `@@` lines from `ScriptRunner` output into a `DiffTableView` model instead of `LogOutputView` text

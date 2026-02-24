@@ -180,10 +180,6 @@ struct ProfileEditorView: View {
                     dirField($profile.sourceDir)
                 }
                 GridRow {
-                    Text("Import dir")
-                    dirField($profile.importDir)
-                }
-                GridRow {
                     Text("Ready dir")
                     dirField($profile.readyDir)
                 }
