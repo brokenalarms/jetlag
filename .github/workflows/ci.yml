@@ -63,7 +63,7 @@ jobs:
       - name: Performance summary
         if: always()
         run: |
-          python3 -c "
+          python3 << 'PYEOF'
           import json, pathlib, os
           p = pathlib.Path('/tmp/perf_results.json')
           if not p.exists():
@@ -76,11 +76,11 @@ jobs:
               delta = r['delta_pct']
               sign = '+' if delta > 0 else ''
               icon = '🔴' if r['regression'] else '🟢'
-              lines.append(f'| {r[\"name\"]} | {r[\"elapsed\"]:.3f}s | {r[\"baseline\"]:.3f}s | {icon} {sign}{delta:.1f}% |')
+              lines.append(f'| {r["name"]} | {r["elapsed"]:.3f}s | {r["baseline"]:.3f}s | {icon} {sign}{delta:.1f}% |')
           summary = '\n'.join(lines) + '\n'
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
               f.write(summary)
-          "
+          PYEOF
 
   gate:
     needs: [scripts-test]
