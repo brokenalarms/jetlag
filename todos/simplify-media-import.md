@@ -107,7 +107,7 @@ If a companion extension needs full processing (tagging, timestamping), it shoul
   - When `--copy-companion-files`: for each main file, also ingest → output its companion files immediately after the main file's output step (before gyroflow). Companions skip optional processing (tag, fix-timestamp, gyroflow). Per-file, not batched — if interrupted, companions for completed files are already in ready_dir.
 - `--source` default changes from profile `import_dir` → profile `source_dir`
 
-### scripts/archive-source.py (new)
+### scripts/archive-source.py ~~(new)~~ ✓ done
 
 Standalone subscript. Called by media-pipeline.py when `archive-source` is in `--tasks`. Also runnable independently.
 
@@ -167,7 +167,7 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 - Test copy-companion-files: companions copied to ready_dir when flag is on
 - Test pipeline without archive-source: source folder untouched after processing
 
-### scripts/tests/test_archive_source.py (new)
+### scripts/tests/test_archive_source.py ~~(new)~~ ✓ done
 
 - Test leave: source folder and files untouched (no-op)
 - Test archive: source folder renamed to `<source> - archived <date>`
