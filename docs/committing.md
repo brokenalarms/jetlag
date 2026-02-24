@@ -22,10 +22,7 @@ Before any commit or push action, every session:
 
 ## Pull requests
 
-- After pushing, always output a pre-filled GitHub compare URL so the user can open a PR with one click; generate it with python so every character is properly escaped:
-  ```
-  python3 -c "import urllib.parse; t='<title>'; b='<one sentence body>'; print('https://github.com/brokenalarms/Jetlag/compare/<branch>?expand=1&title='+urllib.parse.quote(t,safe='')+'&body='+urllib.parse.quote(b,safe=''))"
-  ```
-- Keep the URL body to one short plain sentence with no newlines and no trailing period — dots at the end of URLs get stripped by markdown parsers. GitHub will override with the commit body anyway for single-commit branches
+- After pushing, always create the PR with `gh pr create` — this supports full markdown bodies without URL-encoding issues
 - Title: imperative sentence, lowercase, no period — what changed, not what you did
-- If subsequent commits are added to a PR, then you should update the PR with a new title/summary that describes what has changed in the series of commits. If you have access to `gh`, use that directly to update the PR message, otherwise re-provide a PR creation link that contains the new title and text.
+- Body: concise but informative bullet points covering **what** changed, **why**, and **how it was tested**. Group by theme (e.g. new files, modified behavior, test changes). The reader should understand the PR without opening every file
+- If subsequent commits are added to a PR, update the PR title/body with `gh pr edit` to describe the full series of commits
