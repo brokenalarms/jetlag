@@ -5,7 +5,7 @@ Acts on the source directory after all pipeline files have been processed.
 
 Modes:
   leave   — no-op (default)
-  archive — rename source folder to "<source> - archived <YYYY-MM-DD>"
+  archive — rename source folder to "<source> - copied <YYYY-MM-DD>"
   delete  — remove only the files passed via --files, then clean empty dirs
 """
 
@@ -27,12 +27,12 @@ def signal_handler(sig, frame):
 
 
 def archive_source(source: str, apply: bool) -> int:
-    """Rename source folder to '<source> - archived <date>'.
+    """Rename source folder to '<source> - copied <date>'.
 
     Returns 0 on success, 1 on failure.
     """
     current_date = datetime.now().strftime("%Y-%m-%d")
-    archived_name = f"{source} - archived {current_date}"
+    archived_name = f"{source} - copied {current_date}"
 
     if not apply:
         print(f"Would rename: {source} → {os.path.basename(archived_name)}", file=sys.stderr)

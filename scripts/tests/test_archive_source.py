@@ -81,13 +81,13 @@ class TestArchive:
         shutil.rmtree(self.temp_dir)
 
     def test_archive_renames_source_folder(self):
-        """Source folder is renamed to '<source> - archived <date>'."""
+        """Source folder is renamed to '<source> - copied <date>'."""
         result = run_archive_source("--source", self.source, "--action", "archive", "--apply")
 
         assert result.returncode == 0
 
         today = datetime.now().strftime("%Y-%m-%d")
-        expected_name = f"DCIM - archived {today}"
+        expected_name = f"DCIM - copied {today}"
         archived_path = os.path.join(self.temp_dir, expected_name)
 
         assert os.path.isdir(archived_path), f"Expected archived folder: {expected_name}"
@@ -98,7 +98,7 @@ class TestArchive:
         run_archive_source("--source", self.source, "--action", "archive", "--apply")
 
         today = datetime.now().strftime("%Y-%m-%d")
-        archived_path = os.path.join(self.temp_dir, f"DCIM - archived {today}")
+        archived_path = os.path.join(self.temp_dir, f"DCIM - copied {today}")
 
         assert Path(os.path.join(archived_path, "IMG_001.MP4")).read_bytes() == b"video-a"
         assert Path(os.path.join(archived_path, "sub", "IMG_002.MP4")).read_bytes() == b"video-b"
