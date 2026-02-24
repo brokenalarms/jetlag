@@ -58,7 +58,29 @@ jobs:
           git checkout ${{ github.sha }} -- scripts/
 
       - name: Run tests
-        run: pytest scripts/tests/ -x -v --perf-baseline-file /tmp/perf_baseline.json
+        run: pytest scripts/tests/ -x -v --perf-baseline-file /tmp/perf_baseline.json --perf-results-file /tmp/perf_results.json
+
+      - name: Performance summary
+        if: always()
+        run: |
+          python3 -c "
+          import json, pathlib, os
+          p = pathlib.Path('/tmp/perf_results.json')
+          if not p.exists():
+              exit()
+          data = json.loads(p.read_text())
+          if not data:
+              exit()
+          lines = ['### Performance', '', '| Test | Time | Baseline | Delta |', '|------|------|----------|-------|']
+          for r in data:
+              delta = r['delta_pct']
+              sign = '+' if delta > 0 else ''
+              icon = '🔴' if r['regression'] else '🟢'
+              lines.append(f'| {r[\"name\"]} | {r[\"elapsed\"]:.3f}s | {r[\"baseline\"]:.3f}s | {icon} {sign}{delta:.1f}% |')
+          summary = '\n'.join(lines) + '\n'
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write(summary)
+          "
 
   gate:
     needs: [scripts-test]

@@ -5,9 +5,11 @@ Tests must never be skipped because a tool is missing. If a tool is required,
 install it automatically. macOS-only tests (tag/SetFile) are skipped on Linux.
 """
 
+import json
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -76,6 +78,10 @@ def pytest_addoption(parser):
         "--perf-baseline-file", default=None,
         help="Path to baseline JSON file (default: tests/perf_baseline.json)",
     )
+    parser.addoption(
+        "--perf-results-file", default=None,
+        help="Path to write perf results JSON for CI summaries",
+    )
 
 
 def pytest_configure(config):
@@ -106,5 +112,16 @@ def pytest_configure(config):
                 f"tag: brew install tag\n"
                 f"SetFile: xcode-select --install"
             )
+
+    config._perf_results = []
+
+
+def pytest_sessionfinish(session, exitstatus):
+    results_path = session.config.getoption("--perf-results-file", default=None)
+    results = getattr(session.config, "_perf_results", [])
+    if results_path and results:
+        path = Path(results_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(results, indent=2) + "\n")
 
 
