@@ -1,6 +1,12 @@
-# Video Processing Scripts
+# Jetlag
 
-Collection of scripts for processing and organizing video files.
+Fix timestamps across GoPro, iPhone, drone, and cinema cameras so multi-camera footage lands in the right place in your video editor — automatically.
+
+## Components
+
+- **scripts/** — Python CLI tools for timestamp fixing, tagging, file organization, and gyroflow project generation. Work standalone with no knowledge of the app.
+- **macos/** — SwiftUI app that reads `media-profiles.yaml`, edits camera profiles, and launches the scripts.
+- **web/** — Marketing site (Vite + Tailwind).
 
 ## Setup
 
@@ -17,29 +23,7 @@ Some scripts require environment variables for sensitive information (credential
 2. **Edit `.env.local` with your actual values:**
 
    ```bash
-   # Edit with your NAS credentials, paths, etc.
    vim .env.local
    ```
 
-3. **Never commit `.env.local`** - it's already in `.gitignore`
-
-### Scripts Using Environment Variables
-
-- `backup-to-nas.sh` - Requires NAS credentials in `.env.local`
-
-## Scripts
-
-### Video Timestamp Processing
-
-This is primarily to correct Insta360 exports (prefixed `VID_`), where the raw 360 files have correct timestamps but the exports made at some point later don't.
-We can rewrite the timestamps using the original datetime parsed from the filename to ensure these files show up in the correct order in your video editor.
-
-- `fix-video-timestamp.sh` - Process single video file timestamps
-- `batch-fix-video-timestamps.sh` - Batch process multiple video files  
-- `organize-videos-by-date.sh` - Fix timestamps and organize into date folders
-- `insta360/offset_filename_datetime.sh` - Correct Insta360 files with wrong date/time
-
-### Backup
-
-- `backup-to-nas.sh` - Backup files to NAS using rsync (requires `.env.local`)
-- `backup-local.sh` - Local backup operations
+3. **Never commit `.env.local`** — it's already in `.gitignore`

@@ -1,56 +1,19 @@
-- DOCS — reference docs in docs/ for deeper context; add to agent context as needed:
-  - docs/architecture.md: system overview, two-layer architecture, script flow, media-pipeline, data flow (@@), shared utilities
-  - docs/DEVELOPMENT.md: development principles, source of truth hierarchy, timezone handling, exiftool best practices
-  - TODO.md: sliding context window — current work in progress, known bugs, next tasks (read at session start)
+- DOCS — read the relevant doc before working on a component:
+  - docs/scripts.md: when working on anything in scripts/
+  - docs/macos.md: when working on the Jetlag macOS app
+  - docs/web.md: when working on the marketing site
+  - docs/architecture.md: system overview, how components interact, profile system
+  - TODO.md: sliding context window — read at session start, pick ONE task
 - SESSION START — before any other action, every session:
   1. `git fetch origin main` then `git log origin/main --oneline | head -10`
   2. If a recent main commit title matches the session-assigned branch name or task (squash-merged indicator), the old branch is dead — **immediately** `git checkout -b claude/<new-descriptive-name>-<session-token> origin/main` before touching any files
   3. Never do any work on a branch that was squash-merged; GitHub closes that branch's PR and new commits become inaccessible through it
   4. **`git branch -r --merged` does NOT detect squash merges** — always use the commit title comparison method above
-- LAYOUT — two sibling components at repo root:
+- LAYOUT — three sibling components at repo root:
   - scripts/ — Python/shell scripts, lib/, media-profiles.yaml, tests/. Work standalone with no knowledge of the app.
   - macos/ — SwiftUI app. Sibling to scripts/, NOT nested inside it. Reads media-profiles.yaml and launches scripts.
   - web/ — Vite + Tailwind marketing site. Sections live in web/src/sections/.
   - docs/ — documentation. CLAUDE.md, README.md, TODO.md live at repo root.
-- WEB — after every change to files under web/:
-  - take screenshots before committing: `npm run screenshot --prefix web` (or `cd web && npm run screenshot`)
-  - this builds the site, starts a preview server, captures hero/problem/features/how-it-works sections plus a full-page shot, overwrites PNGs in design/screenshots/ (fixed names so each commit shows a visual diff)
-  - read and share each saved screenshot image with the user using the Read tool before committing, so they can review the rendered output
-  - if the Playwright browser is missing: `npx playwright install chromium` inside web/
-- the goal of these scripts are to manage workflow for importing videos from different cameras, so that they all appear interleaved with each other in your video editor at the time at which they were initially filmed.
-- the time doesn't have to look the same as if I shot it, but the goal is for the files to maintain time relative to each other
-- timezone is the timezone a group of videos is shot in, but is a concern unrelated to the profiles in media-profiles which are camera profiles and could be shot in any number of timezones.
-- PYTHON
-  - each script is in Python over bash because it enables a more functional composition for readability - coding best practices are to use functional building blocks to build up a declarative picture of what needs to be read, what needs to be set, what needs to be done etc, then do it in the last step
-  - all new Python scripts source `lib/ensure-venv.sh` (via their `.sh` wrapper) which sets `PYTHONPATH` to `scripts/site-packages/`, installing deps there on first run.
-- VIDEO EDITORS
-  - FCP uses file birth date to populate 'Content Created' field on import screen, but Keys:CreationDate for "Content Created" once imported. It will fall back to file birth time if Keys:CreationDate is not set.
-  - therefore birth time is an essential part of the fix. setfile -d is used to set birth time. modification time is NOT set since it naturally reflects when the file was last modified (e.g., by exiftool metadata writes).
-  - Keys:CreationDate behavior: can be written with Z for UTC or with timezone. iPhone files are saved with TZ. FCP converts the field's timezone to UTC, then displays in current system timezone. So 08:07:22+08:00 becomes 00:07:22 UTC, then displays as 09:07:22 in Japan (+09:00).
-  - iPhone footage records to Keys:CreationDate with timezone, so should match DateTimeOriginal
-- EXIF INFO and EXIFTOOL
-  - DateTimeOriginal is the source of truth since it has both local time + datetime, so should never be modified (or written once if blank).
-  - exiftool should only be called (in each script) once max on each file read with needed values cached, then once on write, for performance. 
-  - from ExifTool docs: "According to the specification, integer-format QuickTime date/time tags should be stored as UTC. Unfortunately, digital cameras often store local time values instead (presumably because they don't know the time zone). For this reason, by default ExifTool does not assume a time zone for these values. However, if the API QuickTimeUTC option is set, then ExifTool will assume these values are properly stored as UTC, and will convert them to local time when extracting."
-  - our devices DO write UTC time to Media CreateDate and quicktime fields, and so we should interpret them as such (verifying that they are correct by adding the timezone encapsulated in DateTimeOriginal and checking it matches). We should generally avoid using the ExifTool QuicktimeUTC flag to handle this conversion for us since it's more complicated.
-    - there is no such thing as writing to UTC field as wall-clock time and having video editors (like Final Cut Pro) recognize it's not UTC anymore. They will take an integer QT UTC field as UTC, or a string field with 'Z' as UTC or with timezone.
-    - for performance, for each file in each script, exiftool should be called once to get requirements, then writing requirements are built in memory, then exiftool is again called once to write out the built up requirements.
-- YAMLFORMAT
-  - In media-profiles.yaml, use inline array format `[item1, item2]` for short lists like file_extensions, companion_extensions, and tags
-  - Do NOT rewrite these as multi-line bullet lists with `-` prefix
-  - Example: `file_extensions: [.mp4, .mov]` NOT `file_extensions:\n  - .mp4\n  - .mov`
-- BEST PRACTICES
-  - data should be separated from presentation - formatted text shouldn't be relied on for function args, rather key names better suited for describing data, and formatted text should be built at the time of display using data, for example each data element in a structured dict that then forms the building blocks for information/logs
-  - No hardcoded defaults in code - all configuration must be read from configuration files (media-profiles.yaml) or environment variables (.env.local). If required config is missing, fail immediately with a clear error message directing the user where to add it. This ensures portability across different computers and deployment environments.
-  - each base script operates on a single file. media-pipeline orchestrates via yaml profiles. It's job is to translate profiles to args for the base scripts and run them in sequence.
-  - all batched operations should happen to one file at a time before moving onto next, so if the script gets interrupted, it will continue from the next incompletely processed file and not repeat any steps. all batch operations should be performed in alphabetical order.
-  - scripts should be run compositionally, passing through args of higher level ones and never swallowing the output of building block scripts but rather making use of their existing output to avoid needing to add logs at a higher level besides summary. In other words, there should not be any 2>&1 for the output of any script that has been written in this directory.
-    - if a parent script needs data from a child script, use stdout/stderr split: child outputs machine-readable data to stdout with `@@` prefix (e.g., `@@dest=/path/to/file`), human-readable messages to stderr. Parent captures stdout and parses `@@key=value` lines for data; stderr passes through to user. Never parse human-readable output - that would couple presentation to data flow.
-    - tagging happens AFTER copy because tagging the destination is much faster than tagging on a slow memory card. This is why import-media needs the dest path from organize-by-date.
-    - scripts at the bottom level operating on a single file (eg organize-by-date, fix-media-timestamp) can capture_output of system-level things like mkdir etc.
-    - to that extent, stop adding --verbose mode unless instructed.
-- base level scripts are explictly provided all args and don't know about profiles. profiles are used by orchestrator scripts to generate args.
-- batch files always pass through all args transparently
 - don't reference Claude or Claude.md
 - TESTING
   - every commit that changes code for a feature or bug fix must be backed by a test covering that change
@@ -74,41 +37,6 @@
     ```
   - keep the URL body to one short plain sentence with no newlines and no trailing period — dots at the end of URLs get stripped by markdown parsers. GitHub will override with the commit body anyway for single-commit branches
   - title: imperative sentence, lowercase, no period — what changed, not what you did
-- SCENARIO/REGRESSION TESTS:
-  - fix-media-timestamp:
-    - if --overwrite-datetimeoriginal is specified, --timezone must be provided
-    - files with YYYYMMDD_HHMMSS in the filename are first source of truth and filename should never be modified
-    - DateTimeOriginal is next source of truth and should never be modified unless --overwrite-datetimeoriginal is specified
-    - if a file was shot in timezone +0800, with the script run in +0900, then we would expect Keys:Creation date to end up with the +0800 timezone, and the birthdate to end up as one hour later
-    - if a different --timezone is specified that doesn't match DateTimeOriginal, then we should exit with a warning unless --overwrite-datetime-original is specified
-    - if DateTimeOriginal is missing and we change timezones, we would expect the Quicktime UTC fields MediaCreateDate, file birth date, Keys:CreationDate to all be updated
-    - if --preserve-wallclock-time is specified, then we would expect the file birthtime to be set back one hour in order to make the edited file appear in this timezone as if it was shot at the same time in this timezone
-  - organize-by-date:
-    - file is sorted into label template provided
-    - directories that were left empty as the result of a file being moved from it are deleted as soon as that last file is removed from it
-    - directories that were already empty and didn't become so from files being moved are left
-    - .DS_Store files should be deleted if they're the only thing preventing directory cleanup
-    - the shell script entry point to each py file sources `lib/ensure-venv.sh` to set up `PYTHONPATH`
-- WORKFLOWS
-  - import-media.py: copies from SD card (source_dir) to import_dir, uses --copy mode, tags after copy
-  - media-pipeline.py: processes files in import_dir, organizes into ready_dir, uses move mode, fixes timestamps then organizes
-  - both use organize-by-date.py which outputs `@@dest=` and `@@action=` to stdout for parent to parse
-- MEDIA-PIPELINE ARCHITECTURE
-  - flow per file: tag-media.py → fix-media-timestamp.py → organize-by-date.py → generate-gyroflow.py (if gyroflow_enabled)
-  - reads media-profiles.yaml to get: import_dir (source), ready_dir (target), file_extensions, tags, exif make/model, gyroflow_enabled
-  - top-level `gyroflow` section in media-profiles.yaml: binary path and preset (stabilization settings)
-  - CLI args: --profile NAME, --source DIR, --target DIR, --timezone +HHMM, --group NAME, --apply
-  - --group is embedded into the organize template: `{{YYYY}}/GROUP/{{YYYY}}-{{MM}}-{{DD}}`
-  - finds files using profile's file_extensions (e.g., [".mp4", ".insv"]), processes alphabetically
-  - checks for stale exiftool_tmp directories at startup (exiftool fails silently if these exist)
-  - generate-gyroflow.py: generates .gyroflow project files for the Gyroflow Toolbox plugin, non-fatal if no gyro data
-  - batch-generate-gyroflow.py: batch wrapper that scans a directory and runs generate-gyroflow.py on each file
-  - shared utilities in scripts/lib/filesystem.py: find_media_files(), parse_machine_output(), cleanup_empty_parent_dirs()
-  - summary at end: total processed, succeeded, changed, unchanged, failed (with list)
-- CAMERA QUIRKS
-  - GoPro: FAT filesystem stores modification time in camera's local timezone (no TZ info). If camera is set to +02:00 but Mac is +09:00, birth/modify times will be 7 hours off. MediaCreateDate is UTC and correct.
-  - macOS: when copying from SD card, birth time is often preserved from source FAT filesystem (not reset to copy time). This means birth time reflects camera's wrong timezone.
-  - birth time shift of ~7 hours (or other non-standard offset) indicates camera timezone mismatch, not a bug
 - TODO.md
   - TODO.md is a sliding context window for fresh agents — open tasks only; completed work belongs in commit messages, not here
   - at the start of each session, read TODO.md to understand the current state and pick ONE task from it to work on
