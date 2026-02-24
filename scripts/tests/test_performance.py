@@ -125,6 +125,16 @@ class TestPerformance:
         else:
             status = f"faster {delta_pct:.0f}% ({elapsed:.2f}s vs baseline {base:.2f}s)"
         print(f"\n  {name}: {status}")
+
+        result = {
+            "name": name,
+            "elapsed": round(elapsed, 3),
+            "baseline": round(base, 3),
+            "delta_pct": round(delta_pct, 1),
+            "regression": ratio > (1 + REGRESSION_THRESHOLD),
+        }
+        config._perf_results.append(result)
+
         assert ratio <= (1 + REGRESSION_THRESHOLD), (
             f"{name} regression: {elapsed:.2f}s is {delta_pct:.0f}% slower than baseline {base:.2f}s "
             f"(threshold {REGRESSION_THRESHOLD*100:.0f}%)"
