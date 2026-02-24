@@ -69,6 +69,32 @@ def find_media_files(source_dir: str, extensions: list[str]) -> list[Path]:
     return unique_files
 
 
+def find_companions(source_file: Path, companion_extensions: list[str]) -> list[Path]:
+    """Find companion files for a main file by matching stem with companion extensions.
+
+    Checks both lowercase and uppercase versions of each extension.
+
+    Args:
+        source_file: Path to the main media file
+        companion_extensions: List of extensions to look for (e.g., [".lrv", ".thm"])
+
+    Returns:
+        List of Path objects for existing companion files
+    """
+    stem = source_file.stem
+    parent = source_file.parent
+    companions = []
+
+    for ext in companion_extensions:
+        ext_lower = ext.lower()
+        for candidate_ext in (ext_lower, ext_lower.upper()):
+            candidate = parent / f"{stem}{candidate_ext}"
+            if candidate.exists() and candidate != source_file:
+                companions.append(candidate)
+
+    return sorted(companions, key=lambda p: str(p).lower())
+
+
 def parse_machine_output(stdout: str) -> dict:
     """Parse machine-readable @@key=value lines from subprocess stdout.
 

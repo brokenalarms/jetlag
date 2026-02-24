@@ -24,7 +24,7 @@ from typing import Optional
 import yaml
 
 sys.path.insert(0, str(Path(__file__).parent))
-from lib.filesystem import find_media_files
+from lib.filesystem import find_companions, find_media_files
 
 SCRIPT_DIR = Path(__file__).parent
 
@@ -367,8 +367,19 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed processing info")
     parser.add_argument(
         "--tasks", nargs="+",
-        choices=["tag", "fix-timestamp", "gyroflow"],
-        help="Pipeline steps to run (default: all)"
+        choices=["tag", "fix-timestamp", "gyroflow", "archive-source"],
+        default=["tag", "fix-timestamp", "gyroflow"],
+        help="Optional processing steps to run (default: tag fix-timestamp gyroflow)"
+    )
+    parser.add_argument(
+        "--copy-companion-files", action="store_true",
+        help="Copy companion files (e.g., .lrv, .thm) to target alongside main files"
+    )
+    parser.add_argument(
+        "--source-action",
+        choices=["leave", "archive", "delete"],
+        default="leave",
+        help="Action for archive-source task (default: leave)"
     )
 
     args = parser.parse_args()
@@ -479,8 +490,14 @@ def main():
     }
 
     gyroflow_config = full_config.get("gyroflow")
-    tasks = set(args.tasks) if args.tasks else None
+    tasks = set(args.tasks) if args.tasks else set()
     pipeline_failed = False
+
+    # Track all processed source paths (main files + companions) for archive-source
+    processed_source_paths = []
+
+    # Get companion extensions from profile
+    companion_extensions = profile.get("companion_extensions", []) if profile else []
 
     try:
         for i, file_path in enumerate(files, 1):
@@ -510,6 +527,33 @@ def main():
                 stats["succeeded"] += 1
                 if result["changed"]:
                     stats["changed"] += 1
+                processed_source_paths.append(str(file_path))
+
+                # Copy companion files if requested (ingest → output only, skip processing steps)
+                if args.copy_companion_files and companion_extensions:
+                    companions = find_companions(file_path, companion_extensions)
+                    for companion in companions:
+                        print(f"  📎 Companion: {companion.name}")
+                        if args.apply:
+                            companion_working = copy_to_working_dir(companion, working_dir)
+                            # Output: organize companion to ready_dir (same template as main file)
+                            folder_template = profile.get("folder_template") if profile else None
+                            if folder_template:
+                                template = folder_template.replace("{{SUBFOLDER}}", args.subfolder) if args.subfolder else folder_template
+                            elif args.subfolder:
+                                template = f"{{{{YYYY}}}}/{args.subfolder}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
+                            else:
+                                template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
+                            c_output, c_action, c_dest, c_rc = run_organize_by_date(
+                                companion_working, target_dir, template, True, args.verbose
+                            )
+                            if c_output:
+                                for line in c_output.split("\n"):
+                                    if line.strip():
+                                        print(f"    {line}")
+                        else:
+                            print(f"    Would copy to target")
+                        processed_source_paths.append(str(companion))
 
             print()  # Empty line between files
     except Exception:
@@ -529,6 +573,24 @@ def main():
                     shutil.rmtree(working_dir, ignore_errors=True)
                 else:
                     print(f"Working directory not empty (some files may not have been organized): {working_dir}", file=sys.stderr)
+
+    # Archive-source: act on source directory after all files processed
+    if "archive-source" in tasks and not pipeline_failed:
+        print("📦 Running archive-source...")
+        archive_cmd = [
+            sys.executable, str(SCRIPT_DIR / "archive-source.py"),
+            "--source", source_dir,
+            "--action", args.source_action,
+        ]
+        if processed_source_paths:
+            archive_cmd.append("--files")
+            archive_cmd.extend(processed_source_paths)
+        if args.apply:
+            archive_cmd.append("--apply")
+
+        archive_result = subprocess.run(archive_cmd, capture_output=False)
+        if archive_result.returncode != 0:
+            print(f"  ⚠️  archive-source failed (exit {archive_result.returncode})")
 
     # Print summary
     print_summary(stats, args.apply)
