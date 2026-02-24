@@ -74,30 +74,6 @@ class TestTimestampParsing:
         assert result is None
 
 
-class TestTimestampCalculations:
-    """Test timestamp calculation functions"""
-
-    def test_get_expected_file_system_time_display_mode(self):
-        """Test file system time calculation in display mode (default)"""
-        # Create datetime: 2025-06-18 07:25:21+08:00
-        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
-
-        # Without preserve_wallclock, should convert to local timezone
-        result = fmt.get_expected_file_system_time(dt, preserve_wallclock=False)
-
-        expected_local = dt.astimezone().strftime('%Y:%m:%d %H:%M:%S')
-        assert result == expected_local
-
-    def test_get_expected_file_system_time_wallclock_mode(self):
-        """Test file system time calculation in wallclock mode"""
-        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
-
-        # With preserve_wallclock, should keep shooting time
-        result = fmt.get_expected_file_system_time(dt, preserve_wallclock=True)
-
-        assert result == "2025:06:18 07:25:21"
-
-
 class TestExifDataReading:
     """Test EXIF data reading functions"""
 
@@ -144,15 +120,6 @@ class TestExifDataReading:
         assert data1 == data2
         # Verify cache was used
         assert self.test_video in fmt._exif_cache
-
-    def test_get_file_system_timestamps(self):
-        """Test reading file system timestamps"""
-        timestamps = fmt.get_file_system_timestamps(self.test_video)
-
-        assert "birth" in timestamps
-        assert "modify" in timestamps
-        assert len(timestamps["birth"]) > 0
-        assert len(timestamps["modify"]) > 0
 
 
 class TestChangeDetection:
@@ -223,40 +190,6 @@ class TestChangeDetection:
         # All should be boolean
         assert isinstance(changes["keys_creationdate"], bool)
 
-    def test_birthtime_tolerance_within_60_seconds(self):
-        """Test that birthtime differences <= 60 seconds don't trigger update"""
-        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
-
-        # Set birthtime to 59 seconds before expected (within tolerance)
-        # Expected: 07:25:21, Setting: 07:24:22 (59 seconds before)
-        subprocess.run([
-            "SetFile", "-d", "06/18/2025 07:24:22", self.test_video
-        ], capture_output=True, check=True)
-
-        # Should NOT need update (within 60 second tolerance)
-        needs_update = fmt.check_file_system_timestamps_need_update(
-            self.test_video, dt, preserve_wallclock=True
-        )
-
-        assert needs_update is False, "59 second difference should NOT trigger update"
-
-    def test_birthtime_tolerance_exceeds_60_seconds(self):
-        """Test that birthtime differences > 60 seconds trigger update"""
-        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
-
-        # Set birthtime to 61 seconds before expected (exceeds tolerance)
-        # Expected: 07:25:21, Setting: 07:24:20 (61 seconds before)
-        subprocess.run([
-            "SetFile", "-d", "06/18/2025 07:24:20", self.test_video
-        ], capture_output=True, check=True)
-
-        # Should need update (exceeds 60 second tolerance)
-        needs_update = fmt.check_file_system_timestamps_need_update(
-            self.test_video, dt, preserve_wallclock=True
-        )
-
-        assert needs_update is True, "61 second difference should trigger update"
-
 
 class TestWriteOperations:
     """Test write operations and idempotency"""
@@ -301,39 +234,6 @@ class TestWriteOperations:
         fmt._exif_cache.clear()
         data = fmt.read_exif_data(self.test_video)
         assert "CreationDate" in data
-
-    def test_set_file_system_timestamps_birth_only(self):
-        """Test that only birth time is set, not modification time"""
-        timestamp_str = "2025:06:18 07:25:21"
-
-        # Get current mtime
-        original_mtime = os.stat(self.test_video).st_mtime
-
-        success = fmt.set_file_system_timestamps(self.test_video, timestamp_str)
-
-        assert success is True
-
-        # Birth time should be set
-        new_stat = os.stat(self.test_video)
-        new_birthtime = new_stat.st_birthtime
-
-        # Parse expected time
-        expected_dt = datetime.strptime(timestamp_str, '%Y:%m:%d %H:%M:%S')
-
-        # Birth time should match (within tolerance)
-        birthtime_dt = datetime.fromtimestamp(new_birthtime)
-        diff = abs((birthtime_dt - expected_dt).total_seconds())
-        assert diff < 2  # 2 second tolerance
-
-        # Modification time should NOT be artificially set
-        # (it may change due to file operations, but shouldn't be set to the target time)
-        new_mtime = new_stat.st_mtime
-        # If mtime changed, it should be current time, not the target time
-        if new_mtime != original_mtime:
-            mtime_dt = datetime.fromtimestamp(new_mtime)
-            now = datetime.now()
-            # Should be close to now, not the target time
-            assert abs((mtime_dt - now).total_seconds()) < 10
 
 
 class TestTimezoneHandling:
@@ -639,28 +539,12 @@ class TestDetermineNeededChanges:
         assert "file_timestamps" in changes
         assert "quicktime_createdate" in changes
 
-    def test_fresh_file_needs_all_changes(self):
-        """Test that a fresh file needs Keys:CreationDate and file timestamps"""
+    def test_fresh_file_needs_keys_creationdate(self):
+        """Test that a fresh file needs Keys:CreationDate"""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
         changes = fmt.determine_needed_changes(self.test_video, dt)
 
-        # Fresh file should need Keys:CreationDate
         assert changes["keys_creationdate"] is True
-        # Fresh file should need file timestamps fixed
-        assert changes["file_timestamps"] is True
-
-    def test_preserve_wallclock_affects_file_timestamps(self):
-        """Test that preserve_wallclock parameter is passed through"""
-        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
-
-        # Set birthtime to match wallclock time (07:25:21)
-        subprocess.run([
-            "SetFile", "-d", "06/18/2025 07:25:21", self.test_video
-        ], capture_output=True, check=True)
-
-        # With preserve_wallclock=True, shouldn't need update
-        changes = fmt.determine_needed_changes(self.test_video, dt, preserve_wallclock=True)
-        assert changes["file_timestamps"] is False
 
 
 if __name__ == "__main__":

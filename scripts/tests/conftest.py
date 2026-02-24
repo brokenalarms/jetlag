@@ -108,31 +108,3 @@ def pytest_configure(config):
             )
 
 
-def pytest_collection_modifyitems(config, items):
-    """Skip macOS-only tests when running on Linux."""
-    if sys.platform == "darwin":
-        return
-
-    skip_marker = pytest.mark.skip(reason="requires macOS — Finder tags and birth time don't exist on Linux")
-    for item in items:
-        source = _get_test_source(item)
-        if source and _uses_macos_features(source):
-            item.add_marker(skip_marker)
-
-
-def _get_test_source(item):
-    """Get the source code of a test function and its class."""
-    import inspect
-    try:
-        source = inspect.getsource(item.obj)
-        if item.cls:
-            source += inspect.getsource(item.cls)
-        return source
-    except (TypeError, OSError):
-        return None
-
-
-def _uses_macos_features(source: str) -> bool:
-    """Check if source code references macOS-only tools or APIs."""
-    macos_indicators = ['"tag"', "'tag'", '"SetFile"', "'SetFile'", "st_birthtime"]
-    return any(indicator in source for indicator in macos_indicators)

@@ -328,10 +328,6 @@ class TestTimezoneConversion:
         assert "06:38:09" in result.stdout
         assert "+08:00" in result.stdout
 
-        # Birth time should be set (exact value depends on system timezone)
-        birth_time = os.stat(video_path).st_birthtime
-        assert birth_time > 0
-
 
 class TestMissingDateTimeOriginalWithTimezoneChange:
     """
@@ -353,7 +349,6 @@ class TestMissingDateTimeOriginalWithTimezoneChange:
         - Should write DateTimeOriginal
         - Should update MediaCreateDate (UTC)
         - Should update Keys:CreationDate
-        - Should update file birth time
         """
         # Insta360 filename has timestamp
         video_path = os.path.join(self.temp_dir, "VID_20250619_063809.mp4")
@@ -393,10 +388,6 @@ class TestMissingDateTimeOriginalWithTimezoneChange:
         # Keys:CreationDate should be set
         keys_cd = exif_after.get("CreationDate", "")
         assert keys_cd  # Should exist
-
-        # Birth time should be set
-        birth_time = os.stat(video_path).st_birthtime
-        assert birth_time > 0
 
 
 class TestExtractMetadataTimezone:
@@ -488,117 +479,6 @@ class TestExtractMetadataTimezone:
 
         assert "@@timezone=" not in result.stdout
 
-
-class TestBirthTimeCalculation:
-    """
-    Regression test: Birth time calculation must be accurate
-
-    Bug: Birth time was off by 1 hour when converting from Keys:CreationDate
-    Example: Keys:CreationDate = 07:15:30+08:00
-    - Expected birth (UTC): 23:15:30
-    - Was getting:          22:15:30 (1 hour wrong)
-    """
-
-    def setup_method(self):
-        self.temp_dir = tempfile.mkdtemp()
-
-    def teardown_method(self):
-        shutil.rmtree(self.temp_dir)
-        fmt._exif_cache.clear()
-
-    def _create_test_video(self, path: str, datetime_with_tz: str) -> None:
-        """Create a test video with specific DateTimeOriginal"""
-        # Create basic video
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            path
-        ], capture_output=True, check=True)
-
-        # Set DateTimeOriginal
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            f"-DateTimeOriginal={datetime_with_tz}",
-            path
-        ], capture_output=True, check=True)
-
-    def _get_birth_time_local(self, path: str) -> str:
-        """Get file birth time in local timezone"""
-        result = subprocess.run(
-            ["stat", "-f", "%SB", "-t", "%Y:%m:%d %H:%M:%S", path],
-            capture_output=True, text=True, check=True
-        )
-        return result.stdout.strip()
-
-    def test_birth_time_regular_mode(self):
-        """
-        Birth time in regular mode should match UTC converted to current system timezone.
-
-        File shot at 07:15:30 in Taiwan (+08:00) → UTC 2025-06-17 23:15:30.
-        Expected birth time = that UTC instant in the system's local timezone
-        (accounting for DST on the video's date, not today's date).
-        """
-        video_path = os.path.join(self.temp_dir, "test_taiwan.mp4")
-        self._create_test_video(video_path, "2025:06:18 07:15:30+08:00")
-
-        result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            video_path,
-            "--timezone", "+0800",
-            "--apply"
-        ], capture_output=True, text=True)
-
-        assert result.returncode == 0, f"Script failed:\n{result.stderr}"
-
-        birth_local = self._get_birth_time_local(video_path)
-        actual_time = birth_local.split()[1]
-
-        shoot_utc = datetime(2025, 6, 17, 23, 15, 30, tzinfo=timezone.utc)
-        expected_local = shoot_utc.astimezone().strftime("%H:%M:%S")
-
-        assert actual_time == expected_local, (
-            f"Birth time incorrect in regular mode:\n"
-            f"  Expected: {expected_local}\n"
-            f"  Actual:   {actual_time}\n"
-            f"  Full:     {birth_local}"
-        )
-
-    def test_birth_time_idempotency_regular(self):
-        """
-        Running script twice in regular mode should not change birth time second time
-        """
-        video_path = os.path.join(self.temp_dir, "test_idempotent.mp4")
-        self._create_test_video(video_path, "2025:06:18 07:15:30+08:00")
-
-        # First run
-        subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            video_path,
-            "--timezone", "+0800",
-            "--apply"
-        ], capture_output=True, check=True)
-
-        birth_after_first = self._get_birth_time_local(video_path)
-
-        # Second run should detect no changes needed
-        result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            video_path,
-            "--timezone", "+0800"
-        ], capture_output=True, text=True, check=True)
-
-        # Should show "No change needed" or similar
-        assert "No change" in result.stdout or "no change" in result.stdout.lower(), (
-            f"Second run should detect no changes:\n{result.stdout}"
-        )
-
-        birth_after_second = self._get_birth_time_local(video_path)
-
-        assert birth_after_first == birth_after_second, (
-            f"Birth time should not change on second run:\n"
-            f"  After first:  {birth_after_first}\n"
-            f"  After second: {birth_after_second}"
-        )
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

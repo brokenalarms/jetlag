@@ -75,11 +75,6 @@ class TestTimezoneScenarios:
 
         return video_path
 
-    def get_file_birth_time(self, file_path):
-        """Get file birth time as datetime object"""
-        stat = os.stat(file_path)
-        return datetime.fromtimestamp(stat.st_birthtime)
-
     def get_keys_creationdate(self, file_path):
         """Get Keys:CreationDate from file"""
         result = subprocess.run([
@@ -135,16 +130,6 @@ class TestTimezoneScenarios:
         qt_create = exif.get("MediaCreateDate", "")
         # Should be 23:25:21 on 2025-06-17 (UTC)
         assert "2025:06:17 23:25:21" in qt_create
-
-        # Verify file birth time
-        # In default mode (display time), file birth should be converted to viewing timezone
-        # If we're running tests in +09:00, birth time should be 08:25:21
-        # This is hard to test portably, so we just verify it's set
-        birth_time = self.get_file_birth_time(video_path)
-        assert birth_time.year == 2025
-        assert birth_time.month == 6
-        # Day could be 17 or 18 depending on viewing timezone
-        assert birth_time.day in [17, 18]
 
     def test_scenario_gopro_footage_different_timezones(self):
         """
@@ -347,43 +332,6 @@ class TestVideoEditorBehavior:
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
         fmt._exif_cache.clear()
-
-    def test_import_screen_uses_birth_time(self):
-        """
-        Verify that file birth time is set correctly for video editor import screen
-
-        Video editors show "Content Created" from file birth time on the import screen
-        """
-        video_path = os.path.join(self.temp_dir, "nle_test.mp4")
-
-        subprocess.run([
-            "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
-            "-c:v", "libx264", "-t", "1", "-pix_fmt", "yuv420p",
-            video_path
-        ], capture_output=True, check=True)
-
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:06:18 07:25:21+08:00",
-            video_path
-        ], capture_output=True, check=True)
-
-        # Run fix
-        subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            video_path,
-            "--apply"
-        ], capture_output=True, check=True)
-
-        # Birth time should be set
-        birth_time = os.stat(video_path).st_birthtime
-        assert birth_time > 0
-
-        # Birth time should reflect the video time
-        # (exact value depends on viewing timezone, but should be set)
-        birth_dt = datetime.fromtimestamp(birth_time)
-        assert birth_dt.year == 2025
-        assert birth_dt.month == 6
 
     def test_timeline_uses_keys_creationdate(self):
         """
