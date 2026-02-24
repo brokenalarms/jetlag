@@ -88,7 +88,7 @@ If a companion extension needs full processing (tagging, timestamping), it shoul
 
 ## Changes by file
 
-### scripts/media-pipeline.py
+### scripts/media-pipeline.py ✓ done (PR #57, PR #60)
 
 - Add `copy_to_working_dir(source_file, working_dir)` function — flat `shutil.copy2()`
 - Add `--source-action` and `--copy-companion-files` args
@@ -160,14 +160,14 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 - Remove `import_dir` row from profile editor
 - Keep `ready_dir` as "Ready dir" (all profile types)
 
-### scripts/tests/test_media_pipeline.py (new)
+### scripts/tests/test_media_pipeline.py ✓ done (PR #57, PR #60)
 
 - Test ingest: file copied from source to temp working dir
 - Test full pipeline: ingest → tag → output flow, verify file ends up in ready_dir with correct tags
 - Test copy-companion-files: companions copied to ready_dir when flag is on
 - Test pipeline without archive-source: source folder untouched after processing
 
-### scripts/tests/test_archive_source.py ~~(new)~~ ✓ done
+### scripts/tests/test_archive_source.py ✓ done
 
 - Test leave: source folder and files untouched (no-op)
 - Test archive: source folder renamed to `<source> - archived <date>`
