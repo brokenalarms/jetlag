@@ -6,6 +6,7 @@ Validates tagging behavior, idempotency, and check-before-write
 
 import os
 import subprocess
+import sys
 import tempfile
 import shutil
 from pathlib import Path
@@ -57,7 +58,7 @@ class TestTagMedia:
 
         # Run without --apply (dry run mode)
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--tags", "test-tag",
             "--make", "TestMake",
@@ -96,7 +97,7 @@ class TestTagMedia:
         has_another_tag_before = "another-tag" in tag_result_before.stdout
 
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--tags", "test-tag,another-tag",
             "--apply"
@@ -130,7 +131,7 @@ class TestTagMedia:
         has_model_before = "HERO12 Black" in exif_result_before.stdout
 
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--make", "GoPro",
             "--model", "HERO12 Black",
@@ -159,7 +160,7 @@ class TestTagMedia:
         """
         # First run
         subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--tags", "test-tag",
             "--apply"
@@ -173,7 +174,7 @@ class TestTagMedia:
 
         # Second run
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--tags", "test-tag",
             "--apply"
@@ -198,7 +199,7 @@ class TestTagMedia:
         """
         # First run
         subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--make", "GoPro",
             "--model", "HERO12 Black",
@@ -217,7 +218,7 @@ class TestTagMedia:
 
         # Second run
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--make", "GoPro",
             "--model", "HERO12 Black",
@@ -248,7 +249,7 @@ class TestTagMedia:
         """
         # Add first tag
         subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--tags", "existing-tag",
             "--apply"
@@ -263,7 +264,7 @@ class TestTagMedia:
 
         # Add second tag (first should be skipped)
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--tags", "existing-tag,new-tag",
             "--apply"
@@ -291,7 +292,7 @@ class TestTagMedia:
         """
         # Set Make only
         subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--make", "GoPro",
             "--apply"
@@ -306,7 +307,7 @@ class TestTagMedia:
 
         # Set both Make and Model (only Model should be written)
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--make", "GoPro",
             "--model", "HERO12 Black",
@@ -341,7 +342,7 @@ class TestTagMedia:
 
         # Process all files at once
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             *videos,
             "--tags", "batch-tag",
             "--apply"
@@ -387,7 +388,7 @@ class TestTagMedia:
 
         # Should skip EXIF for .lrv but still allow tags
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             lrv_path,
             "--make", "GoPro",
             "--tags", "test-tag",
@@ -415,7 +416,7 @@ class TestTagMedia:
     def test_output_format(self, test_video):
         """Test that output follows presentation format"""
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--tags", "test-tag",
             "--make", "GoPro",
@@ -447,7 +448,7 @@ class TestTagMedia:
         has_model_before = "HERO12 Black" in exif_result_before.stdout
 
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--tags", "gopro-hero-12",
             "--make", "GoPro",
@@ -503,7 +504,7 @@ class TestTagMediaDataPresentation:
         # Functions should return what changed, presentation formats it
 
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--tags", "tag1,tag2",
             "--make", "TestMake",
@@ -520,7 +521,7 @@ class TestTagMediaDataPresentation:
         """Test that already-correct files report status correctly"""
         # Add tags
         subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--tags", "test-tag",
             "--apply"
@@ -528,7 +529,7 @@ class TestTagMediaDataPresentation:
 
         # Run again - should report already correct
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             test_video,
             "--tags", "test-tag",
             "--apply"

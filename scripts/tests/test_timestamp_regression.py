@@ -10,7 +10,7 @@ import tempfile
 import shutil
 import subprocess
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -69,7 +69,7 @@ class TestFilenameSourceOfTruth:
 
         # Run with --overwrite-datetimeoriginal to use filename as source of truth
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
             "--overwrite-datetimeoriginal",
             "--timezone", "+0800",
@@ -102,7 +102,7 @@ class TestFilenameSourceOfTruth:
 
         # Run fix (even with wrong EXIF data)
         subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
             "--timezone", "+0800",
             "--apply"
@@ -148,7 +148,7 @@ class TestDateTimeOriginalPreservation:
 
         # Run fix without --overwrite-datetimeoriginal
         subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
             "--apply"
         ], capture_output=True, check=True)
@@ -185,7 +185,7 @@ class TestOverwriteDateTimeOriginalRequiresTimezone:
 
         # Try to run with --overwrite-datetimeoriginal but no --timezone
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
             "--overwrite-datetimeoriginal",
             "--apply"
@@ -230,7 +230,7 @@ class TestTimezoneMismatchDetection:
 
         # Try to run with DIFFERENT timezone +09:00
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
             "--timezone", "+0900",
             "--apply"
@@ -262,7 +262,7 @@ class TestTimezoneMismatchDetection:
 
         # Run with DIFFERENT timezone but with --overwrite-datetimeoriginal
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
             "--overwrite-datetimeoriginal",
             "--timezone", "+0900",
@@ -315,7 +315,7 @@ class TestTimezoneConversion:
 
         # Run fix
         subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
             "--apply"
         ], capture_output=True, check=True)
@@ -371,7 +371,7 @@ class TestMissingDateTimeOriginalWithTimezoneChange:
 
         # Run with timezone
         subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
             "--timezone", "+0800",
             "--apply"
@@ -470,7 +470,7 @@ class TestExtractMetadataTimezone:
         ], capture_output=True, check=True)
 
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path
         ], capture_output=True, text=True)
 
@@ -482,7 +482,7 @@ class TestExtractMetadataTimezone:
         self._create_test_video(video_path)
 
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path
         ], capture_output=True, text=True)
 
@@ -532,19 +532,17 @@ class TestBirthTimeCalculation:
 
     def test_birth_time_regular_mode(self):
         """
-        Birth time in regular mode should match UTC converted to current timezone
+        Birth time in regular mode should match UTC converted to current system timezone.
 
-        Example: File shot at 07:15:30 in Taiwan (+08:00)
-        - UTC time: 2025-06-17 23:15:30
-        - Viewing in Japan (+09:00)
-        - Birth time should be: 2025-06-18 08:15:30 local
+        File shot at 07:15:30 in Taiwan (+08:00) → UTC 2025-06-17 23:15:30.
+        Expected birth time = that UTC instant in the system's local timezone
+        (accounting for DST on the video's date, not today's date).
         """
         video_path = os.path.join(self.temp_dir, "test_taiwan.mp4")
         self._create_test_video(video_path, "2025:06:18 07:15:30+08:00")
 
-        # Run script in regular mode
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
             "--timezone", "+0800",
             "--apply"
@@ -552,16 +550,15 @@ class TestBirthTimeCalculation:
 
         assert result.returncode == 0, f"Script failed:\n{result.stderr}"
 
-        # Check birth time
         birth_local = self._get_birth_time_local(video_path)
-        actual_time = birth_local.split()[1]  # Extract HH:MM:SS
+        actual_time = birth_local.split()[1]
 
-        # Expected: 08:15:30 (07:15 Taiwan + 1 hour for Japan timezone)
-        expected_time = "08:15:30"
+        shoot_utc = datetime(2025, 6, 17, 23, 15, 30, tzinfo=timezone.utc)
+        expected_local = shoot_utc.astimezone().strftime("%H:%M:%S")
 
-        assert actual_time == expected_time, (
+        assert actual_time == expected_local, (
             f"Birth time incorrect in regular mode:\n"
-            f"  Expected: {expected_time}\n"
+            f"  Expected: {expected_local}\n"
             f"  Actual:   {actual_time}\n"
             f"  Full:     {birth_local}"
         )
@@ -575,7 +572,7 @@ class TestBirthTimeCalculation:
 
         # First run
         subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
             "--timezone", "+0800",
             "--apply"
@@ -585,7 +582,7 @@ class TestBirthTimeCalculation:
 
         # Second run should detect no changes needed
         result = subprocess.run([
-            "python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
             "--timezone", "+0800"
         ], capture_output=True, text=True, check=True)

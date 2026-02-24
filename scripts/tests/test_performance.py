@@ -18,6 +18,7 @@ import json
 import shutil
 import statistics
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -132,7 +133,7 @@ class TestPerformance:
     def test_tag_media_apply(self, source_mp4, request):
         """tag-media.py: apply tags + EXIF to a single file."""
         elapsed = measure_script(
-            ["python3", str(SCRIPT_DIR / "tag-media.py"),
+            [sys.executable, str(SCRIPT_DIR / "tag-media.py"),
              "__FILE__",
              "--tags", "gopro,action",
              "--make", "GoPro",
@@ -145,7 +146,7 @@ class TestPerformance:
     def test_fix_media_timestamp_apply(self, source_mp4, request):
         """fix-media-timestamp.py: apply timestamp fix to a single file."""
         elapsed = measure_script(
-            ["python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            [sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
              "__FILE__",
              "--timezone", "+0900",
              "--apply"],
@@ -158,7 +159,7 @@ class TestPerformance:
         # Pre-tag the file once
         pre_tagged = fresh_copy(source_mp4, self._tmp, "pre_tagged.mp4")
         subprocess.run([
-            "python3", str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             str(pre_tagged),
             "--tags", "gopro",
             "--make", "GoPro",
@@ -171,7 +172,7 @@ class TestPerformance:
         for _ in range(TIMED_RUNS):
             t0 = time.perf_counter()
             subprocess.run([
-                "python3", str(SCRIPT_DIR / "tag-media.py"),
+                sys.executable, str(SCRIPT_DIR / "tag-media.py"),
                 str(pre_tagged),
                 "--tags", "gopro",
                 "--make", "GoPro",
