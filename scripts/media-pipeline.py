@@ -13,9 +13,11 @@ import argparse
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -25,6 +27,18 @@ sys.path.insert(0, str(Path(__file__).parent))
 from lib.filesystem import find_media_files
 
 SCRIPT_DIR = Path(__file__).parent
+
+
+def copy_to_working_dir(source_file: Path, working_dir: str) -> Path:
+    """Copy a file into the working directory (flat, no subdirectories).
+
+    Returns:
+        Path to the copied file in the working directory
+    """
+    os.makedirs(working_dir, exist_ok=True)
+    dest = Path(working_dir) / source_file.name
+    shutil.copy2(str(source_file), str(dest))
+    return dest
 
 
 def signal_handler(sig, frame):
@@ -207,18 +221,31 @@ def process_file(
     location_args: list[str],
     apply: bool,
     verbose: bool,
+    working_dir: str,
     gyroflow_config: Optional[dict] = None,
     tasks: Optional[set] = None
 ) -> dict:
     """Process a single file through the pipeline.
 
+    Pipeline flow: ingest (always) → [tag] → [fix-timestamp] → output (always) → [gyroflow]
+    Ingest copies source to temp working dir. Output organizes to ready_dir.
+
     Returns:
-        dict with keys: changed, failed, error
+        dict with keys: changed, failed, error, working_copy, dest_path
     """
-    result = {"changed": False, "failed": False, "error": None}
+    result = {"changed": False, "failed": False, "error": None, "working_copy": None, "dest_path": None}
     file_changed = False
 
-    # Step 1: Tag media (if profile has tags/make/model)
+    # Step 0: Ingest — copy source to working directory (always)
+    if apply:
+        working_copy = copy_to_working_dir(file_path, working_dir)
+        print("  📥 Copied to working directory")
+    else:
+        working_copy = file_path
+        print("  📥 Would copy to working directory")
+    result["working_copy"] = working_copy
+
+    # Step 1: Tag media (if in tasks and profile has tags/make/model)
     if (tasks is None or "tag" in tasks) and profile:
         tags = ",".join(profile.get("tags", []))
         exif = profile.get("exif", {})
@@ -227,16 +254,16 @@ def process_file(
 
         if tags or make or model:
             print("🏷️  Checking tags...")
-            output, changed = run_tag_media(file_path, tags or None, make or None, model or None, apply)
+            output, changed = run_tag_media(working_copy, tags or None, make or None, model or None, apply)
             for line in output.split("\n"):
                 print(f"  {line}")
             if changed:
                 file_changed = True
 
-    # Step 2: Fix video timestamp
+    # Step 2: Fix timestamp
     if tasks is None or "fix-timestamp" in tasks:
         print("🔧 Fixing timestamp...")
-        output, changed, rc = run_fix_timestamp(file_path, location_args, apply, verbose)
+        output, changed, rc = run_fix_timestamp(working_copy, location_args, apply, verbose)
         for line in output.split("\n"):
             print(f"  {line}")
 
@@ -249,42 +276,40 @@ def process_file(
         if changed:
             file_changed = True
 
-    # Step 3: Organize by date
-    dest = ""
-    if tasks is None or "organize" in tasks:
-        print("📁 Organizing by date...")
+    # Step 3: Output — organize to ready_dir (always runs)
+    print("📁 Organizing by date...")
 
-        folder_template = profile.get("folder_template") if profile else None
-        if folder_template:
-            template = folder_template.replace("{{SUBFOLDER}}", subfolder) if subfolder else folder_template
-        elif subfolder:
-            template = f"{{{{YYYY}}}}/{subfolder}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
-        else:
-            template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
-        output, action, dest, rc = run_organize_by_date(file_path, target_dir, template, apply, verbose)
+    folder_template = profile.get("folder_template") if profile else None
+    if folder_template:
+        template = folder_template.replace("{{SUBFOLDER}}", subfolder) if subfolder else folder_template
+    elif subfolder:
+        template = f"{{{{YYYY}}}}/{subfolder}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
+    else:
+        template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
+    output, action, dest, rc = run_organize_by_date(working_copy, target_dir, template, apply, verbose)
 
-        # Print stderr output (user-visible messages)
-        if output:
-            for line in output.split("\n"):
-                if line.strip():
-                    print(line)
+    if output:
+        for line in output.split("\n"):
+            if line.strip():
+                print(line)
 
-        if rc != 0:
-            print(f"   ❌ Organization failed for {file_path.name}")
-            result["failed"] = True
-            result["error"] = "Organization failed"
-            return result
+    if rc != 0:
+        print(f"   ❌ Organization failed for {file_path.name}")
+        result["failed"] = True
+        result["error"] = "Organization failed"
+        return result
 
-        if action in ("copied", "moved", "overwrote"):
-            file_changed = True
+    if action in ("copied", "moved", "overwrote"):
+        file_changed = True
 
-    # Step 4: Generate gyroflow project (if enabled)
+    result["dest_path"] = dest
+
+    # Step 4: Generate gyroflow project (if enabled, operates on file in ready_dir)
     gyroflow_enabled = profile.get("gyroflow_enabled", False) if profile else False
     if (tasks is None or "gyroflow" in tasks) and gyroflow_enabled and gyroflow_config:
         print("🎥 Generating gyroflow project...")
 
-        # Use the dest path from organize (file may have moved)
-        gyroflow_file = Path(dest) if dest else file_path
+        gyroflow_file = Path(dest) if dest else working_copy
         preset = gyroflow_config.get("preset", {})
         preset_json = json.dumps(preset)
 
@@ -342,7 +367,7 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed processing info")
     parser.add_argument(
         "--tasks", nargs="+",
-        choices=["tag", "fix-timestamp", "organize", "gyroflow"],
+        choices=["tag", "fix-timestamp", "gyroflow"],
         help="Pipeline steps to run (default: all)"
     )
 
@@ -359,15 +384,15 @@ def main():
     target_dir = args.target
 
     if profile:
-        import_dir = profile.get("import_dir")
         ready_dir = profile.get("ready_dir")
-        if not source_dir and import_dir and import_dir != "None":
-            source_dir = import_dir
+        profile_source = profile.get("source_dir")
+        if not source_dir and profile_source and profile_source != "None":
+            source_dir = profile_source
         if not target_dir and ready_dir and ready_dir != "None":
             target_dir = ready_dir
 
     if not source_dir:
-        print("ERROR: --source is required (or use --profile with import_dir)", file=sys.stderr)
+        print("ERROR: --source is required (or use --profile with source_dir)", file=sys.stderr)
         sys.exit(1)
 
     if not target_dir:
@@ -403,7 +428,6 @@ def main():
             response = input("Delete them? This will allow exiftool to run. (y/n) ")
             if response.lower() == "y":
                 for d in tmp_dirs:
-                    import shutil
                     shutil.rmtree(d)
                 print("✅ Deleted exiftool_tmp directories", file=sys.stderr)
             else:
@@ -442,6 +466,9 @@ def main():
     print(f"📹 Found {total_files} video file(s) to process")
     print()
 
+    # Create temp working directory
+    working_dir = tempfile.mkdtemp(prefix="jetlag-pipeline-")
+
     # Process each file
     stats = {
         "processed": 0,
@@ -453,34 +480,55 @@ def main():
 
     gyroflow_config = full_config.get("gyroflow")
     tasks = set(args.tasks) if args.tasks else None
+    pipeline_failed = False
 
-    for i, file_path in enumerate(files, 1):
-        stats["processed"] += 1
-        base = file_path.name
+    try:
+        for i, file_path in enumerate(files, 1):
+            stats["processed"] += 1
+            base = file_path.name
 
-        print(f"[{i}/{total_files}] Processing: {base}")
+            print(f"[{i}/{total_files}] Processing: {base}")
 
-        result = process_file(
-            file_path,
-            profile,
-            target_dir,
-            args.subfolder,
-            location_args,
-            args.apply,
-            args.verbose,
-            gyroflow_config=gyroflow_config,
-            tasks=tasks
-        )
+            result = process_file(
+                file_path,
+                profile,
+                target_dir,
+                args.subfolder,
+                location_args,
+                args.apply,
+                args.verbose,
+                working_dir,
+                gyroflow_config=gyroflow_config,
+                tasks=tasks
+            )
 
-        if result["failed"]:
-            stats["failed"] += 1
-            stats["failed_files"].append(base)
+            if result["failed"]:
+                stats["failed"] += 1
+                stats["failed_files"].append(base)
+                pipeline_failed = True
+            else:
+                stats["succeeded"] += 1
+                if result["changed"]:
+                    stats["changed"] += 1
+
+            print()  # Empty line between files
+    except Exception:
+        pipeline_failed = True
+        raise
+    finally:
+        # Clean up working directory
+        if pipeline_failed:
+            print(f"Working directory preserved for inspection: {working_dir}", file=sys.stderr)
         else:
-            stats["succeeded"] += 1
-            if result["changed"]:
-                stats["changed"] += 1
-
-        print()  # Empty line between files
+            try:
+                os.rmdir(working_dir)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                if not args.apply:
+                    shutil.rmtree(working_dir, ignore_errors=True)
+                else:
+                    print(f"Working directory not empty (some files may not have been organized): {working_dir}", file=sys.stderr)
 
     # Print summary
     print_summary(stats, args.apply)

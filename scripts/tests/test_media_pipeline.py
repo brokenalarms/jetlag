@@ -129,7 +129,7 @@ def test_profile(temp_workspace):
 
     # Add test profile
     profiles["profiles"]["_test"] = {
-        "import_dir": str(temp_workspace["source"]),
+        "source_dir": str(temp_workspace["source"]),
         "ready_dir": str(temp_workspace["target"]),
         "file_extensions": [".mp4"],
         "tags": ["test-camera"],
@@ -257,7 +257,7 @@ class TestApplyMode:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "TestGroup", "--apply"],
         )
 
-        assert not video.exists(), "Source file should be moved"
+        assert video.exists(), "Source file should still exist (copied, not moved)"
         expected = target / "2025" / "TestGroup" / "2025-10-05" / "test.mp4"
         assert expected.exists(), f"File should be at {expected}"
 
@@ -294,6 +294,58 @@ class TestApplyMode:
         moved = list(target.rglob("*.mp4"))[0]
         creation_date = get_exif_field(moved, "CreationDate")
         assert "+09:00" in creation_date or "+0900" in creation_date
+
+
+class TestIngestOutput:
+    """Tests for always-on ingest (copy to temp) and output (organize to target) steps."""
+
+    def test_source_preserved_and_output_organized(self, temp_workspace, test_profile):
+        """Source file is copied (not moved) during ingest, then working copy ends up in target via organize-by-date."""
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        run_pipeline(
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
+        )
+
+        assert video.exists(), "Source file must still exist after processing (ingest copies, not moves)"
+        organized = target / "2025" / "Test" / "2025-10-05" / "test.mp4"
+        assert organized.exists(), f"Processed file should be organized in target at {organized}"
+
+    def test_working_dir_cleaned_up_after_success(self, temp_workspace, test_profile):
+        """Temp working directory is cleaned up after successful processing — no new jetlag-pipeline-* dirs left behind."""
+        source = temp_workspace["source"]
+        create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
+
+        tmp_root = Path(tempfile.gettempdir())
+        pre_existing = set(tmp_root.glob("jetlag-pipeline-*"))
+
+        result = run_pipeline(
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
+        )
+
+        assert result.returncode == 0
+        new_dirs = set(tmp_root.glob("jetlag-pipeline-*")) - pre_existing
+        assert new_dirs == set(), f"Working dir should be cleaned up, but found new dirs: {new_dirs}"
+
+    def test_tasks_tag_still_produces_organized_output(self, temp_workspace, test_profile):
+        """Output (organize-by-date) runs even when --tasks only includes 'tag' — output is always on."""
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        run_pipeline(
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test", "--tasks", "tag", "--apply"],
+        )
+
+        organized_files = list(target.rglob("*.mp4"))
+        assert len(organized_files) == 1, f"File should be organized in target even with --tasks tag only, found: {organized_files}"
+        relative = organized_files[0].relative_to(target)
+        parts = relative.parts
+        assert len(parts) >= 3, f"File should be in date-based folder structure (YYYY/subfolder/YYYY-MM-DD/), got: {relative}"
 
 
 class TestSubfolderTemplate:
@@ -529,7 +581,7 @@ class TestAlreadyProcessedFiles:
             ["--profile", test_profile, "--source", str(correct_path.parent), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
         )
 
-        assert "Already organized" in result.output or "No change" in result.output
+        assert "Skipped" in result.output or "Already organized" in result.output or "No change" in result.output
 
 
 class TestCLIArguments:
@@ -547,8 +599,8 @@ class TestCLIArguments:
         assert result.returncode == 0
         assert "Found 1 video file(s)" in result.stdout
 
-    def test_source_defaults_to_profile_import_dir(self, temp_workspace, test_profile):
-        """Without --source, uses profile's import_dir."""
+    def test_source_defaults_to_profile_source_dir(self, temp_workspace, test_profile):
+        """Without --source, uses profile's source_dir."""
         source = temp_workspace["source"]
         create_test_video(source / "test.mp4")
 
