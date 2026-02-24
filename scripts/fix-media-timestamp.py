@@ -9,7 +9,6 @@ import argparse
 import os
 import re
 import signal
-import subprocess
 import sys
 import time
 from datetime import datetime, timezone, timedelta
@@ -27,6 +26,8 @@ try:
 except ImportError:
     print("Error: humanize library not found. Install with: pip install humanize", file=sys.stderr)
     sys.exit(1)
+
+from lib.exiftool import exiftool
 
 if sys.platform == "darwin":
     from lib.file_timestamps import (
@@ -147,7 +148,6 @@ def get_country_name(input_country: str) -> str:
 
 def read_exif_data(file_path: str) -> Dict[str, str]:
     """Read all relevant EXIF data with single exiftool call (cached)"""
-    # Check cache first
     if file_path in _exif_cache:
         return _exif_cache[file_path]
 
@@ -156,30 +156,21 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
         "QuickTime:MediaCreateDate", "QuickTime:MediaModifyDate", "Keys:CreationDate"
     ]
 
-    cmd = ["exiftool", "-s"] + [f"-{field}" for field in fields] + [file_path]
-
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        raw = exiftool.read_tags(file_path, fields)
 
-        # Parse exiftool output
         data = {}
-        for line in result.stdout.strip().split('\n'):
-            if ':' in line:
-                key, value = line.split(':', 1)
-                key = key.strip()
-                value = value.strip()
-                # Normalize QuickTime field names for consistency
-                if key == "MediaCreateDate":
-                    data["MediaCreateDate"] = value
-                elif key == "MediaModifyDate":
-                    data["MediaModifyDate"] = value
-                else:
-                    data[key] = value
+        for key, value in raw.items():
+            if key == "MediaCreateDate":
+                data["MediaCreateDate"] = value
+            elif key == "MediaModifyDate":
+                data["MediaModifyDate"] = value
+            else:
+                data[key] = value
 
-        # Cache the result
         _exif_cache[file_path] = data
         return data
-    except subprocess.CalledProcessError as e:
+    except Exception as e:
         print(f"Error reading EXIF data: {e}", file=sys.stderr)
         return {}
 
@@ -300,12 +291,11 @@ def parse_filename_timestamp(file_path: str) -> Optional[str]:
 def write_exif_fields(file_path: str, field_args: list) -> bool:
     """Write multiple EXIF fields in a single exiftool call."""
     try:
-        cmd = ["exiftool", "-P", "-overwrite_original"] + field_args + [file_path]
-        subprocess.run(cmd, capture_output=True, check=True)
+        result = exiftool.write_tags(file_path, field_args)
         if file_path in _exif_cache:
             del _exif_cache[file_path]
-        return True
-    except subprocess.CalledProcessError as e:
+        return result
+    except Exception as e:
         print(f"Error writing EXIF fields: {e}", file=sys.stderr)
         return False
 
@@ -313,13 +303,11 @@ def write_exif_fields(file_path: str, field_args: list) -> bool:
 def write_datetime_original(file_path: str, datetime_with_tz: str) -> bool:
     """Write DateTimeOriginal to file if missing"""
     try:
-        cmd = ["exiftool", "-P", "-overwrite_original", f"-DateTimeOriginal={datetime_with_tz}", file_path]
-        subprocess.run(cmd, capture_output=True, check=True)
-        # Invalidate cache since file was modified
+        result = exiftool.write_tags(file_path, [f"-DateTimeOriginal={datetime_with_tz}"])
         if file_path in _exif_cache:
             del _exif_cache[file_path]
-        return True
-    except subprocess.CalledProcessError as e:
+        return result
+    except Exception as e:
         print(f"Error writing DateTimeOriginal: {e}", file=sys.stderr)
         return False
 
@@ -336,25 +324,14 @@ def write_keys_creationdate(file_path: str, datetime_original: datetime) -> bool
         True if successful, False otherwise
     """
     try:
-        # Write DateTimeOriginal value directly (with its original timezone)
         keys_value = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
-        # Format timezone with colon
         keys_value = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', keys_value)
 
-        cmd = [
-            "exiftool",
-            "-P",
-            "-overwrite_original",
-            f"-Keys:CreationDate={keys_value}",
-            file_path
-        ]
-        subprocess.run(cmd, capture_output=True, check=True)
-
-        # Invalidate cache since file was modified
+        result = exiftool.write_tags(file_path, [f"-Keys:CreationDate={keys_value}"])
         if file_path in _exif_cache:
             del _exif_cache[file_path]
-        return True
-    except subprocess.CalledProcessError as e:
+        return result
+    except Exception as e:
         print(f"Error writing Keys:CreationDate: {e}", file=sys.stderr)
         return False
 
@@ -374,28 +351,17 @@ def write_quicktime_createdate(file_path: str, datetime_original: datetime) -> b
         True if successful, False otherwise
     """
     try:
-        # Convert to UTC
-        # Example: 2025:10:07 16:26:42+09:00 → 2025:10:07 07:26:42 UTC
         utc_dt = datetime_original.astimezone(timezone.utc)
         utc_time = utc_dt.strftime("%Y:%m:%d %H:%M:%S")
 
-        # Write UTC directly (without QuickTimeUTC flag)
-        # The flag would assume our value is in current system timezone and convert it
-        cmd = [
-            "exiftool",
-            "-P",
-            "-overwrite_original",
+        result = exiftool.write_tags(file_path, [
             f"-QuickTime:CreateDate={utc_time}",
             f"-QuickTime:MediaCreateDate={utc_time}",
-            file_path
-        ]
-        subprocess.run(cmd, capture_output=True, check=True)
-
-        # Invalidate cache since file was modified
+        ])
         if file_path in _exif_cache:
             del _exif_cache[file_path]
-        return True
-    except subprocess.CalledProcessError as e:
+        return result
+    except Exception as e:
         print(f"Error writing QuickTime CreateDate: {e}", file=sys.stderr)
         return False
 
