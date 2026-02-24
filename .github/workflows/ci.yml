@@ -1,13 +1,24 @@
-name: scripts tests
+name: CI
 
 on:
   pull_request:
-    paths:
-      - "scripts/**"
-      - ".github/workflows/scripts-tests.yml"
 
 jobs:
-  test:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      scripts: ${{ steps.filter.outputs.scripts }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            scripts:
+              - 'scripts/**'
+
+  scripts-test:
+    needs: changes
+    if: needs.changes.outputs.scripts == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,7 +34,7 @@ jobs:
         id: cache-apt
         with:
           path: ~/apt-cache
-          key: apt-${{ runner.os }}-${{ hashFiles('.github/workflows/scripts-tests.yml') }}
+          key: apt-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
 
       - name: Install system tools
         run: |
@@ -40,3 +51,12 @@ jobs:
 
       - name: Run tests (excluding perf)
         run: pytest scripts/tests/ -x -v --ignore=scripts/tests/test_performance.py
+
+  gate:
+    needs: [scripts-test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          [[ "${{ needs.scripts-test.result }}" == "failure" ]] && exit 1
+          exit 0
