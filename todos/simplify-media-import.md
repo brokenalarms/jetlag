@@ -78,7 +78,7 @@ If a companion extension needs full processing (tagging, timestamping), it shoul
 - `--tasks` — optional processing steps: `tag`, `fix-timestamp`, `gyroflow`, `archive-source`. Default: all except `archive-source`. Ingest and output always run regardless.
 
 **New:**
-- `--source-action` — passed through to `archive-source.py` when `archive-source` is in `--tasks`: `archive` (default, rename folder) or `delete` (remove folder). Ignored if `archive-source` not in `--tasks`.
+- `--source-action` — always passed through to `archive-source.py`: `leave` (default, no-op), `archive` (rename folder), or `delete` (remove folder).
 - `--copy-companion-files` — also copy companion files (matching profile `companion_extensions`) to ready_dir. Default: off. Companions skip optional processing steps (tag, fix-timestamp, gyroflow).
 
 **Unchanged:**
@@ -110,7 +110,7 @@ If a companion extension needs full processing (tagging, timestamping), it shoul
 Standalone subscript. Called by media-pipeline.py when `archive-source` is in `--tasks`. Also runnable independently.
 
 - `--source` — source directory to act on (required)
-- `--action` — `archive` (default) or `delete`
+- `--action` — `leave` (default, no-op), `archive`, or `delete`
 - `--apply` / `--verbose` — same dry-run semantics as other subscripts
 - Archive mode: `os.rename(source, f"{source} - archived {date}")`
 - Delete mode: `shutil.rmtree(source)`
@@ -130,8 +130,8 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 
 ### macos/Sources/Models/AppState.swift
 
-- Add `SourceAction` enum: `.archive`, `.delete` with raw string values matching CLI args
-- Add `sourceAction: SourceAction` (default `.archive`) — only relevant when `archive-source` step is enabled
+- Add `SourceAction` enum: `.leave`, `.archive`, `.delete` with raw string values matching CLI args
+- Add `sourceAction: SourceAction` (default `.leave`)
 - Rename `skipCompanion: Bool` → `copyCompanionFiles: Bool` (default `false`) — controls whether companions are also copied to ready_dir
 - `PipelineStep`: add `.archiveSource` case; add computed property `isAlwaysOn` — true for `.importFromCard` and `.organize`
 - Update `.importFromCard` help text: `"Copy files from source to working directory for processing"`
@@ -145,10 +145,10 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 - Always call `media-pipeline.sh` (remove the `hasImport ? "import-media.sh" : "media-pipeline.sh"` fork)
 - Always pass `--source` with `state.sourceDir`
 - Build `--tasks` from enabled optional steps only (exclude `.importFromCard` and `.organize`). `.archiveSource` maps to task name `archive-source`.
-- When `archive-source` in tasks: pass `--source-action` with value from `state.sourceAction` (`archive` or `delete`)
+- Always pass `--source-action` with value from `state.sourceAction` (`leave`, `archive`, or `delete`)
 - Pass `--copy-companion-files` when `state.copyCompanionFiles`
 - `importCardOptions` section: always visible when profile selected (not gated on `.importFromCard` enabled, since import is always on). Rename GroupBox label from "Memory Card / Source Actions" to "Source"
-- When `.archiveSource` is enabled, show `sourceAction` picker (archive / delete). "Delete" option shows caution text: `"Permanently deletes source files after successful processing"`
+- Show `sourceAction` picker (leave / archive / delete). "Delete" option shows caution text: `"Permanently deletes source files after successful processing"`
 - `pipelineTaskNames`: remove `.organize` mapping (no longer a task choice). Add `.archiveSource` → `"archive-source"`. Keep `.tag`, `.fixTimezone`, `.gyroflow`. Do not add `.importFromCard` (not a task choice).
 - `countMediaFiles()`: always count from `state.sourceDir` (remove the `hasImport ?` branch)
 
@@ -166,6 +166,7 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 
 ### scripts/tests/test_archive_source.py (new)
 
+- Test leave: source folder untouched (no-op)
 - Test archive: source folder renamed to `<source> - archived <date>`
 - Test delete: source folder removed
 - Test read-only source: logs error, exits non-zero
