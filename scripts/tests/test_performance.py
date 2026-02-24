@@ -143,7 +143,7 @@ class TestPerformance:
                     with open(profiles_path) as f:
                         profiles = yaml.safe_load(f)
                     profiles["profiles"]["_perf_test"] = {
-                        "import_dir": str(source),
+                        "source_dir": str(source),
                         "ready_dir": str(target),
                         "file_extensions": [".mp4"],
                     }
@@ -155,7 +155,7 @@ class TestPerformance:
                         "--profile", "_perf_test",
                         "--source", str(source),
                         "--timezone", "+0900",
-                        "--tasks", "fix-timestamp", "organize",
+                        "--tasks", "fix-timestamp",
                         "--apply",
                     ])
                     times.append(time.perf_counter() - t0)

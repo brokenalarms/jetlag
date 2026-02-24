@@ -16,8 +16,6 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.exiftool import exiftool
-from lib.filesystem import cleanup_empty_parent_dirs
-
 
 MONTH_ABBREVS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -119,10 +117,8 @@ def _handle_existing_target(file_path, target_file, target_path, abs_target,
                 print(f"\u267b\ufe0f  Overwrote: {base} \u2192 {organized_path}/", file=sys.stderr)
                 return abs_target, "overwrote"
             else:
-                source_dir = os.path.dirname(file_path)
                 shutil.move(file_path, target_file)
                 print(f"\u267b\ufe0f  Overwrote: {base} \u2192 {organized_path}/", file=sys.stderr)
-                cleanup_empty_parent_dirs(source_dir, stop_at='/')
                 return abs_target, "overwrote"
         else:
             print(f"[DRY RUN] Would overwrite: {file_path} \u2192 {abs_target}", file=sys.stderr)
@@ -134,11 +130,6 @@ def _handle_existing_target(file_path, target_file, target_path, abs_target,
         print(f"\u23ed\ufe0f  Skipped (identical, {size_mb:.1f} MB): {base}", file=sys.stderr)
     else:
         print(f"\u23ed\ufe0f  Skipped (user choice): {base}", file=sys.stderr)
-
-    if not copy_mode and apply:
-        source_dir = os.path.dirname(file_path)
-        os.remove(file_path)
-        cleanup_empty_parent_dirs(source_dir, stop_at='/')
 
     return abs_target, "skipped"
 
@@ -198,10 +189,8 @@ def process_file(file_path: str, target_dir: str, template: str,
             print(f"\u2705 Copied: {file_path} \u2192 {abs_target}", file=sys.stderr)
             return abs_target, "copied"
         else:
-            source_dir = os.path.dirname(file_path)
             shutil.move(file_path, target_file)
             print(f"\u2705 Moved: {file_path} \u2192 {abs_target}", file=sys.stderr)
-            cleanup_empty_parent_dirs(source_dir, stop_at='/')
             return abs_target, "moved"
     else:
         if copy_mode:

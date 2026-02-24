@@ -596,8 +596,8 @@ class TestOverwriteMode:
         assert "@@action=overwrote" in result.stdout
 
 
-class TestDirectoryCleanupAfterMove:
-    """Tests for empty directory cleanup in organize-by-date.sh after move."""
+class TestSourceDirectoryPreservedAfterMove:
+    """Source directory structure is preserved after move — cleanup is handled elsewhere."""
 
     @pytest.fixture
     def temp_dir(self):
@@ -616,8 +616,8 @@ class TestDirectoryCleanupAfterMove:
             "-DateTimeOriginal=2025:06:18 07:25:21+08:00", path
         ], capture_output=True, check=True)
 
-    def test_empty_source_dir_removed_after_move(self, temp_dir):
-        """Source directory is cleaned up after last file is moved out."""
+    def test_empty_source_dir_preserved_after_move(self, temp_dir):
+        """Source directory is not cleaned up after file is moved out."""
         subdir = os.path.join(temp_dir, "source", "subdir")
         source = os.path.join(subdir, "test.mp4")
         target_dir = os.path.join(temp_dir, "target")
@@ -630,45 +630,10 @@ class TestDirectoryCleanupAfterMove:
             "--apply"
         ], capture_output=True, check=True)
 
-        assert not os.path.exists(subdir), "Empty source subdir should be removed"
+        assert os.path.exists(subdir), "Source dir should be preserved after move"
 
-    def test_ds_store_only_dir_removed(self, temp_dir):
-        """Directory with only .DS_Store is cleaned up after move."""
-        subdir = os.path.join(temp_dir, "source", "subdir")
-        source = os.path.join(subdir, "test.mp4")
-        target_dir = os.path.join(temp_dir, "target")
-        self._create_video(source)
-        Path(os.path.join(subdir, ".DS_Store")).write_bytes(b"fake")
-
-        subprocess.run([
-            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
-            source, "--target", target_dir,
-            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
-            "--apply"
-        ], capture_output=True, check=True)
-
-        assert not os.path.exists(subdir), "Dir with only .DS_Store should be removed"
-
-    def test_nonempty_dir_preserved(self, temp_dir):
-        """Directory with other files is not removed after move."""
-        subdir = os.path.join(temp_dir, "source", "subdir")
-        source = os.path.join(subdir, "test.mp4")
-        target_dir = os.path.join(temp_dir, "target")
-        self._create_video(source)
-        Path(os.path.join(subdir, "other.txt")).write_bytes(b"keep")
-
-        subprocess.run([
-            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
-            source, "--target", target_dir,
-            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
-            "--apply"
-        ], capture_output=True, check=True)
-
-        assert os.path.exists(subdir), "Dir with other files should remain"
-        assert os.path.exists(os.path.join(subdir, "other.txt"))
-
-    def test_copy_mode_no_cleanup(self, temp_dir):
-        """Copy mode should not remove source directories."""
+    def test_copy_mode_preserves_source(self, temp_dir):
+        """Copy mode preserves source file and directory."""
         subdir = os.path.join(temp_dir, "source", "subdir")
         source = os.path.join(subdir, "test.mp4")
         target_dir = os.path.join(temp_dir, "target")
@@ -681,7 +646,8 @@ class TestDirectoryCleanupAfterMove:
             "--copy", "--apply"
         ], capture_output=True, check=True)
 
-        assert os.path.exists(subdir), "Copy mode should not clean up source"
+        assert os.path.exists(source), "Source file should remain after copy"
+        assert os.path.exists(subdir), "Source dir should remain after copy"
 
 
 if __name__ == "__main__":
