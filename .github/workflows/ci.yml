@@ -62,24 +62,7 @@ jobs:
 
       - name: Performance summary
         if: always()
-        shell: python
-        run: |
-          import json, pathlib, os
-          p = pathlib.Path('/tmp/perf_results.json')
-          if not p.exists():
-              exit()
-          data = json.loads(p.read_text())
-          if not data:
-              exit()
-          lines = ['### Performance', '', '| Test | Time | Baseline | Delta |', '|------|------|----------|-------|']
-          for r in data:
-              delta = r['delta_pct']
-              sign = '+' if delta > 0 else ''
-              icon = '\U0001f534' if r['regression'] else '\U0001f7e2'
-              lines.append(f'| {r["name"]} | {r["elapsed"]:.3f}s | {r["baseline"]:.3f}s | {icon} {sign}{delta:.1f}% |')
-          summary = '\n'.join(lines) + '\n'
-          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
-              f.write(summary)
+        run: python3 .github/scripts/perf_summary.py
 
   gate:
     needs: [scripts-test]
