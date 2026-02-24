@@ -12,7 +12,6 @@ profiles:
   insta360:
     type: video
     source_dir: /Volumes/Untitled/DCIM
-    import_dir: /Volumes/Extreme GRN/Videos/Source Video/Insta360/Import
     ready_dir: /Volumes/Extreme GRN/Videos/Source Video/Insta360/Ready
     backup_enabled: true
     gyroflow_enabled: false
@@ -34,7 +33,6 @@ profiles:
   gopro:
     type: video
     source_dir: /Volumes/Untitled/DCIM
-    import_dir: /Volumes/Extreme GRN/Videos/Source Video/GoPro/Import
     ready_dir: /Volumes/Extreme GRN/Videos/Source Video/GoPro/Ready
     backup_enabled: true
     gyroflow_enabled: true
@@ -54,7 +52,6 @@ profiles:
   dji-mini-4-pro-video:
     type: video
     source_dir: /Volumes/Untitled/DCIM
-    import_dir: /Volumes/Extreme GRN/Videos/Source Video/DJI/Import
     ready_dir: /Volumes/Extreme GRN/Videos/Source Video/DJI/Ready
     backup_enabled: true
     gyroflow_enabled: false
@@ -75,7 +72,7 @@ profiles:
   dji-mini-4-pro-photo:
     type: photo
     source_dir: /Volumes/Untitled/DCIM
-    import_dir: /Volumes/Extreme GRN/Photos/Import
+    ready_dir: /Volumes/Extreme GRN/Photos/Import
     backup_enabled: true
     backup_dir: /Volumes/Extreme GRN/Photos/Originals
     backup_exclude_subdirs: []
@@ -91,7 +88,7 @@ profiles:
   sony-a7iv-photo:
     type: photo
     source_dir: /Volumes/Untitled/DCIM
-    import_dir: /Volumes/Extreme GRN/Photos/Import
+    ready_dir: /Volumes/Extreme GRN/Photos/Import
     backup_enabled: true
     backup_dir: /Volumes/Extreme GRN/Photos/Originals
     backup_exclude_subdirs:
@@ -111,7 +108,6 @@ profiles:
   sony-a7iv-video:
     type: video
     source_dir: /Volumes/Untitled/PRIVATE
-    import_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Import
     backup_enabled: true
     gyroflow_enabled: true
     ready_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Ready
@@ -132,7 +128,7 @@ profiles:
   sony-a7v-photo:
     type: photo
     source_dir: /Volumes/Untitled/DCIM
-    import_dir: /Volumes/Extreme GRN/Photos/Import
+    ready_dir: /Volumes/Extreme GRN/Photos/Import
     backup_enabled: true
     backup_dir: /Volumes/Extreme GRN/Photos/Originals
     backup_exclude_subdirs:
@@ -152,7 +148,6 @@ profiles:
   sony-a7v-video:
     type: video
     source_dir: /Volumes/Untitled/PRIVATE
-    import_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7V/Import
     backup_enabled: true
     gyroflow_enabled: true
     ready_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7V/Ready
@@ -173,7 +168,6 @@ profiles:
   iphone-16-pro:
     type: video
     source_dir: /Volumes/Untitled/DCIM
-    import_dir: /Volumes/Extreme GRN/Videos/Source Video/iPhone/Import
     ready_dir: /Volumes/Extreme GRN/Videos/Source Video/iPhone/Ready
     backup_enabled: false
     gyroflow_enabled: false

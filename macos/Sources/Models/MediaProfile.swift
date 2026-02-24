@@ -66,7 +66,6 @@ enum MediaType: String, Codable, CaseIterable, Identifiable {
 struct MediaProfile: Codable {
     var type: MediaType?
     var sourceDir: String?
-    var importDir: String?
     var readyDir: String?
     var backupEnabled: Bool?
     var backupDir: String?
@@ -80,7 +79,6 @@ struct MediaProfile: Codable {
     enum CodingKeys: String, CodingKey {
         case type
         case sourceDir = "source_dir"
-        case importDir = "import_dir"
         case readyDir = "ready_dir"
         case backupEnabled = "backup_enabled"
         case backupDir = "backup_dir"

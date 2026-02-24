@@ -93,21 +93,13 @@ struct WorkflowView: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(state.availableSteps) { step in
-                    let isEnabled = state.enabledSteps.contains(step)
-                    
-                    Button {
-                        if isEnabled {
-                            state.enabledSteps.remove(step)
-                        } else {
-                            state.enabledSteps.insert(step)
-                        }
-                    } label: {
+                    if step.isAlwaysOn {
                         HStack(spacing: 8) {
                             Image(systemName: step.systemImage)
                                 .font(.system(size: 12))
-                                .foregroundStyle(isEnabled ? step.iconColor : Color.secondary)
+                                .foregroundStyle(step.iconColor)
                                 .frame(width: 16)
-                            
+
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(step.rawValue)
                                     .font(.system(size: 12, weight: .medium))
@@ -116,24 +108,65 @@ struct WorkflowView: View {
                                     .foregroundStyle(.secondary)
                                     .lineLimit(2)
                             }
-                            
+
                             Spacer()
-                            
-                            Image(systemName: isEnabled ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(isEnabled ? step.iconColor : Color.secondary)
+
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
-                        .background(isEnabled ? step.iconColor.opacity(0.08) : .clear)
-                        .foregroundStyle(isEnabled ? .primary : .secondary)
-                        .contentShape(Rectangle())
+                        .background(step.iconColor.opacity(0.04))
+                        .foregroundStyle(.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .strokeBorder(step.iconColor.opacity(0.2), lineWidth: 1)
+                        )
+                    } else {
+                        let isEnabled = state.enabledSteps.contains(step)
+
+                        Button {
+                            if isEnabled {
+                                state.enabledSteps.remove(step)
+                            } else {
+                                state.enabledSteps.insert(step)
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: step.systemImage)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(isEnabled ? step.iconColor : Color.secondary)
+                                    .frame(width: 16)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(step.rawValue)
+                                        .font(.system(size: 12, weight: .medium))
+                                    Text(step.help)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: isEnabled ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(isEnabled ? step.iconColor : Color.secondary)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(isEnabled ? step.iconColor.opacity(0.08) : .clear)
+                            .foregroundStyle(isEnabled ? .primary : .secondary)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .strokeBorder(isEnabled ? step.iconColor.opacity(0.3) : Color.secondary.opacity(0.5), lineWidth: 1)
+                        )
                     }
-                    .buttonStyle(.plain)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(isEnabled ? step.iconColor.opacity(0.3) : Color.secondary.opacity(0.5), lineWidth: 1)
-                    )
                 }
             }
         } label: {
@@ -148,39 +181,44 @@ struct WorkflowView: View {
     @ViewBuilder
     private var stepOptions: some View {
         VStack(alignment: .leading, spacing: 12) {
-            subfolderField
-            
-            if state.enabledSteps.contains(.importFromCard) {
-                importCardOptions
-            }
+            groupField
+            sourceOptions
 
             if state.enabledSteps.contains(.fixTimezone) {
                 timezoneField
             }
         }
     }
-    
-    private var subfolderField: some View {
+
+    private var groupField: some View {
         Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
             GridRow {
-                HelpLabel("Subfolder", help: Strings.Workflow.subfolder)
+                HelpLabel("Group", help: Strings.Workflow.group)
                     .gridColumnAlignment(.trailing)
-                TextField("Optional", text: $state.subfolder)
-                    .textFieldStyle(.roundedBorder)
+                VStack(alignment: .leading, spacing: 6) {
+                    TextField("Optional", text: $state.group)
+                        .textFieldStyle(.roundedBorder)
+                    if state.enabledSteps.contains(.fixTimezone) && !state.group.isEmpty {
+                        HStack(spacing: 4) {
+                            Toggle("Append timezone to group folder", isOn: $state.appendTimezoneToGroup)
+                            HelpButton(Strings.Workflow.appendTimezoneToGroup)
+                        }
+                    }
+                }
             }
         }
     }
-    
-    private var importCardOptions: some View {
+
+    private var sourceOptions: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 12) {
                 sourceDirectoryField
                 Divider()
-                importActionToggles
+                sourceActionToggles
             }
             .padding(4)
         } label: {
-            Label("Memory Card / Source Actions", systemImage: "sdcard")
+            Label("Source", systemImage: "sdcard")
                 .font(.headline)
                 .foregroundStyle(Color("NeonCyan"))
         }
@@ -216,12 +254,12 @@ struct WorkflowView: View {
         }
     }
     
-    private var importActionToggles: some View {
+    private var sourceActionToggles: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 4) {
-                Toggle(isOn: $state.skipCompanion) {
+                Toggle(isOn: $state.copyCompanionFiles) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Skip companion files")
+                        Text("Copy companion files")
                         if companionExtensions.isEmpty {
                             Text("No companion files noted for this device")
                                 .font(.caption)
@@ -234,12 +272,27 @@ struct WorkflowView: View {
                     }
                 }
                 .disabled(companionExtensions.isEmpty)
-                HelpButton(Strings.Workflow.skipCompanion)
+                HelpButton(Strings.Workflow.copyCompanionFiles)
             }
-            
+
             HStack(spacing: 4) {
-                Toggle("Leave source files in place", isOn: $state.preserveSource)
-                HelpButton(Strings.Workflow.preserveSource)
+                Text("Source action:")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Picker("", selection: $state.sourceAction) {
+                    Text("Leave").tag(SourceAction.leave)
+                    Text("Archive").tag(SourceAction.archive)
+                    Text("Delete").tag(SourceAction.delete)
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 220)
+                HelpButton(Strings.Workflow.sourceAction)
+            }
+            if state.sourceAction == .delete {
+                Label("Deletes processed files and companions from source after successful processing", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.yellow)
             }
         }
     }
@@ -296,7 +349,6 @@ struct WorkflowView: View {
                         .disabled(
                             state.isRunning
                             || state.selectedProfile.isEmpty
-                            || state.enabledSteps.isEmpty
                             || !timezoneIsValid
                         )
                         .keyboardShortcut(.return, modifiers: .command)
@@ -312,20 +364,13 @@ struct WorkflowView: View {
 
     // MARK: - Actions
 
-    private let pipelineTaskNames: [PipelineStep: String] = [
-        .tag: "tag",
-        .fixTimezone: "fix-timestamp",
-        .organize: "organize",
-        .gyroflow: "gyroflow"
-    ]
-
     private func countMediaFiles() -> Int {
         guard let profile = state.activeProfile else { return 0 }
         let extensions = (profile.fileExtensions ?? []).map {
             $0.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
         }
         guard !extensions.isEmpty else { return 0 }
-        let dir = state.enabledSteps.contains(.importFromCard) ? state.sourceDir : (profile.importDir ?? "")
+        let dir = state.sourceDir
         guard !dir.isEmpty else { return 0 }
         guard let enumerator = FileManager.default.enumerator(
             at: URL(fileURLWithPath: dir),
@@ -349,32 +394,7 @@ struct WorkflowView: View {
         state.clearLog()
         state.isRunning = true
 
-        let steps = state.enabledSteps
-        let hasImport = steps.contains(.importFromCard)
-
-        let script = hasImport ? "import-media.sh" : "media-pipeline.sh"
-        var args: [String] = []
-        args += ["--profile", state.selectedProfile]
-        
-        if !state.subfolder.isEmpty {
-            args += ["--subfolder", state.subfolder]
-        }
-        
-        if hasImport {
-            if state.skipCompanion { args.append("--skip-companion") }
-            if !state.sourceDir.isEmpty { args.append(state.sourceDir) }
-        } else {
-            let taskArgs = state.availableSteps
-                .filter { $0 != .importFromCard && steps.contains($0) }
-                .compactMap { pipelineTaskNames[$0] }
-            if !taskArgs.isEmpty {
-                args += ["--tasks"] + taskArgs
-            }
-        }
-        if steps.contains(.fixTimezone) && !state.timezone.isEmpty {
-            args += ["--timezone", state.timezone]
-        }
-        if state.applyMode { args.append("--apply") }
+        let (script, args) = state.buildPipelineArgs()
 
         let (process, stream) = ScriptRunner.run(
             script: script,

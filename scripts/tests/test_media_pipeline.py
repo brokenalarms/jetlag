@@ -146,7 +146,7 @@ class TestFileDiscovery:
         create_test_video(source / "2025-10-05" / "test2.mp4")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         assert "Found 2 video file(s)" in result.stdout
@@ -159,7 +159,7 @@ class TestFileDiscovery:
         (source / "2025-10-05" / "test.txt").write_bytes(b"fake")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         assert "Found 1 video file(s)" in result.stdout
@@ -171,7 +171,7 @@ class TestFileDiscovery:
         create_test_video(source / "2025-10-06" / "subdir" / "test2.mp4")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         assert "Found 2 video file(s)" in result.stdout
@@ -184,7 +184,7 @@ class TestFileDiscovery:
         create_test_video(source / "mango.mp4")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         lines = result.stdout.split("\n")
@@ -205,7 +205,7 @@ class TestDryRunMode:
         create_test_video(video)
 
         result = run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         assert video.exists(), "Source file should still exist"
@@ -221,7 +221,7 @@ class TestDryRunMode:
         original_dto = get_exif_field(video, "DateTimeOriginal")
 
         run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         new_dto = get_exif_field(video, "DateTimeOriginal")
@@ -239,7 +239,7 @@ class TestApplyMode:
         create_test_video(video, media_create_date="2025:10:05 01:00:00")
 
         run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "TestGroup", "--apply"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "TestGroup", "--apply"],
         )
 
         assert video.exists(), "Source file should be preserved"
@@ -257,7 +257,7 @@ class TestApplyMode:
         assert get_exif_field(video, "DateTimeOriginal") == ""
 
         run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         # Find the moved file
@@ -273,7 +273,7 @@ class TestApplyMode:
         create_test_video(video, media_create_date="2025:10:05 01:00:00")
 
         run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         moved = list(target.rglob("*.mp4"))[0]
@@ -281,40 +281,40 @@ class TestApplyMode:
         assert "+09:00" in creation_date or "+0900" in creation_date
 
 
-class TestSubfolderTemplate:
-    """Tests for --subfolder parameter and path template."""
+class TestGroupTemplate:
+    """Tests for --group parameter and path template."""
 
-    def test_subfolder_creates_correct_path_structure(self, temp_workspace, test_profile):
-        """--subfolder creates YYYY/SUBFOLDER/YYYY-MM-DD structure."""
+    def test_group_creates_correct_path_structure(self, temp_workspace, test_profile):
+        """--group creates YYYY/GROUP/YYYY-MM-DD structure."""
         source = temp_workspace["source"]
         target = temp_workspace["target"]
         video = source / "test.mp4"
         create_test_video(video, media_create_date="2025:08:15 03:00:00")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "South Korea Trip", "--apply"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "South Korea Trip", "--apply"],
         )
 
         actual_files = list(target.rglob("*.mp4"))
         expected = target / "2025" / "South Korea Trip" / "2025-08-15" / "test.mp4"
         assert expected.exists(), f"Expected: {expected}\nActual files: {actual_files}\nStdout: {result.stdout[-500:]}\nStderr: {result.stderr}"
 
-    def test_subfolder_with_special_characters(self, temp_workspace, test_profile):
-        """Subfolder names with special characters work correctly."""
+    def test_group_with_special_characters(self, temp_workspace, test_profile):
+        """Group names with special characters work correctly."""
         source = temp_workspace["source"]
         target = temp_workspace["target"]
         video = source / "test.mp4"
         create_test_video(video, media_create_date="2025:08:15 03:00:00")
 
         run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "08-09 - South Korea", "--apply"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "08-09 - South Korea", "--apply"],
         )
 
         expected = target / "2025" / "08-09 - South Korea" / "2025-08-15" / "test.mp4"
         assert expected.exists()
 
-    def test_without_subfolder_uses_flat_date_structure(self, temp_workspace, test_profile):
-        """Without --subfolder, files are organized into YYYY/YYYY-MM-DD structure."""
+    def test_without_group_uses_flat_date_structure(self, temp_workspace, test_profile):
+        """Without --group, files are organized into YYYY/YYYY-MM-DD structure."""
         source = temp_workspace["source"]
         target = temp_workspace["target"]
         video = source / "test.mp4"
@@ -328,12 +328,12 @@ class TestSubfolderTemplate:
         expected = target / "2025" / "2025-08-15" / "test.mp4"
         assert expected.exists(), f"Expected: {expected}\nActual files: {actual_files}\nStdout: {result.stdout[-500:]}\nStderr: {result.stderr}"
 
-    def test_folder_template_with_subfolder(self, temp_workspace, test_profile):
-        """Profile folder_template with {{SUBFOLDER}} token substitutes the subfolder value."""
+    def test_folder_template_with_group(self, temp_workspace, test_profile):
+        """Profile folder_template with {{GROUP}} token substitutes the group value."""
         profiles_path = SCRIPT_DIR / "media-profiles.yaml"
         with open(profiles_path) as f:
             profiles = yaml.safe_load(f)
-        profiles["profiles"]["_test"]["folder_template"] = "{{YYYY}}/{{MM}}/{{SUBFOLDER}}/{{YYYY}}-{{MM}}-{{DD}}"
+        profiles["profiles"]["_test"]["folder_template"] = "{{YYYY}}/{{MM}}/{{GROUP}}/{{YYYY}}-{{MM}}-{{DD}}"
         with open(profiles_path, "w") as f:
             yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
 
@@ -343,19 +343,19 @@ class TestSubfolderTemplate:
         create_test_video(video, media_create_date="2025:08:15 03:00:00")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Japan", "--apply"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Japan", "--apply"],
         )
 
         actual_files = list(target.rglob("*.mp4"))
         expected = target / "2025" / "08" / "Japan" / "2025-08-15" / "test.mp4"
         assert expected.exists(), f"Expected: {expected}\nActual files: {actual_files}\nStdout: {result.stdout[-500:]}\nStderr: {result.stderr}"
 
-    def test_folder_template_without_subfolder(self, temp_workspace, test_profile):
-        """Profile folder_template used as-is when no --subfolder given."""
+    def test_folder_template_without_group(self, temp_workspace, test_profile):
+        """Profile folder_template used as-is when no --group given."""
         profiles_path = SCRIPT_DIR / "media-profiles.yaml"
         with open(profiles_path) as f:
             profiles = yaml.safe_load(f)
-        profiles["profiles"]["_test"]["folder_template"] = "{{YYYY}}/{{MM}}/{{SUBFOLDER}}/{{YYYY}}-{{MM}}-{{DD}}"
+        profiles["profiles"]["_test"]["folder_template"] = "{{YYYY}}/{{MM}}/{{GROUP}}/{{YYYY}}-{{MM}}-{{DD}}"
         with open(profiles_path, "w") as f:
             yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
 
@@ -369,8 +369,83 @@ class TestSubfolderTemplate:
         )
 
         actual_files = list(target.rglob("*.mp4"))
-        expected = target / "2025" / "08" / "{{SUBFOLDER}}" / "2025-08-15" / "test.mp4"
+        expected = target / "2025" / "08" / "{{GROUP}}" / "2025-08-15" / "test.mp4"
         assert expected.exists(), f"Expected: {expected}\nActual files: {actual_files}\nStdout: {result.stdout[-500:]}\nStderr: {result.stderr}"
+
+
+class TestAppendTimezoneToGroup:
+    """Tests for --append-timezone-to-group flag."""
+
+    def test_appends_timezone_to_group_folder(self, temp_workspace, test_profile):
+        """--append-timezone-to-group appends timezone offset to group folder name."""
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:08:15 03:00:00")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Japan",
+            "--append-timezone-to-group",
+            "--apply",
+        ])
+
+        expected = target / "2025" / "Japan (+0900)" / "2025-08-15" / "test.mp4"
+        actual_files = list(target.rglob("*.mp4"))
+        assert expected.exists(), f"Expected: {expected}\nActual files: {actual_files}"
+
+    def test_group_without_append_timezone(self, temp_workspace, test_profile):
+        """--group without --append-timezone-to-group uses plain group name."""
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:08:15 03:00:00")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Japan",
+            "--apply",
+        ])
+
+        expected = target / "2025" / "Japan" / "2025-08-15" / "test.mp4"
+        actual_files = list(target.rglob("*.mp4"))
+        assert expected.exists(), f"Expected: {expected}\nActual files: {actual_files}"
+
+    def test_append_timezone_without_group_errors(self, temp_workspace, test_profile):
+        """--append-timezone-to-group without --group exits with error."""
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        create_test_video(video)
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--append-timezone-to-group",
+        ])
+
+        assert result.returncode != 0
+        assert "--group" in result.output
+
+    def test_append_timezone_without_timezone_errors(self, temp_workspace, test_profile):
+        """--append-timezone-to-group without --timezone exits with error."""
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        create_test_video(video)
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--group", "Japan",
+            "--append-timezone-to-group",
+        ])
+
+        assert result.returncode != 0
+        assert "--timezone" in result.output
 
 
 class TestTimezoneHandling:
@@ -388,7 +463,7 @@ class TestTimezoneHandling:
         create_test_video(video, media_create_date="2025:10:05 01:00:00")
 
         run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         moved = list(target.rglob("*.mp4"))[0]
@@ -402,7 +477,7 @@ class TestTimezoneHandling:
         create_test_video(video)
 
         result = run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "JST", "--subfolder", "Test"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "JST", "--group", "Test"],
         )
 
         assert result.returncode != 0
@@ -420,7 +495,7 @@ class TestSummaryOutput:
         create_test_video(source / "test3.mp4")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         assert "Total files processed: 3" in result.stdout
@@ -435,7 +510,7 @@ class TestSummaryOutput:
         video.chmod(0o000)
 
         result = run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         # Restore permissions for cleanup
@@ -454,7 +529,7 @@ class TestExiftoolTmpDetection:
         create_test_video(source / "test.mp4")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         assert "exiftool_tmp" in result.output
@@ -471,7 +546,7 @@ class TestTagging:
         create_test_video(video)
 
         result = run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         # Check that tagging was reported in output (Spotlight indexing unreliable in temp dirs)
@@ -485,7 +560,7 @@ class TestTagging:
         create_test_video(video)
 
         run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         moved = list(target.rglob("*.mp4"))[0]
@@ -510,7 +585,7 @@ class TestAlreadyProcessedFiles:
         original_size = correct_path.stat().st_size
 
         run_pipeline(
-            ["--profile", test_profile, "--source", str(correct_path.parent), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
+            ["--profile", test_profile, "--source", str(correct_path.parent), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         assert correct_path.exists(), "File should still be at the organized location"
@@ -522,8 +597,8 @@ class TestAlreadyProcessedFiles:
 class TestCLIArguments:
     """Tests for CLI argument handling."""
 
-    def test_subfolder_is_optional(self, temp_workspace, test_profile):
-        """--subfolder is optional; pipeline runs without it."""
+    def test_group_is_optional(self, temp_workspace, test_profile):
+        """--group is optional; pipeline runs without it."""
         source = temp_workspace["source"]
         create_test_video(source / "test.mp4")
 
@@ -540,7 +615,7 @@ class TestCLIArguments:
         create_test_video(source / "test.mp4")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--timezone", "+0900", "--subfolder", "Test"],
+            ["--profile", test_profile, "--timezone", "+0900", "--group", "Test"],
         )
 
         assert str(source) in result.stdout
@@ -553,7 +628,7 @@ class TestCLIArguments:
         create_test_video(source / "test.mp4")
 
         result = run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
         assert str(target) in result.stdout
@@ -570,7 +645,7 @@ class TestIngestIntegration:
         original_bytes = video.read_bytes()
 
         run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         assert video.exists(), "Source file should be preserved after pipeline"
@@ -585,7 +660,7 @@ class TestIngestIntegration:
         original_dto = get_exif_field(video, "DateTimeOriginal")
 
         run_pipeline(
-            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--subfolder", "Test", "--apply"],
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
         assert video.exists(), "Source file should exist"
@@ -605,7 +680,7 @@ class TestOutputAlwaysOn:
 
         run_pipeline(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900",
-             "--subfolder", "Test", "--tasks", "fix-timestamp", "--apply"],
+             "--group", "Test", "--tasks", "fix-timestamp", "--apply"],
         )
 
         output_files = list(target.rglob("*.mp4"))
@@ -620,7 +695,7 @@ class TestOutputAlwaysOn:
 
         run_pipeline(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900",
-             "--subfolder", "Test", "--tasks", "tag", "--apply"],
+             "--group", "Test", "--tasks", "tag", "--apply"],
         )
 
         output_files = list(target.rglob("*.mp4"))
@@ -644,7 +719,7 @@ class TestCompanionFiles:
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
-            "--subfolder", "Test",
+            "--group", "Test",
             "--copy-companion-files",
             "--apply",
         ])
@@ -668,7 +743,7 @@ class TestCompanionFiles:
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
-            "--subfolder", "Test",
+            "--group", "Test",
             "--apply",
         ])
 
@@ -693,7 +768,7 @@ class TestCompanionFiles:
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
-            "--subfolder", "Test",
+            "--group", "Test",
             "--copy-companion-files",
             "--apply",
         ])
@@ -718,7 +793,7 @@ class TestArchiveSourceIntegration:
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
-            "--subfolder", "Test",
+            "--group", "Test",
             "--tasks", "tag", "fix-timestamp", "archive-source",
             "--source-action", "archive",
             "--apply",
@@ -742,7 +817,7 @@ class TestArchiveSourceIntegration:
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
-            "--subfolder", "Test",
+            "--group", "Test",
             "--tasks", "tag", "fix-timestamp", "archive-source",
             "--source-action", "delete",
             "--apply",
@@ -762,7 +837,7 @@ class TestArchiveSourceIntegration:
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
-            "--subfolder", "Test",
+            "--group", "Test",
             "--apply",
         ])
 
@@ -782,7 +857,7 @@ class TestArchiveSourceIntegration:
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
-            "--subfolder", "Test",
+            "--group", "Test",
             "--tasks", "tag", "fix-timestamp", "archive-source",
             "--source-action", "delete",
             "--copy-companion-files",

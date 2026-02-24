@@ -2,20 +2,21 @@ import Foundation
 
 enum Strings {
     enum Workflow {
-        static let subfolder = String(localized: "workflow.subfolder.help",
-            defaultValue: "Optional subfolder for organizing files (e.g. trip or project name)")
+        static let group = String(localized: "workflow.group.help",
+            defaultValue: "Optional group folder for organizing files (e.g. trip name like 'Japan'). Creates YYYY/Group/YYYY-MM-DD structure.")
         static let sourceDir = String(localized: "workflow.sourceDir.help",
             defaultValue: "Directory to import from, usually an SD card mount point. Pre-filled from profile, editable.")
-        static let skipCompanion = String(localized: "workflow.skipCompanion.help",
-            defaultValue: "Companion files are sidecar files generated alongside the main media — e.g. .thm (thumbnail), .lrv (low-res proxy), .srt (subtitles/telemetry). When skipped, only the primary media files are imported. The companion files remain on the source and are not deleted.")
-        static let preserveSource = String(localized: "workflow.preserveSource.help",
+        static let copyCompanionFiles = String(localized: "workflow.copyCompanionFiles.help",
+            defaultValue: "Companion files are sidecar files generated alongside the main media — e.g. .thm (thumbnail), .lrv (low-res proxy), .srt (subtitles/telemetry). When enabled, companions are copied alongside the main file to the ready directory.")
+        static let sourceAction = String(localized: "workflow.sourceAction.help",
             defaultValue: """
-When enabled, original are left in place on the memory card after copying.
-
-When disabled, files are archived on the card (e.g., moved into 'DCIM - copied 2026-01-01' after successful copy).
-
-Files will not be deleted from the memory card in either case.
+What happens to source files after processing:
+• Leave — files stay in place (default)
+• Archive — rename source folder with date suffix
+• Delete — remove only processed files and companions from source
 """)
+        static let appendTimezoneToGroup = String(localized: "workflow.appendTimezoneToGroup.help",
+            defaultValue: "Appends the timezone offset to the group folder name, e.g. 'Japan (+0900)'. Useful when a trip spans multiple timezones.")
         static let timezone = String(localized: "workflow.timezone.help",
             defaultValue: "Timezone the footage was shot in, used to fix timestamps for your video editor")
         static let timezoneManual = String(localized: "workflow.timezoneManual.help",

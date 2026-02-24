@@ -119,7 +119,7 @@ Standalone subscript. Called by media-pipeline.py when `archive-source` is in `-
 - Delete mode: remove each file in `--files`, then walk up from each file's parent dir to `--source`, calling `os.rmdir()` on empty directories (stops at `--source` itself — does not delete the source root unless it's empty too)
 - Read-only fallback: log error, exit non-zero
 
-### scripts/media-profiles.yaml
+### scripts/media-profiles.yaml ✓ done
 
 All profiles: remove `import_dir` (working dir is now always temp).
 
@@ -131,7 +131,7 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 - Remove `import_dir` line
 - `ready_dir` unchanged
 
-### macos/Sources/Models/AppState.swift
+### macos/Sources/Models/AppState.swift ✓ done
 
 - Add `SourceAction` enum: `.leave`, `.archive`, `.delete` with raw string values matching CLI args
 - Add `sourceAction: SourceAction` (default `.leave`)
@@ -142,7 +142,7 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 - `availableSteps`: unchanged (still returns all steps including import and organize)
 - `enabledSteps`: always-on steps cannot be removed from the set
 
-### macos/Sources/Views/WorkflowView.swift
+### macos/Sources/Views/WorkflowView.swift ✓ done
 
 - `stepsPipeline`: render always-on steps (`isAlwaysOn`) with distinct visual treatment — non-toggleable, visually differentiated from optional steps (different background, no checkbox, or structural separator)
 - Always call `media-pipeline.sh` (remove the `hasImport ? "import-media.sh" : "media-pipeline.sh"` fork)
@@ -155,7 +155,7 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 - `pipelineTaskNames`: remove `.organize` mapping (no longer a task choice). Add `.archiveSource` → `"archive-source"`. Keep `.tag`, `.fixTimezone`, `.gyroflow`. Do not add `.importFromCard` (not a task choice).
 - `countMediaFiles()`: always count from `state.sourceDir` (remove the `hasImport ?` branch)
 
-### macos/Sources/Views/ProfilesView.swift
+### macos/Sources/Views/ProfilesView.swift ✓ done
 
 - Remove `import_dir` row from profile editor
 - Keep `ready_dir` as "Ready dir" (all profile types)
@@ -177,11 +177,11 @@ Video profiles (insta360, gopro, dji-mini-4-pro-video, sony-a7iv-video, sony-a7v
 - Test read-only source: logs error, exits non-zero
 - Test dry-run: no changes when `--apply` not passed
 
-### docs/scripts.md
+### docs/scripts.md ✓ done
 
 - Update workflow design section to reflect single-orchestrator model
 
-### TODO.md
+### TODO.md ✓ done
 
 - Remove completed task (this one)
 - Add deferred task: rename `--subfolder` → `--group` across scripts and app

@@ -39,3 +39,14 @@ targets:
           cp -r "${SRCROOT}/../scripts/" "$DEST"
           rm -rf "$DEST/site-packages"
           python3 -m pip install --quiet --target "$DEST/site-packages" -r "$DEST/requirements.txt"
+  JetlagTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests
+    dependencies:
+      - target: Jetlag
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: YES
