@@ -3,7 +3,6 @@
 - (2026-02-24) **Replace conftest auto-skip with explicit decorators** — the source-inspection skip mechanism is opaque and misses indirect macOS dependencies. Replace with explicit `@pytest.mark.skipif` on each macOS-only class. Full plan: [todos/improve-platform-based-test-skipping.md](todos/improve-platform-based-test-skipping.md)
 
 - (2026-02-20) **`tag-media.py` still makes a separate exiftool read for Make/Model** — `get_existing_exif_camera()` runs its own exiftool subprocess independent of any other data read for the file. For files where both EXIF and Finder tags need checking, this means 2 reads (tag list + exif) before deciding on writes. Low priority since these are already small reads, but could be merged if tag-media is ever extended to read more EXIF fields.
-- (2026-02-24) make test output as quiet as possible, just 'running tests...' then the failed test name + FAILED (saves context)
 
 ## `macos/`
 
