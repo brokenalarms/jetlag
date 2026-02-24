@@ -3,7 +3,7 @@
   - docs/macos.md: when working on the Jetlag macOS app
   - docs/web.md: when working on the marketing site
   - docs/architecture.md: system overview, how components interact, profile system
-  - docs/committing.md: branch checks, commit rules, PR workflow
+  - docs/committing.md: branch checks, commit rules, PR workflow. Make sure you consult this for commit rules before committing and pushing.
   - TODO.md: sliding context window — read at session start, pick ONE task
 - SESSION START — see docs/committing.md for the full branch-check procedure. Run it before any other action, every session.
 - LAYOUT — three sibling components at repo root:
@@ -22,5 +22,5 @@
   - TODO.md is a sliding context window for fresh agents — open tasks only; completed work belongs in commit messages, not here
   - tasks are grouped by subrepo (`scripts/`, `macos/`, `web/`); cross-repo tasks appear under combined headings (e.g. `scripts/` + `macos/`)
   - each task is prefixed with its date added in YYYY-MM-DD format
-  - at the start of each session, read TODO.md; if not instructed to work on a specific task, determine the single highest-leverage, oldest, or most badly needed task, and work only on that
-  - at the end of a session, remove completed tasks and add any newly discovered ones; never add a "Done" section
+  - at the start of each session, read TODO.md; if not instructed to work on a specific task, determine the single highest-leverage or most badly needed task, and work only on that. Use dates created to help inform where we are up to in terms of the backlog and broken-down tasks that may only be partially implemented.
+  - at the end of a session, remove completed tasks from TODO.md and add any newly discovered ones; never add a "Done" section to TODO.md. The commit record is the 'Done' record.
