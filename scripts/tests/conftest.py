@@ -66,6 +66,14 @@ def _install_python_package(import_name, pip_name):
         )
 
 
+def pytest_addoption(parser):
+    """Register custom CLI flags."""
+    parser.addoption(
+        "--perf-baseline", action="store_true", default=False,
+        help="Record performance baselines instead of comparing against them",
+    )
+
+
 def pytest_configure(config):
     """Install missing tools and packages before tests run."""
     platform = "darwin" if sys.platform == "darwin" else "linux"

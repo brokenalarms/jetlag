@@ -5,15 +5,19 @@ Performance snapshot harness for base scripts.
 Measures wall-clock time for each script processing a single file and compares
 against a saved baseline to detect speed regressions.
 
-Baseline file (tests/perf_baseline.json) is auto-created on first run.
-Delete it to reset and record a new baseline after intentional perf improvements.
+Usage:
+    pytest tests/test_performance.py -v -s                  # compare against baseline
+    pytest tests/test_performance.py -v -s --perf-baseline  # record new baseline
+
+The baseline file (tests/perf_baseline.json) is machine-specific and gitignored.
+Record it once on your dev machine with --perf-baseline, then subsequent runs
+compare against it. Delete the file and re-record after intentional perf changes.
 """
 
 import json
 import shutil
 import statistics
 import subprocess
-import tempfile
 import time
 from pathlib import Path
 
@@ -88,29 +92,36 @@ class TestPerformance:
     def tmp(self, tmp_path):
         self._tmp = tmp_path
 
-    def _check(self, name: str, elapsed: float, baseline: dict, results: dict):
-        results[name] = round(elapsed, 3)
-        if name in baseline:
-            base = baseline[name]
-            ratio = elapsed / base if base > 0 else 1.0
-            delta_pct = (ratio - 1.0) * 100
-            if delta_pct > 0:
-                status = f"SLOWER +{delta_pct:.0f}% ({elapsed:.2f}s vs baseline {base:.2f}s)"
-            else:
-                status = f"faster {delta_pct:.0f}% ({elapsed:.2f}s vs baseline {base:.2f}s)"
-            print(f"\n  {name}: {status}")
-            assert ratio <= (1 + REGRESSION_THRESHOLD), (
-                f"{name} regression: {elapsed:.2f}s is {delta_pct:.0f}% slower than baseline {base:.2f}s "
-                f"(threshold {REGRESSION_THRESHOLD*100:.0f}%)"
-            )
-        else:
-            print(f"\n  {name}: {elapsed:.2f}s (no baseline yet)")
-
-    def test_tag_media_apply(self, source_mp4):
-        """tag-media.py: apply tags + EXIF to a single file."""
+    def _check(self, name: str, elapsed: float, request):
+        """Compare elapsed time against baseline, or record if --perf-baseline."""
         baseline = load_baseline()
-        results = {}
+        recording = request.config.getoption("--perf-baseline", default=False)
 
+        if recording:
+            baseline[name] = round(elapsed, 3)
+            save_baseline(baseline)
+            print(f"\n  {name}: {elapsed:.2f}s (baseline recorded)")
+            return
+
+        if name not in baseline:
+            print(f"\n  {name}: {elapsed:.2f}s (no baseline — run with --perf-baseline to record)")
+            return
+
+        base = baseline[name]
+        ratio = elapsed / base if base > 0 else 1.0
+        delta_pct = (ratio - 1.0) * 100
+        if delta_pct > 0:
+            status = f"SLOWER +{delta_pct:.0f}% ({elapsed:.2f}s vs baseline {base:.2f}s)"
+        else:
+            status = f"faster {delta_pct:.0f}% ({elapsed:.2f}s vs baseline {base:.2f}s)"
+        print(f"\n  {name}: {status}")
+        assert ratio <= (1 + REGRESSION_THRESHOLD), (
+            f"{name} regression: {elapsed:.2f}s is {delta_pct:.0f}% slower than baseline {base:.2f}s "
+            f"(threshold {REGRESSION_THRESHOLD*100:.0f}%)"
+        )
+
+    def test_tag_media_apply(self, source_mp4, request):
+        """tag-media.py: apply tags + EXIF to a single file."""
         elapsed = measure_script(
             ["python3", str(SCRIPT_DIR / "tag-media.py"),
              "__FILE__",
@@ -120,20 +131,10 @@ class TestPerformance:
              "--apply"],
             source_mp4, self._tmp
         )
-        self._check("tag_media_apply", elapsed, baseline, results)
+        self._check("tag_media_apply", elapsed, request)
 
-        if not baseline:
-            save_baseline(results)
-            print(f"\n  Baseline saved to {BASELINE_FILE}")
-        else:
-            updated = {**baseline, **results}
-            save_baseline(updated)
-
-    def test_fix_media_timestamp_apply(self, source_mp4):
+    def test_fix_media_timestamp_apply(self, source_mp4, request):
         """fix-media-timestamp.py: apply timestamp fix to a single file."""
-        baseline = load_baseline()
-        results = {}
-
         elapsed = measure_script(
             ["python3", str(SCRIPT_DIR / "fix-media-timestamp.py"),
              "__FILE__",
@@ -141,16 +142,9 @@ class TestPerformance:
              "--apply"],
             source_mp4, self._tmp
         )
-        self._check("fix_media_timestamp_apply", elapsed, baseline, results)
+        self._check("fix_media_timestamp_apply", elapsed, request)
 
-        if not baseline:
-            save_baseline(results)
-            print(f"\n  Baseline saved to {BASELINE_FILE}")
-        else:
-            updated = {**baseline, **results}
-            save_baseline(updated)
-
-    def test_tag_media_no_work(self, source_mp4):
+    def test_tag_media_no_work(self, source_mp4, request):
         """tag-media.py: file already tagged correctly (check-before-write path)."""
         # Pre-tag the file once
         pre_tagged = fresh_copy(source_mp4, self._tmp, "pre_tagged.mp4")
@@ -162,9 +156,6 @@ class TestPerformance:
             "--model", "HERO12 Black",
             "--apply"
         ], capture_output=True, check=True)
-
-        baseline = load_baseline()
-        results = {}
 
         # Now measure the idempotent (no-op) run — still makes reads, skips writes
         times = []
@@ -181,10 +172,4 @@ class TestPerformance:
             times.append(time.perf_counter() - t0)
         elapsed = statistics.median(times)
 
-        self._check("tag_media_no_work", elapsed, baseline, results)
-
-        if not baseline:
-            save_baseline(results)
-        else:
-            updated = {**baseline, **results}
-            save_baseline(updated)
+        self._check("tag_media_no_work", elapsed, request)
