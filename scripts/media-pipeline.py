@@ -6,7 +6,7 @@ Orchestrates media processing: ingest from source, process, output to target.
 Usage: media-pipeline.py --profile PROFILE [--subfolder SUBFOLDER] [OPTIONS]
        media-pipeline.py --source DIR --target DIR [--subfolder SUBFOLDER] [OPTIONS]
 
-Pipeline: INGEST (always) → [tag] → [fix-timestamp] → [gyroflow] → OUTPUT (always)
+Pipeline: INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow] → [archive-source]
 
 Source files are read-only inputs — ingest copies them to a working directory,
 all processing happens there, then output moves files to the target.
@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -176,20 +177,24 @@ def run_organize_by_date(
 def run_ingest_media(
     file_path: Path,
     working_dir: str,
-    apply: bool
-) -> tuple[str, str, str, int]:
+    apply: bool,
+    companion_extensions: list[str] | None = None,
+) -> tuple[str, str, str, int, list[str]]:
     """Copy a source file into the flat working directory.
 
     Calls ingest-media.ingest_file() directly to avoid per-file subprocess overhead.
 
     Returns:
-        tuple of (stderr_output, action, dest_path, return_code)
+        tuple of (stderr_output, action, dest_path, return_code, companion_dests)
     """
     try:
-        dest, action = _ingest_mod.ingest_file(str(file_path), working_dir, apply)
-        return "", action, dest, 0
+        dest, action, companion_dests = _ingest_mod.ingest_file(
+            str(file_path), working_dir, apply,
+            companion_extensions=companion_extensions,
+        )
+        return "", action, dest, 0, companion_dests
     except Exception as e:
-        return str(e), "", "", 1
+        return str(e), "", "", 1, []
 
 
 def run_generate_gyroflow(
@@ -224,6 +229,35 @@ def run_generate_gyroflow(
     return action, result.returncode
 
 
+def run_archive_source(
+    source_dir: str,
+    action: str,
+    files: list[str],
+    apply: bool,
+    verbose: bool,
+) -> int:
+    """Run archive-source.py on the source directory after all files processed.
+
+    Returns the subprocess return code.
+    """
+    cmd = [
+        sys.executable, str(SCRIPT_DIR / "archive-source.py"),
+        "--source", source_dir,
+        "--action", action,
+    ]
+
+    if files:
+        cmd.append("--files")
+        cmd.extend(files)
+    if apply:
+        cmd.append("--apply")
+    if verbose:
+        cmd.append("--verbose")
+
+    result = subprocess.run(cmd)
+    return result.returncode
+
+
 def process_file(
     file_path: Path,
     profile: Optional[dict],
@@ -234,21 +268,26 @@ def process_file(
     apply: bool,
     verbose: bool,
     gyroflow_config: Optional[dict] = None,
-    tasks: Optional[set] = None
+    tasks: set | None = None,
+    companion_extensions: list[str] | None = None,
+    copy_companion_files: bool = False,
 ) -> dict:
     """Process a single file through the pipeline.
 
-    Flow: INGEST (always) → [tag] → [fix-timestamp] → [gyroflow] → OUTPUT (always)
+    Flow: INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow]
 
     Returns:
-        dict with keys: changed, failed, error
+        dict with keys: changed, failed, error, source_files
     """
-    result = {"changed": False, "failed": False, "error": None}
+    result = {"changed": False, "failed": False, "error": None, "source_files": [str(file_path)]}
     file_changed = False
 
     # INGEST (always): copy source file to working dir
     print("📥 Ingesting...")
-    output, action, dest, rc = run_ingest_media(file_path, working_dir, apply)
+    ingest_companions = companion_extensions if copy_companion_files else None
+    output, action, dest, rc, companion_dests = run_ingest_media(
+        file_path, working_dir, apply, companion_extensions=ingest_companions,
+    )
     if output:
         for line in output.split("\n"):
             if line.strip():
@@ -264,8 +303,16 @@ def process_file(
     if action == "copied":
         file_changed = True
 
+    if copy_companion_files and companion_dests:
+        source_dir = file_path.parent
+        stem = file_path.stem
+        for ext in companion_extensions or []:
+            companion_source = source_dir / (stem + ext)
+            if companion_source.is_file():
+                result["source_files"].append(str(companion_source))
+
     # Tag media (if in tasks and profile has tags/make/model)
-    if (tasks is None or "tag" in tasks) and profile:
+    if "tag" in tasks and profile:
         tags = ",".join(profile.get("tags", []))
         exif = profile.get("exif", {})
         make = exif.get("make", "")
@@ -280,7 +327,7 @@ def process_file(
                 file_changed = True
 
     # Fix video timestamp (if in tasks)
-    if tasks is None or "fix-timestamp" in tasks:
+    if "fix-timestamp" in tasks:
         print("🔧 Fixing timestamp...")
         output, changed, rc = run_fix_timestamp(active_file, location_args, apply, verbose)
         for line in output.split("\n"):
@@ -293,21 +340,6 @@ def process_file(
             return result
 
         if changed:
-            file_changed = True
-
-    # Generate gyroflow project (if in tasks and enabled)
-    gyroflow_enabled = profile.get("gyroflow_enabled", False) if profile else False
-    if (tasks is None or "gyroflow" in tasks) and gyroflow_enabled and gyroflow_config:
-        print("🎥 Generating gyroflow project...")
-
-        preset = gyroflow_config.get("preset", {})
-        preset_json = json.dumps(preset)
-
-        gf_action, rc = run_generate_gyroflow(active_file, preset_json, apply)
-
-        if rc != 0:
-            print(f"   ⚠️  Gyroflow generation failed for {file_path.name} (non-fatal)")
-        elif gf_action == "generated":
             file_changed = True
 
     # OUTPUT (always): organize active_file to target_dir
@@ -335,6 +367,34 @@ def process_file(
 
     if action in ("copied", "moved", "overwrote"):
         file_changed = True
+
+    # Move companions to the same output directory as the main file
+    if copy_companion_files and companion_dests and dest:
+        output_dir = Path(dest).parent
+        for companion_working_path in companion_dests:
+            companion_file = Path(companion_working_path)
+            companion_target = output_dir / companion_file.name
+            if apply and companion_file.exists():
+                os.makedirs(output_dir, exist_ok=True)
+                shutil.move(str(companion_file), str(companion_target))
+                print(f"  Companion: {companion_file.name} → {companion_target}")
+            elif not apply:
+                print(f"  [DRY RUN] Would move companion: {companion_file.name} → {companion_target}")
+
+    # Generate gyroflow project (if in tasks and enabled)
+    gyroflow_enabled = profile.get("gyroflow_enabled", False) if profile else False
+    if "gyroflow" in tasks and gyroflow_enabled and gyroflow_config:
+        print("🎥 Generating gyroflow project...")
+
+        preset = gyroflow_config.get("preset", {})
+        preset_json = json.dumps(preset)
+
+        gf_action, rc = run_generate_gyroflow(Path(dest) if dest else active_file, preset_json, apply)
+
+        if rc != 0:
+            print(f"   ⚠️  Gyroflow generation failed for {file_path.name} (non-fatal)")
+        elif gf_action == "generated":
+            file_changed = True
 
     result["changed"] = file_changed
     return result
@@ -383,8 +443,19 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed processing info")
     parser.add_argument(
         "--tasks", nargs="+",
-        choices=["tag", "fix-timestamp", "gyroflow"],
-        help="Optional pipeline steps to run (default: all). Ingest and output are always on."
+        choices=["tag", "fix-timestamp", "gyroflow", "archive-source"],
+        default=["tag", "fix-timestamp", "gyroflow"],
+        help="Optional pipeline steps to run (default: tag, fix-timestamp, gyroflow). Ingest and output are always on."
+    )
+    parser.add_argument(
+        "--source-action",
+        choices=["leave", "archive", "delete"],
+        default="leave",
+        help="Action for source after processing (default: leave). Requires archive-source in --tasks."
+    )
+    parser.add_argument(
+        "--copy-companion-files", action="store_true",
+        help="Also copy companion files (matching profile companion_extensions) to target."
     )
     parser.add_argument(
         "--working-dir",
@@ -449,7 +520,6 @@ def main():
             response = input("Delete them? This will allow exiftool to run. (y/n) ")
             if response.lower() == "y":
                 for d in tmp_dirs:
-                    import shutil
                     shutil.rmtree(d)
                 print("✅ Deleted exiftool_tmp directories", file=sys.stderr)
             else:
@@ -473,6 +543,8 @@ def main():
         print(f"→ Timezone: {location_args[0]} {location_args[1]}")
     else:
         print("→ Timezone: From video metadata (or will prompt if needed)")
+    print(f"→ Source action: {args.source_action}")
+    print(f"→ Copy companions: {'yes' if args.copy_companion_files else 'no'}")
     print()
 
     # Create target directory if needed
@@ -504,7 +576,13 @@ def main():
     }
 
     gyroflow_config = full_config.get("gyroflow")
-    tasks = set(args.tasks) if args.tasks else None
+    tasks = set(args.tasks)
+
+    companion_extensions = None
+    if args.copy_companion_files and profile:
+        companion_extensions = profile.get("companion_extensions")
+
+    all_source_files = []
 
     for i, file_path in enumerate(files, 1):
         stats["processed"] += 1
@@ -522,7 +600,9 @@ def main():
             args.apply,
             args.verbose,
             gyroflow_config=gyroflow_config,
-            tasks=tasks
+            tasks=tasks,
+            companion_extensions=companion_extensions,
+            copy_companion_files=args.copy_companion_files,
         )
 
         if result["failed"]:
@@ -533,7 +613,18 @@ def main():
             if result["changed"]:
                 stats["changed"] += 1
 
+        all_source_files.extend(result.get("source_files", []))
+
         print()  # Empty line between files
+
+    # Archive source (if in tasks and not default leave)
+    if "archive-source" in tasks:
+        print("📦 Archive source...")
+        arc_rc = run_archive_source(
+            source_dir, args.source_action, all_source_files, args.apply, args.verbose,
+        )
+        if arc_rc != 0:
+            print(f"   ⚠️  Archive-source failed (exit {arc_rc})")
 
     # Clean up working dir
     if args.apply:

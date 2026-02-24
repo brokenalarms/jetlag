@@ -8,11 +8,13 @@ identically when run against a Python rewrite.
 Run with: pytest tests/test_media_pipeline.py -v
 """
 
+import os
 import shlex
 import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 import pytest
@@ -116,6 +118,7 @@ def test_profile(temp_workspace):
         "file_extensions": [".mp4"],
         "tags": ["test-camera"],
         "exif": {"make": "Test", "model": "Camera"},
+        "companion_extensions": [".thm", ".lrv"],
     }
 
     # Write back (preserve formatting)
@@ -622,6 +625,172 @@ class TestOutputAlwaysOn:
 
         output_files = list(target.rglob("*.mp4"))
         assert len(output_files) == 1, f"File should be in target, found: {output_files}"
+
+
+class TestCompanionFiles:
+    """Tests for --copy-companion-files flag."""
+
+    def test_companions_copied_alongside_main_file(self, temp_workspace, test_profile):
+        """With --copy-companion-files, companion files end up in the same target directory as the main file."""
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+        (source / "test.thm").write_bytes(b"thumbnail-data")
+        (source / "test.lrv").write_bytes(b"lowres-video-data")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--subfolder", "Test",
+            "--copy-companion-files",
+            "--apply",
+        ])
+
+        expected_dir = target / "2025" / "Test" / "2025-10-05"
+        assert (expected_dir / "test.mp4").exists(), "Main file should be in target"
+        assert (expected_dir / "test.thm").exists(), "THM companion should be in target"
+        assert (expected_dir / "test.lrv").exists(), "LRV companion should be in target"
+
+    def test_companions_not_copied_without_flag(self, temp_workspace, test_profile):
+        """Without --copy-companion-files, only the main file appears in target."""
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+        (source / "test.thm").write_bytes(b"thumbnail-data")
+        (source / "test.lrv").write_bytes(b"lowres-video-data")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--subfolder", "Test",
+            "--apply",
+        ])
+
+        target_files = list(target.rglob("*"))
+        target_file_names = [f.name for f in target_files if f.is_file()]
+        assert "test.mp4" in target_file_names, "Main file should be in target"
+        assert "test.thm" not in target_file_names, "THM should not be copied without flag"
+        assert "test.lrv" not in target_file_names, "LRV should not be copied without flag"
+
+    def test_source_companions_preserved(self, temp_workspace, test_profile):
+        """Source companion files are untouched after processing with --copy-companion-files."""
+        source = temp_workspace["source"]
+
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+        thm = source / "test.thm"
+        lrv = source / "test.lrv"
+        thm.write_bytes(b"thumbnail-data")
+        lrv.write_bytes(b"lowres-video-data")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--subfolder", "Test",
+            "--copy-companion-files",
+            "--apply",
+        ])
+
+        assert thm.exists(), "Source THM should be preserved"
+        assert thm.read_bytes() == b"thumbnail-data"
+        assert lrv.exists(), "Source LRV should be preserved"
+        assert lrv.read_bytes() == b"lowres-video-data"
+
+
+class TestArchiveSourceIntegration:
+    """Tests for archive-source task integration in the pipeline."""
+
+    def test_archive_renames_source_dir(self, temp_workspace, test_profile):
+        """With archive-source task and --source-action archive, source dir is renamed."""
+        source = temp_workspace["source"]
+
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--subfolder", "Test",
+            "--tasks", "tag", "fix-timestamp", "archive-source",
+            "--source-action", "archive",
+            "--apply",
+        ])
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        expected_renamed = source.parent / f"{source.name} - copied {today}"
+        assert expected_renamed.exists(), f"Source should be renamed to {expected_renamed.name}"
+        assert not source.exists(), "Original source dir should no longer exist"
+
+    def test_delete_removes_processed_files(self, temp_workspace, test_profile):
+        """With --source-action delete, processed source files are removed."""
+        source = temp_workspace["source"]
+
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+        unrelated = source / "notes.txt"
+        unrelated.write_bytes(b"keep me")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--subfolder", "Test",
+            "--tasks", "tag", "fix-timestamp", "archive-source",
+            "--source-action", "delete",
+            "--apply",
+        ])
+
+        assert not video.exists(), "Processed video should be deleted from source"
+        assert unrelated.exists(), "Unrelated file should survive"
+
+    def test_archive_source_not_run_by_default(self, temp_workspace, test_profile):
+        """Default tasks do not include archive-source, so source is untouched."""
+        source = temp_workspace["source"]
+
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--subfolder", "Test",
+            "--apply",
+        ])
+
+        assert source.exists(), "Source dir should be untouched with default tasks"
+        assert video.exists(), "Source file should still exist"
+
+    def test_archive_source_with_companions(self, temp_workspace, test_profile):
+        """Archive-source with companions: companions included in source file list for delete."""
+        source = temp_workspace["source"]
+
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+        thm = source / "test.thm"
+        thm.write_bytes(b"thumbnail-data")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--subfolder", "Test",
+            "--tasks", "tag", "fix-timestamp", "archive-source",
+            "--source-action", "delete",
+            "--copy-companion-files",
+            "--apply",
+        ])
+
+        assert not video.exists(), "Processed video should be deleted from source"
+        assert not thm.exists(), "Companion THM should be deleted from source"
 
 
 if __name__ == "__main__":
