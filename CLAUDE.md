@@ -39,5 +39,7 @@
   - title: imperative sentence, lowercase, no period — what changed, not what you did
 - TODO.md
   - TODO.md is a sliding context window for fresh agents — open tasks only; completed work belongs in commit messages, not here
-  - at the start of each session, read TODO.md to understand the current state and pick ONE task from it to work on
+  - tasks are grouped by subrepo (`scripts/`, `macos/`, `web/`); cross-repo tasks appear under combined headings (e.g. `scripts/` + `macos/`)
+  - each task is prefixed with its date added in YYYY-MM-DD format
+  - at the start of each session, read TODO.md; if not instructed to work on a specific task, determine the single highest-leverage, oldest, or most badly needed task, and work only on that
   - at the end of a session, remove completed tasks and add any newly discovered ones; never add a "Done" section
