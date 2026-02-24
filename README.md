@@ -1,6 +1,6 @@
 # Jetlag
 
-Fix timestamps across GoPro, iPhone, drone, and cinema cameras so multi-camera footage lands in the right place in your video editor — automatically.
+Fix timestamps across GoPro, iPhone, drone, and cinema cameras so multi-camera footage lands in the right place in your video editor.
 
 ## Components
 
