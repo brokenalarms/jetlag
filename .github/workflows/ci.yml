@@ -53,9 +53,9 @@ jobs:
 
       - name: Record perf baseline from main
         run: |
-          git checkout origin/main -- scripts/
+          git checkout origin/main -- scripts/*.py scripts/*.sh scripts/lib/
           pytest scripts/tests/test_performance.py --perf-baseline --perf-baseline-file /tmp/perf_baseline.json -v -s
-          git checkout ${{ github.sha }} -- scripts/
+          git checkout ${{ github.sha }} -- scripts/*.py scripts/*.sh scripts/lib/
 
       - name: Run tests
         run: pytest scripts/tests/ -x -v --perf-baseline-file /tmp/perf_baseline.json
