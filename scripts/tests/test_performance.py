@@ -118,10 +118,16 @@ class TestPerformance:
             f"(threshold {REGRESSION_THRESHOLD*100:.0f}%)"
         )
 
-    def test_media_pipeline_3_files(self, request):
-        """media-pipeline: fix-timestamp + organize on 3 files."""
+    def test_media_pipeline(self, request):
+        """media-pipeline: fix-timestamp + organize on 17 files."""
         profiles_path = SCRIPT_DIR / "media-profiles.yaml"
         original_yaml = profiles_path.read_text()
+
+        file_count = 17
+        timestamps = [
+            f"2025:10:{5 + i:02d} {i:02d}:00:00"
+            for i in range(file_count)
+        ]
 
         times = []
         try:
@@ -133,11 +139,7 @@ class TestPerformance:
                     source.mkdir()
                     target.mkdir()
 
-                    for j, ts in enumerate([
-                        "2025:10:05 01:00:00",
-                        "2025:10:06 02:00:00",
-                        "2025:10:07 03:00:00",
-                    ]):
+                    for j, ts in enumerate(timestamps):
                         create_test_video(source / f"file_{j}.mp4", media_create_date=ts)
 
                     with open(profiles_path) as f:
@@ -162,4 +164,4 @@ class TestPerformance:
         finally:
             profiles_path.write_text(original_yaml)
 
-        self._check("media_pipeline_3_files", statistics.median(times), request)
+        self._check("media_pipeline", statistics.median(times), request)
