@@ -193,10 +193,20 @@ class TestMissingBinary:
 
                 assert result.returncode != 0
                 assert "not found" in result.stderr.lower() or "ERROR" in result.stderr
+                assert "@@error=" in result.stdout, "Machine-readable @@error should be emitted on failure"
 
             finally:
                 with open(PROFILES_FILE, "w") as f:
                     f.write(original_config)
+
+    def test_nonexistent_file_emits_error(self):
+        """@@error should be emitted for a nonexistent input file."""
+        result = run_generate_gyroflow([
+            "/nonexistent/file.mp4", "--preset", get_test_preset()
+        ])
+
+        assert result.returncode != 0
+        assert "@@error=" in result.stdout
 
 
 class TestPreset:
