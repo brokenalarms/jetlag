@@ -296,9 +296,10 @@ struct WorkflowView: View {
                 TextField("Optional", text: $state.group)
                     .textFieldStyle(.roundedBorder)
             }
-            if state.enabledSteps.contains(.fixTimezone) && !state.group.isEmpty {
+            if state.enabledSteps.contains(.fixTimezone) {
                 HStack(spacing: 4) {
                     Toggle("Append timezone to group folder", isOn: $state.appendTimezoneToGroup)
+                        .disabled(state.group.isEmpty)
                     HelpButton(Strings.Workflow.appendTimezoneToGroup)
                 }
             }
@@ -405,7 +406,7 @@ struct WorkflowView: View {
     // MARK: - Helpers
 
     private func destinationPreview(readyDir: String) -> String {
-        var path = (readyDir as NSString).lastPathComponent + "/YYYY"
+        var path = readyDir + "/YYYY"
         if !state.group.isEmpty {
             var groupName = state.group
             if state.appendTimezoneToGroup && state.enabledSteps.contains(.fixTimezone) && !state.timezone.isEmpty {
