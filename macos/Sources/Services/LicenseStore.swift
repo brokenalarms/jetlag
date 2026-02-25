@@ -29,6 +29,6 @@ final class LicenseStore {
         try? await Task.sleep(for: .seconds(1))
 
         // Stub: always fails until real payment integration is wired
-        activationError = "License activation coming soon — check back after launch"
+        activationError = Strings.Errors.licenseComingSoon
     }
 }

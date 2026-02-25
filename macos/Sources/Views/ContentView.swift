@@ -6,7 +6,7 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             List(SidebarTab.allCases, selection: $state.selectedTab) { tab in
-                Label(tab.rawValue, systemImage: tab.systemImage)
+                Label(tab.label, systemImage: tab.systemImage)
                     .tag(tab)
             }
             .navigationSplitViewColumnWidth(min: 140, ideal: 160)

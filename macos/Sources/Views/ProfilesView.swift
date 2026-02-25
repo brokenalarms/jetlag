@@ -25,12 +25,12 @@ struct ProfilesView: View {
                 .id(name)
                 .frame(maxWidth: .infinity)
             } else {
-                Text("Select a profile to edit")
+                Text(Strings.Profiles.selectPrompt)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .navigationTitle("Media Profiles")
+        .navigationTitle(Strings.Nav.mediaProfiles)
     }
 
     private var profileList: some View {
@@ -89,17 +89,17 @@ struct ProfilesView: View {
                 .buttonStyle(.borderless)
                 .disabled(selectedProfile == nil)
                 .confirmationDialog(
-                    "Delete profile \"\(selectedProfile ?? "")\"?",
+                    Strings.Profiles.deleteConfirmationTitle(selectedProfile ?? ""),
                     isPresented: $showDeleteConfirmation,
                     titleVisibility: .visible
                 ) {
-                    Button("Delete", role: .destructive) {
+                    Button(Strings.Common.delete, role: .destructive) {
                         if let name = selectedProfile {
                             deleteProfile(name)
                         }
                     }
                 } message: {
-                    Text("This will remove the profile from media-profiles.yaml. This cannot be undone.")
+                    Text(Strings.Profiles.deleteConfirmationMessage)
                 }
 
                 Spacer()
@@ -139,7 +139,7 @@ struct ProfilesView: View {
             try ProfileService.write(config, to: state.resolvedProfilesPath)
         } catch {
             state.profileLoadError = ProfileLoadError(
-                message: "Failed to write profiles",
+                message: Strings.Errors.profilesWriteFailed,
                 filePath: state.resolvedProfilesPath,
                 detail: error.localizedDescription
             )
@@ -158,16 +158,16 @@ struct ProfileEditorView: View {
         ScrollView {
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
                 GridRow {
-                    Text("Name").gridColumnAlignment(.trailing)
-                    TextField("profile-name", text: $profileName)
+                    Text(Strings.Profiles.nameLabel).gridColumnAlignment(.trailing)
+                    TextField(Strings.Profiles.namePlaceholder, text: $profileName)
                         .textFieldStyle(.roundedBorder)
                 }
 
                 GridRow {
-                    HelpLabel("Type", help: Strings.Profiles.type)
+                    HelpLabel(Strings.Profiles.typeLabel, help: Strings.Profiles.typeHelp)
                     Picker("", selection: typeBinding) {
-                        Text("Video").tag(MediaType.video)
-                        Text("Photo").tag(MediaType.photo)
+                        Text(Strings.Profiles.videoOption).tag(MediaType.video)
+                        Text(Strings.Profiles.photoOption).tag(MediaType.photo)
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
@@ -177,42 +177,42 @@ struct ProfileEditorView: View {
                 Divider().gridCellUnsizedAxes(.horizontal)
 
                 GridRow {
-                    Text("Source dir")
+                    Text(Strings.Profiles.sourceDirLabel)
                     dirField($profile.sourceDir)
                 }
                 GridRow {
-                    Text("Ready dir")
+                    Text(Strings.Profiles.readyDirLabel)
                     dirField($profile.readyDir)
                 }
 
                 Divider().gridCellUnsizedAxes(.horizontal)
 
                 GridRow {
-                    Text("EXIF Make")
-                    TextField("e.g. Sony", text: exifBinding(\.make))
+                    Text(Strings.Profiles.exifMakeLabel)
+                    TextField(Strings.Profiles.exifMakePlaceholder, text: exifBinding(\.make))
                         .textFieldStyle(.roundedBorder)
                 }
                 GridRow {
-                    Text("EXIF Model")
-                    TextField("e.g. ILCE-7M4", text: exifBinding(\.model))
+                    Text(Strings.Profiles.exifModelLabel)
+                    TextField(Strings.Profiles.exifModelPlaceholder, text: exifBinding(\.model))
                         .textFieldStyle(.roundedBorder)
                 }
 
                 Divider().gridCellUnsizedAxes(.horizontal)
 
                 GridRow {
-                    HelpLabel("File types", help: Strings.Profiles.fileExtensions)
+                    HelpLabel(Strings.Profiles.fileTypesLabel, help: Strings.Profiles.fileExtensionsHelp)
                     ExtensionField(items: $profile.fileExtensions)
                 }
 
                 GridRow {
-                    HelpLabel("Companion", help: Strings.Profiles.companion)
+                    HelpLabel(Strings.Profiles.companionLabel, help: Strings.Profiles.companionHelp)
                     ExtensionField(items: $profile.companionExtensions)
                 }
 
                 GridRow {
-                    HelpLabel("Tags", help: Strings.Profiles.tags)
-                    CommaSeparatedField(items: $profile.tags, placeholder: "tag1, tag2")
+                    HelpLabel(Strings.Profiles.tagsLabel, help: Strings.Profiles.tagsHelp)
+                    CommaSeparatedField(items: $profile.tags, placeholder: Strings.Profiles.tagPlaceholder)
                 }
 
                 Divider().gridCellUnsizedAxes(.horizontal)
@@ -220,8 +220,8 @@ struct ProfileEditorView: View {
                 GridRow {
                     Text("")
                     HStack(spacing: 4) {
-                        Toggle("Generate Gyroflow project files", isOn: gyroflowToggle)
-                        HelpButton(Strings.Profiles.gyroflow)
+                        Toggle(Strings.Profiles.gyroflowToggle, isOn: gyroflowToggle)
+                        HelpButton(Strings.Profiles.gyroflowHelp)
                     }
                 }
             }
@@ -230,9 +230,9 @@ struct ProfileEditorView: View {
         .safeAreaInset(edge: .bottom) {
             HStack {
                 Spacer()
-                Button("Cancel") { onCancel() }
+                Button(Strings.Common.cancel) { onCancel() }
                     .keyboardShortcut(.escape)
-                Button(isNew ? "Create" : "Update") { onSave(profileName, profile) }
+                Button(isNew ? Strings.Profiles.createButton : Strings.Profiles.updateButton) { onSave(profileName, profile) }
                     .keyboardShortcut(.return, modifiers: .command)
                     .buttonStyle(.borderedProminent)
                     .disabled(profileName.isEmpty)
@@ -246,7 +246,7 @@ struct ProfileEditorView: View {
         HStack(spacing: 6) {
             TextField("", text: optionalBinding(binding))
                 .textFieldStyle(.roundedBorder)
-            Button("Browse...") {
+            Button(Strings.Common.browse) {
                 let panel = NSOpenPanel()
                 panel.canChooseDirectories = true
                 panel.canChooseFiles = false

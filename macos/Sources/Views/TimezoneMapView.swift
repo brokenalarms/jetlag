@@ -25,7 +25,7 @@ struct TimezonePickerView: View {
             HStack(spacing: 6) {
                 Image(systemName: "globe")
                 if selectedTimezone.isEmpty {
-                    Text("Select timezone...")
+                    Text(Strings.Workflow.selectTimezone)
                         .foregroundStyle(.secondary)
                 } else {
                     let match = Self.timezones.first { $0.offset == selectedTimezone }
@@ -88,10 +88,10 @@ private struct TimezonePickerSheet: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("Search timezones...", text: $searchText)
+                TextField(Strings.Workflow.searchTimezones, text: $searchText)
                     .textFieldStyle(.plain)
                 Spacer()
-                Button("Done") {
+                Button(Strings.Common.done) {
                     isPresented = false
                 }
             }
