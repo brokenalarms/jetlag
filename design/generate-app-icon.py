@@ -185,12 +185,13 @@ def glow_layer(canvas_size, x0, y0, x1, y1, color_rgb):
     return layer.filter(ImageFilter.GaussianBlur(GLOW_RADIUS))
 
 
-def draw_row_card(img, row_y):
-    """Faint card background spanning the full content width behind each row."""
+def draw_row_card(img, row_y, card_bounds=None):
+    """Faint card background behind each row."""
     overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
     d = ImageDraw.Draw(overlay)
+    x0, x1 = card_bounds or (PAD, SIZE - PAD)
     d.rounded_rectangle(
-        [PAD, row_y, SIZE - PAD, row_y + ROW_H],
+        [x0, row_y, x1, row_y + ROW_H],
         radius=CARD_R,
         fill=(255, 255, 255, 10),     # white / ~4 %
         outline=(255, 255, 255, 18),  # white / ~7 %
@@ -199,10 +200,10 @@ def draw_row_card(img, row_y):
     return composite(img, overlay)
 
 
-def draw_clip_row(img, clip, row_y, bar_offset, fill, border, text_color, glow_rgb, fonts):
+def draw_clip_row(img, clip, row_y, bar_offset, fill, border, text_color, glow_rgb, fonts, x_shift=0):
     """Render one clip row: glow behind bar, bar rect, 'jet'/'lag' label centred inside."""
     font_bar = fonts[0]
-    bx0 = BAR_X + bar_offset
+    bx0 = BAR_X + bar_offset + x_shift
     bx1 = bx0 + CLIP_W
     by0 = row_y + (ROW_H - BAR_H) // 2
     by1 = by0 + BAR_H
@@ -285,33 +286,50 @@ def draw_time_labels(img, clip, row_y, fonts):
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+def render(fonts, with_labels=True):
+    x_shift = 0
+    card_bounds = None
+    if not with_labels:
+        pair_center = BAR_X + STAIRCASE_H_PAD + CLIP_W
+        x_shift = SIZE // 2 - pair_center
+        card_bounds = (PAD, SIZE - PAD)
+
+    img = Image.new('RGBA', (SIZE, SIZE), (*BG_COLOR, 255))
+
+    img = draw_row_card(img, ROW1_Y, card_bounds)
+    img = draw_clip_row(img, CLIPS[0], ROW1_Y, BAR_OFFSETS[0],
+                        BLUE_FILL, BLUE_BORDER, BLUE_TEXT, (59, 130, 246), fonts, x_shift)
+    if with_labels:
+        img = draw_time_labels(img, CLIPS[0], ROW1_Y, fonts)
+
+    img = draw_row_card(img, ROW2_Y, card_bounds)
+    img = draw_clip_row(img, CLIPS[1], ROW2_Y, BAR_OFFSETS[1],
+                        GREEN_FILL, GREEN_BORDER, GREEN_TEXT, (34, 197, 94), fonts, x_shift)
+    if with_labels:
+        img = draw_time_labels(img, CLIPS[1], ROW2_Y, fonts)
+
+    return img.convert('RGB')
+
+
+def save(img, path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(str(path), 'PNG')
+    print(f"  {path.name:24s} ({img.width}×{img.height})  →  {path}")
+
+
 def main():
     fonts = (
         load_bold(FONT_BAR_SZ),
         load_bold(FONT_TIME_SZ),
         load_regular(FONT_TZ_SZ),
     )
+    repo = Path(__file__).parent.parent
 
-    img = Image.new('RGBA', (SIZE, SIZE), (*BG_COLOR, 255))
+    full = render(fonts, with_labels=True)
+    save(full, repo / "macos/Sources/Assets.xcassets/AppIcon.appiconset/AppIcon.png")
 
-    img = draw_row_card(img, ROW1_Y)
-    img = draw_clip_row(img, CLIPS[0], ROW1_Y, BAR_OFFSETS[0],
-                        BLUE_FILL, BLUE_BORDER, BLUE_TEXT, (59, 130, 246), fonts)
-    img = draw_time_labels(img, CLIPS[0], ROW1_Y, fonts)
-
-    img = draw_row_card(img, ROW2_Y)
-    img = draw_clip_row(img, CLIPS[1], ROW2_Y, BAR_OFFSETS[1],
-                        GREEN_FILL, GREEN_BORDER, GREEN_TEXT, (34, 197, 94), fonts)
-    img = draw_time_labels(img, CLIPS[1], ROW2_Y, fonts)
-
-    script_dir = Path(__file__).parent
-    out_dir    = (script_dir.parent
-                  / "macos/Sources/Assets.xcassets/AppIcon.appiconset")
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    out_path = out_dir / "AppIcon.png"
-    img.convert('RGB').save(str(out_path), 'PNG')
-    print(f"  AppIcon.png  (1024×1024)  →  {out_path}")
+    simple = render(fonts, with_labels=False)
+    save(simple, repo / "web/public/apple-touch-icon.png")
 
 
 if __name__ == '__main__':
