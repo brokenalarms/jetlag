@@ -331,6 +331,9 @@ def main():
     simple = render(fonts, with_labels=False)
     save(simple, repo / "web/public/apple-touch-icon.png")
 
+    favicon = simple.resize((32, 32), Image.LANCZOS)
+    save(favicon, repo / "web/public/favicon.png")
+
 
 if __name__ == '__main__':
     main()

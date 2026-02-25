@@ -3,10 +3,7 @@ export function renderNav() {
     <nav class="fixed top-0 z-50 w-full border-b border-white/6 bg-neutral-950/80 backdrop-blur-xl">
       <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <a href="#" class="flex items-center gap-2 text-white no-underline">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <rect width="28" height="28" rx="8" fill="#ff2d78"/>
-            <path d="M8 9l4.5 4.5L8 18M14 18h6" stroke="#0a0a0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <img src="/apple-touch-icon.png" width="28" height="28" alt="" aria-hidden="true" class="rounded-md">
           <span class="text-base font-bold tracking-tight">Jetlag</span>
         </a>
 

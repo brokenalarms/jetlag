@@ -4,10 +4,7 @@ export function renderFooter() {
       <div class="mx-auto max-w-6xl">
         <div class="flex flex-col items-center justify-between gap-6 sm:flex-row">
           <div class="flex items-center gap-2">
-            <svg width="22" height="22" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <rect width="28" height="28" rx="8" fill="#f59e0b"/>
-              <path d="M8 9l4.5 4.5L8 18M14 18h6" stroke="#0a0a0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+            <img src="/apple-touch-icon.png" width="22" height="22" alt="" aria-hidden="true" class="rounded-md">
             <span class="text-sm font-bold text-white">Jetlag</span>
           </div>
 
