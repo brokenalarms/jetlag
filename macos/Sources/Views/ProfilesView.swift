@@ -22,6 +22,7 @@ struct ProfilesView: View {
                     onSave: { savedName, savedProfile in saveProfile(name: savedName, profile: savedProfile) },
                     onCancel: { self.editingProfile = nil; isCreatingNew = false }
                 )
+                .id(name)
                 .frame(maxWidth: .infinity)
             } else {
                 Text("Select a profile to edit")
