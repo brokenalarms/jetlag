@@ -297,11 +297,9 @@ struct WorkflowView: View {
                 Button("Browse...") { pickReadyDir() }
                     .controlSize(.small)
             }
-            if !state.readyDir.isEmpty {
-                Text(destinationPreview(readyDir: state.readyDir))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text(state.readyDir.isEmpty ? "Set ready directory above" : destinationPreview(readyDir: state.readyDir))
+                .font(.caption)
+                .foregroundStyle(.secondary)
             HStack(spacing: 4) {
                 HelpLabel("Group", help: Strings.Workflow.group)
                 TextField("Optional", text: $state.group)
