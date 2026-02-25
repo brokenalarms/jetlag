@@ -13,9 +13,10 @@ Usage:
 
 import atexit
 import re
-import shutil
 import subprocess
 import threading
+
+from lib.tools import resolve as resolve_tool
 
 
 class ExifTool:
@@ -29,9 +30,7 @@ class ExifTool:
     def _ensure_running(self):
         if self._process is not None and self._process.poll() is None:
             return
-        exe = shutil.which("exiftool")
-        if exe is None:
-            raise FileNotFoundError("exiftool not found on PATH")
+        exe = resolve_tool("exiftool")
         self._process = subprocess.Popen(
             [exe, "-stay_open", "True", "-@", "-"],
             stdin=subprocess.PIPE,
