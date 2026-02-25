@@ -13,10 +13,11 @@
   - docs/ — documentation. CLAUDE.md, README.md, TODO.md live at repo root.
 - don't reference Claude or Claude.md
 - TESTING
-  - always run tests with fail fast: `pytest -x` (stop on first failure and address one at a time before continuing)
-  - tests should not be updated without explicit confirmation, unless we use TDD to make the change, confirm that the the tests now break in the way expected, then update the test accordingly. Otherwise tests at this stage should not break from a change unless there is a regression, and the test should be used to identify this regression.
+- tests should not be updated to cater to broken behavior, unless we are specifically using TDD in advance to make a broken test then write the feature to fix itthe change.
+-  Otherwise tests at this stage should not break from a change unless there is a regression, and the test should be used to identify this regression.
   - testing that returncode is 0 is not testing the actual behavior or effect of the code, just that it ran without error, so would make for a useless test
-  - similarly testing result.stdout reveals nothing but what the logs said, which could lie. the changes to the fake test file need to be recorded before and after with actual/expected human readable messages.
+  - similarly testing result.stdout reveals nothing but what the logs said, which could lie. the changes to the fake test file need to be recorded before and after with actual/expected human readable messages. Strings for users are brittle and should not be tested directly - that's why we have the scripts passing @@key=value for machines.
+  - Don't run the entire suite to validate every change. Try to run local relevant tests for that script or module first to avoid time wasted on redundant testing. Only perform a full test suite run if the work is complex or interrelated, or before the final push.
 - COMMITS & PULL REQUESTS — see docs/committing.md for all rules on commits, branches, and PRs
 - TODO.md
   - TODO.md is a sliding context window for fresh agents — open tasks only; completed work belongs in commit messages, not here

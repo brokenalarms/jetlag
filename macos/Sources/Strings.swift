@@ -11,8 +11,7 @@ enum Strings {
         static let sourceAction = String(localized: "workflow.sourceAction.help",
             defaultValue: """
 What happens to source files after processing:
-• Leave — files stay in place (default)
-• Archive — rename source folder with date suffix
+• Archive — rename source folder with date suffix (default)
 • Delete — remove only processed files and companions from source
 """)
         static let appendTimezoneToGroup = String(localized: "workflow.appendTimezoneToGroup.help",

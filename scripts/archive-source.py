@@ -4,7 +4,6 @@ archive-source.py
 Acts on the source directory after all pipeline files have been processed.
 
 Modes:
-  leave   — no-op (default)
   archive — rename source folder to "<source> - copied <YYYY-MM-DD>"
   delete  — remove only the files passed via --files, then clean empty dirs
 """
@@ -95,9 +94,9 @@ def main():
     parser.add_argument("--source", required=True, help="Source directory to act on")
     parser.add_argument(
         "--action",
-        choices=["leave", "archive", "delete"],
-        default="leave",
-        help="Action to take on source (default: leave)",
+        choices=["archive", "delete"],
+        default="archive",
+        help="Action to take on source (default: archive)",
     )
     parser.add_argument(
         "--files",
@@ -115,11 +114,6 @@ def main():
     if not os.path.isdir(source):
         print(f"ERROR: Source directory not found: {source}", file=sys.stderr)
         sys.exit(1)
-
-    if args.action == "leave":
-        if args.verbose:
-            print(f"Leaving source untouched: {source}", file=sys.stderr)
-        sys.exit(0)
 
     if args.action == "archive":
         sys.exit(archive_source(source, args.apply))

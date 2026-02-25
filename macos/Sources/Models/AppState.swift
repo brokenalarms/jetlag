@@ -16,7 +16,7 @@ enum SidebarTab: String, CaseIterable, Identifiable {
 }
 
 enum SourceAction: String, CaseIterable {
-    case leave, archive, delete
+    case archive, delete
 }
 
 enum PipelineStep: String, CaseIterable, Identifiable {
@@ -104,11 +104,18 @@ final class AppState {
     var timezone: String = ""
     var useTimezonePicker: Bool = true
     var copyCompanionFiles: Bool = false
-    var sourceAction: SourceAction = .leave
+    var sourceAction: SourceAction = .archive
     var appendTimezoneToGroup: Bool = false
     var applyMode: Bool = false
 
-    var enabledSteps: Set<PipelineStep> = Set(PipelineStep.allCases)
+    var showLog: Bool = false
+    var enabledSteps: Set<PipelineStep> = Set(PipelineStep.allCases) {
+        didSet {
+            if !enabledSteps.contains(.archiveSource) {
+                sourceAction = .archive
+            }
+        }
+    }
 
     // Execution state
     var isRunning: Bool = false
@@ -151,7 +158,7 @@ final class AppState {
         timezone = ""
         useTimezonePicker = true
         copyCompanionFiles = false
-        sourceAction = .leave
+        sourceAction = .archive
         appendTimezoneToGroup = false
         applyMode = false
         if let profile = profile(named: profileName) {
@@ -188,7 +195,9 @@ final class AppState {
             args += ["--tasks"] + tasks
         }
 
-        args += ["--source-action", sourceAction.rawValue]
+        if enabledSteps.contains(.archiveSource) && sourceAction != .archive {
+            args += ["--source-action", sourceAction.rawValue]
+        }
 
         if copyCompanionFiles {
             args.append("--copy-companion-files")
