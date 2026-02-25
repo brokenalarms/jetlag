@@ -631,6 +631,37 @@ def determine_needed_changes(file_path: str, datetime_original: datetime, preser
 
     return changes
 
+
+def _get_raw_original_time(current_data: dict) -> str:
+    """Get the raw original timestamp from the actual source field for machine output.
+
+    Returns the EXIF field value that was used as the timestamp source,
+    falling back through common fields if the source-specific field is empty.
+    """
+    exif = current_data.get("exif", {})
+    source = current_data.get("timestamp_source", "")
+
+    if "DateTimeOriginal" in source:
+        val = exif.get("DateTimeOriginal", "")
+        if val:
+            return val
+    if "CreationDate" in source:
+        val = exif.get("CreationDate", "")
+        if val:
+            return val
+    if "MediaCreateDate" in source:
+        val = exif.get("MediaCreateDate", "")
+        if val:
+            return val
+
+    # Fallback: first non-empty common timestamp field
+    for field in ["DateTimeOriginal", "CreationDate", "MediaCreateDate", "CreateDate"]:
+        val = exif.get(field, "")
+        if val:
+            return val
+    return ""
+
+
 def format_exif_timestamp_display(ts: str) -> str:
     """Format EXIF timestamp with dashes for date, colons for time"""
     # Convert YYYY:MM:DD HH:MM:SS to YYYY-MM-DD HH:MM:SS
@@ -968,7 +999,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
         print(f"📊 Change   : {change_desc} (DRY RUN)", file=sys.stderr)
         # Emit machine-readable @@ lines
         print(f"@@file={filename}")
-        print(f"@@original_time={current_data['exif'].get('DateTimeOriginal', '')}")
+        print(f"@@original_time={_get_raw_original_time(current_data)}")
         print(f"@@corrected_time={datetime_original_str}")
         print(f"@@timestamp_source={_source_to_machine_token(timestamp_source)}")
         print(f"@@timestamp_action=would_fix")
@@ -979,7 +1010,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
     if not has_changes:
         # Emit machine-readable @@ lines for no-change case
         print(f"@@file={filename}")
-        print(f"@@original_time={current_data['exif'].get('DateTimeOriginal', '')}")
+        print(f"@@original_time={_get_raw_original_time(current_data)}")
         print(f"@@corrected_time={datetime_original_str}")
         print(f"@@timestamp_source={_source_to_machine_token(timestamp_source)}")
         print(f"@@timestamp_action=no_change")
@@ -1033,7 +1064,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
 
     # Emit machine-readable @@ lines
     print(f"@@file={filename}")
-    print(f"@@original_time={current_data['exif'].get('DateTimeOriginal', '')}")
+    print(f"@@original_time={_get_raw_original_time(current_data)}")
     print(f"@@corrected_time={datetime_original_str}")
     print(f"@@timestamp_source={_source_to_machine_token(timestamp_source)}")
     print(f"@@timestamp_action={'fixed' if success else 'error'}")

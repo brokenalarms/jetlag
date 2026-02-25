@@ -40,7 +40,7 @@ struct WorkflowView: View {
                 }
                 LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
             }
-            .inspectorColumnWidth(min: 260, ideal: 320)
+            .inspectorColumnWidth(min: 480, ideal: 680)
         }
         .navigationTitle("Workflow")
         .sheet(isPresented: $showUpgradeSheet) {
