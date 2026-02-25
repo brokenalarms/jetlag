@@ -26,17 +26,24 @@ class ExifTool:
         self._process = None
         self._lock = threading.Lock()
         self._exec_id = 0
+        self._unavailable = False
 
     def _ensure_running(self):
+        if self._unavailable:
+            raise FileNotFoundError("exiftool not available")
         if self._process is not None and self._process.poll() is None:
             return
-        exe = resolve_tool("exiftool")
-        self._process = subprocess.Popen(
-            [exe, "-stay_open", "True", "-@", "-"],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        try:
+            exe = resolve_tool("exiftool")
+            self._process = subprocess.Popen(
+                [exe, "-stay_open", "True", "-@", "-"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except FileNotFoundError:
+            self._unavailable = True
+            raise
 
     def execute(self, *args: str) -> str:
         """Send a command and block until the sentinel line is returned."""

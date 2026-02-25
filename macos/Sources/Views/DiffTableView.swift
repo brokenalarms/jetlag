@@ -28,28 +28,28 @@ struct DiffTableView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
-                .width(min: 100, ideal: 160)
+                .width(min: 80, ideal: 140)
 
                 TableColumn("Original") { row in
                     Text(row.originalTime ?? "—")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(row.originalTime != nil ? .primary : .tertiary)
                 }
-                .width(min: 80, ideal: 140)
+                .width(min: 130, ideal: 175)
 
                 TableColumn("Corrected") { row in
                     Text(row.correctedTime ?? "—")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(row.correctedTime != nil ? .primary : .tertiary)
                 }
-                .width(min: 80, ideal: 140)
+                .width(min: 130, ideal: 175)
 
                 TableColumn("TZ") { row in
                     Text(row.timezone ?? "—")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(row.timezone != nil ? .primary : .tertiary)
                 }
-                .width(min: 40, ideal: 60)
+                .width(min: 50, ideal: 60)
 
                 TableColumn("Destination") { row in
                     if let dest = row.dest {

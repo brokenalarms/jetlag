@@ -960,5 +960,54 @@ class TestPipelineMachineOutput:
                 assert line.startswith("@@"), f"Actual: stdout line '{line}' is not @@-prefixed, Expected: all stdout lines are @@key=value"
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — EXIF tags use the `tag` command")
+class TestCLIOverrides:
+    """Tests for --tags, --make, --model CLI overrides that take precedence over profile values."""
+
+    def test_make_model_override_profile(self, temp_workspace, test_profile):
+        """--make and --model override profile's exif.make and exif.model."""
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+            "--make", "OverrideMake",
+            "--model", "OverrideModel",
+            "--apply",
+        ])
+
+        moved = list(target.rglob("*.mp4"))[0]
+        make = get_exif_field(moved, "Make")
+        model = get_exif_field(moved, "Model")
+        assert make == "OverrideMake", f"Expected Make=OverrideMake, got {make}"
+        assert model == "OverrideModel", f"Expected Model=OverrideModel, got {model}"
+
+    def test_target_overrides_profile_ready_dir(self, temp_workspace, test_profile):
+        """--target overrides profile's ready_dir, files land in override directory."""
+        source = temp_workspace["source"]
+        override_target = temp_workspace["root"] / "override_target"
+        override_target.mkdir()
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--target", str(override_target),
+            "--timezone", "+0900",
+            "--group", "Test",
+            "--apply",
+        ])
+
+        profile_target = temp_workspace["target"]
+        assert not any(profile_target.rglob("*.mp4")), "No files should be in profile's ready_dir"
+        assert any(override_target.rglob("*.mp4")), "Files should be in override target directory"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

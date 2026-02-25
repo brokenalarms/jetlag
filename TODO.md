@@ -10,8 +10,6 @@
 
 - (2026-02-24) **Timezone map in picker** — MapKit and CoreLocation are already linked in `project.yml` but unused. Replace or augment `TimezoneMapView` with an actual map showing timezone boundaries. When footage timezone differs from current system timezone, show both on the map with a visual arc.
 
-- (2026-02-25) **Editable paths in workflow** — Each path populated into a task (sourceDir, readyDir, backupDir) should be pre-filled from profile but editable in the workflow UI. Add option at end of run to save changed paths back to the profile.
-
 ## `scripts/` + `macos/`
 
 - (2026-02-24) **Per-file progress cards** — During apply mode, replace scrolling logs with a card-based UI. Each file gets a card showing pipeline stages as checkmarks: Tagged → Timestamp Fixed → Organized → Gyroflow. Failed stages show red. Cards expand to show details.

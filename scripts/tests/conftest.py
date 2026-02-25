@@ -45,15 +45,11 @@ def create_test_video(path, **exif_tags):
 
 
 # Map of required tool -> install commands by platform.
-# Each entry is {tool_name: {platform: [install_command]}}.
+# exiftool is vendored at scripts/tools/ — no install needed.
 REQUIRED_TOOLS = {
     "ffmpeg": {
         "linux": ["apt-get", "install", "-y", "-qq", "ffmpeg"],
         "darwin": ["brew", "install", "ffmpeg"],
-    },
-    "exiftool": {
-        "linux": ["apt-get", "install", "-y", "-qq", "libimage-exiftool-perl"],
-        "darwin": ["brew", "install", "exiftool"],
     },
 }
 
@@ -136,11 +132,13 @@ def pytest_configure(config):
             _install_python_package(import_name, pip_name)
 
     if sys.platform == "darwin":
+        # tag is vendored at scripts/tools/tag; SetFile is from Xcode
         missing_mac = [t for t in MACOS_TOOLS if not shutil.which(t)]
+        # Don't fail for 'tag' — it's resolved via lib/tools.py from scripts/tools/
+        missing_mac = [t for t in missing_mac if t != "tag"]
         if missing_mac:
             raise pytest.UsageError(
                 f"Required macOS tools not installed: {', '.join(missing_mac)}\n"
-                f"tag: brew install tag\n"
                 f"SetFile: xcode-select --install"
             )
 

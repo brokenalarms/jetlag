@@ -18,6 +18,17 @@ struct LogOutputView: View {
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
+                Button {
+                    let text = lines.map(\.text).joined(separator: "\n")
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(text, forType: .string)
+                } label: {
+                    Label("Copy All", systemImage: "doc.on.doc")
+                }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .disabled(lines.isEmpty)
+
                 Button("Clear") { onClear() }
                     .buttonStyle(.borderless)
                     .font(.caption)
@@ -35,12 +46,12 @@ struct LogOutputView: View {
                                 .foregroundStyle(colorFor(line))
                                 .padding(.vertical, 1)
                                 .padding(.horizontal, 10)
-                                .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .id(line.id)
                         }
                     }
                     .padding(.vertical, 6)
+                    .textSelection(.enabled)
                 }
                 .onChange(of: lines.count) {
                     if let last = lines.last {
