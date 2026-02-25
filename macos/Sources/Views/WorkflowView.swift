@@ -263,29 +263,27 @@ struct WorkflowView: View {
     }
 
     private var tagOptions: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if let tags = state.activeProfile?.tags, !tags.isEmpty {
-                HStack(spacing: 4) {
-                    Text("Tags:")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(tags.joined(separator: ", "))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Text("Tags:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36, alignment: .trailing)
+                TextField("tag1, tag2", text: $state.tags)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.caption)
             }
-            if let exif = state.activeProfile?.exif {
-                let parts = [exif.make, exif.model].compactMap { $0 }
-                if !parts.isEmpty {
-                    HStack(spacing: 4) {
-                        Text("EXIF:")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(parts.joined(separator: " "))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+            HStack(spacing: 4) {
+                Text("EXIF:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36, alignment: .trailing)
+                TextField("Make", text: $state.exifMake)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.caption)
+                TextField("Model", text: $state.exifModel)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.caption)
             }
         }
         .padding(10)
@@ -293,8 +291,14 @@ struct WorkflowView: View {
 
     private var organizeOptions: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if let readyDir = state.activeProfile?.readyDir, !readyDir.isEmpty {
-                Text(destinationPreview(readyDir: readyDir))
+            HStack(spacing: 6) {
+                TextField("Ready directory path", text: $state.readyDir)
+                    .textFieldStyle(.roundedBorder)
+                Button("Browse...") { pickReadyDir() }
+                    .controlSize(.small)
+            }
+            if !state.readyDir.isEmpty {
+                Text(destinationPreview(readyDir: state.readyDir))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -506,6 +510,16 @@ struct WorkflowView: View {
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             state.sourceDir = url.path
+        }
+    }
+
+    private func pickReadyDir() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url {
+            state.readyDir = url.path
         }
     }
 }

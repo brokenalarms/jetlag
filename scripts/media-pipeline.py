@@ -501,6 +501,9 @@ def main():
         "--copy-companion-files", action="store_true",
         help="Also copy companion files (matching profile companion_extensions) to target."
     )
+    parser.add_argument("--tags", help="Comma-separated Finder tags (overrides profile tags)")
+    parser.add_argument("--make", help="EXIF camera make (overrides profile exif.make)")
+    parser.add_argument("--model", help="EXIF camera model (overrides profile exif.model)")
     parser.add_argument(
         "--working-dir",
         default=os.path.expanduser("~/Library/Application Support/Jetlag/working"),
@@ -514,6 +517,15 @@ def main():
     full_config = {}
     if args.profile:
         profile, full_config = load_config(args.profile)
+
+    # Apply CLI overrides to profile (workflow tab ad-hoc edits)
+    if profile:
+        if args.tags is not None:
+            profile["tags"] = [t.strip() for t in args.tags.split(",") if t.strip()]
+        if args.make is not None:
+            profile.setdefault("exif", {})["make"] = args.make
+        if args.model is not None:
+            profile.setdefault("exif", {})["model"] = args.model
 
     # Determine source and target directories from profile or CLI args
     source_dir = args.source

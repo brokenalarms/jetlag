@@ -101,6 +101,10 @@ final class AppState {
     var selectedProfile: String = ""
     var group: String = ""
     var sourceDir: String = ""
+    var readyDir: String = ""
+    var tags: String = ""
+    var exifMake: String = ""
+    var exifModel: String = ""
     var timezone: String = ""
     var useTimezonePicker: Bool = true
     var copyCompanionFiles: Bool = false
@@ -159,9 +163,11 @@ final class AppState {
         switch step {
         case .ingest:
             return !sourceDir.isEmpty
+        case .organize:
+            return !readyDir.isEmpty
         case .fixTimezone:
             return !timezone.isEmpty
-        case .tag, .organize, .gyroflow, .archiveSource:
+        case .tag, .gyroflow, .archiveSource:
             return true
         }
     }
@@ -181,8 +187,16 @@ final class AppState {
         applyMode = false
         if let profile = profile(named: profileName) {
             sourceDir = profile.sourceDir ?? ""
+            readyDir = profile.readyDir ?? ""
+            tags = (profile.tags ?? []).joined(separator: ", ")
+            exifMake = profile.exif?.make ?? ""
+            exifModel = profile.exif?.model ?? ""
         } else {
             sourceDir = ""
+            readyDir = ""
+            tags = ""
+            exifMake = ""
+            exifModel = ""
         }
         enabledSteps = Set(availableSteps)
     }
@@ -191,6 +205,18 @@ final class AppState {
         var args: [String] = []
         args += ["--profile", selectedProfile]
         args += ["--source", sourceDir]
+        args += ["--target", readyDir]
+
+        let trimmedTags = tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: ",")
+        if !trimmedTags.isEmpty {
+            args += ["--tags", trimmedTags]
+        }
+        if !exifMake.isEmpty {
+            args += ["--make", exifMake]
+        }
+        if !exifModel.isEmpty {
+            args += ["--model", exifModel]
+        }
 
         if !group.isEmpty {
             args += ["--group", group]
