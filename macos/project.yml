@@ -40,14 +40,10 @@ targets:
           rm -rf "$DEST/site-packages"
           python3 -m pip install --quiet --target "$DEST/site-packages" -r "$DEST/requirements.txt"
 
-          TOOLS="$DEST/tools"
-          mkdir -p "$TOOLS"
+          # Verify vendored tools are present (copied by cp -r above)
           for tool in exiftool tag; do
-            tool_path="$(which "$tool" 2>/dev/null || true)"
-            if [ -n "$tool_path" ]; then
-              cp "$tool_path" "$TOOLS/"
-            else
-              echo "error: $tool not found in PATH — install with: brew install $tool" >&2
+            if [ ! -f "$DEST/tools/$tool" ]; then
+              echo "error: scripts/tools/$tool missing — see scripts/tools/README" >&2
               exit 1
             fi
           done

@@ -43,7 +43,7 @@ class ExifTool:
             )
         except FileNotFoundError:
             self._unavailable = True
-            raise FileNotFoundError("exiftool not found")
+            raise
 
     def execute(self, *args: str) -> str:
         """Send a command and block until the sentinel line is returned."""

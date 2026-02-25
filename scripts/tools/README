@@ -1,0 +1,8 @@
+Vendored tools — bundled into the macOS app alongside scripts/.
+
+exiftool   Perl script + lib/ from Image-ExifTool distribution (exiftool.org).
+           Currently v13.50. To update: download a new tar.gz, replace
+           exiftool and lib/.
+
+tag        macOS Finder tag CLI (github.com/jdberry/tag).
+           Copy from Homebrew: cp $(brew --prefix)/bin/tag scripts/tools/tag
