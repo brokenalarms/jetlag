@@ -34,8 +34,14 @@ struct WorkflowView: View {
             .frame(minWidth: 340)
 
             if state.showLog {
-                LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
-                    .frame(minWidth: 260)
+                VStack(spacing: 0) {
+                    if !state.diffTableRows.isEmpty || state.isRunning {
+                        DiffTableView(rows: state.diffTableRows)
+                    }
+                    LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
+                        .frame(minWidth: 260)
+                }
+                .frame(minWidth: 260)
             }
         }
         .navigationTitle("Workflow")
@@ -165,6 +171,9 @@ struct WorkflowView: View {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
+            } else if isActive && !state.isStepReady(step) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .foregroundStyle(.yellow)
             } else {
                 Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(isActive ? step.iconColor : .secondary)
@@ -379,6 +388,7 @@ struct WorkflowView: View {
                         .disabled(
                             state.isRunning
                             || state.selectedProfile.isEmpty
+                            || !state.allStepsReady
                             || !timezoneIsValid
                         )
                         .keyboardShortcut(.return, modifiers: .command)
