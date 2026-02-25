@@ -46,6 +46,9 @@ targets:
             tool_path="$(which "$tool" 2>/dev/null || true)"
             if [ -n "$tool_path" ]; then
               cp "$tool_path" "$TOOLS/"
+            else
+              echo "error: $tool not found in PATH — install with: brew install $tool" >&2
+              exit 1
             fi
           done
   JetlagTests:

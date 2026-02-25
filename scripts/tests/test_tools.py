@@ -26,7 +26,7 @@ class TestResolve:
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("JETLAG_FAKE", None)
             with mock.patch("shutil.which", return_value=None):
-                with pytest.raises(FileNotFoundError, match="fake not found"):
+                with pytest.raises(FileNotFoundError, match="^fake not found$"):
                     resolve("fake")
 
     def test_env_var_name_uppercased(self, tmp_path):

@@ -10,6 +10,4 @@ def resolve(name: str) -> str:
     path = shutil.which(name)
     if path:
         return path
-    raise FileNotFoundError(
-        f"{name} not found. Install via: brew install {name}"
-    )
+    raise FileNotFoundError(f"{name} not found")
