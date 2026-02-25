@@ -1,5 +1,9 @@
 # Jetlag
 
+<div align=center>
+  <img src="https://github.com/brokenalarms/jetlag/blob/main/macos/Sources/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width=300>
+</div>
+
 Fix timestamps across GoPro, iPhone, drone, and cinema cameras so multi-camera footage lands in the right place in your video editor.
 
 ## Components
