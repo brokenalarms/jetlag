@@ -181,11 +181,11 @@ In `WorkflowView`, the right panel of `HSplitView` currently shows
    - [x] tests for each script verifying `@@` lines in stdout
 
 2. **PR 2 — macos: diff table view**
-   - [ ] step 7: DiffTableRow model
-   - [ ] step 8: AppState parsing
-   - [ ] step 9: DiffTableView
-   - [ ] step 10: WorkflowView integration
-   - [ ] step 11: clear state
+   - [x] step 7: DiffTableRow model
+   - [x] step 8: AppState parsing
+   - [x] step 9: DiffTableView
+   - [x] step 10: WorkflowView integration
+   - [x] step 11: clear state
 
 ## Out of scope
 

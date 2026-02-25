@@ -13,6 +13,12 @@ struct ScriptRunner {
         ] + args
         process.currentDirectoryURL = URL(fileURLWithPath: workingDir)
 
+        var env = ProcessInfo.processInfo.environment
+        let homebrewPaths = "/opt/homebrew/bin:/usr/local/bin"
+        let currentPath = env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+        env["PATH"] = homebrewPaths + ":" + currentPath
+        process.environment = env
+
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
         process.standardOutput = stdoutPipe

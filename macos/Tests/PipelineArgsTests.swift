@@ -31,8 +31,7 @@ final class PipelineArgsTests: XCTestCase {
         XCTAssertEqual(script, "media-pipeline.sh")
         XCTAssertTrue(args.contains("--source"))
         XCTAssertTrue(args.contains("--profile"))
-        XCTAssertTrue(args.contains("--source-action"))
-        XCTAssertTrue(args.contains("leave"))
+        XCTAssertFalse(args.contains("--source-action"))
 
         let tasksIndex = args.firstIndex(of: "--tasks")!
         let tasksSlice = args[(tasksIndex + 1)...]
@@ -134,6 +133,40 @@ final class PipelineArgsTests: XCTestCase {
         let (_, args) = state.buildPipelineArgs()
 
         XCTAssertFalse(args.contains("--apply"))
+    }
+
+    // MARK: - Step readiness
+
+    func testIsStepReadyFixTimezoneRequiresTimezone() {
+        let state = makeState()
+        state.timezone = ""
+        XCTAssertFalse(state.isStepReady(.fixTimezone))
+    }
+
+    func testIsStepReadyFixTimezoneWithTimezone() {
+        let state = makeState()
+        state.timezone = "+0900"
+        XCTAssertTrue(state.isStepReady(.fixTimezone))
+    }
+
+    func testIsStepReadyIngestRequiresSourceDir() {
+        let state = makeState()
+        state.sourceDir = ""
+        XCTAssertFalse(state.isStepReady(.ingest))
+    }
+
+    func testAllStepsReadyWhenFixTimezoneDisabledAndTimezoneEmpty() {
+        let state = makeState()
+        state.timezone = ""
+        state.enabledSteps.remove(.fixTimezone)
+        XCTAssertTrue(state.allStepsReady)
+    }
+
+    func testAllStepsNotReadyWhenFixTimezoneEnabledAndTimezoneEmpty() {
+        let state = makeState()
+        state.timezone = ""
+        state.enabledSteps.insert(.fixTimezone)
+        XCTAssertFalse(state.allStepsReady)
     }
 
     func testAlwaysOnStepsNeverInTasks() {

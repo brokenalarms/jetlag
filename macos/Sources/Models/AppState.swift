@@ -121,6 +121,8 @@ final class AppState {
     var isRunning: Bool = false
     var logOutput: [LogLine] = []
     var currentProcess: Process?
+    var diffTableRows: [DiffTableRow] = []
+    private var currentDiffRow: DiffTableRow?
 
     init() {
         self.scriptsDirectory = (Bundle.main.resourcePath! as NSString)
@@ -151,6 +153,22 @@ final class AppState {
         }
         steps.append(.archiveSource)
         return steps
+    }
+
+    func isStepReady(_ step: PipelineStep) -> Bool {
+        switch step {
+        case .ingest:
+            return !sourceDir.isEmpty
+        case .fixTimezone:
+            return !timezone.isEmpty
+        case .tag, .organize, .gyroflow, .archiveSource:
+            return true
+        }
+    }
+
+    var allStepsReady: Bool {
+        let active = availableSteps.filter { $0.isAlwaysOn || enabledSteps.contains($0) }
+        return active.allSatisfy { isStepReady($0) }
     }
 
     func resetWorkflowFields(for profileName: String) {
@@ -214,10 +232,58 @@ final class AppState {
 
     func clearLog() {
         logOutput = []
+        diffTableRows = []
+        currentDiffRow = nil
     }
 
     func appendLog(_ line: LogLine) {
+        if line.isMachineReadable {
+            parseMachineReadableLine(line.text)
+            return
+        }
         logOutput.append(line)
+    }
+
+    private func parseMachineReadableLine(_ text: String) {
+        let stripped = String(text.dropFirst(2))
+        guard let eqIndex = stripped.firstIndex(of: "=") else { return }
+        let key = String(stripped[stripped.startIndex..<eqIndex])
+        let value = String(stripped[stripped.index(after: eqIndex)...])
+
+        switch key {
+        case "pipeline_file":
+            if var row = currentDiffRow {
+                row.pipelineResult = row.pipelineResult ?? "in_progress"
+                diffTableRows.append(row)
+            }
+            currentDiffRow = DiffTableRow(file: value)
+        case "pipeline_result":
+            if var row = currentDiffRow {
+                row.pipelineResult = value
+                diffTableRows.append(row)
+                currentDiffRow = nil
+            }
+        case "tag_action":
+            currentDiffRow?.tagAction = value
+        case "tags_added":
+            currentDiffRow?.tagsAdded = value
+        case "original_time":
+            currentDiffRow?.originalTime = value
+        case "corrected_time":
+            currentDiffRow?.correctedTime = value
+        case "timestamp_source":
+            currentDiffRow?.timestampSource = value
+        case "timestamp_action":
+            currentDiffRow?.timestampAction = value
+        case "timezone":
+            currentDiffRow?.timezone = value
+        case "dest":
+            currentDiffRow?.dest = value
+        case "action":
+            currentDiffRow?.organizeAction = value
+        default:
+            break
+        }
     }
 
     func cancelRunning() {
