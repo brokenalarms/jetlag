@@ -39,6 +39,15 @@ targets:
           cp -r "${SRCROOT}/../scripts/" "$DEST"
           rm -rf "$DEST/site-packages"
           python3 -m pip install --quiet --target "$DEST/site-packages" -r "$DEST/requirements.txt"
+
+          TOOLS="$DEST/tools"
+          mkdir -p "$TOOLS"
+          for tool in exiftool tag; do
+            tool_path="$(which "$tool" 2>/dev/null || true)"
+            if [ -n "$tool_path" ]; then
+              cp "$tool_path" "$TOOLS/"
+            fi
+          done
   JetlagTests:
     type: bundle.unit-test
     platform: macOS

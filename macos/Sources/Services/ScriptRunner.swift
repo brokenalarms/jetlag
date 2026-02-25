@@ -14,9 +14,9 @@ struct ScriptRunner {
         process.currentDirectoryURL = URL(fileURLWithPath: workingDir)
 
         var env = ProcessInfo.processInfo.environment
-        let homebrewPaths = "/opt/homebrew/bin:/usr/local/bin"
-        let currentPath = env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
-        env["PATH"] = homebrewPaths + ":" + currentPath
+        let toolsDir = (workingDir as NSString).appendingPathComponent("tools")
+        env["JETLAG_EXIFTOOL"] = (toolsDir as NSString).appendingPathComponent("exiftool")
+        env["JETLAG_TAG"] = (toolsDir as NSString).appendingPathComponent("tag")
         process.environment = env
 
         let stdoutPipe = Pipe()
