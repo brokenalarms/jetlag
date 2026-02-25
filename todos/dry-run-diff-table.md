@@ -8,6 +8,11 @@ before/after state.  The log stays available behind a toggle for debugging.
 - Scripts emit `@@key=value` on **stdout**, human text on **stderr**
   (already the convention in `organize-by-date.py`, `ingest-media.py`,
   `generate-gyroflow.py`).
+- `@@` values are always machine tokens or raw data values — never formatted
+  human-readable strings.  A value should be something you could assign to a
+  variable: a path, an EXIF timestamp, an enum-like token (`would_fix`,
+  `no_change`), a timezone offset.  Never prose like
+  `"DateTimeOriginal with timezone"`.
 - `media-pipeline.py` already captures stdout/stderr separately for each
   child script; it parses `@@` lines from stdout and passes stderr through.
 - The macOS app's `ScriptRunner` already tags lines by stream
@@ -47,9 +52,11 @@ These are emitted from `tag_media_file()` alongside the existing human output
 @@file=<basename>
 @@original_time=<DateTimeOriginal as-read, e.g. 2025:05:14 16:38:07+02:00>
 @@corrected_time=<corrected DateTimeOriginal with timezone, same format>
-@@timestamp_source=<source description, e.g. "DateTimeOriginal with timezone">
+@@timestamp_source=datetimeoriginal | creationdate | filename | mediaCreatedate | file_birth | file_mtime
 @@timestamp_action=would_fix | no_change | fixed | error
 ```
+
+Values are machine tokens or raw data only — no formatted descriptions.
 
 `@@timezone=` is already emitted.  Keep it.
 
@@ -102,18 +109,23 @@ No changes needed (pipeline emits these itself if needed).
 ```swift
 struct DiffTableRow: Identifiable {
     let id = UUID()
-    let file: String
-    var tagAction: String?        // "tagged" | "already_correct"
-    var tagsAdded: String?        // comma-separated
-    var originalTime: String?     // raw EXIF string
-    var correctedTime: String?    // corrected EXIF string
-    var timestampAction: String?  // "would_fix" | "no_change" | ...
-    var timezone: String?
-    var dest: String?             // from organize step
-    var organizeAction: String?   // "would_move" | "moved" | ...
-    var pipelineResult: String?   // "changed" | "unchanged" | "failed"
+    let file: String              // basename, from @@file or @@pipeline_file
+    var tagAction: String?        // machine token: tagged | already_correct
+    var tagsAdded: String?        // comma-separated tag names
+    var originalTime: String?     // raw EXIF timestamp string
+    var correctedTime: String?    // raw EXIF timestamp string
+    var timestampSource: String?  // machine token: datetimeoriginal | creationdate | filename | ...
+    var timestampAction: String?  // machine token: would_fix | no_change | fixed | error
+    var timezone: String?         // offset: +09:00
+    var dest: String?             // absolute path from @@dest
+    var organizeAction: String?   // machine token: would_move | moved | skipped | ...
+    var pipelineResult: String?   // machine token: changed | unchanged | failed
 }
 ```
+
+All String? fields hold machine tokens or raw data values, never
+user-facing display strings.  The view layer is responsible for
+formatting these into human-readable text.
 
 ### 8. Parse `@@` lines in AppState
 
