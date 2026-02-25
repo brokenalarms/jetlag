@@ -170,8 +170,11 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
 
         _exif_cache[file_path] = data
         return data
+    except FileNotFoundError as e:
+        print(f"❌ {e}", file=sys.stderr)
+        return {}
     except Exception as e:
-        print(f"Error reading EXIF data: {e}", file=sys.stderr)
+        print(f"❌ EXIF read failed for {Path(file_path).name}: {e}", file=sys.stderr)
         return {}
 
 def is_valid_timestamp(timestamp_str: str) -> bool:
