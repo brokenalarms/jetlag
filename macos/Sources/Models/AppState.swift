@@ -155,7 +155,7 @@ final class AppState {
         if profile.gyroflowEnabled == true {
             steps.append(.gyroflow)
         }
-        steps.append(.archiveSource)
+        // steps.append(.archiveSource)
         return steps
     }
 
