@@ -20,29 +20,25 @@ struct WorkflowView: View {
     }
 
     var body: some View {
-        HSplitView {
-            ScrollView {
-                VStack(spacing: 16) {
-                    profileSelector
-                    if !state.selectedProfile.isEmpty {
-                        stepsPipeline
-                        executionBar
-                    }
+        ScrollView {
+            VStack(spacing: 16) {
+                profileSelector
+                if !state.selectedProfile.isEmpty {
+                    stepsPipeline
+                    executionBar
                 }
-                .padding()
             }
-            .frame(minWidth: 340)
-
-            if state.showLog {
-                VStack(spacing: 0) {
-                    if !state.diffTableRows.isEmpty || state.isRunning {
-                        DiffTableView(rows: state.diffTableRows)
-                    }
-                    LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
-                        .frame(minWidth: 260)
+            .padding()
+        }
+        .frame(minWidth: 340)
+        .inspector(isPresented: $state.showLog) {
+            VStack(spacing: 0) {
+                if !state.diffTableRows.isEmpty || state.isRunning {
+                    DiffTableView(rows: state.diffTableRows)
                 }
-                .frame(minWidth: 260)
+                LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
             }
+            .inspectorColumnWidth(min: 260, ideal: 320)
         }
         .navigationTitle("Workflow")
         .sheet(isPresented: $showUpgradeSheet) {
