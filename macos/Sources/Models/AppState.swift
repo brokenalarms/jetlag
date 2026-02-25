@@ -81,6 +81,17 @@ struct LogLine: Identifiable {
     }
 }
 
+private func validateDirectory(_ path: String) -> String? {
+    guard !path.isEmpty else { return nil }
+    var isDir: ObjCBool = false
+    if !FileManager.default.fileExists(atPath: path, isDirectory: &isDir) {
+        return "Directory not found"
+    } else if !isDir.boolValue {
+        return "Path is a file, not a directory"
+    }
+    return nil
+}
+
 @Observable
 final class AppState {
     var selectedTab: SidebarTab = .workflow
@@ -102,6 +113,8 @@ final class AppState {
     var group: String = ""
     var sourceDir: String = ""
     var readyDir: String = ""
+    var sourceDirError: String? { validateDirectory(sourceDir) }
+    var readyDirError: String? { validateDirectory(readyDir) }
     var tags: String = ""
     var exifMake: String = ""
     var exifModel: String = ""
@@ -162,9 +175,9 @@ final class AppState {
     func isStepReady(_ step: PipelineStep) -> Bool {
         switch step {
         case .ingest:
-            return !sourceDir.isEmpty
+            return !sourceDir.isEmpty && sourceDirError == nil
         case .organize:
-            return !readyDir.isEmpty
+            return !readyDir.isEmpty && readyDirError == nil
         case .fixTimezone:
             return !timezone.isEmpty
         case .tag, .gyroflow, .archiveSource:

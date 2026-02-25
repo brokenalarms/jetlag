@@ -6,15 +6,16 @@ final class PipelineArgsTests: XCTestCase {
     private func makeState() -> AppState {
         let state = AppState()
         state.selectedProfile = "test-profile"
-        state.sourceDir = "/Volumes/TestCard/DCIM"
+        state.sourceDir = "/tmp"
+        state.readyDir = "/tmp"
         state.profilesConfig = ProfilesConfig(
             gyroflow: nil,
             backupConfig: nil,
             profiles: [
                 "test-profile": MediaProfile(
                     type: .video,
-                    sourceDir: "/Volumes/TestCard/DCIM",
-                    readyDir: "/tmp/ready",
+                    sourceDir: "/tmp",
+                    readyDir: "/tmp",
                     gyroflowEnabled: true,
                     fileExtensions: [".mp4"]
                 )
@@ -149,10 +150,28 @@ final class PipelineArgsTests: XCTestCase {
         XCTAssertTrue(state.isStepReady(.fixTimezone))
     }
 
-    func testIsStepReadyIngestRequiresSourceDir() {
+    func testIngestNotReadyWhenSourceDirEmpty() {
         let state = makeState()
         state.sourceDir = ""
         XCTAssertFalse(state.isStepReady(.ingest))
+    }
+
+    func testIngestNotReadyWhenSourceDirNotExists() {
+        let state = makeState()
+        state.sourceDir = "/nonexistent/path/that/does/not/exist"
+        XCTAssertFalse(state.isStepReady(.ingest))
+    }
+
+    func testOrganizeNotReadyWhenReadyDirEmpty() {
+        let state = makeState()
+        state.readyDir = ""
+        XCTAssertFalse(state.isStepReady(.organize))
+    }
+
+    func testOrganizeNotReadyWhenReadyDirNotExists() {
+        let state = makeState()
+        state.readyDir = "/nonexistent/path/that/does/not/exist"
+        XCTAssertFalse(state.isStepReady(.organize))
     }
 
     func testAllStepsReadyWhenFixTimezoneDisabledAndTimezoneEmpty() {

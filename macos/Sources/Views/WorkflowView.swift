@@ -2,8 +2,6 @@ import SwiftUI
 
 struct WorkflowView: View {
     @Bindable var state: AppState
-    @State private var sourceDirError: String?
-    @FocusState private var sourceDirFocused: Bool
     @State private var showUpgradeSheet = false
     @State private var detectedFileCount = 0
     private var licenseStore: LicenseStore { LicenseStore.shared }
@@ -223,17 +221,10 @@ struct WorkflowView: View {
                 HStack(spacing: 6) {
                     TextField("SD card or directory path", text: $state.sourceDir)
                         .textFieldStyle(.roundedBorder)
-                        .focused($sourceDirFocused)
-                        .onChange(of: sourceDirFocused) { _, focused in
-                            if !focused { validateSourceDir() }
-                        }
-                        .onChange(of: state.sourceDir) { _, _ in
-                            sourceDirError = nil
-                        }
                     Button("Browse...") { pickSourceDir() }
                         .controlSize(.small)
                 }
-                if let error = sourceDirError {
+                if let error = state.sourceDirError {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)
                         .foregroundStyle(.red)
@@ -296,6 +287,11 @@ struct WorkflowView: View {
                     .textFieldStyle(.roundedBorder)
                 Button("Browse...") { pickReadyDir() }
                     .controlSize(.small)
+            }
+            if let error = state.readyDirError {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
             Text(state.readyDir.isEmpty ? "Set ready directory above" : destinationPreview(readyDir: state.readyDir))
                 .font(.caption)
@@ -485,19 +481,6 @@ struct WorkflowView: View {
                 state.isRunning = false
                 state.currentProcess = nil
             }
-        }
-    }
-
-    private func validateSourceDir() {
-        let path = state.sourceDir
-        guard !path.isEmpty else { sourceDirError = nil; return }
-        var isDir: ObjCBool = false
-        if !FileManager.default.fileExists(atPath: path, isDirectory: &isDir) {
-            sourceDirError = "Directory not found"
-        } else if !isDir.boolValue {
-            sourceDirError = "Path is a file, not a directory"
-        } else {
-            sourceDirError = nil
         }
     }
 
