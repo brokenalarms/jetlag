@@ -70,17 +70,30 @@ def check_exiftool_tmp(source_dir: str) -> list[Path]:
     return list(source.rglob("exiftool_tmp"))
 
 
+def _parse_at_lines(stdout: str) -> dict[str, str]:
+    """Parse @@key=value lines from stdout into a dict."""
+    result = {}
+    for line in stdout.split("\n"):
+        if line.startswith("@@"):
+            key_value = line[2:]  # strip @@
+            if "=" in key_value:
+                key, value = key_value.split("=", 1)
+                result[key] = value
+    return result
+
+
 def run_tag_media(
     file_path: Path,
     tags: Optional[str],
     make: Optional[str],
     model: Optional[str],
     apply: bool
-) -> tuple[str, bool]:
+) -> tuple[str, bool, dict[str, str]]:
     """Run tag-media.py on a file.
 
     Returns:
-        tuple of (output_text, changed)
+        tuple of (stderr_output, changed, at_lines)
+        at_lines is a dict of parsed @@key=value pairs from stdout
     """
     cmd = [sys.executable, str(SCRIPT_DIR / "tag-media.py"), str(file_path)]
 
@@ -94,14 +107,15 @@ def run_tag_media(
         cmd.append("--apply")
 
     result = subprocess.run(cmd, capture_output=True, text=True)
-    output = result.stdout + result.stderr
 
-    # Check if tags were changed
-    changed = False
-    if ("📌" in output or "Tagged:" in output or "EXIF:" in output) and "Already tagged correctly" not in output:
-        changed = True
+    # Parse @@key=value from stdout
+    at_lines = _parse_at_lines(result.stdout)
 
-    return output.strip(), changed
+    # Check if tags were changed via machine token
+    changed = at_lines.get("tag_action") == "tagged"
+
+    # stderr contains user-visible output
+    return result.stderr.strip(), changed, at_lines
 
 
 def run_fix_timestamp(
@@ -109,11 +123,12 @@ def run_fix_timestamp(
     location_args: list[str],
     apply: bool,
     verbose: bool
-) -> tuple[str, bool, int]:
+) -> tuple[str, bool, int, dict[str, str]]:
     """Run fix-media-timestamp.py on a file.
 
     Returns:
-        tuple of (output_text, changed, return_code)
+        tuple of (stderr_output, changed, return_code, at_lines)
+        at_lines is a dict of parsed @@key=value pairs from stdout
     """
     cmd = [sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), str(file_path)]
     cmd.extend(location_args)
@@ -124,14 +139,16 @@ def run_fix_timestamp(
         cmd.append("--verbose")
 
     result = subprocess.run(cmd, capture_output=True, text=True)
-    output = result.stdout + result.stderr
 
-    # Check if timestamp was changed
-    changed = False
-    if ("✅" in output or "Updated" in output or "Written" in output) and "No change" not in output:
-        changed = True
+    # Parse @@key=value from stdout
+    at_lines = _parse_at_lines(result.stdout)
 
-    return output.strip(), changed, result.returncode
+    # Check if timestamp was changed via machine token
+    action = at_lines.get("timestamp_action", "")
+    changed = action in ("would_fix", "fixed")
+
+    # stderr contains user-visible output
+    return result.stderr.strip(), changed, result.returncode, at_lines
 
 
 def run_organize_by_date(
@@ -282,8 +299,11 @@ def process_file(
     result = {"changed": False, "failed": False, "error": None, "source_files": [str(file_path)]}
     file_changed = False
 
+    # Emit pipeline_file @@ line at the start of each file
+    print(f"@@pipeline_file={file_path.name}")
+
     # INGEST (always): copy source file to working dir
-    print("📥 Ingesting...")
+    print("📥 Ingesting...", file=sys.stderr)
     ingest_companions = companion_extensions if copy_companion_files else None
     output, action, dest, rc, companion_dests = run_ingest_media(
         file_path, working_dir, apply, companion_extensions=ingest_companions,
@@ -291,12 +311,13 @@ def process_file(
     if output:
         for line in output.split("\n"):
             if line.strip():
-                print(f"  {line}")
+                print(f"  {line}", file=sys.stderr)
 
     if rc != 0:
-        print(f"   ❌ Ingest failed for {file_path.name}")
+        print(f"   ❌ Ingest failed for {file_path.name}", file=sys.stderr)
         result["failed"] = True
         result["error"] = "Ingest failed"
+        print(f"@@pipeline_result=failed")
         return result
 
     active_file = Path(dest) if action == "copied" else file_path
@@ -319,31 +340,40 @@ def process_file(
         model = exif.get("model", "")
 
         if tags or make or model:
-            print("🏷️  Checking tags...")
-            output, changed = run_tag_media(active_file, tags or None, make or None, model or None, apply)
+            print("🏷️  Checking tags...", file=sys.stderr)
+            output, changed, at_lines = run_tag_media(active_file, tags or None, make or None, model or None, apply)
             for line in output.split("\n"):
-                print(f"  {line}")
+                if line.strip():
+                    print(f"  {line}", file=sys.stderr)
+            # Re-emit @@ lines on stdout for the macOS app
+            for key, value in at_lines.items():
+                print(f"@@{key}={value}")
             if changed:
                 file_changed = True
 
     # Fix video timestamp (if in tasks)
     if "fix-timestamp" in tasks:
-        print("🔧 Fixing timestamp...")
-        output, changed, rc = run_fix_timestamp(active_file, location_args, apply, verbose)
+        print("🔧 Fixing timestamp...", file=sys.stderr)
+        output, changed, rc, at_lines = run_fix_timestamp(active_file, location_args, apply, verbose)
         for line in output.split("\n"):
-            print(f"  {line}")
+            if line.strip():
+                print(f"  {line}", file=sys.stderr)
+        # Re-emit @@ lines on stdout for the macOS app
+        for key, value in at_lines.items():
+            print(f"@@{key}={value}")
 
         if rc != 0:
-            print(f"   ❌ Timestamp fix failed for {file_path.name}")
+            print(f"   ❌ Timestamp fix failed for {file_path.name}", file=sys.stderr)
             result["failed"] = True
             result["error"] = "Timestamp fix failed"
+            print(f"@@pipeline_result=failed")
             return result
 
         if changed:
             file_changed = True
 
     # OUTPUT (always): organize active_file to target_dir
-    print("📁 Organizing by date...")
+    print("📁 Organizing by date...", file=sys.stderr)
 
     folder_template = profile.get("folder_template") if profile else None
     if folder_template:
@@ -353,16 +383,22 @@ def process_file(
     else:
         template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
     output, action, dest, rc = run_organize_by_date(active_file, target_dir, template, apply, verbose)
+    # Re-emit organize @@ lines
+    if action:
+        print(f"@@action={action}")
+    if dest:
+        print(f"@@dest={dest}")
 
     if output:
         for line in output.split("\n"):
             if line.strip():
-                print(line)
+                print(line, file=sys.stderr)
 
     if rc != 0:
-        print(f"   ❌ Organization failed for {file_path.name}")
+        print(f"   ❌ Organization failed for {file_path.name}", file=sys.stderr)
         result["failed"] = True
         result["error"] = "Organization failed"
+        print(f"@@pipeline_result=failed")
         return result
 
     if action in ("copied", "moved", "overwrote"):
@@ -377,14 +413,14 @@ def process_file(
             if apply and companion_file.exists():
                 os.makedirs(output_dir, exist_ok=True)
                 shutil.move(str(companion_file), str(companion_target))
-                print(f"  Companion: {companion_file.name} → {companion_target}")
+                print(f"  Companion: {companion_file.name} → {companion_target}", file=sys.stderr)
             elif not apply:
-                print(f"  [DRY RUN] Would move companion: {companion_file.name} → {companion_target}")
+                print(f"  [DRY RUN] Would move companion: {companion_file.name} → {companion_target}", file=sys.stderr)
 
     # Generate gyroflow project (if in tasks and enabled)
     gyroflow_enabled = profile.get("gyroflow_enabled", False) if profile else False
     if "gyroflow" in tasks and gyroflow_enabled and gyroflow_config:
-        print("🎥 Generating gyroflow project...")
+        print("🎥 Generating gyroflow project...", file=sys.stderr)
 
         preset = gyroflow_config.get("preset", {})
         preset_json = json.dumps(preset)
@@ -392,37 +428,44 @@ def process_file(
         gf_action, rc = run_generate_gyroflow(Path(dest) if dest else active_file, preset_json, apply)
 
         if rc != 0:
-            print(f"   ⚠️  Gyroflow generation failed for {file_path.name} (non-fatal)")
+            print(f"   ⚠️  Gyroflow generation failed for {file_path.name} (non-fatal)", file=sys.stderr)
         elif gf_action == "generated":
             file_changed = True
 
     result["changed"] = file_changed
+    # Emit pipeline result summary
+    if result["failed"]:
+        print(f"@@pipeline_result=failed")
+    elif file_changed:
+        print(f"@@pipeline_result=changed")
+    else:
+        print(f"@@pipeline_result=unchanged")
     return result
 
 
 def print_summary(stats: dict, apply: bool):
-    """Print pipeline summary."""
-    print()
-    print("===========================================")
-    print("📊 MEDIA PIPELINE SUMMARY")
-    print("-------------------------------------------")
-    print(f"Total files processed: {stats['processed']}")
-    print(f"Successfully completed: {stats['succeeded']}")
-    print(f"Files changed: {stats['changed']}")
-    print(f"Files unchanged: {stats['succeeded'] - stats['changed']}")
+    """Print pipeline summary to stderr."""
+    print(file=sys.stderr)
+    print("===========================================", file=sys.stderr)
+    print("📊 MEDIA PIPELINE SUMMARY", file=sys.stderr)
+    print("-------------------------------------------", file=sys.stderr)
+    print(f"Total files processed: {stats['processed']}", file=sys.stderr)
+    print(f"Successfully completed: {stats['succeeded']}", file=sys.stderr)
+    print(f"Files changed: {stats['changed']}", file=sys.stderr)
+    print(f"Files unchanged: {stats['succeeded'] - stats['changed']}", file=sys.stderr)
 
     if stats["failed"] > 0:
-        print(f"Failed: {stats['failed']}")
-        print()
-        print("Failed files:")
+        print(f"Failed: {stats['failed']}", file=sys.stderr)
+        print(file=sys.stderr)
+        print("Failed files:", file=sys.stderr)
         for f in stats["failed_files"]:
-            print(f"  - {f}")
+            print(f"  - {f}", file=sys.stderr)
 
     if apply:
-        print("✅ Media pipeline complete - changes applied.")
+        print("✅ Media pipeline complete - changes applied.", file=sys.stderr)
     else:
-        print("✅ Media pipeline complete - DRY RUN.")
-        print("   Use --apply to execute timestamp fixes and file organization.")
+        print("✅ Media pipeline complete - DRY RUN.", file=sys.stderr)
+        print("   Use --apply to execute timestamp fixes and file organization.", file=sys.stderr)
 
 
 def main():
@@ -550,18 +593,18 @@ def main():
         os.makedirs(working_dir, exist_ok=True)
 
     # Display configuration
-    print(f"→ Source:  {source_dir}")
-    print(f"→ Working: {working_dir}")
-    print(f"→ Target:  {target_dir}")
-    print(f"→ Mode:    {'APPLY (files will be processed)' if args.apply else 'DRY RUN (no changes)'}")
+    print(f"→ Source:  {source_dir}", file=sys.stderr)
+    print(f"→ Working: {working_dir}", file=sys.stderr)
+    print(f"→ Target:  {target_dir}", file=sys.stderr)
+    print(f"→ Mode:    {'APPLY (files will be processed)' if args.apply else 'DRY RUN (no changes)'}", file=sys.stderr)
     if location_args:
-        print(f"→ Timezone: {location_args[0]} {location_args[1]}")
+        print(f"→ Timezone: {location_args[0]} {location_args[1]}", file=sys.stderr)
     else:
-        print("→ Timezone: From video metadata (or will prompt if needed)")
+        print("→ Timezone: From video metadata (or will prompt if needed)", file=sys.stderr)
     if "archive-source" in args.tasks:
-        print(f"→ Source action: {args.source_action}")
-    print(f"→ Copy companions: {'yes' if args.copy_companion_files else 'no'}")
-    print()
+        print(f"→ Source action: {args.source_action}", file=sys.stderr)
+    print(f"→ Copy companions: {'yes' if args.copy_companion_files else 'no'}", file=sys.stderr)
+    print(file=sys.stderr)
 
     # Create target directory if needed
     if args.apply:
@@ -576,11 +619,11 @@ def main():
     total_files = len(files)
 
     if total_files == 0:
-        print(f"No video files found in {source_dir}")
+        print(f"No video files found in {source_dir}", file=sys.stderr)
         sys.exit(0)
 
-    print(f"📹 Found {total_files} video file(s) to process")
-    print()
+    print(f"📹 Found {total_files} video file(s) to process", file=sys.stderr)
+    print(file=sys.stderr)
 
     # Process each file
     stats = {
@@ -604,7 +647,7 @@ def main():
         stats["processed"] += 1
         base = file_path.name
 
-        print(f"[{i}/{total_files}] Processing: {base}")
+        print(f"[{i}/{total_files}] Processing: {base}", file=sys.stderr)
 
         result = process_file(
             file_path,
@@ -631,21 +674,21 @@ def main():
 
         all_source_files.extend(result.get("source_files", []))
 
-        print()  # Empty line between files
+        print(file=sys.stderr)  # Empty line between files
 
     # Archive source (if in tasks)
     if "archive-source" in tasks:
-        print("📦 Archive source...")
+        print("📦 Archive source...", file=sys.stderr)
         arc_rc = run_archive_source(
             source_dir, args.source_action, all_source_files, args.apply, args.verbose,
         )
         if arc_rc != 0:
-            print(f"   ⚠️  Archive-source failed (exit {arc_rc})")
+            print(f"   ⚠️  Archive-source failed (exit {arc_rc})", file=sys.stderr)
 
     # Clean up working dir
     if args.apply:
         if stats["failed"] > 0:
-            print(f"⚠️  Working dir preserved for inspection: {working_dir}")
+            print(f"⚠️  Working dir preserved for inspection: {working_dir}", file=sys.stderr)
         else:
             try:
                 os.rmdir(working_dir)

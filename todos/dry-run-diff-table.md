@@ -174,11 +174,11 @@ In `WorkflowView`, the right panel of `HSplitView` currently shows
 ## Implementation order
 
 1. **PR 1 — scripts: stdout/stderr cleanup + new `@@` lines**
-   - [ ] step 1: fix tag-media.py stderr
-   - [ ] step 2: add `@@` output to tag-media.py
-   - [ ] step 3: fix fix-media-timestamp.py stderr, add `@@` output
-   - [ ] step 4: update media-pipeline.py to separate streams and re-emit `@@`
-   - [ ] tests for each script verifying `@@` lines in stdout
+   - [x] step 1: fix tag-media.py stderr
+   - [x] step 2: add `@@` output to tag-media.py
+   - [x] step 3: fix fix-media-timestamp.py stderr, add `@@` output
+   - [x] step 4: update media-pipeline.py to separate streams and re-emit `@@`
+   - [x] tests for each script verifying `@@` lines in stdout
 
 2. **PR 2 — macos: diff table view**
    - [ ] step 7: DiffTableRow model

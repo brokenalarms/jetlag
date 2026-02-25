@@ -149,7 +149,7 @@ class TestFileDiscovery:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
-        assert "Found 2 video file(s)" in result.stdout
+        assert "Found 2 video file(s)" in result.stderr
 
     def test_ignores_other_extensions(self, temp_workspace, test_profile):
         """Pipeline ignores files not matching profile extensions."""
@@ -162,7 +162,7 @@ class TestFileDiscovery:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
-        assert "Found 1 video file(s)" in result.stdout
+        assert "Found 1 video file(s)" in result.stderr
 
     def test_finds_files_in_subdirectories(self, temp_workspace, test_profile):
         """Pipeline recursively finds files in subdirectories."""
@@ -174,7 +174,7 @@ class TestFileDiscovery:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
-        assert "Found 2 video file(s)" in result.stdout
+        assert "Found 2 video file(s)" in result.stderr
 
     def test_processes_alphabetically(self, temp_workspace, test_profile):
         """Pipeline processes files in alphabetical order."""
@@ -187,7 +187,7 @@ class TestFileDiscovery:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
-        lines = result.stdout.split("\n")
+        lines = result.stderr.split("\n")
         processing_lines = [l for l in lines if "Processing:" in l]
         assert "apple.mp4" in processing_lines[0]
         assert "mango.mp4" in processing_lines[1]
@@ -498,8 +498,8 @@ class TestSummaryOutput:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
-        assert "Total files processed: 3" in result.stdout
-        assert "Successfully completed: 3" in result.stdout
+        assert "Total files processed: 3" in result.stderr
+        assert "Successfully completed: 3" in result.stderr
 
     def test_summary_shows_failed_files(self, temp_workspace, test_profile):
         """Summary lists files that failed processing."""
@@ -516,7 +516,7 @@ class TestSummaryOutput:
         # Restore permissions for cleanup
         video.chmod(0o644)
 
-        assert "Failed: 1" in result.stdout or result.returncode != 0
+        assert "Failed: 1" in result.stderr or result.returncode != 0
 
 
 class TestExiftoolTmpDetection:
@@ -550,7 +550,7 @@ class TestTagging:
         )
 
         # Check that tagging was reported in output (Spotlight indexing unreliable in temp dirs)
-        assert "Tagged:" in result.stdout or "Already tagged" in result.stdout
+        assert "Tagged:" in result.stderr or "Already tagged" in result.stderr
 
     def test_applies_exif_make_model_from_profile(self, temp_workspace, test_profile):
         """EXIF Make/Model from profile are applied."""
@@ -607,7 +607,7 @@ class TestCLIArguments:
         )
 
         assert result.returncode == 0
-        assert "Found 1 video file(s)" in result.stdout
+        assert "Found 1 video file(s)" in result.stderr
 
     def test_source_defaults_to_profile_source_dir(self, temp_workspace, test_profile):
         """Without --source, uses profile's source_dir."""
@@ -618,8 +618,8 @@ class TestCLIArguments:
             ["--profile", test_profile, "--timezone", "+0900", "--group", "Test"],
         )
 
-        assert str(source) in result.stdout
-        assert "Found 1 video file(s)" in result.stdout
+        assert str(source) in result.stderr
+        assert "Found 1 video file(s)" in result.stderr
 
     def test_target_from_profile_ready_dir(self, temp_workspace, test_profile):
         """--target defaults to profile's ready_dir."""
@@ -631,7 +631,7 @@ class TestCLIArguments:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
-        assert str(target) in result.stdout
+        assert str(target) in result.stderr
 
 
 class TestIngestIntegration:
@@ -866,6 +866,98 @@ class TestArchiveSourceIntegration:
 
         assert not video.exists(), "Processed video should be deleted from source"
         assert not thm.exists(), "Companion THM should be deleted from source"
+
+
+class TestPipelineMachineOutput:
+    """Test @@ machine-readable output from media-pipeline."""
+
+    def _parse_at_lines(self, stdout: str) -> list[dict]:
+        """Parse @@ lines from pipeline stdout, grouping by @@pipeline_file."""
+        files = []
+        current = {}
+        for line in stdout.strip().split("\n"):
+            if line.startswith("@@pipeline_file="):
+                if current:
+                    files.append(current)
+                current = {"pipeline_file": line.split("=", 1)[1]}
+            elif line.startswith("@@") and "=" in line:
+                key = line[2:].split("=", 1)[0]
+                value = line[2:].split("=", 1)[1]
+                current[key] = value
+        if current:
+            files.append(current)
+        return files
+
+    def test_pipeline_emits_at_lines_per_file(self, temp_workspace, test_profile):
+        """Pipeline emits @@pipeline_file and @@pipeline_result for each file.
+
+        Actual: stdout contains @@pipeline_file=<basename> and @@pipeline_result=<token>
+        Expected: one set of @@ lines per file processed
+        """
+        source = temp_workspace["source"]
+        create_test_video(source / "test1.mp4", media_create_date="2025:10:05 01:00:00")
+        create_test_video(source / "test2.mp4", media_create_date="2025:10:05 01:00:00")
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+        ])
+
+        files = self._parse_at_lines(result.stdout)
+        assert len(files) == 2, f"Actual: {len(files)} file groups, Expected: 2"
+        names = {f["pipeline_file"] for f in files}
+        assert "test1.mp4" in names
+        assert "test2.mp4" in names
+        for f in files:
+            assert "pipeline_result" in f, f"Missing @@pipeline_result for {f.get('pipeline_file')}"
+            assert f["pipeline_result"] in ("changed", "unchanged"), f"Unexpected pipeline_result: {f['pipeline_result']}"
+
+    def test_pipeline_re_emits_child_at_lines(self, temp_workspace, test_profile):
+        """Pipeline re-emits @@ lines from child scripts (fix-timestamp, organize).
+
+        Actual: stdout contains child @@ lines (timestamp_action, dest)
+        Expected: child script @@ data flows through pipeline to stdout
+        """
+        source = temp_workspace["source"]
+        create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+        ])
+
+        files = self._parse_at_lines(result.stdout)
+        assert len(files) == 1
+        f = files[0]
+        # tag_action only present on macOS (tag-media requires Finder tags)
+        if sys.platform == "darwin":
+            assert "tag_action" in f, "Missing @@tag_action from tag-media child"
+        assert "timestamp_action" in f, "Missing @@timestamp_action from fix-timestamp child"
+        assert "dest" in f, "Missing @@dest from organize child"
+
+    def test_pipeline_stdout_only_has_at_lines(self, temp_workspace, test_profile):
+        """Pipeline stdout contains only @@key=value lines.
+
+        Actual: every non-empty stdout line starts with @@
+        Expected: clean machine-readable output on stdout, human text on stderr
+        """
+        source = temp_workspace["source"]
+        create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+        ])
+
+        for line in result.stdout.strip().split("\n"):
+            if line.strip():
+                assert line.startswith("@@"), f"Actual: stdout line '{line}' is not @@-prefixed, Expected: all stdout lines are @@key=value"
 
 
 if __name__ == "__main__":
