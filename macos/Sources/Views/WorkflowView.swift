@@ -2,8 +2,8 @@ import SwiftUI
 
 struct WorkflowView: View {
     @Bindable var state: AppState
-    @State private var sourceDirError: String?
-    @FocusState private var sourceDirFocused: Bool
+    @State private var touch = TouchState()
+    @FocusState private var focusedField: Field?
     @State private var showUpgradeSheet = false
     @State private var detectedFileCount = 0
     private var licenseStore: LicenseStore { LicenseStore.shared }
@@ -12,14 +12,33 @@ struct WorkflowView: View {
         state.activeProfile?.companionExtensions?.joined(separator: ", ") ?? ""
     }
 
-    private var timezoneIsValid: Bool {
-        let tz = state.timezone
-        if tz.isEmpty {
-            return !state.enabledSteps.contains(.fixTimezone)
-        }
-        let pattern = /^[+-]\d{4}$/
-        return tz.contains(pattern)
+    private enum Field: Hashable {
+        case sourceDir
+        case timezone
     }
+
+    private var sourceDirError: String? {
+        let path = state.sourceDir
+        guard !path.isEmpty else { return nil }
+        var isDir: ObjCBool = false
+        if !FileManager.default.fileExists(atPath: path, isDirectory: &isDir) {
+            return "Directory not found"
+        } else if !isDir.boolValue {
+            return "Path is a file, not a directory"
+        }
+        return nil
+    }
+
+    private var timezoneError: String? {
+        if state.useTimezonePicker { return nil }
+        if !state.enabledSteps.contains(.fixTimezone) { return nil }
+        let tz = state.timezone
+        if tz.isEmpty { return "Timezone required" }
+        if !tz.contains(/^[+-]\d{4}$/) { return "Expected format: +HHMM or -HHMM" }
+        return nil
+    }
+
+    private var timezoneIsValid: Bool { timezoneError == nil }
 
     var body: some View {
         ScrollView {
@@ -31,6 +50,9 @@ struct WorkflowView: View {
                 }
             }
             .padding()
+        }
+        .onChange(of: focusedField) { old, _ in
+            if let old { touch.markBlurred(old) }
         }
         .frame(minWidth: 340)
         .inspector(isPresented: $state.showLog) {
@@ -91,6 +113,7 @@ struct WorkflowView: View {
                 ProfilePicker(selection: $state.selectedProfile, state: state)
                     .onChange(of: state.selectedProfile) { _, newValue in
                         state.resetWorkflowFields(for: newValue)
+                        touch.reset()
                     }
             }
         }
@@ -223,21 +246,11 @@ struct WorkflowView: View {
                 HStack(spacing: 6) {
                     TextField("SD card or directory path", text: $state.sourceDir)
                         .textFieldStyle(.roundedBorder)
-                        .focused($sourceDirFocused)
-                        .onChange(of: sourceDirFocused) { _, focused in
-                            if !focused { validateSourceDir() }
-                        }
-                        .onChange(of: state.sourceDir) { _, _ in
-                            sourceDirError = nil
-                        }
+                        .focused($focusedField, equals: .sourceDir)
                     Button("Browse...") { pickSourceDir() }
                         .controlSize(.small)
                 }
-                if let error = sourceDirError {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
+                .fieldError(sourceDirError, show: touch.hasBlurred(.sourceDir))
             }
 
             HStack(spacing: 4) {
@@ -323,12 +336,11 @@ struct WorkflowView: View {
                     TextField("+HHMM", text: $state.timezone)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 90)
-                        .foregroundColor(timezoneIsValid ? .primary : .red)
-                    if !state.timezone.isEmpty && !timezoneIsValid {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.yellow)
-                            .help("Expected format: +HHMM or -HHMM")
-                    }
+                        .focused($focusedField, equals: .timezone)
+                        .foregroundColor(
+                            touch.hasBlurred(.timezone) && timezoneError != nil
+                                ? .red : .primary
+                        )
                 } else {
                     TimezonePickerView(selectedTimezone: $state.timezone)
                 }
@@ -342,11 +354,7 @@ struct WorkflowView: View {
                 .contentShape(Rectangle())
                 .help(state.useTimezonePicker ? "Type manually" : "Pick from list")
             }
-            if state.timezone.isEmpty {
-                Label("Timezone required", systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.yellow)
-            }
+            .fieldError(timezoneError, show: touch.hasBlurred(.timezone))
         }
         .padding(10)
     }
@@ -488,19 +496,6 @@ struct WorkflowView: View {
         }
     }
 
-    private func validateSourceDir() {
-        let path = state.sourceDir
-        guard !path.isEmpty else { sourceDirError = nil; return }
-        var isDir: ObjCBool = false
-        if !FileManager.default.fileExists(atPath: path, isDirectory: &isDir) {
-            sourceDirError = "Directory not found"
-        } else if !isDir.boolValue {
-            sourceDirError = "Path is a file, not a directory"
-        } else {
-            sourceDirError = nil
-        }
-    }
-
     private func pickSourceDir() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -508,6 +503,7 @@ struct WorkflowView: View {
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             state.sourceDir = url.path
+            touch.markBlurred(.sourceDir)
         }
     }
 
