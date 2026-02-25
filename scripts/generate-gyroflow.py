@@ -59,6 +59,7 @@ def load_gyroflow_config() -> dict:
     if not profiles_file.exists():
         print(f"ERROR: Config file not found: {profiles_file}", file=sys.stderr)
         print("Add a 'gyroflow' section to media-profiles.yaml with 'binary' path", file=sys.stderr)
+        print(f"@@error=Config file not found: {profiles_file}")
         sys.exit(1)
 
     with open(profiles_file) as f:
@@ -68,10 +69,12 @@ def load_gyroflow_config() -> dict:
     if not config:
         print("ERROR: No 'gyroflow' section found in media-profiles.yaml", file=sys.stderr)
         print("Add a 'gyroflow' section with at minimum a 'binary' path", file=sys.stderr)
+        print("@@error=No 'gyroflow' section in media-profiles.yaml")
         sys.exit(1)
 
     if not config.get("binary"):
         print("ERROR: No 'binary' path in gyroflow config in media-profiles.yaml", file=sys.stderr)
+        print("@@error=No 'binary' path in gyroflow config")
         sys.exit(1)
 
     return config
@@ -92,6 +95,7 @@ def main():
     file_path = Path(args.file).resolve()
     if not file_path.exists():
         print(f"ERROR: File not found: {file_path}", file=sys.stderr)
+        print(f"@@error=File not found: {file_path}")
         sys.exit(1)
 
     gyroflow_path = file_path.with_suffix(".gyroflow")
@@ -123,6 +127,7 @@ def main():
     if not os.path.isfile(binary):
         print(f"ERROR: Gyroflow binary not found at: {binary}", file=sys.stderr)
         print("Install Gyroflow or update the 'binary' path in media-profiles.yaml", file=sys.stderr)
+        print(f"@@error=Gyroflow binary not found at: {binary}")
         sys.exit(1)
 
     preset_json = args.preset or json.dumps(config.get("preset", {}))
@@ -135,14 +140,15 @@ def main():
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     if result.returncode != 0:
-        if result.stderr:
-            print(result.stderr.rstrip(), file=sys.stderr)
-        print(f"Gyroflow skipped {rel_path}", file=sys.stderr)
+        error_msg = result.stderr.rstrip() if result.stderr else f"exit code {result.returncode}"
+        print(error_msg, file=sys.stderr)
+        print(f"@@error={error_msg}")
         print(f"@@action=skipped")
         return
 
     if not gyroflow_path.exists():
         print(f"Gyroflow ran but no project file created for {rel_path}", file=sys.stderr)
+        print(f"@@error=No project file created for {rel_path}")
         print(f"@@action=skipped")
         return
 

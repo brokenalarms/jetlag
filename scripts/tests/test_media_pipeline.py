@@ -959,6 +959,35 @@ class TestPipelineMachineOutput:
             if line.strip():
                 assert line.startswith("@@"), f"Actual: stdout line '{line}' is not @@-prefixed, Expected: all stdout lines are @@key=value"
 
+    def test_gyroflow_skipped_in_dry_run(self, temp_workspace, test_profile):
+        """Gyroflow step is skipped in dry run — no @@error from nonexistent output path.
+
+        Actual: no @@error in stdout when gyroflow is enabled but --apply is not passed
+        Expected: gyroflow step doesn't fire in dry run
+        """
+        profiles_path = SCRIPT_DIR / "media-profiles.yaml"
+        with open(profiles_path) as f:
+            profiles = yaml.safe_load(f)
+        profiles["profiles"]["_test"]["gyroflow_enabled"] = True
+        with open(profiles_path, "w") as f:
+            yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
+
+        source = temp_workspace["source"]
+        create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+            "--tasks", "tag", "fix-timestamp", "gyroflow",
+        ])
+
+        files = self._parse_at_lines(result.stdout)
+        assert len(files) == 1
+        assert "error" not in files[0], f"Gyroflow should be skipped in dry run, got @@error={files[0].get('error')}"
+        assert files[0]["pipeline_result"] in ("changed", "unchanged")
+
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — EXIF tags use the `tag` command")
 class TestCLIOverrides:

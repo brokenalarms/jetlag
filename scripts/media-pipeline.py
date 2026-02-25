@@ -33,6 +33,17 @@ _ingest_mod = importlib.import_module("ingest-media")
 
 SCRIPT_DIR = Path(__file__).parent
 
+_machine_output = not sys.stdout.isatty()
+
+
+def emit(key: str, value: str):
+    """Emit a @@key=value machine-readable line to stdout.
+
+    Only emits when stdout is a pipe (macOS app), not a terminal (CLI).
+    """
+    if _machine_output:
+        print(f"@@{key}={value}")
+
 
 def signal_handler(sig, frame):
     """Handle Ctrl-C gracefully."""
@@ -218,14 +229,12 @@ def run_generate_gyroflow(
     file_path: Path,
     preset_json: str,
     apply: bool
-) -> tuple[str, int]:
+) -> tuple[str, int, dict[str, str]]:
     """Run generate-gyroflow.py on a file.
 
-    stderr passes through to user. stdout captured for @@key=value parsing.
-
     Returns:
-        tuple of (action, return_code)
-        action is parsed from @@action=X in stdout
+        tuple of (stderr_output, return_code, at_lines)
+        at_lines is a dict of parsed @@key=value pairs from stdout
     """
     cmd = [
         sys.executable, str(SCRIPT_DIR / "generate-gyroflow.py"),
@@ -236,14 +245,11 @@ def run_generate_gyroflow(
     if apply:
         cmd.append("--apply")
 
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True)
 
-    action = ""
-    for line in result.stdout.split("\n"):
-        if line.startswith("@@action="):
-            action = line.split("=", 1)[1]
+    at_lines = _parse_at_lines(result.stdout)
 
-    return action, result.returncode
+    return result.stderr.strip(), result.returncode, at_lines
 
 
 def run_archive_source(
@@ -299,8 +305,7 @@ def process_file(
     result = {"changed": False, "failed": False, "error": None, "source_files": [str(file_path)]}
     file_changed = False
 
-    # Emit pipeline_file @@ line at the start of each file
-    print(f"@@pipeline_file={file_path.name}")
+    emit("pipeline_file", file_path.name)
 
     # INGEST (always): copy source file to working dir
     print("📥 Ingesting...", file=sys.stderr)
@@ -317,7 +322,7 @@ def process_file(
         print(f"   ❌ Ingest failed for {file_path.name}", file=sys.stderr)
         result["failed"] = True
         result["error"] = "Ingest failed"
-        print(f"@@pipeline_result=failed")
+        emit("pipeline_result", "failed")
         return result
 
     active_file = Path(dest) if action == "copied" else file_path
@@ -345,9 +350,8 @@ def process_file(
             for line in output.split("\n"):
                 if line.strip():
                     print(f"  {line}", file=sys.stderr)
-            # Re-emit @@ lines on stdout for the macOS app
             for key, value in at_lines.items():
-                print(f"@@{key}={value}")
+                emit(key, value)
             if changed:
                 file_changed = True
 
@@ -358,15 +362,14 @@ def process_file(
         for line in output.split("\n"):
             if line.strip():
                 print(f"  {line}", file=sys.stderr)
-        # Re-emit @@ lines on stdout for the macOS app
         for key, value in at_lines.items():
-            print(f"@@{key}={value}")
+            emit(key, value)
 
         if rc != 0:
             print(f"   ❌ Timestamp fix failed for {file_path.name}", file=sys.stderr)
             result["failed"] = True
             result["error"] = "Timestamp fix failed"
-            print(f"@@pipeline_result=failed")
+            emit("pipeline_result", "failed")
             return result
 
         if changed:
@@ -383,11 +386,10 @@ def process_file(
     else:
         template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
     output, action, dest, rc = run_organize_by_date(active_file, target_dir, template, apply, verbose)
-    # Re-emit organize @@ lines
     if action:
-        print(f"@@action={action}")
+        emit("action", action)
     if dest:
-        print(f"@@dest={dest}")
+        emit("dest", dest)
 
     if output:
         for line in output.split("\n"):
@@ -398,7 +400,7 @@ def process_file(
         print(f"   ❌ Organization failed for {file_path.name}", file=sys.stderr)
         result["failed"] = True
         result["error"] = "Organization failed"
-        print(f"@@pipeline_result=failed")
+        emit("pipeline_result", "failed")
         return result
 
     if action in ("copied", "moved", "overwrote"):
@@ -417,29 +419,32 @@ def process_file(
             elif not apply:
                 print(f"  [DRY RUN] Would move companion: {companion_file.name} → {companion_target}", file=sys.stderr)
 
-    # Generate gyroflow project (if in tasks and enabled)
+    # Generate gyroflow project (if in tasks, enabled, and applying)
     gyroflow_enabled = profile.get("gyroflow_enabled", False) if profile else False
-    if "gyroflow" in tasks and gyroflow_enabled and gyroflow_config:
+    if "gyroflow" in tasks and gyroflow_enabled and gyroflow_config and apply:
         print("🎥 Generating gyroflow project...", file=sys.stderr)
 
         preset = gyroflow_config.get("preset", {})
         preset_json = json.dumps(preset)
 
-        gf_action, rc = run_generate_gyroflow(Path(dest) if dest else active_file, preset_json, apply)
+        gf_output, _, gf_at_lines = run_generate_gyroflow(Path(dest) if dest else active_file, preset_json, apply)
+        for line in gf_output.split("\n"):
+            if line.strip():
+                print(f"  {line}", file=sys.stderr)
+        for key, value in gf_at_lines.items():
+            emit(key, value)
 
-        if rc != 0:
-            print(f"   ⚠️  Gyroflow generation failed for {file_path.name} (non-fatal)", file=sys.stderr)
-        elif gf_action == "generated":
+        if gf_at_lines.get("action") == "generated":
             file_changed = True
 
     result["changed"] = file_changed
     # Emit pipeline result summary
     if result["failed"]:
-        print(f"@@pipeline_result=failed")
+        emit("pipeline_result", "failed")
     elif file_changed:
-        print(f"@@pipeline_result=changed")
+        emit("pipeline_result", "changed")
     else:
-        print(f"@@pipeline_result=unchanged")
+        emit("pipeline_result", "unchanged")
     return result
 
 
