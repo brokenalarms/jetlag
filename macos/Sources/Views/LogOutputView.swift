@@ -6,8 +6,6 @@ struct LogOutputView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Divider()
-
             HStack(spacing: 6) {
                 Image(systemName: "terminal")
                     .foregroundStyle(.secondary)

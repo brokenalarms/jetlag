@@ -20,18 +20,23 @@ struct WorkflowView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: 16) {
-                profileSelector
-                if !state.selectedProfile.isEmpty {
-                    stepsPipeline
-                    stepOptions
-                    executionBar
+        HSplitView {
+            ScrollView {
+                VStack(spacing: 16) {
+                    profileSelector
+                    if !state.selectedProfile.isEmpty {
+                        stepsPipeline
+                        executionBar
+                    }
                 }
+                .padding()
             }
-            .padding()
+            .frame(minWidth: 340)
 
-            LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
+            if state.showLog {
+                LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
+                    .frame(minWidth: 260)
+            }
         }
         .navigationTitle("Workflow")
         .sheet(isPresented: $showUpgradeSheet) {
@@ -90,147 +95,123 @@ struct WorkflowView: View {
     // MARK: - Pipeline steps
 
     private var stepsPipeline: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(state.availableSteps) { step in
-                    if step.isAlwaysOn {
-                        HStack(spacing: 8) {
-                            Image(systemName: step.systemImage)
-                                .font(.system(size: 12))
-                                .foregroundStyle(step.iconColor)
-                                .frame(width: 16)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(step.rawValue)
-                                    .font(.system(size: 12, weight: .medium))
-                                Text(step.help)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                            }
-
-                            Spacer()
-
-                            Image(systemName: "lock.fill")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.tertiary)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(step.iconColor.opacity(0.04))
-                        .foregroundStyle(.primary)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .strokeBorder(step.iconColor.opacity(0.2), lineWidth: 1)
-                        )
-                    } else {
-                        let isEnabled = state.enabledSteps.contains(step)
-
-                        Button {
-                            if isEnabled {
-                                state.enabledSteps.remove(step)
-                            } else {
-                                state.enabledSteps.insert(step)
-                            }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: step.systemImage)
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(isEnabled ? step.iconColor : Color.secondary)
-                                    .frame(width: 16)
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(step.rawValue)
-                                        .font(.system(size: 12, weight: .medium))
-                                    Text(step.help)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(2)
-                                }
-
-                                Spacer()
-
-                                Image(systemName: isEnabled ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(isEnabled ? step.iconColor : Color.secondary)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .background(isEnabled ? step.iconColor.opacity(0.08) : .clear)
-                            .foregroundStyle(isEnabled ? .primary : .secondary)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .strokeBorder(isEnabled ? step.iconColor.opacity(0.3) : Color.secondary.opacity(0.5), lineWidth: 1)
-                        )
-                    }
+        let steps = state.availableSteps
+        return VStack(spacing: 0) {
+            ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
+                stepCard(step)
+                if index < steps.count - 1 {
+                    stepArrow
                 }
             }
-        } label: {
-            Label("Pipeline", systemImage: "arrow.triangle.branch")
-                .font(.headline)
-                .foregroundStyle(Color.accentColor)
         }
     }
 
-    // MARK: - Step-specific options
+    private func stepCard(_ step: PipelineStep) -> some View {
+        let isActive = step.isAlwaysOn || state.enabledSteps.contains(step)
+        return VStack(spacing: 0) {
+            stepHeader(step, isActive: isActive)
+            if isActive {
+                stepOptionsContent(step)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(
+                    isActive ? step.iconColor.opacity(step.isAlwaysOn ? 0.2 : 0.3)
+                             : Color.secondary.opacity(0.5),
+                    lineWidth: 1
+                )
+        )
+    }
 
     @ViewBuilder
-    private var stepOptions: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            groupField
-            sourceOptions
-
-            if state.enabledSteps.contains(.fixTimezone) {
-                timezoneField
-            }
-        }
-    }
-
-    private var groupField: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
-            GridRow {
-                HelpLabel("Group", help: Strings.Workflow.group)
-                    .gridColumnAlignment(.trailing)
-                VStack(alignment: .leading, spacing: 6) {
-                    TextField("Optional", text: $state.group)
-                        .textFieldStyle(.roundedBorder)
-                    if state.enabledSteps.contains(.fixTimezone) && !state.group.isEmpty {
-                        HStack(spacing: 4) {
-                            Toggle("Append timezone to group folder", isOn: $state.appendTimezoneToGroup)
-                            HelpButton(Strings.Workflow.appendTimezoneToGroup)
-                        }
-                    }
+    private func stepHeader(_ step: PipelineStep, isActive: Bool) -> some View {
+        if step.isAlwaysOn {
+            stepHeaderContent(step, isActive: isActive)
+        } else {
+            Button {
+                if isActive {
+                    state.enabledSteps.remove(step)
+                } else {
+                    state.enabledSteps.insert(step)
                 }
+            } label: {
+                stepHeaderContent(step, isActive: isActive)
             }
+            .buttonStyle(.plain)
         }
     }
 
-    private var sourceOptions: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                sourceDirectoryField
-                Divider()
-                sourceActionToggles
+    private func stepHeaderContent(_ step: PipelineStep, isActive: Bool) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: step.systemImage)
+                .font(.system(size: 12))
+                .foregroundStyle(isActive ? step.iconColor : .secondary)
+                .frame(width: 16)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(step.rawValue)
+                    .font(.system(size: 12, weight: .medium))
+                Text(step.help)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
-            .padding(4)
-        } label: {
-            Label("Source", systemImage: "sdcard")
-                .font(.headline)
-                .foregroundStyle(Color("NeonCyan"))
+
+            Spacer()
+
+            if step.isAlwaysOn {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            } else {
+                Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isActive ? step.iconColor : .secondary)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(isActive ? step.iconColor.opacity(step.isAlwaysOn ? 0.04 : 0.08) : .clear)
+        .foregroundStyle(isActive ? .primary : .secondary)
+        .contentShape(Rectangle())
+    }
+
+    private var stepArrow: some View {
+        Image(systemName: "arrow.down")
+            .font(.system(size: 11))
+            .foregroundStyle(.tertiary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func stepOptionsContent(_ step: PipelineStep) -> some View {
+        switch step {
+        case .ingest:
+            Divider()
+            ingestOptions
+        case .tag:
+            Divider()
+            tagOptions
+        case .organize:
+            Divider()
+            organizeOptions
+        case .fixTimezone:
+            Divider()
+            fixTimezoneOptions
+        case .archiveSource:
+            Divider()
+            archiveSourceOptions
+        default:
+            EmptyView()
         }
     }
-    
-    private var sourceDirectoryField: some View {
-        HStack(spacing: 6) {
-            Text("Source:")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .frame(width: 60, alignment: .trailing)
-            
+
+    // MARK: - Inline step options
+
+    private var ingestOptions: some View {
+        VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     TextField("SD card or directory path", text: $state.sourceDir)
@@ -251,11 +232,7 @@ struct WorkflowView: View {
                         .foregroundStyle(.red)
                 }
             }
-        }
-    }
-    
-    private var sourceActionToggles: some View {
-        VStack(alignment: .leading, spacing: 8) {
+
             HStack(spacing: 4) {
                 Toggle(isOn: $state.copyCompanionFiles) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -274,13 +251,96 @@ struct WorkflowView: View {
                 .disabled(companionExtensions.isEmpty)
                 HelpButton(Strings.Workflow.copyCompanionFiles)
             }
+        }
+        .padding(10)
+    }
 
+    private var tagOptions: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let tags = state.activeProfile?.tags, !tags.isEmpty {
+                HStack(spacing: 4) {
+                    Text("Tags:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(tags.joined(separator: ", "))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if let exif = state.activeProfile?.exif {
+                let parts = [exif.make, exif.model].compactMap { $0 }
+                if !parts.isEmpty {
+                    HStack(spacing: 4) {
+                        Text("EXIF:")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(parts.joined(separator: " "))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(10)
+    }
+
+    private var organizeOptions: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let readyDir = state.activeProfile?.readyDir, !readyDir.isEmpty {
+                Text(destinationPreview(readyDir: readyDir))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 4) {
+                HelpLabel("Group", help: Strings.Workflow.group)
+                TextField("Optional", text: $state.group)
+                    .textFieldStyle(.roundedBorder)
+            }
+            if state.enabledSteps.contains(.fixTimezone) && !state.group.isEmpty {
+                HStack(spacing: 4) {
+                    Toggle("Append timezone to group folder", isOn: $state.appendTimezoneToGroup)
+                    HelpButton(Strings.Workflow.appendTimezoneToGroup)
+                }
+            }
+        }
+        .padding(10)
+    }
+
+    private var fixTimezoneOptions: some View {
+        HStack(spacing: 6) {
+            if !state.useTimezonePicker {
+                TextField("+HHMM", text: $state.timezone)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 90)
+                    .foregroundColor(timezoneIsValid ? .primary : .red)
+                if !timezoneIsValid {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.yellow)
+                        .help("Expected format: +HHMM or -HHMM")
+                }
+            } else {
+                TimezonePickerView(selectedTimezone: $state.timezone)
+            }
+            Spacer()
+            Button {
+                state.useTimezonePicker.toggle()
+            } label: {
+                Image(systemName: state.useTimezonePicker ? "keyboard" : "globe")
+                    .padding(4)
+            }
+            .contentShape(Rectangle())
+            .help(state.useTimezonePicker ? "Type manually" : "Pick from list")
+        }
+        .padding(10)
+    }
+
+    private var archiveSourceOptions: some View {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 4) {
                 Text("Source action:")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Picker("", selection: $state.sourceAction) {
-                    Text("Leave").tag(SourceAction.leave)
                     Text("Archive").tag(SourceAction.archive)
                     Text("Delete").tag(SourceAction.delete)
                 }
@@ -295,38 +355,7 @@ struct WorkflowView: View {
                     .foregroundStyle(.yellow)
             }
         }
-    }
-    
-    private var timezoneField: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
-            GridRow {
-                Text("Timezone").gridColumnAlignment(.trailing)
-                HStack(spacing: 6) {
-                    if !state.useTimezonePicker {
-                        TextField("+HHMM", text: $state.timezone)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 90)
-                            .foregroundColor(timezoneIsValid ? .primary : .red)
-                        if !timezoneIsValid {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.yellow)
-                                .help("Expected format: +HHMM or -HHMM")
-                        }
-                    } else {
-                        TimezonePickerView(selectedTimezone: $state.timezone)
-                    }
-                    Spacer()
-                    Button {
-                        state.useTimezonePicker.toggle()
-                    } label: {
-                        Image(systemName: state.useTimezonePicker ? "keyboard" : "globe")
-                            .padding(4)
-                    }
-                    .contentShape(Rectangle())
-                    .help(state.useTimezonePicker ? "Type manually" : "Pick from list")
-                }
-            }
-        }
+        .padding(10)
     }
 
     // MARK: - Execution
@@ -357,9 +386,35 @@ struct WorkflowView: View {
                     if state.isRunning {
                         Button("Cancel", role: .destructive) { state.cancelRunning() }
                     }
+
+                    Spacer()
+
+                    Button {
+                        state.showLog.toggle()
+                    } label: {
+                        Image(systemName: "terminal")
+                            .foregroundStyle(state.showLog ? .primary : .secondary)
+                    }
+                    .buttonStyle(.borderless)
+                    .help(state.showLog ? "Hide log" : "Show log")
                 }
             }
         }
+    }
+
+    // MARK: - Helpers
+
+    private func destinationPreview(readyDir: String) -> String {
+        var path = (readyDir as NSString).lastPathComponent + "/YYYY"
+        if !state.group.isEmpty {
+            var groupName = state.group
+            if state.appendTimezoneToGroup && state.enabledSteps.contains(.fixTimezone) && !state.timezone.isEmpty {
+                groupName += " (\(state.timezone))"
+            }
+            path += "/\(groupName)"
+        }
+        path += "/YYYY-MM-DD"
+        return path
     }
 
     // MARK: - Actions
@@ -392,6 +447,7 @@ struct WorkflowView: View {
         }
 
         state.clearLog()
+        state.showLog = true
         state.isRunning = true
 
         let (script, args) = state.buildPipelineArgs()

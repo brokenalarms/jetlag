@@ -450,9 +450,9 @@ def main():
     )
     parser.add_argument(
         "--source-action",
-        choices=["leave", "archive", "delete"],
-        default="leave",
-        help="Action for source after processing (default: leave). Requires archive-source in --tasks."
+        choices=["archive", "delete"],
+        default="archive",
+        help="Action for source after processing (default: archive). Requires archive-source in --tasks."
     )
     parser.add_argument(
         "--copy-companion-files", action="store_true",
@@ -558,7 +558,8 @@ def main():
         print(f"→ Timezone: {location_args[0]} {location_args[1]}")
     else:
         print("→ Timezone: From video metadata (or will prompt if needed)")
-    print(f"→ Source action: {args.source_action}")
+    if "archive-source" in args.tasks:
+        print(f"→ Source action: {args.source_action}")
     print(f"→ Copy companions: {'yes' if args.copy_companion_files else 'no'}")
     print()
 
@@ -632,7 +633,7 @@ def main():
 
         print()  # Empty line between files
 
-    # Archive source (if in tasks and not default leave)
+    # Archive source (if in tasks)
     if "archive-source" in tasks:
         print("📦 Archive source...")
         arc_rc = run_archive_source(

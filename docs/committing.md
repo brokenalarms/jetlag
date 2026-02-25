@@ -14,7 +14,7 @@ Before any commit or push action, every session:
 - Before **every** commit, repeat the branch check above — merges can land between commits
 - Commits should be atomic: one feature change or bug fix per commit where possible
 - Every commit message must have a subject line AND a body separated by a blank line — GitHub uses the subject as PR title and body as PR description when the user clicks "Create PR" on the branch
-- Commit body should cover: what changed, why, and how it was tested
+- Commit body should cover: what changed, why, and what tests were created or updated to cover it. No need to say 'all tests pass' - this is checked by CI.
 - Related atomic commits may be grouped into a single PR
 - Every commit that changes code for a feature or bug fix must be backed by a test covering that change
 - Never commit without first running tests with `pytest -x` and confirming they pass
@@ -23,7 +23,8 @@ Before any commit or push action, every session:
 
 ## Pull requests
 
-- After pushing, always create the PR with `gh pr create` — this supports full markdown bodies without URL-encoding issues
+- After pushing, always create the PR with `gh pr create` if available — this supports full markdown bodies without URL-encoding issues
+- Otherwise, provide a fully URL-encoded link for user to click on to create PR
 - Title: imperative sentence, lowercase, no period — what changed, not what you did
 - Body: concise but informative bullet points covering **what** changed, **why**, and **how it was tested**. Group by theme (e.g. new files, modified behavior, test changes). The reader should understand the PR without opening every file
-- If subsequent commits are added to a PR, update the PR title/body with `gh pr edit` to describe the full series of commits
+- If subsequent commits are added to a PR, update the PR title/body with `gh pr edit` to describe the full series of commits if `gh` available, otherwise give user new description text to paste in.

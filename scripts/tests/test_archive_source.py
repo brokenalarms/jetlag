@@ -2,7 +2,7 @@
 """
 Tests for archive-source.py
 
-Covers: leave no-op, archive rename, delete only passed files,
+Covers: archive rename, delete only passed files,
 empty dir cleanup, non-empty dir preservation, read-only source error,
 dry-run no-op.
 """
@@ -30,38 +30,6 @@ def run_archive_source(*args: str) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
     )
-
-
-class TestLeave:
-    """--action leave is a no-op: source folder and files are untouched."""
-
-    def setup_method(self):
-        self.temp_dir = tempfile.mkdtemp()
-        self.source = os.path.join(self.temp_dir, "DCIM")
-        os.makedirs(self.source)
-        self.file_a = os.path.join(self.source, "IMG_001.MP4")
-        Path(self.file_a).write_bytes(b"video-a")
-
-    def teardown_method(self):
-        shutil.rmtree(self.temp_dir)
-
-    def test_leave_preserves_source(self):
-        """Source directory and all files remain after leave action."""
-        before_files = set(os.listdir(self.source))
-
-        result = run_archive_source("--source", self.source, "--action", "leave", "--apply")
-
-        assert result.returncode == 0
-        assert os.path.isdir(self.source)
-        assert set(os.listdir(self.source)) == before_files
-
-    def test_leave_is_default_action(self):
-        """When no --action is specified, leave is the default."""
-        result = run_archive_source("--source", self.source, "--apply")
-
-        assert result.returncode == 0
-        assert os.path.isdir(self.source)
-        assert Path(self.file_a).read_bytes() == b"video-a"
 
 
 class TestArchive:
