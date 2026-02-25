@@ -19,11 +19,15 @@ struct ScriptRunner {
         process.standardError = stderrPipe
 
         let stream = AsyncStream<LogLine> { continuation in
+            let group = DispatchGroup()
+
             func readLines(from pipe: Pipe, stream: LogLine.Stream) {
+                group.enter()
                 pipe.fileHandleForReading.readabilityHandler = { handle in
                     let data = handle.availableData
                     guard !data.isEmpty else {
                         pipe.fileHandleForReading.readabilityHandler = nil
+                        group.leave()
                         return
                     }
                     if let text = String(data: data, encoding: .utf8) {
@@ -37,13 +41,15 @@ struct ScriptRunner {
             readLines(from: stdoutPipe, stream: .stdout)
             readLines(from: stderrPipe, stream: .stderr)
 
-            process.terminationHandler = { _ in
+            group.notify(queue: .global()) {
                 continuation.finish()
             }
 
             do {
                 try process.run()
             } catch {
+                stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                stderrPipe.fileHandleForReading.readabilityHandler = nil
                 continuation.yield(LogLine(text: "Failed to start: \(error.localizedDescription)", stream: .stderr))
                 continuation.finish()
             }
