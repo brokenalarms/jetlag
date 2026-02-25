@@ -14,7 +14,9 @@ struct WorkflowView: View {
 
     private var timezoneIsValid: Bool {
         let tz = state.timezone
-        if tz.isEmpty { return true }
+        if tz.isEmpty {
+            return !state.enabledSteps.contains(.fixTimezone)
+        }
         let pattern = /^[+-]\d{4}$/
         return tz.contains(pattern)
     }
@@ -317,29 +319,36 @@ struct WorkflowView: View {
     }
 
     private var fixTimezoneOptions: some View {
-        HStack(spacing: 6) {
-            if !state.useTimezonePicker {
-                TextField("+HHMM", text: $state.timezone)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 90)
-                    .foregroundColor(timezoneIsValid ? .primary : .red)
-                if !timezoneIsValid {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.yellow)
-                        .help("Expected format: +HHMM or -HHMM")
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                if !state.useTimezonePicker {
+                    TextField("+HHMM", text: $state.timezone)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 90)
+                        .foregroundColor(timezoneIsValid ? .primary : .red)
+                    if !state.timezone.isEmpty && !timezoneIsValid {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.yellow)
+                            .help("Expected format: +HHMM or -HHMM")
+                    }
+                } else {
+                    TimezonePickerView(selectedTimezone: $state.timezone)
                 }
-            } else {
-                TimezonePickerView(selectedTimezone: $state.timezone)
+                Spacer()
+                Button {
+                    state.useTimezonePicker.toggle()
+                } label: {
+                    Image(systemName: state.useTimezonePicker ? "keyboard" : "globe")
+                        .padding(4)
+                }
+                .contentShape(Rectangle())
+                .help(state.useTimezonePicker ? "Type manually" : "Pick from list")
             }
-            Spacer()
-            Button {
-                state.useTimezonePicker.toggle()
-            } label: {
-                Image(systemName: state.useTimezonePicker ? "keyboard" : "globe")
-                    .padding(4)
+            if state.timezone.isEmpty {
+                Label("Timezone required", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.yellow)
             }
-            .contentShape(Rectangle())
-            .help(state.useTimezonePicker ? "Type manually" : "Pick from list")
         }
         .padding(10)
     }

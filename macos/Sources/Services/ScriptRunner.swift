@@ -14,9 +14,7 @@ struct ScriptRunner {
         process.currentDirectoryURL = URL(fileURLWithPath: workingDir)
 
         var env = ProcessInfo.processInfo.environment
-        let homebrewPaths = "/opt/homebrew/bin:/usr/local/bin"
-        let currentPath = env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
-        env["PATH"] = homebrewPaths + ":" + currentPath
+        env["PATH"] = ScriptRunner.loginPath()
         process.environment = env
 
         let stdoutPipe = Pipe()
@@ -62,5 +60,28 @@ struct ScriptRunner {
         }
 
         return (process, stream)
+    }
+
+    static func loginPath() -> String {
+        var paths = ["/opt/homebrew/bin", "/usr/local/bin"]
+
+        if let etcPaths = try? String(contentsOfFile: "/etc/paths", encoding: .utf8) {
+            paths += etcPaths.components(separatedBy: .newlines).filter { !$0.isEmpty }
+        }
+
+        let pathsD = (try? FileManager.default.contentsOfDirectory(atPath: "/etc/paths.d")) ?? []
+        for file in pathsD {
+            if let content = try? String(contentsOfFile: "/etc/paths.d/\(file)", encoding: .utf8) {
+                paths += content.components(separatedBy: .newlines).filter { !$0.isEmpty }
+            }
+        }
+
+        let current = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        if !current.isEmpty {
+            paths += current.components(separatedBy: ":")
+        }
+
+        var seen = Set<String>()
+        return paths.filter { seen.insert($0).inserted }.joined(separator: ":")
     }
 }
