@@ -23,6 +23,17 @@ import yaml
 SCRIPT_DIR = Path(__file__).parent.parent
 MEDIA_PIPELINE = SCRIPT_DIR / "media-pipeline.sh"
 
+sys.path.insert(0, str(SCRIPT_DIR))
+from lib.tools import resolve as resolve_tool
+
+
+def _has_tag_cmd() -> bool:
+    try:
+        resolve_tool("tag")
+        return True
+    except FileNotFoundError:
+        return False
+
 
 @dataclass
 class PipelineResult:
@@ -535,7 +546,10 @@ class TestExiftoolTmpDetection:
         assert "exiftool_tmp" in result.output
 
 
-@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags use the `tag` command")
+@pytest.mark.skipif(
+    sys.platform != "darwin" or not _has_tag_cmd(),
+    reason="requires macOS and the 'tag' command (brew install tag, or set JETLAG_TAG)"
+)
 class TestTagging:
     """Tests for file tagging from profile."""
 
@@ -933,8 +947,7 @@ class TestPipelineMachineOutput:
         files = self._parse_at_lines(result.stdout)
         assert len(files) == 1
         f = files[0]
-        # tag_action only present on macOS (tag-media requires Finder tags)
-        if sys.platform == "darwin":
+        if _has_tag_cmd():
             assert "tag_action" in f, "Missing @@tag_action from tag-media child"
         assert "timestamp_action" in f, "Missing @@timestamp_action from fix-timestamp child"
         assert "dest" in f, "Missing @@dest from organize child"
@@ -989,7 +1002,7 @@ class TestPipelineMachineOutput:
         assert files[0]["pipeline_result"] in ("changed", "unchanged")
 
 
-@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — EXIF tags use the `tag` command")
+@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS")
 class TestCLIOverrides:
     """Tests for --tags, --make, --model CLI overrides that take precedence over profile values."""
 

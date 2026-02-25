@@ -32,13 +32,11 @@ def get_existing_finder_tags(file_path: str) -> List[str]:
     try:
         result = subprocess.run([_tag_cmd(), '--list', '--no-name', file_path],
                               capture_output=True, check=True, text=True)
-        # Parse tags - comma-separated on a single line
         output = result.stdout.strip()
         if not output:
             return []
-        existing_tags = [tag.strip() for tag in output.split(',') if tag.strip()]
-        return existing_tags
-    except subprocess.CalledProcessError:
+        return [tag.strip() for tag in output.split(',') if tag.strip()]
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return []
 
 def apply_finder_tags(file_path: str, tags: List[str], dry_run: bool = False) -> Tuple[bool, List[str]]:
@@ -51,18 +49,19 @@ def apply_finder_tags(file_path: str, tags: List[str], dry_run: bool = False) ->
         return True, []
 
     try:
-        # Check which tags already exist
         existing_tags = get_existing_finder_tags(file_path)
         tags_to_add = [tag for tag in tags if tag not in existing_tags]
 
         if not tags_to_add:
-            return True, []  # All tags already present
+            return True, []
 
-        # Use tag command to add only missing tags (unless dry run)
         if not dry_run:
             subprocess.run([_tag_cmd(), '--add', ','.join(tags_to_add), file_path],
                           capture_output=True, check=True)
         return True, tags_to_add
+    except FileNotFoundError:
+        print("Warning: 'tag' command not found — install with: brew install tag", file=sys.stderr)
+        return False, []
     except subprocess.CalledProcessError as e:
         print(f"Warning: Failed to apply tags to {file_path}: {e}", file=sys.stderr)
         return False, []
