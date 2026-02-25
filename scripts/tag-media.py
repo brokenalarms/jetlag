@@ -109,6 +109,66 @@ def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Option
         print(f"Warning: Failed to add camera info to {file_path}: {e}", file=sys.stderr)
         return False, []
 
+def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], model: Optional[str], dry_run: bool) -> Optional[dict]:
+    """Process a single file: apply tags and EXIF, return machine-readable result.
+
+    Returns:
+        dict with keys: file, tags_added, exif_make, exif_model, tag_action
+        None if file not found or processing failed
+    """
+    if not os.path.exists(file_path):
+        print(f"Warning: File not found: {file_path}", file=sys.stderr)
+        return None
+
+    filename = os.path.basename(file_path)
+    actions = []
+    all_tags_added = []
+    exif_make = ""
+    exif_model = ""
+
+    # Apply camera EXIF (Make and Model)
+    if make or model:
+        success, fields_updated = add_camera_to_exif(file_path, make=make, model=model, dry_run=dry_run)
+        if not success:
+            return None
+
+        if fields_updated:
+            exif_parts = []
+            if 'Make' in fields_updated and make:
+                exif_parts.append(make)
+                exif_make = make
+            if 'Model' in fields_updated and model:
+                exif_parts.append(model)
+                exif_model = model
+            actions.append(f"EXIF: {' / '.join(exif_parts)}")
+
+    # Apply Finder tags
+    if finder_tags:
+        success, tags_added = apply_finder_tags(file_path, finder_tags, dry_run=dry_run)
+        if not success:
+            return None
+
+        if tags_added:
+            all_tags_added = tags_added
+            actions.append(f"Tags: {', '.join(tags_added)}")
+
+    dry_run_suffix = " (DRY RUN)" if dry_run else ""
+    tag_action = "tagged" if actions else "already_correct"
+
+    if actions:
+        print(f"📌 Tagged: {filename} ({'; '.join(actions)}){dry_run_suffix}", file=sys.stderr)
+    else:
+        print(f"✓ {filename}: Already tagged correctly{dry_run_suffix}", file=sys.stderr)
+
+    return {
+        "file": filename,
+        "tags_added": all_tags_added,
+        "exif_make": exif_make,
+        "exif_model": exif_model,
+        "tag_action": tag_action,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description='Tag media files with Finder tags and camera EXIF')
     parser.add_argument('files', nargs='+', help='Media files to tag')
@@ -128,41 +188,16 @@ def main():
 
     success_count = 0
     for file_path in file_paths:
-        if not os.path.exists(file_path):
-            print(f"Warning: File not found: {file_path}", file=sys.stderr)
+        result = tag_media_file(file_path, finder_tags, args.make, args.model, dry_run)
+        if result is None:
             continue
 
-        filename = os.path.basename(file_path)
-        actions = []
-
-        # Apply camera EXIF (Make and Model)
-        if args.make or args.model:
-            success, fields_updated = add_camera_to_exif(file_path, make=args.make, model=args.model, dry_run=dry_run)
-            if not success:
-                continue
-
-            if fields_updated:
-                exif_parts = []
-                if 'Make' in fields_updated and args.make:
-                    exif_parts.append(args.make)
-                if 'Model' in fields_updated and args.model:
-                    exif_parts.append(args.model)
-                actions.append(f"EXIF: {' / '.join(exif_parts)}")
-
-        # Apply Finder tags
-        if finder_tags:
-            success, tags_added = apply_finder_tags(file_path, finder_tags, dry_run=dry_run)
-            if not success:
-                continue
-
-            if tags_added:
-                actions.append(f"Tags: {', '.join(tags_added)}")
-
-        dry_run_suffix = " (DRY RUN)" if dry_run else ""
-        if actions:
-            print(f"📌 Tagged: {filename} ({'; '.join(actions)}){dry_run_suffix}")
-        else:
-            print(f"✓ {filename}: Already tagged correctly{dry_run_suffix}")
+        # Emit machine-readable @@ lines on stdout
+        print(f"@@file={result['file']}")
+        print(f"@@tags_added={','.join(result['tags_added'])}")
+        print(f"@@exif_make={result['exif_make']}")
+        print(f"@@exif_model={result['exif_model']}")
+        print(f"@@tag_action={result['tag_action']}")
 
         success_count += 1
 

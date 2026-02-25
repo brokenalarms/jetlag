@@ -53,7 +53,7 @@ class TestFixMediaTimestamp:
         ], capture_output=True, text=True)
 
         assert result.returncode == 0
-        assert "(DRY RUN)" in result.stdout
+        assert "(DRY RUN)" in result.stderr
 
         assert os.stat(test_video).st_mtime == original_mtime
 
@@ -79,7 +79,7 @@ class TestFixMediaTimestamp:
         ], capture_output=True, text=True)
 
         assert result2.returncode == 0
-        assert "No change" in result2.stdout
+        assert "No change" in result2.stderr
 
     def test_timezone_flag(self, test_video_no_timezone):
         """Test --timezone flag adds timezone to DateTimeOriginal without timezone"""
@@ -132,8 +132,8 @@ class TestFixMediaTimestamp:
         ], capture_output=True, text=True)
 
         assert result.returncode == 0
-        assert "filename" in result.stdout.lower()
-        assert "2025-06-18" in result.stdout or "2025:06:18" in result.stdout
+        assert "@@timestamp_source=filename" in result.stdout
+        assert "2025-06-18" in result.stderr or "2025:06:18" in result.stderr
 
     def test_missing_timezone_error(self, test_video_no_timezone):
         """Test that missing timezone is reported correctly"""
@@ -154,11 +154,11 @@ class TestFixMediaTimestamp:
         ], capture_output=True, text=True)
 
         assert result.returncode == 0
-        # Should have structured output sections
-        assert "📅 Original" in result.stdout or "Original" in result.stdout
-        assert "⏱️ Corrected" in result.stdout or "Corrected" in result.stdout
-        assert "🌐 UTC" in result.stdout or "UTC" in result.stdout
-        assert "📊 Change" in result.stdout or "Change" in result.stdout
+        # Human-readable output on stderr
+        assert "📅 Original" in result.stderr or "Original" in result.stderr
+        assert "⏱️ Corrected" in result.stderr or "Corrected" in result.stderr
+        assert "🌐 UTC" in result.stderr or "UTC" in result.stderr
+        assert "📊 Change" in result.stderr or "Change" in result.stderr
 
     def test_quicktime_createdate_healing(self, test_video):
         """Test that corrupted QuickTime CreateDate is healed"""
@@ -176,7 +176,7 @@ class TestFixMediaTimestamp:
         ], capture_output=True, text=True)
 
         assert result.returncode == 0
-        assert "QuickTime CreateDate" in result.stdout
+        assert "QuickTime CreateDate" in result.stderr
 
         # Verify QuickTime CreateDate is now correct (in UTC)
         exif_result = subprocess.run([
@@ -218,9 +218,123 @@ class TestFixMediaTimestampIntegration:
 
         # All should have similar output (same corrections needed)
         for i in range(len(results) - 1):
-            # Compare key parts of output
-            assert "Keys:CreationDate" in results[i].stdout
-            assert "Keys:CreationDate" in results[i + 1].stdout
+            # Compare key parts of output (human-readable on stderr)
+            assert "Keys:CreationDate" in results[i].stderr
+            assert "Keys:CreationDate" in results[i + 1].stderr
+
+
+class TestFixMediaTimestampMachineOutput:
+    """Test @@ machine-readable output from fix-media-timestamp.py"""
+
+    @pytest.fixture
+    def temp_dir(self):
+        tmpdir = tempfile.mkdtemp()
+        yield tmpdir
+        shutil.rmtree(tmpdir)
+
+    def _parse_at_lines(self, stdout: str) -> dict:
+        """Parse @@key=value lines from stdout."""
+        result = {}
+        for line in stdout.strip().split("\n"):
+            if line.startswith("@@"):
+                key_value = line[2:]
+                if "=" in key_value:
+                    key, value = key_value.split("=", 1)
+                    result[key] = value
+        return result
+
+    def test_dry_run_emits_would_fix(self, temp_dir):
+        """Dry run on file needing fixes emits @@timestamp_action=would_fix
+
+        Actual: stdout contains @@timestamp_action=would_fix
+        Expected: would_fix action for a file that needs timestamp corrections
+        """
+        video = os.path.join(temp_dir, "test.mp4")
+        create_test_video(video, DateTimeOriginal="2025:06:18 07:25:21+08:00")
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video
+        ], capture_output=True, text=True)
+
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("file") == "test.mp4", f"Actual: @@file={at_lines.get('file')}, Expected: test.mp4"
+        assert at_lines.get("timestamp_action") == "would_fix", f"Actual: @@timestamp_action={at_lines.get('timestamp_action')}, Expected: would_fix"
+        assert at_lines.get("timestamp_source") == "datetimeoriginal", f"Actual: @@timestamp_source={at_lines.get('timestamp_source')}, Expected: datetimeoriginal"
+        assert at_lines.get("original_time") == "2025:06:18 07:25:21+08:00"
+        assert at_lines.get("corrected_time") == "2025:06:18 07:25:21+08:00"
+        assert at_lines.get("timezone") == "+08:00"
+
+    def test_no_change_emits_no_change(self, temp_dir):
+        """File already correct emits @@timestamp_action=no_change
+
+        Actual: stdout contains @@timestamp_action=no_change after second run
+        Expected: no_change for a file that was already fixed
+        """
+        video = os.path.join(temp_dir, "test.mp4")
+        create_test_video(video, DateTimeOriginal="2025:06:18 07:25:21+08:00")
+
+        # First apply
+        subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--apply"
+        ], capture_output=True, text=True)
+
+        # Second run - should be no_change
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--apply"
+        ], capture_output=True, text=True)
+
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("timestamp_action") == "no_change", f"Actual: @@timestamp_action={at_lines.get('timestamp_action')}, Expected: no_change"
+
+    def test_apply_emits_fixed(self, temp_dir):
+        """Apply mode emits @@timestamp_action=fixed
+
+        Actual: stdout contains @@timestamp_action=fixed
+        Expected: fixed action when changes are applied
+        """
+        video = os.path.join(temp_dir, "test.mp4")
+        create_test_video(video, DateTimeOriginal="2025:06:18 07:25:21+08:00")
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--apply"
+        ], capture_output=True, text=True)
+
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("timestamp_action") == "fixed", f"Actual: @@timestamp_action={at_lines.get('timestamp_action')}, Expected: fixed"
+
+    def test_filename_source_detected(self, temp_dir):
+        """Filename-based timestamp source emits @@timestamp_source=filename
+
+        Actual: stdout contains @@timestamp_source=filename
+        Expected: filename source for VID_YYYYMMDD_HHMMSS pattern
+        """
+        video = os.path.join(temp_dir, "VID_20250618_072521.mp4")
+        create_test_video(video)
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            "--timezone", "+0800"
+        ], capture_output=True, text=True)
+
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("timestamp_source") == "filename", f"Actual: @@timestamp_source={at_lines.get('timestamp_source')}, Expected: filename"
+
+    def test_stdout_only_has_at_lines(self, temp_dir):
+        """Stdout contains only @@key=value lines, no human-readable text
+
+        Actual: every non-empty stdout line starts with @@
+        Expected: clean machine-readable output on stdout
+        """
+        video = os.path.join(temp_dir, "test.mp4")
+        create_test_video(video, DateTimeOriginal="2025:06:18 07:25:21+08:00")
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video
+        ], capture_output=True, text=True)
+
+        for line in result.stdout.strip().split("\n"):
+            if line.strip():
+                assert line.startswith("@@"), f"Actual: stdout line '{line}' is not @@-prefixed, Expected: all stdout lines are @@key=value"
 
 
 if __name__ == "__main__":

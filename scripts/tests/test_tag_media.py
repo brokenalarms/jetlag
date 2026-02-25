@@ -413,10 +413,9 @@ class TestTagMedia:
         ], capture_output=True, text=True)
 
         assert result.returncode == 0
-        # Should show what will be tagged
-        assert "test_video.mp4" in result.stdout
-        # Should indicate dry run
-        assert "(DRY RUN)" in result.stdout
+        # Human-readable on stderr
+        assert "test_video.mp4" in result.stderr
+        assert "(DRY RUN)" in result.stderr
 
     def test_combined_tags_and_exif(self, test_video):
         """Test adding both tags and EXIF together
@@ -497,10 +496,10 @@ class TestTagMediaDataPresentation:
         ], capture_output=True, text=True)
 
         assert result.returncode == 0
-        # Output should show specifically what was added
-        assert "tag1" in result.stdout
-        assert "tag2" in result.stdout
-        assert "TestMake" in result.stdout
+        # Human-readable on stderr
+        assert "tag1" in result.stderr
+        assert "tag2" in result.stderr
+        assert "TestMake" in result.stderr
 
     def test_no_output_for_unchanged(self, test_video):
         """Test that already-correct files report status correctly"""
@@ -520,9 +519,94 @@ class TestTagMediaDataPresentation:
             "--apply"
         ], capture_output=True, text=True)
 
-        assert "Already tagged correctly" in result.stdout
+        assert "Already tagged correctly" in result.stderr
         # Should NOT say it tagged anything
-        assert "Tagged:" not in result.stdout or "Already" in result.stdout
+        assert "Tagged:" not in result.stderr or "Already" in result.stderr
+
+
+class TestTagMediaMachineOutput:
+    """Test @@ machine-readable output from tag-media.py"""
+
+    @pytest.fixture
+    def temp_dir(self):
+        tmpdir = tempfile.mkdtemp()
+        yield tmpdir
+        shutil.rmtree(tmpdir)
+
+    @pytest.fixture
+    def test_video(self, temp_dir):
+        video_path = os.path.join(temp_dir, "test.mp4")
+        create_test_video(video_path)
+        return video_path
+
+    def _parse_at_lines(self, stdout: str) -> dict:
+        result = {}
+        for line in stdout.strip().split("\n"):
+            if line.startswith("@@"):
+                key_value = line[2:]
+                if "=" in key_value:
+                    key, value = key_value.split("=", 1)
+                    result[key] = value
+        return result
+
+    def test_tagged_emits_correct_action(self, test_video):
+        """Tagging a file emits @@tag_action=tagged
+
+        Actual: stdout contains @@tag_action=tagged with tags listed
+        Expected: tagged action when new tags are applied
+        """
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            test_video,
+            "--tags", "test-tag,other-tag",
+            "--make", "GoPro",
+            "--model", "HERO12",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("file") == "test.mp4", f"Actual: @@file={at_lines.get('file')}, Expected: test.mp4"
+        assert at_lines.get("tag_action") == "tagged", f"Actual: @@tag_action={at_lines.get('tag_action')}, Expected: tagged"
+        assert "test-tag" in at_lines.get("tags_added", ""), f"Actual: @@tags_added={at_lines.get('tags_added')}, Expected: contains test-tag"
+        assert at_lines.get("exif_make") == "GoPro", f"Actual: @@exif_make={at_lines.get('exif_make')}, Expected: GoPro"
+        assert at_lines.get("exif_model") == "HERO12", f"Actual: @@exif_model={at_lines.get('exif_model')}, Expected: HERO12"
+
+    def test_already_correct_emits_already_correct(self, test_video):
+        """Already-tagged file emits @@tag_action=already_correct
+
+        Actual: stdout contains @@tag_action=already_correct
+        Expected: already_correct for idempotent second run
+        """
+        # First run
+        subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            test_video, "--tags", "test-tag", "--apply"
+        ], capture_output=True, check=True)
+
+        # Second run - already correct
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            test_video, "--tags", "test-tag", "--apply"
+        ], capture_output=True, text=True)
+
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("tag_action") == "already_correct", f"Actual: @@tag_action={at_lines.get('tag_action')}, Expected: already_correct"
+        assert at_lines.get("tags_added") == "", f"Actual: @@tags_added={at_lines.get('tags_added')}, Expected: empty"
+
+    def test_stdout_only_has_at_lines(self, test_video):
+        """Stdout contains only @@key=value lines, no human-readable text
+
+        Actual: every non-empty stdout line starts with @@
+        Expected: clean machine-readable output on stdout
+        """
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            test_video, "--tags", "test-tag", "--make", "GoPro"
+        ], capture_output=True, text=True)
+
+        for line in result.stdout.strip().split("\n"):
+            if line.strip():
+                assert line.startswith("@@"), f"Actual: stdout line '{line}' is not @@-prefixed, Expected: all stdout lines are @@key=value"
 
 
 if __name__ == "__main__":

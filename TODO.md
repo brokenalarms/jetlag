@@ -14,7 +14,7 @@
 
 ## `scripts/` + `macos/`
 
-- (2026-02-24) **Dry-run diff table** — see `todos/dry-run-diff-table.md` for full spec. PR 1: scripts stdout/stderr cleanup + new `@@` lines. PR 2: macOS DiffTableView.
+- (2026-02-24) **Dry-run diff table** — see `todos/dry-run-diff-table.md` for full spec. PR 1 complete (scripts stdout/stderr cleanup + new `@@` lines). PR 2: macOS DiffTableView.
 
 - (2026-02-24) **Per-file progress cards** — During apply mode, replace scrolling logs with a card-based UI. Each file gets a card showing pipeline stages as checkmarks: Tagged → Timestamp Fixed → Organized → Gyroflow. Failed stages show red. Cards expand to show details.
    - `scripts/`: `media-pipeline.py` needs to emit `@@stage_complete=<stage>` after each step
