@@ -264,7 +264,7 @@ class TestBirthTimeCalculation:
             "--timezone", "+0800"
         ], capture_output=True, text=True, check=True)
 
-        assert "No change" in result.stdout or "no change" in result.stdout.lower(), (
+        assert "@@timestamp_action=no_change" in result.stdout, (
             f"Second run should detect no changes:\n{result.stdout}"
         )
 

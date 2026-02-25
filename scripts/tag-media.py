@@ -13,6 +13,9 @@ from typing import List, Optional, Tuple
 import argparse
 
 from lib.exiftool import exiftool
+from lib.tools import resolve as resolve_tool
+
+TAG_CMD = resolve_tool("tag")
 
 # Handle Ctrl-C gracefully
 def signal_handler(sig, frame):  # noqa: ARG001
@@ -24,7 +27,7 @@ signal.signal(signal.SIGINT, signal_handler)
 def get_existing_finder_tags(file_path: str) -> List[str]:
     """Get existing Finder tags from a file"""
     try:
-        result = subprocess.run(['tag', '--list', '--no-name', file_path],
+        result = subprocess.run([TAG_CMD, '--list', '--no-name', file_path],
                               capture_output=True, check=True, text=True)
         # Parse tags - comma-separated on a single line
         output = result.stdout.strip()
@@ -54,7 +57,7 @@ def apply_finder_tags(file_path: str, tags: List[str], dry_run: bool = False) ->
 
         # Use tag command to add only missing tags (unless dry run)
         if not dry_run:
-            subprocess.run(['tag', '--add', ','.join(tags_to_add), file_path],
+            subprocess.run([TAG_CMD, '--add', ','.join(tags_to_add), file_path],
                           capture_output=True, check=True)
         return True, tags_to_add
     except subprocess.CalledProcessError as e:
