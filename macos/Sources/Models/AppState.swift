@@ -301,7 +301,6 @@ final class AppState {
         guard let eqIndex = stripped.firstIndex(of: "=") else { return }
         let key = String(stripped[stripped.startIndex..<eqIndex])
         let value = String(stripped[stripped.index(after: eqIndex)...])
-        let normalized: String? = value.isEmpty ? nil : value
 
         switch key {
         case "pipeline_file":
@@ -317,23 +316,23 @@ final class AppState {
                 currentDiffRow = nil
             }
         case "tag_action":
-            currentDiffRow?.tagAction = normalized
+            currentDiffRow?.tagAction = value
         case "tags_added":
-            currentDiffRow?.tagsAdded = normalized
+            currentDiffRow?.tagsAdded = value
         case "original_time":
-            currentDiffRow?.originalTime = normalized
+            currentDiffRow?.originalTime = value
         case "corrected_time":
-            currentDiffRow?.correctedTime = normalized
+            currentDiffRow?.correctedTime = value
         case "timestamp_source":
-            currentDiffRow?.timestampSource = normalized
+            currentDiffRow?.timestampSource = value
         case "timestamp_action":
-            currentDiffRow?.timestampAction = normalized
+            currentDiffRow?.timestampAction = value
         case "timezone":
-            currentDiffRow?.timezone = normalized
+            currentDiffRow?.timezone = value
         case "dest":
-            currentDiffRow?.dest = normalized
+            currentDiffRow?.dest = value
         case "action":
-            currentDiffRow?.organizeAction = normalized
+            currentDiffRow?.organizeAction = value
         default:
             break
         }

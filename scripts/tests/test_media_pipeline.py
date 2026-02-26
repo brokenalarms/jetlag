@@ -1064,6 +1064,40 @@ class TestPipelineMachineOutput:
                 assert not line.startswith("@@file="), \
                     f"@@file= should be filtered, found: {line}"
 
+    def test_tz_mismatch_emits_distinct_token(self, temp_workspace, test_profile):
+        """Timezone mismatch emits @@timestamp_action=tz_mismatch, not generic error.
+
+        Actual: @@timestamp_action=tz_mismatch when file timezone differs from provided
+        Expected: distinct token so the UI can show a specific "TZ Mismatch" badge
+        """
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        _create_video_raw(
+            video,
+            MediaCreateDate="2025:10:05 01:00:00",
+            CreateDate="2025:10:05 01:00:00",
+            DateTimeOriginal="2025:10:05 01:00:00+09:00",
+        )
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0200",
+            "--tasks", "fix-timestamp",
+        ])
+
+        files = self._parse_at_lines(result.stdout)
+        assert len(files) == 1
+        f = files[0]
+        assert f.get("timestamp_action") == "tz_mismatch", \
+            f"Expected timestamp_action=tz_mismatch, got: {f.get('timestamp_action')}"
+        assert "original_time" in f, \
+            f"TZ mismatch should emit @@original_time, got keys: {list(f.keys())}"
+        assert f["original_time"], \
+            f"@@original_time should be non-empty, got: {f.get('original_time')}"
+        assert f.get("pipeline_result") == "failed", \
+            f"Expected pipeline_result=failed, got: {f.get('pipeline_result')}"
+
     def test_error_path_emits_original_time(self, temp_workspace, test_profile):
         """Error path emits @@original_time when the file has a known timestamp.
 
