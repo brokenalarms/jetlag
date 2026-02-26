@@ -292,7 +292,8 @@ final class AppState {
 
     var workflowSession = WorkflowSession()
 
-    var showLog: Bool = false
+    var showInspector: Bool = false
+    var showLogOutput: Bool = false
 
     // Execution state
     var isRunning: Bool = false
@@ -336,6 +337,7 @@ final class AppState {
         diffTableRows = []
         currentDiffRow = nil
         liveRow = nil
+        showLogOutput = false
     }
 
     func appendLog(_ line: LogLine) {
