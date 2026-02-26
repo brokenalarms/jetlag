@@ -110,6 +110,7 @@ final class AppState {
 
     var profilesConfig: ProfilesConfig?
     var profileLoadError: ProfileLoadError?
+    private(set) var profilesLoadGeneration: Int = 0
 
     var sortedProfileNames: [String] {
         profilesConfig?.profiles.keys.sorted() ?? []
@@ -327,6 +328,37 @@ final class AppState {
             currentDiffRow?.organizeAction = value
         default:
             break
+        }
+    }
+
+    func loadProfiles() {
+        let previousSelection = selectedProfile
+        do {
+            profilesConfig = try ProfileService.load(from: resolvedProfilesPath)
+            profileLoadError = nil
+        } catch {
+            profilesConfig = nil
+            profileLoadError = error
+        }
+        profilesLoadGeneration += 1
+        reconcileSelectedProfile(previousSelection: previousSelection)
+    }
+
+    /// After a reload, ensure selectedProfile still points at a valid profile.
+    /// If the previous selection is gone, fall back to the first available profile.
+    /// Resets workflow fields whenever the effective selection changes.
+    private func reconcileSelectedProfile(previousSelection: String) {
+        let names = sortedProfileNames
+        if names.contains(previousSelection) {
+            // Selection still valid — refresh workflow fields in case profile data changed
+            selectedProfile = previousSelection
+            resetWorkflowFields(for: previousSelection)
+        } else if let first = names.first {
+            selectedProfile = first
+            resetWorkflowFields(for: first)
+        } else {
+            selectedProfile = ""
+            resetWorkflowFields(for: "")
         }
     }
 

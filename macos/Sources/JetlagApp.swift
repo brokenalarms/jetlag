@@ -13,7 +13,7 @@ struct JetlagApp: App {
         WindowGroup {
             ContentView(state: state)
                 .frame(minWidth: 900, minHeight: 500)
-                .onAppear { loadProfiles() }
+                .onAppear { state.loadProfiles() }
         }
         .defaultSize(width: 1050, height: 720)
         .commands {
@@ -27,17 +27,7 @@ struct JetlagApp: App {
 
         Settings {
             SettingsView(state: state)
-                .onDisappear { loadProfiles() }
-        }
-    }
-
-    private func loadProfiles() {
-        do {
-            state.profilesConfig = try ProfileService.load(from: state.resolvedProfilesPath)
-            state.profileLoadError = nil
-        } catch {
-            state.profilesConfig = nil
-            state.profileLoadError = error
+                .onDisappear { state.loadProfiles() }
         }
     }
 }

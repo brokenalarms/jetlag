@@ -71,23 +71,13 @@ struct SettingsView: View {
                         .font(.caption)
                     }
                     Spacer()
-                    Button(Strings.Settings.reloadProfilesButton) { loadProfiles() }
+                    Button(Strings.Settings.reloadProfilesButton) { state.loadProfiles() }
                 }
             }
         }
         .formStyle(.grouped)
         .frame(width: 500)
         .padding()
-    }
-
-    private func loadProfiles() {
-        do {
-            state.profilesConfig = try ProfileService.load(from: state.resolvedProfilesPath)
-            state.profileLoadError = nil
-        } catch {
-            state.profilesConfig = nil
-            state.profileLoadError = error
-        }
     }
 
     private func pickFile() {

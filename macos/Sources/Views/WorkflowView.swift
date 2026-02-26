@@ -48,6 +48,10 @@ struct WorkflowView: View {
         }
         .onChange(of: sourceDir.current) { _, new in state.sourceDir = new }
         .onChange(of: timezone.current) { _, new in state.timezone = new }
+        .onChange(of: state.profilesLoadGeneration) { _, _ in
+            sourceDir = Dirtyable(state.sourceDir)
+            timezone = Dirtyable(state.timezone)
+        }
         .frame(minWidth: 340)
         .inspector(isPresented: $state.showLog) {
             VStack(spacing: 0) {
