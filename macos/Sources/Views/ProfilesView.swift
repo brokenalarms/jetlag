@@ -148,6 +148,8 @@ struct ProfilesView: View {
                     originalSnapshot = nil
                 } label: {
                     Image(systemName: "plus")
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
 
@@ -155,6 +157,8 @@ struct ProfilesView: View {
                     showDeleteConfirmation = true
                 } label: {
                     Image(systemName: "minus")
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
                 .disabled(selectedProfile == nil)
