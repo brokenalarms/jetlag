@@ -21,6 +21,7 @@
   - visually verify any web changes yourself in playwright if you can
   - if you cannot visually build and verify (eg XCode projects), include on the PR a test plan checklist that the reviewer may follow to visually verify the changes in the live app.
 - COMMITS & PULL REQUESTS — see docs/committing.md for all rules on commits, branches, and PRs
+  - you don't need to ask for permission to pull new content in from main and run local git commands, besides final pushes.
 - TODO.md
   - TODO.md is a sliding context window for fresh agents — open tasks only; completed work belongs in commit messages, not here
   - tasks are grouped by subrepo (`scripts/`, `macos/`, `web/`); cross-repo tasks appear under combined headings (e.g. `scripts/` + `macos/`)
