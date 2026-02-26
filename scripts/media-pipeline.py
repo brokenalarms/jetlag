@@ -40,9 +40,11 @@ def emit(key: str, value: str):
     """Emit a @@key=value machine-readable line to stdout.
 
     Only emits when stdout is a pipe (macOS app), not a terminal (CLI).
+    Flushes immediately so the app receives each line without waiting
+    for Python's block-buffer to fill or the process to exit.
     """
     if _machine_output:
-        print(f"@@{key}={value}")
+        print(f"@@{key}={value}", flush=True)
 
 
 def signal_handler(sig, frame):
