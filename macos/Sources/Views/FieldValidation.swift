@@ -1,29 +1,54 @@
 import SwiftUI
 
-/// Tracks which form fields have been blurred (lost focus) at least once.
-/// Fields that have never been blurred should not show validation errors.
-///
-/// Generic over any `Hashable` field identifier — typically a view-local enum.
-@Observable
-final class TouchState {
-    private var blurred: Set<AnyHashable> = []
+@dynamicMemberLookup
+struct Dirtyable<T> {
+    private(set) var original: T
+    private var updated: T?
 
-    func hasBlurred<F: Hashable>(_ field: F) -> Bool {
-        blurred.contains(AnyHashable(field))
+    var current: T { updated ?? original }
+
+    init(_ initialValue: T) {
+        original = initialValue
     }
 
-    func markBlurred<F: Hashable>(_ field: F) {
-        blurred.insert(AnyHashable(field))
+    var isDirty: Bool { updated != nil }
+
+    var value: T {
+        get { updated ?? original }
+        set {
+            if updated == nil { updated = original }
+            updated = newValue
+        }
     }
 
-    func reset() {
-        blurred.removeAll()
+    subscript<V>(dynamicMember keyPath: WritableKeyPath<T, V>) -> V {
+        get { (updated ?? original)[keyPath: keyPath] }
+        set {
+            if updated == nil { updated = original }
+            updated![keyPath: keyPath] = newValue
+        }
+    }
+
+    mutating func commit() {
+        if let updated {
+            original = updated
+            self.updated = nil
+        }
+    }
+
+    mutating func rollback() {
+        updated = nil
+    }
+}
+
+extension Dirtyable where T: Equatable {
+    var isDirty: Bool {
+        guard let updated else { return false }
+        return updated != original
     }
 }
 
 extension View {
-    /// Conditionally appends a validation error label below the view.
-    /// Shows nothing when `error` is nil or `show` is false.
     @ViewBuilder
     func fieldError(_ error: String?, show: Bool) -> some View {
         self

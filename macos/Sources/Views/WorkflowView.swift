@@ -2,8 +2,8 @@ import SwiftUI
 
 struct WorkflowView: View {
     @Bindable var state: AppState
-    @State private var touch = TouchState()
-    @FocusState private var focusedField: Field?
+    @State private var sourceDir = Dirtyable("")
+    @State private var timezone = Dirtyable("")
     @State private var showUpgradeSheet = false
     @State private var detectedFileCount = 0
     private var licenseStore: LicenseStore { LicenseStore.shared }
@@ -12,13 +12,8 @@ struct WorkflowView: View {
         state.activeProfile?.companionExtensions?.joined(separator: ", ") ?? ""
     }
 
-    private enum Field: Hashable {
-        case sourceDir
-        case timezone
-    }
-
     private var sourceDirError: String? {
-        let path = state.sourceDir
+        let path = sourceDir.current
         guard !path.isEmpty else { return nil }
         var isDir: ObjCBool = false
         if !FileManager.default.fileExists(atPath: path, isDirectory: &isDir) {
@@ -32,7 +27,7 @@ struct WorkflowView: View {
     private var timezoneError: String? {
         if state.useTimezonePicker { return nil }
         if !state.enabledSteps.contains(.fixTimezone) { return nil }
-        let tz = state.timezone
+        let tz = timezone.current
         if tz.isEmpty { return Strings.Workflow.timezoneRequired }
         if !tz.contains(/^[+-]\d{4}$/) { return Strings.Workflow.timezoneFormatHelp }
         return nil
@@ -51,9 +46,8 @@ struct WorkflowView: View {
             }
             .padding()
         }
-        .onChange(of: focusedField) { old, _ in
-            if let old { touch.markBlurred(old) }
-        }
+        .onChange(of: sourceDir.current) { _, new in state.sourceDir = new }
+        .onChange(of: timezone.current) { _, new in state.timezone = new }
         .frame(minWidth: 340)
         .inspector(isPresented: $state.showLog) {
             VStack(spacing: 0) {
@@ -113,7 +107,8 @@ struct WorkflowView: View {
                 ProfilePicker(selection: $state.selectedProfile, state: state)
                     .onChange(of: state.selectedProfile) { _, newValue in
                         state.resetWorkflowFields(for: newValue)
-                        touch.reset()
+                        sourceDir = Dirtyable(state.sourceDir)
+                        timezone = Dirtyable(state.timezone)
                     }
             }
         }
@@ -244,13 +239,12 @@ struct WorkflowView: View {
         VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    TextField(Strings.Workflow.sourceDirPlaceholder, text: $state.sourceDir)
+                    TextField(Strings.Workflow.sourceDirPlaceholder, text: $sourceDir.value)
                         .textFieldStyle(.roundedBorder)
-                        .focused($focusedField, equals: .sourceDir)
                     Button(Strings.Common.browse) { pickSourceDir() }
                         .controlSize(.small)
                 }
-                .fieldError(sourceDirError, show: touch.hasBlurred(.sourceDir))
+                .fieldError(sourceDirError, show: sourceDir.isDirty)
             }
 
             HStack(spacing: 4) {
@@ -333,16 +327,11 @@ struct WorkflowView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 if !state.useTimezonePicker {
-                    TextField(Strings.Workflow.timezonePlaceholder, text: $state.timezone)
+                    TextField(Strings.Workflow.timezonePlaceholder, text: $timezone.value)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 90)
-                        .focused($focusedField, equals: .timezone)
-                        .foregroundColor(
-                            touch.hasBlurred(.timezone) && timezoneError != nil
-                                ? .red : .primary
-                        )
                 } else {
-                    TimezonePickerView(selectedTimezone: $state.timezone)
+                    TimezonePickerView(selectedTimezone: $timezone.value)
                 }
                 Spacer()
                 Button {
@@ -354,7 +343,7 @@ struct WorkflowView: View {
                 .contentShape(Rectangle())
                 .help(state.useTimezonePicker ? Strings.Workflow.typeManuallyHelp : Strings.Workflow.pickFromListHelp)
             }
-            .fieldError(timezoneError, show: touch.hasBlurred(.timezone))
+            .fieldError(timezoneError, show: timezone.isDirty)
         }
         .padding(10)
     }
@@ -502,8 +491,7 @@ struct WorkflowView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
-            state.sourceDir = url.path
-            touch.markBlurred(.sourceDir)
+            sourceDir.value = url.path
         }
     }
 
