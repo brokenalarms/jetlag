@@ -13,12 +13,6 @@ from typing import List, Optional, Tuple
 import argparse
 
 from lib.exiftool import exiftool
-from lib.tools import resolve as resolve_tool
-
-def _tag_cmd():
-    """Lazy resolve — tag is macOS-only, so defer until actually called."""
-    return resolve_tool("tag")
-
 
 # Handle Ctrl-C gracefully
 def signal_handler(sig, frame):  # noqa: ARG001
@@ -30,7 +24,7 @@ signal.signal(signal.SIGINT, signal_handler)
 def get_existing_finder_tags(file_path: str) -> List[str]:
     """Get existing Finder tags from a file"""
     try:
-        result = subprocess.run([_tag_cmd(), '--list', '--no-name', file_path],
+        result = subprocess.run(["tag", '--list', '--no-name', file_path],
                               capture_output=True, check=True, text=True)
         output = result.stdout.strip()
         if not output:
@@ -56,7 +50,7 @@ def apply_finder_tags(file_path: str, tags: List[str], dry_run: bool = False) ->
             return True, []
 
         if not dry_run:
-            subprocess.run([_tag_cmd(), '--add', ','.join(tags_to_add), file_path],
+            subprocess.run(["tag", '--add', ','.join(tags_to_add), file_path],
                           capture_output=True, check=True)
         return True, tags_to_add
     except FileNotFoundError:
