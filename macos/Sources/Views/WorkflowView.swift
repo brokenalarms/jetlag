@@ -36,8 +36,8 @@ struct WorkflowView: View {
         .frame(minWidth: 340, idealWidth: defaultColumnWidth, maxWidth: defaultColumnWidth)
         .inspector(isPresented: $state.showLog) {
             VStack(spacing: 0) {
-                if !state.diffTableRows.isEmpty || state.isRunning {
-                    DiffTableView(rows: state.diffTableRows)
+                if !state.visibleRows.isEmpty || state.isRunning {
+                    DiffTableView(rows: state.visibleRows)
                 }
                 LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
             }

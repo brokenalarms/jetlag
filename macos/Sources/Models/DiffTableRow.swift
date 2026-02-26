@@ -13,4 +13,31 @@ struct DiffTableRow: Identifiable {
     var dest: String?
     var organizeAction: String?
     var pipelineResult: String?
+
+    var completedStages: Set<String> = []
+
+    mutating func markStageComplete(_ stage: String) {
+        completedStages.insert(stage)
+    }
+
+    /// Stage order matching the pipeline execution sequence
+    private static let stageOrder = ["ingest", "tag", "fix-timestamp", "output", "gyroflow"]
+
+    /// Display label for the most recently completed stage
+    var lastCompletedStageLabel: String? {
+        for stage in Self.stageOrder.reversed() {
+            if completedStages.contains(stage) {
+                return Self.stageLabelMap[stage]
+            }
+        }
+        return nil
+    }
+
+    private static let stageLabelMap: [String: String] = [
+        "ingest": "Ingest",
+        "tag": "Tag",
+        "fix-timestamp": "Fix TZ",
+        "output": "Organize",
+        "gyroflow": "Gyroflow",
+    ]
 }

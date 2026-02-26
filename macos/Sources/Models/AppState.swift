@@ -260,6 +260,15 @@ final class AppState {
     var currentProcess: Process?
     var diffTableRows: [DiffTableRow] = []
     private var currentDiffRow: DiffTableRow?
+    private(set) var liveRow: DiffTableRow?
+
+    /// All completed rows plus the in-progress file for live table display
+    var visibleRows: [DiffTableRow] {
+        if let live = liveRow {
+            return diffTableRows + [live]
+        }
+        return diffTableRows
+    }
 
     init() {
         self.scriptsDirectory = (Bundle.main.resourcePath! as NSString)
@@ -286,6 +295,7 @@ final class AppState {
         logOutput = []
         diffTableRows = []
         currentDiffRow = nil
+        liveRow = nil
     }
 
     func appendLog(_ line: LogLine) {
@@ -309,11 +319,13 @@ final class AppState {
                 diffTableRows.append(row)
             }
             currentDiffRow = DiffTableRow(file: value)
+            liveRow = currentDiffRow
         case "pipeline_result":
             if var row = currentDiffRow {
                 row.pipelineResult = value
                 diffTableRows.append(row)
                 currentDiffRow = nil
+                liveRow = nil
             }
         case "tag_action":
             currentDiffRow?.tagAction = value
@@ -333,8 +345,15 @@ final class AppState {
             currentDiffRow?.dest = value
         case "action":
             currentDiffRow?.organizeAction = value
+        case "stage_complete":
+            currentDiffRow?.markStageComplete(value)
         default:
             break
+        }
+
+        // Push snapshot for live table display (skip events already handled above)
+        if key != "pipeline_file" && key != "pipeline_result" {
+            liveRow = currentDiffRow
         }
     }
 

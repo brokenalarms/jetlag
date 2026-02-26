@@ -129,8 +129,15 @@ struct DiffTableView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(Color("NeonCyan").opacity(0.7))
         case nil:
-            ProgressView()
-                .controlSize(.small)
+            HStack(spacing: 4) {
+                ProgressView()
+                    .controlSize(.small)
+                if let stage = row.lastCompletedStageLabel {
+                    Text(stage)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+            }
         default:
             Text(row.pipelineResult ?? "")
                 .font(.system(size: 11))
