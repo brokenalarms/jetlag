@@ -271,12 +271,14 @@ final class AppState {
     var logOutput: [LogLine] = []
     var currentProcess: Process?
     var diffTableRows: [DiffTableRow] = []
-    var currentDiffRow: DiffTableRow?
+    private var currentDiffRow: DiffTableRow?
+    /// Snapshot of the in-progress file, published for live card display
+    private(set) var liveRow: DiffTableRow?
 
     /// All rows including the in-progress file, for live progress display
     var visibleRows: [DiffTableRow] {
-        if let current = currentDiffRow {
-            return diffTableRows + [current]
+        if let live = liveRow {
+            return diffTableRows + [live]
         }
         return diffTableRows
     }
@@ -306,6 +308,7 @@ final class AppState {
         logOutput = []
         diffTableRows = []
         currentDiffRow = nil
+        liveRow = nil
     }
 
     func appendLog(_ line: LogLine) {
@@ -329,11 +332,13 @@ final class AppState {
                 diffTableRows.append(row)
             }
             currentDiffRow = DiffTableRow(file: value)
+            liveRow = currentDiffRow
         case "pipeline_result":
             if var row = currentDiffRow {
                 row.pipelineResult = value
                 diffTableRows.append(row)
                 currentDiffRow = nil
+                liveRow = nil
             }
         case "tag_action":
             currentDiffRow?.tagAction = value
@@ -357,6 +362,11 @@ final class AppState {
             currentDiffRow?.markStageComplete(value)
         default:
             break
+        }
+
+        // Push snapshot for live card display (skip for events already handled above)
+        if key != "pipeline_file" && key != "pipeline_result" {
+            liveRow = currentDiffRow
         }
     }
 

@@ -392,6 +392,9 @@ struct WorkflowView: View {
                     .labelsHidden()
                     .pickerStyle(.segmented)
                     .frame(width: 160)
+                    .onChange(of: session.applyMode) { _, _ in
+                        state.clearLog()
+                    }
 
                     Button(state.isRunning ? Strings.Workflow.runningButton : Strings.Workflow.runButton) { runWorkflow() }
                         .disabled(state.isRunning || !session.allStepsReady)

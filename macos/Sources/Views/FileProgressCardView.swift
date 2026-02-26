@@ -110,12 +110,13 @@ struct FileProgressCardView: View {
         }
     }
 
+    @ViewBuilder
     private func stageChip(_ step: PipelineStep) -> some View {
         let stageKey = step.stageKey
         let isStageComplete = stageKey.map { row.completedStages.contains($0) } ?? false
         let isFailedStage = isFailed && !isStageComplete && isFirstIncompleteStep(step)
 
-        return HStack(spacing: 3) {
+        let chipContent = HStack(spacing: 3) {
             Image(systemName: step.systemImage)
                 .font(.system(size: 9))
             if isStageComplete {
@@ -126,11 +127,6 @@ struct FileProgressCardView: View {
                     .font(.system(size: 8, weight: .bold))
             }
         }
-        .foregroundStyle(
-            isStageComplete ? step.iconColor
-                : isFailedStage ? .red
-                : .tertiary
-        )
         .padding(.horizontal, 5)
         .padding(.vertical, 3)
         .background(
@@ -142,6 +138,14 @@ struct FileProgressCardView: View {
                 )
         )
         .help(step.label)
+
+        if isStageComplete {
+            chipContent.foregroundStyle(step.iconColor)
+        } else if isFailedStage {
+            chipContent.foregroundStyle(.red)
+        } else {
+            chipContent.foregroundStyle(.tertiary)
+        }
     }
 
     private func isFirstIncompleteStep(_ step: PipelineStep) -> Bool {
