@@ -175,9 +175,6 @@ struct FileProgressCardView: View {
             if let corrected = row.correctedTime {
                 detailRow(Strings.DiffTable.correctedColumn, value: corrected)
             }
-            if let tz = row.timezone {
-                detailRow(Strings.DiffTable.tzColumn, value: tz)
-            }
             if let dest = row.dest {
                 detailRow(Strings.DiffTable.destinationColumn, value: (dest as NSString).lastPathComponent)
                     .help(dest)
