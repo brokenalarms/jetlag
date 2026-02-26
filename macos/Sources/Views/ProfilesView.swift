@@ -10,6 +10,7 @@ struct ProfilesView: View {
     @State private var showDeleteConfirmation = false
     @State private var showDiscardConfirmation = false
     @State private var pendingSelection: String?
+    @State private var pendingTabChange: SidebarTab?
 
     private var isDirty: Bool {
         guard let snapshot = originalSnapshot, let current = editingProfile else { return false }
@@ -52,6 +53,13 @@ struct ProfilesView: View {
             }
         }
         .navigationTitle(Strings.Nav.mediaProfiles)
+        .onChange(of: state.selectedTab) { oldValue, newValue in
+            if oldValue == .profiles && newValue != .profiles && isDirty {
+                state.selectedTab = .profiles
+                pendingTabChange = newValue
+                showDiscardConfirmation = true
+            }
+        }
         .confirmationDialog(
             Strings.Profiles.unsavedChangesTitle,
             isPresented: $showDiscardConfirmation,
@@ -59,9 +67,11 @@ struct ProfilesView: View {
         ) {
             Button(Strings.Profiles.saveAndContinue) {
                 saveCurrentProfile()
-                let pending = pendingSelection
-                pendingSelection = nil
-                if let pending {
+                if let tab = pendingTabChange {
+                    pendingTabChange = nil
+                    state.selectedTab = tab
+                } else if let pending = pendingSelection {
+                    pendingSelection = nil
                     loadProfileForEditing(pending)
                 }
             }
@@ -70,13 +80,16 @@ struct ProfilesView: View {
                     editingName = snapshot.name
                     editingProfile = snapshot.profile
                 }
-                let pending = pendingSelection
-                pendingSelection = nil
-                if let pending {
+                if let tab = pendingTabChange {
+                    pendingTabChange = nil
+                    state.selectedTab = tab
+                } else if let pending = pendingSelection {
+                    pendingSelection = nil
                     loadProfileForEditing(pending)
                 }
             }
             Button(Strings.Common.cancel, role: .cancel) {
+                pendingTabChange = nil
                 pendingSelection = nil
             }
         }
@@ -194,6 +207,9 @@ struct ProfilesView: View {
     private func deleteProfile(_ name: String) {
         state.profilesConfig?.profiles.removeValue(forKey: name)
         writeProfiles()
+        if state.workflowSession.profileName == name {
+            state.workflowSession = WorkflowSession()
+        }
         selectedProfile = nil
         editingProfile = nil
         editingName = ""
@@ -293,6 +309,11 @@ struct ProfileEditorView: View {
                 }
             }
             .padding()
+        }
+        .onAppear {
+            if profile.type == nil {
+                profile.type = .video
+            }
         }
         .safeAreaInset(edge: .bottom) {
             HStack {
