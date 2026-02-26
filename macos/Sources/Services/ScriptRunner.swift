@@ -15,8 +15,8 @@ struct ScriptRunner {
 
         var env = ProcessInfo.processInfo.environment
         let toolsDir = (workingDir as NSString).appendingPathComponent("tools")
-        env["JETLAG_EXIFTOOL"] = (toolsDir as NSString).appendingPathComponent("exiftool")
-        env["JETLAG_TAG"] = (toolsDir as NSString).appendingPathComponent("tag")
+        let existingPath = env["PATH"] ?? "/usr/bin:/bin"
+        env["PATH"] = toolsDir + ":" + existingPath
         process.environment = env
 
         let stdoutPipe = Pipe()

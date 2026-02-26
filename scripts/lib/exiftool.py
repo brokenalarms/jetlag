@@ -16,7 +16,6 @@ import re
 import subprocess
 import threading
 
-from lib.tools import resolve as resolve_tool
 
 
 class ExifTool:
@@ -34,9 +33,8 @@ class ExifTool:
         if self._process is not None and self._process.poll() is None:
             return
         try:
-            exe = resolve_tool("exiftool")
             self._process = subprocess.Popen(
-                [exe, "-stay_open", "True", "-@", "-"],
+                ["exiftool", "-stay_open", "True", "-@", "-"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,

@@ -10,6 +10,7 @@ Run with: pytest tests/test_media_pipeline.py -v
 
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -24,15 +25,10 @@ SCRIPT_DIR = Path(__file__).parent.parent
 MEDIA_PIPELINE = SCRIPT_DIR / "media-pipeline.sh"
 
 sys.path.insert(0, str(SCRIPT_DIR))
-from lib.tools import resolve as resolve_tool
 
 
 def _has_tag_cmd() -> bool:
-    try:
-        resolve_tool("tag")
-        return True
-    except FileNotFoundError:
-        return False
+    return shutil.which("tag") is not None
 
 
 @dataclass
@@ -548,7 +544,7 @@ class TestExiftoolTmpDetection:
 
 @pytest.mark.skipif(
     sys.platform != "darwin" or not _has_tag_cmd(),
-    reason="requires macOS and the 'tag' command (brew install tag, or set JETLAG_TAG)"
+    reason="requires macOS and the 'tag' command (brew install tag)"
 )
 class TestTagging:
     """Tests for file tagging from profile."""
