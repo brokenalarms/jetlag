@@ -338,8 +338,12 @@ struct WorkflowView: View {
                         .onChange(of: timezoneFocused) { _, focused in
                             if !focused { timezone.markTouched() }
                         }
+                        .id("timezone-textfield-\(timezone.current)")
                 } else {
                     TimezonePickerView(selectedTimezone: $timezone.value)
+                        .onChange(of: timezone.value) { _, _ in
+                            timezone.markTouched()
+                        }
                 }
                 Spacer()
                 Button {
