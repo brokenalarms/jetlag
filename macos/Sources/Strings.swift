@@ -223,13 +223,13 @@ What happens to source files after processing:
 
     // MARK: - Log output
 
-    enum Log {
-        static let title = String(localized: "log.title", defaultValue: "Output")
-        static let clearButton = String(localized: "log.clear.button", defaultValue: "Clear")
-        static let copyAllButton = String(localized: "log.copyAll.button", defaultValue: "Copy All")
+    enum LogOutput {
+        static let title = String(localized: "logOutput.title", defaultValue: "Output")
+        static let clearButton = String(localized: "logOutput.clear.button", defaultValue: "Clear")
+        static let copyAllButton = String(localized: "logOutput.copyAll.button", defaultValue: "Copy All")
 
         static func lineCount(_ count: Int) -> String {
-            String(localized: "log.lineCount",
+            String(localized: "logOutput.lineCount",
                    defaultValue: "\(count) lines")
         }
     }
