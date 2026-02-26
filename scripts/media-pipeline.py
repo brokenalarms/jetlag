@@ -353,7 +353,8 @@ def process_file(
                 if line.strip():
                     print(f"  {line}", file=sys.stderr)
             for key, value in at_lines.items():
-                emit(key, value)
+                if key != "file":
+                    emit(key, value)
             if changed:
                 file_changed = True
 
@@ -365,7 +366,8 @@ def process_file(
             if line.strip():
                 print(f"  {line}", file=sys.stderr)
         for key, value in at_lines.items():
-            emit(key, value)
+            if key != "file":
+                emit(key, value)
 
         if rc != 0:
             print(f"   ❌ Timestamp fix failed for {file_path.name}", file=sys.stderr)
@@ -405,7 +407,7 @@ def process_file(
         emit("pipeline_result", "failed")
         return result
 
-    if action in ("copied", "moved", "overwrote"):
+    if action in ("copied", "moved", "overwrote", "would_copy", "would_move", "would_overwrite"):
         file_changed = True
 
     # Move companions to the same output directory as the main file
@@ -435,17 +437,17 @@ def process_file(
             if line.strip():
                 print(f"  {line}", file=sys.stderr)
         for key, value in gf_at_lines.items():
-            emit(key, value)
+            if key != "file":
+                emit(key, value)
 
         if gf_at_lines.get("action") == "generated":
             file_changed = True
 
     result["changed"] = file_changed
-    # Emit pipeline result summary
     if result["failed"]:
         emit("pipeline_result", "failed")
     elif file_changed:
-        emit("pipeline_result", "changed")
+        emit("pipeline_result", "changed" if apply else "would_change")
     else:
         emit("pipeline_result", "unchanged")
     return result
