@@ -13,11 +13,4 @@ struct DiffTableRow: Identifiable {
     var dest: String?
     var organizeAction: String?
     var pipelineResult: String?
-
-    // Stage completion tracking (set by @@stage_complete events)
-    var completedStages: Set<String> = []
-
-    mutating func markStageComplete(_ stage: String) {
-        completedStages.insert(stage)
-    }
 }

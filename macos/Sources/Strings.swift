@@ -214,27 +214,23 @@ What happens to source files after processing:
         static let fileColumn = String(localized: "diffTable.file.column", defaultValue: "File")
         static let originalColumn = String(localized: "diffTable.original.column", defaultValue: "Original")
         static let correctedColumn = String(localized: "diffTable.corrected.column", defaultValue: "Corrected")
-        static let tzColumn = String(localized: "diffTable.tz.column", defaultValue: "TZ")
+        static let changeColumn = String(localized: "diffTable.change.column", defaultValue: "Change")
         static let destinationColumn = String(localized: "diffTable.destination.column", defaultValue: "Destination")
         static let statusColumn = String(localized: "diffTable.status.column", defaultValue: "Status")
         static let changedStatus = String(localized: "diffTable.changed.status", defaultValue: "Changed")
         static let noChangeStatus = String(localized: "diffTable.noChange.status", defaultValue: "No change")
         static let failedStatus = String(localized: "diffTable.failed.status", defaultValue: "Failed")
         static let wouldChangeStatus = String(localized: "diffTable.wouldChange.status", defaultValue: "Would change")
-        static let tzMismatchStatus = String(localized: "diffTable.tzMismatch.status", defaultValue: "timezone mismatch")
+        static let tzMismatchStatus = String(localized: "diffTable.tzMismatch.status", defaultValue: "TZ mismatch")
+        static let wouldFixChange = String(localized: "diffTable.wouldFix.change", defaultValue: "Would fix")
+        static let fixedChange = String(localized: "diffTable.fixed.change", defaultValue: "Fixed")
+        static let noChangeChange = String(localized: "diffTable.noChange.change", defaultValue: "No change")
+        static let errorChange = String(localized: "diffTable.error.change", defaultValue: "Error")
 
         static func fileCount(_ count: Int) -> String {
             String(localized: "diffTable.fileCount",
                    defaultValue: "\(count) files")
         }
-    }
-
-    // MARK: - Progress cards
-
-    enum ProgressCards {
-        static let title = String(localized: "progressCards.title", defaultValue: "Progress")
-        static let expandDetails = String(localized: "progressCards.expandDetails", defaultValue: "Show details")
-        static let collapseDetails = String(localized: "progressCards.collapseDetails", defaultValue: "Hide details")
     }
 
     // MARK: - Log output
