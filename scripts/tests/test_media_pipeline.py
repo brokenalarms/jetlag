@@ -926,7 +926,7 @@ class TestPipelineMachineOutput:
     def test_pipeline_re_emits_child_at_lines(self, temp_workspace, test_profile):
         """Pipeline re-emits @@ lines from child scripts (fix-timestamp, organize).
 
-        Actual: stdout contains child @@ lines (timestamp_action, dest)
+        Actual: stdout contains child @@ lines (timestamp_action, original_time, corrected_time, dest)
         Expected: child script @@ data flows through pipeline to stdout
         """
         source = temp_workspace["source"]
@@ -942,9 +942,13 @@ class TestPipelineMachineOutput:
         files = self._parse_at_lines(result.stdout)
         assert len(files) == 1
         f = files[0]
-        if _has_tag_cmd():
+        if sys.platform == "darwin" and _has_tag_cmd():
             assert "tag_action" in f, "Missing @@tag_action from tag-media child"
         assert "timestamp_action" in f, "Missing @@timestamp_action from fix-timestamp child"
+        assert "original_time" in f, f"Missing @@original_time from fix-timestamp child, got keys: {list(f.keys())}"
+        assert f["original_time"], f"@@original_time is empty, expected a timestamp value"
+        assert "corrected_time" in f, f"Missing @@corrected_time from fix-timestamp child, got keys: {list(f.keys())}"
+        assert f["corrected_time"], f"@@corrected_time is empty, expected a timestamp value"
         assert "dest" in f, "Missing @@dest from organize child"
 
     def test_pipeline_stdout_only_has_at_lines(self, temp_workspace, test_profile):

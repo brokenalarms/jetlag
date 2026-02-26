@@ -29,16 +29,33 @@ struct ScriptRunner {
 
             func readLines(from pipe: Pipe, stream: LogLine.Stream) {
                 group.enter()
+                // Buffer for partial lines that span pipe chunk boundaries.
+                // Without this, a chunk ending mid-line (e.g. "@@original_ti")
+                // would be yielded as an incomplete line and the remainder
+                // ("me=2024:01:15 08:30:00") lost as a separate non-@@ fragment.
+                var partialLine = ""
                 pipe.fileHandleForReading.readabilityHandler = { handle in
                     let data = handle.availableData
                     guard !data.isEmpty else {
+                        if !partialLine.isEmpty {
+                            continuation.yield(LogLine(text: partialLine, stream: stream))
+                            partialLine = ""
+                        }
                         pipe.fileHandleForReading.readabilityHandler = nil
                         group.leave()
                         return
                     }
                     if let text = String(data: data, encoding: .utf8) {
-                        for line in text.components(separatedBy: .newlines) where !line.isEmpty {
-                            continuation.yield(LogLine(text: line, stream: stream))
+                        let combined = partialLine + text
+                        partialLine = ""
+                        let segments = combined.components(separatedBy: .newlines)
+                        for (i, segment) in segments.enumerated() {
+                            if i == segments.count - 1 {
+                                // Last segment may be a partial line (no trailing newline)
+                                partialLine = segment
+                            } else if !segment.isEmpty {
+                                continuation.yield(LogLine(text: segment, stream: stream))
+                            }
                         }
                     }
                 }
