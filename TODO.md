@@ -16,6 +16,8 @@
    - `scripts/`: ✅ `media-pipeline.py` now emits `@@stage_complete=<stage>` after each step (ingest, tag, fix-timestamp, output, gyroflow)
    - `macos/`: card-based progress view consuming `@@stage_complete` events, parse in `AppState.parseMachineReadableLine()`
 
+- (2026-02-26) **Time correction pipeline step** — Extend `fix-media-timestamp.py` to handle camera clock errors (not just timezone). Add `--time-offset`, `--infer-from-filename`, smart warnings. Surface in macOS app as a second mode on the Fix Timestamps step. Full spec: `todos/time-correction-pipeline-step.md`
+
 ## `web/`
 
-(no open tasks)
+- (2026-02-26) **Interactive before/after timeline slider** — Replace the static side-by-side cards in the Problem section with a draggable slider. Clips animate between broken and corrected positions as the user drags. Reuse existing `timeline.js` scale/positioning math. The before state is the default; dragging right reveals the corrected positions with smooth CSS transitions.
