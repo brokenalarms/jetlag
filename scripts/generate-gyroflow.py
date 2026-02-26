@@ -30,13 +30,17 @@ def signal_handler(sig, frame):
 
 def has_motion_data(file_path: Path) -> bool:
     """Check if video file contains motion/gyro data streams using ffprobe."""
-    result = subprocess.run(
-        [
-            "ffprobe", "-v", "quiet", "-print_format", "json",
-            "-show_streams", str(file_path)
-        ],
-        capture_output=True, text=True
-    )
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "quiet", "-print_format", "json",
+                "-show_streams", str(file_path)
+            ],
+            capture_output=True, text=True
+        )
+    except OSError:
+        print("Warning: ffprobe not available — cannot check for motion data", file=sys.stderr)
+        return False
     if result.returncode != 0:
         return False
 
