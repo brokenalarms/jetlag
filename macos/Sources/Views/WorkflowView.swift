@@ -4,6 +4,8 @@ struct WorkflowView: View {
     @Bindable var state: AppState
     @State private var sourceDir = Dirtyable("")
     @State private var timezone = Dirtyable("")
+    @FocusState private var sourceDirFocused: Bool
+    @FocusState private var timezoneFocused: Bool
     @State private var showUpgradeSheet = false
     @State private var detectedFileCount = 0
     private var licenseStore: LicenseStore { LicenseStore.shared }
@@ -241,10 +243,14 @@ struct WorkflowView: View {
                 HStack(spacing: 6) {
                     TextField(Strings.Workflow.sourceDirPlaceholder, text: $sourceDir.value)
                         .textFieldStyle(.roundedBorder)
+                        .focused($sourceDirFocused)
+                        .onChange(of: sourceDirFocused) { _, focused in
+                            if !focused { sourceDir.markTouched() }
+                        }
                     Button(Strings.Common.browse) { pickSourceDir() }
                         .controlSize(.small)
                 }
-                .fieldError(sourceDirError, show: sourceDir.isDirty)
+                .fieldError(sourceDirError, show: sourceDir.touched)
             }
 
             HStack(spacing: 4) {
@@ -330,6 +336,10 @@ struct WorkflowView: View {
                     TextField(Strings.Workflow.timezonePlaceholder, text: $timezone.value)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 90)
+                        .focused($timezoneFocused)
+                        .onChange(of: timezoneFocused) { _, focused in
+                            if !focused { timezone.markTouched() }
+                        }
                 } else {
                     TimezonePickerView(selectedTimezone: $timezone.value)
                 }
@@ -343,7 +353,7 @@ struct WorkflowView: View {
                 .contentShape(Rectangle())
                 .help(state.useTimezonePicker ? Strings.Workflow.typeManuallyHelp : Strings.Workflow.pickFromListHelp)
             }
-            .fieldError(timezoneError, show: timezone.isDirty)
+            .fieldError(timezoneError, show: timezone.touched)
         }
         .padding(10)
     }
@@ -492,6 +502,7 @@ struct WorkflowView: View {
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             sourceDir.value = url.path
+            sourceDir.markTouched()
         }
     }
 

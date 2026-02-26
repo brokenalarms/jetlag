@@ -81,4 +81,33 @@ final class DirtyableTests: XCTestCase {
         XCTAssertFalse(field.isDirty)
         XCTAssertEqual(field.current, "unchanged")
     }
+
+    // MARK: - Touched (blur tracking)
+
+    func testInitiallyNotTouched() {
+        let field = Dirtyable("hello")
+        XCTAssertFalse(field.touched)
+    }
+
+    func testMarkTouchedSetsTouched() {
+        var field = Dirtyable("hello")
+        field.markTouched()
+        XCTAssertTrue(field.touched)
+    }
+
+    func testFreshInstanceResetsTouch() {
+        var field = Dirtyable("hello")
+        field.markTouched()
+        field = Dirtyable("new")
+        XCTAssertFalse(field.touched)
+    }
+
+    func testRollbackPreservesTouched() {
+        var field = Dirtyable("hello")
+        field.value = "world"
+        field.markTouched()
+        field.rollback()
+        XCTAssertTrue(field.touched)
+        XCTAssertFalse(field.isDirty)
+    }
 }

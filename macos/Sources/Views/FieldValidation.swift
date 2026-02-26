@@ -4,6 +4,7 @@ import SwiftUI
 struct Dirtyable<T> {
     private(set) var original: T
     private var updated: T?
+    private(set) var touched = false
 
     var current: T { updated ?? original }
 
@@ -12,6 +13,10 @@ struct Dirtyable<T> {
     }
 
     var isDirty: Bool { updated != nil }
+
+    mutating func markTouched() {
+        touched = true
+    }
 
     var value: T {
         get { updated ?? original }
