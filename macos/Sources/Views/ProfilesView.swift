@@ -6,14 +6,14 @@ struct ProfilesView: View {
     @State private var editingName: String = ""
     @State private var editingProfile: MediaProfile?
     @State private var originalSnapshot: (name: String, profile: MediaProfile)?
-    @State private var isCreatingNew = false
     @State private var showDeleteConfirmation = false
     @State private var showDiscardConfirmation = false
     @State private var pendingSelection: String?
     @State private var pendingTabChange: SidebarTab?
 
     private var isDirty: Bool {
-        guard let snapshot = originalSnapshot, let current = editingProfile else { return false }
+        guard let snapshot = originalSnapshot, let current = editingProfile
+        else { return false }
         return editingName != snapshot.name || current != snapshot.profile
     }
 
@@ -35,16 +35,13 @@ struct ProfilesView: View {
                 ProfileEditorView(
                     profileName: $editingName,
                     profile: editingProfileBinding,
-                    isNew: isCreatingNew,
                     onSave: { saveCurrentProfile() },
                     onCancel: {
                         editingProfile = nil
                         editingName = ""
                         originalSnapshot = nil
-                        isCreatingNew = false
                     }
                 )
-                .id(editingName)
                 .frame(maxWidth: .infinity)
             } else {
                 Text(Strings.Profiles.selectPrompt)
@@ -72,7 +69,10 @@ struct ProfilesView: View {
                     state.selectedTab = tab
                 } else if let pending = pendingSelection {
                     pendingSelection = nil
-                    loadProfileForEditing(pending)
+                    loadProfileForEditing(
+                        pending,
+                        state.profile(named: pending)
+                    )
                 }
             }
             Button(Strings.Profiles.discardChanges, role: .destructive) {
@@ -85,8 +85,12 @@ struct ProfilesView: View {
                     state.selectedTab = tab
                 } else if let pending = pendingSelection {
                     pendingSelection = nil
-                    loadProfileForEditing(pending)
+                    loadProfileForEditing(
+                        pending,
+                        state.profile(named: pending)
+                    )
                 }
+
             }
             Button(Strings.Common.cancel, role: .cancel) {
                 pendingTabChange = nil
@@ -101,12 +105,17 @@ struct ProfilesView: View {
                 ForEach(state.sortedProfileNames, id: \.self) { name in
                     HStack(spacing: 6) {
                         if let profile = state.profile(named: name) {
-                            Image(systemName: profile.type?.systemImage ?? "questionmark")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 14)
+                            Image(
+                                systemName: profile.type?.systemImage
+                                    ?? "questionmark"
+                            )
+                            .foregroundStyle(.secondary)
+                            .frame(width: 14)
 
-                            let device = [profile.exif?.make, profile.exif?.model]
-                                .compactMap { $0 }.joined(separator: " ")
+                            let device = [
+                                profile.exif?.make, profile.exif?.model,
+                            ]
+                            .compactMap { $0 }.joined(separator: " ")
                             VStack(alignment: .leading, spacing: 2) {
                                 if !device.isEmpty {
                                     Text(device).fontWeight(.medium)
@@ -126,7 +135,6 @@ struct ProfilesView: View {
                 }
             }
             .onChange(of: selectedProfile) { oldValue, newValue in
-                guard !isCreatingNew else { return }
                 if pendingSelection != nil { return }
 
                 if isDirty {
@@ -134,18 +142,14 @@ struct ProfilesView: View {
                     selectedProfile = oldValue
                     showDiscardConfirmation = true
                 } else if let name = newValue {
-                    loadProfileForEditing(name)
+                    loadProfileForEditing(name, state.profile(named: name))
                 }
             }
 
             Divider()
             HStack {
                 Button {
-                    isCreatingNew = true
-                    selectedProfile = nil
-                    editingName = "new-profile"
-                    editingProfile = MediaProfile()
-                    originalSnapshot = nil
+                    loadProfileForEditing("new-profile", MediaProfile())
                 } label: {
                     Image(systemName: "plus")
                         .frame(width: 24, height: 24)
@@ -163,7 +167,9 @@ struct ProfilesView: View {
                 .buttonStyle(.borderless)
                 .disabled(selectedProfile == nil)
                 .confirmationDialog(
-                    Strings.Profiles.deleteConfirmationTitle(selectedProfile ?? ""),
+                    Strings.Profiles.deleteConfirmationTitle(
+                        selectedProfile ?? ""
+                    ),
                     isPresented: $showDeleteConfirmation,
                     titleVisibility: .visible
                 ) {
@@ -176,14 +182,27 @@ struct ProfilesView: View {
                     Text(Strings.Profiles.deleteConfirmationMessage)
                 }
 
+                Button {
+                    duplicateProfile()
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .disabled(selectedProfile == nil)
+
                 Spacer()
             }
             .padding(6)
         }
     }
 
-    private func loadProfileForEditing(_ name: String) {
-        guard let profile = state.profile(named: name) else { return }
+    private func loadProfileForEditing(
+        _ name: String,
+        _ newProfile: MediaProfile?
+    ) {
+        guard let profile = newProfile else { return }
         editingName = name
         editingProfile = profile
         originalSnapshot = (name: name, profile: profile)
@@ -191,13 +210,17 @@ struct ProfilesView: View {
     }
 
     private func saveCurrentProfile() {
-        guard let profile = editingProfile, state.profilesConfig != nil else { return }
+        guard let profile = editingProfile, state.profilesConfig != nil else {
+            return
+        }
 
-        if isCreatingNew {
+        if state.profile(named: editingName) == nil {
             state.profilesConfig?.profiles[editingName] = profile
         } else if let snapshot = originalSnapshot {
             if snapshot.name != editingName {
-                state.profilesConfig?.profiles.removeValue(forKey: snapshot.name)
+                state.profilesConfig?.profiles.removeValue(
+                    forKey: snapshot.name
+                )
             }
             state.profilesConfig?.profiles[editingName] = profile
         }
@@ -205,7 +228,6 @@ struct ProfilesView: View {
         writeProfiles()
         originalSnapshot = (name: editingName, profile: profile)
         selectedProfile = editingName
-        isCreatingNew = false
     }
 
     private func deleteProfile(_ name: String) {
@@ -218,6 +240,23 @@ struct ProfilesView: View {
         editingProfile = nil
         editingName = ""
         originalSnapshot = nil
+    }
+
+    private func duplicateProfile() {
+        guard let name = selectedProfile,
+            let profile = state.profile(named: name)
+        else { return }
+
+        // Generate a unique name for the duplicated profile
+        let baseName = name.replacing(/\ copy \d+$/, with: "")
+
+        var counter = 1
+        var duplicateName = "\(baseName) copy \(counter)"
+        while state.profile(named: duplicateName) != nil {
+            duplicateName = "\(baseName) copy \(counter)"
+            counter += 1
+        }
+        loadProfileForEditing(duplicateName, profile)
     }
 
     private func writeProfiles() {
@@ -237,21 +276,32 @@ struct ProfilesView: View {
 struct ProfileEditorView: View {
     @Binding var profileName: String
     @Binding var profile: MediaProfile
-    let isNew: Bool
     let onSave: () -> Void
     let onCancel: () -> Void
 
     var body: some View {
         ScrollView {
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
+            Grid(
+                alignment: .leadingFirstTextBaseline,
+                horizontalSpacing: 12,
+                verticalSpacing: 10
+            ) {
                 GridRow {
-                    Text(Strings.Profiles.nameLabel).gridColumnAlignment(.trailing)
-                    TextField(Strings.Profiles.namePlaceholder, text: $profileName)
-                        .textFieldStyle(.roundedBorder)
+                    Text(Strings.Profiles.nameLabel).gridColumnAlignment(
+                        .trailing
+                    )
+                    TextField(
+                        Strings.Profiles.namePlaceholder,
+                        text: $profileName
+                    )
+                    .textFieldStyle(.roundedBorder)
                 }
 
                 GridRow {
-                    HelpLabel(Strings.Profiles.typeLabel, help: Strings.Profiles.typeHelp)
+                    HelpLabel(
+                        Strings.Profiles.typeLabel,
+                        help: Strings.Profiles.typeHelp
+                    )
                     Picker("", selection: typeBinding) {
                         Text(Strings.Profiles.videoOption).tag(MediaType.video)
                         Text(Strings.Profiles.photoOption).tag(MediaType.photo)
@@ -276,30 +326,48 @@ struct ProfileEditorView: View {
 
                 GridRow {
                     Text(Strings.Profiles.exifMakeLabel)
-                    TextField(Strings.Profiles.exifMakePlaceholder, text: exifBinding(\.make))
-                        .textFieldStyle(.roundedBorder)
+                    TextField(
+                        Strings.Profiles.exifMakePlaceholder,
+                        text: exifBinding(\.make)
+                    )
+                    .textFieldStyle(.roundedBorder)
                 }
                 GridRow {
                     Text(Strings.Profiles.exifModelLabel)
-                    TextField(Strings.Profiles.exifModelPlaceholder, text: exifBinding(\.model))
-                        .textFieldStyle(.roundedBorder)
+                    TextField(
+                        Strings.Profiles.exifModelPlaceholder,
+                        text: exifBinding(\.model)
+                    )
+                    .textFieldStyle(.roundedBorder)
                 }
 
                 Divider().gridCellUnsizedAxes(.horizontal)
 
                 GridRow {
-                    HelpLabel(Strings.Profiles.fileTypesLabel, help: Strings.Profiles.fileExtensionsHelp)
+                    HelpLabel(
+                        Strings.Profiles.fileTypesLabel,
+                        help: Strings.Profiles.fileExtensionsHelp
+                    )
                     ExtensionField(items: $profile.fileExtensions)
                 }
 
                 GridRow {
-                    HelpLabel(Strings.Profiles.companionLabel, help: Strings.Profiles.companionHelp)
+                    HelpLabel(
+                        Strings.Profiles.companionLabel,
+                        help: Strings.Profiles.companionHelp
+                    )
                     ExtensionField(items: $profile.companionExtensions)
                 }
 
                 GridRow {
-                    HelpLabel(Strings.Profiles.tagsLabel, help: Strings.Profiles.tagsHelp)
-                    CommaSeparatedField(items: $profile.tags, placeholder: Strings.Profiles.tagPlaceholder)
+                    HelpLabel(
+                        Strings.Profiles.tagsLabel,
+                        help: Strings.Profiles.tagsHelp
+                    )
+                    CommaSeparatedField(
+                        items: $profile.tags,
+                        placeholder: Strings.Profiles.tagPlaceholder
+                    )
                 }
 
                 Divider().gridCellUnsizedAxes(.horizontal)
@@ -307,7 +375,10 @@ struct ProfileEditorView: View {
                 GridRow {
                     Text("")
                     HStack(spacing: 4) {
-                        Toggle(Strings.Profiles.gyroflowToggle, isOn: gyroflowToggle)
+                        Toggle(
+                            Strings.Profiles.gyroflowToggle,
+                            isOn: gyroflowToggle
+                        )
                         HelpButton(Strings.Profiles.gyroflowHelp)
                     }
                 }
@@ -324,7 +395,7 @@ struct ProfileEditorView: View {
                 Spacer()
                 Button(Strings.Common.cancel) { onCancel() }
                     .keyboardShortcut(.escape)
-                Button(isNew ? Strings.Profiles.createButton : Strings.Profiles.updateButton) { onSave() }
+                Button(Strings.Profiles.saveButton) { onSave() }
                     .keyboardShortcut(.return, modifiers: .command)
                     .buttonStyle(.borderedProminent)
                     .disabled(profileName.isEmpty)
@@ -350,14 +421,17 @@ struct ProfileEditorView: View {
         }
     }
 
-    private func optionalBinding(_ binding: Binding<String?>) -> Binding<String> {
+    private func optionalBinding(_ binding: Binding<String?>) -> Binding<String>
+    {
         Binding(
             get: { binding.wrappedValue ?? "" },
             set: { binding.wrappedValue = $0.isEmpty ? nil : $0 }
         )
     }
 
-    private func exifBinding(_ sub: WritableKeyPath<ExifConfig, String?>) -> Binding<String> {
+    private func exifBinding(_ sub: WritableKeyPath<ExifConfig, String?>)
+        -> Binding<String>
+    {
         Binding(
             get: { profile.exif?[keyPath: sub] ?? "" },
             set: { newValue in

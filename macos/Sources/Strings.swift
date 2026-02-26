@@ -131,8 +131,7 @@ What happens to source files after processing:
         static let tagsLabel = String(localized: "profiles.tags.label", defaultValue: "Tags")
         static let tagPlaceholder = String(localized: "profiles.tag.placeholder", defaultValue: "tag1, tag2")
         static let gyroflowToggle = String(localized: "profiles.gyroflow.toggle", defaultValue: "Generate Gyroflow project files")
-        static let createButton = String(localized: "profiles.create.button", defaultValue: "Create")
-        static let updateButton = String(localized: "profiles.update.button", defaultValue: "Update")
+        static let saveButton = String(localized: "profiles.save.button", defaultValue: "Save")
         static let deleteConfirmationMessage = String(localized: "profiles.deleteConfirmation.message",
             defaultValue: "This will remove the profile from media-profiles.yaml. This cannot be undone.")
 
