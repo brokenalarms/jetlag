@@ -152,6 +152,13 @@ What happens to source files after processing:
             defaultValue: "File types this profile processes (e.g. .mp4, .mov, .insv)")
         static let tagsHelp = String(localized: "profiles.tags.help",
             defaultValue: "macOS Finder tags applied to imported files for organization")
+
+        static let unsavedChangesTitle = String(localized: "profiles.unsavedChanges.title",
+            defaultValue: "You have unsaved changes")
+        static let saveAndContinue = String(localized: "profiles.saveAndContinue.button",
+            defaultValue: "Save Changes")
+        static let discardChanges = String(localized: "profiles.discardChanges.button",
+            defaultValue: "Discard Changes")
     }
 
     // MARK: - Settings
