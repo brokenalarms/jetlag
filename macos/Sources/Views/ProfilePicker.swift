@@ -6,7 +6,7 @@ struct ProfilePicker: View {
 
     var body: some View {
         Picker("", selection: $selection) {
-            Text("Select...").tag("")
+            Text(Strings.Workflow.selectProfile).tag("")
             ForEach(state.sortedProfileNames, id: \.self) { name in
                 profileLabel(name: name).tag(name)
             }

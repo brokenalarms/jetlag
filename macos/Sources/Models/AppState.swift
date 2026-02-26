@@ -7,6 +7,13 @@ enum SidebarTab: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var label: String {
+        switch self {
+        case .workflow: Strings.Nav.workflow
+        case .profiles: Strings.Nav.profiles
+        }
+    }
+
     var systemImage: String {
         switch self {
         case .workflow: "play.rectangle"
@@ -55,14 +62,25 @@ enum PipelineStep: String, CaseIterable, Identifiable {
         }
     }
 
+    var label: String {
+        switch self {
+        case .ingest: Strings.Pipeline.ingestLabel
+        case .tag: Strings.Pipeline.tagLabel
+        case .fixTimezone: Strings.Pipeline.fixTimezoneLabel
+        case .organize: Strings.Pipeline.organizeLabel
+        case .gyroflow: Strings.Pipeline.gyroflowLabel
+        case .archiveSource: Strings.Pipeline.archiveSourceLabel
+        }
+    }
+
     var help: String {
         switch self {
-        case .ingest: "Copy files from source to working directory for processing"
-        case .tag: "Apply Finder tags and EXIF metadata from profile"
-        case .fixTimezone: "Correct timestamps for your video editor using the selected timezone"
-        case .organize: "Move processed files into date-based folders in ready directory"
-        case .gyroflow: "Generate Gyroflow stabilization project files (requires gyro data)"
-        case .archiveSource: "Act on source folder after processing (archive or delete)"
+        case .ingest: Strings.Pipeline.ingestHelp
+        case .tag: Strings.Pipeline.tagHelp
+        case .fixTimezone: Strings.Pipeline.fixTimezoneHelp
+        case .organize: Strings.Pipeline.organizeHelp
+        case .gyroflow: Strings.Pipeline.gyroflowHelp
+        case .archiveSource: Strings.Pipeline.archiveSourceHelp
         }
     }
 }

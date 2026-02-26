@@ -7,21 +7,21 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("License") {
+            Section(Strings.Settings.licenseSection) {
                 if licenseStore.isUnlocked {
-                    Label("Jetlag Pro — Activated", systemImage: "checkmark.seal.fill")
+                    Label(Strings.Settings.proActivated, systemImage: "checkmark.seal.fill")
                         .foregroundStyle(.green)
                 } else {
-                    LabeledContent("Plan") {
-                        Text("Free — up to \(licenseStore.fileLimit) files per run")
+                    LabeledContent(Strings.Settings.planLabel) {
+                        Text(Strings.Settings.freePlan(fileLimit: licenseStore.fileLimit))
                             .foregroundStyle(.secondary)
                     }
 
                     HStack(spacing: 8) {
-                        TextField("License key", text: $licenseKey)
+                        TextField(Strings.Settings.licenseKeyPlaceholder, text: $licenseKey)
                             .textFieldStyle(.roundedBorder)
                             .disabled(licenseStore.isActivating)
-                        Button(licenseStore.isActivating ? "Activating…" : "Activate") {
+                        Button(licenseStore.isActivating ? Strings.Settings.activatingButton : Strings.Settings.activateButton) {
                             Task { await licenseStore.activate(licenseKey: licenseKey.trimmingCharacters(in: .whitespaces)) }
                         }
                         .disabled(licenseKey.trimmingCharacters(in: .whitespaces).isEmpty || licenseStore.isActivating)
@@ -33,14 +33,14 @@ struct SettingsView: View {
                             .foregroundStyle(.red)
                     }
 
-                    Button("Buy Jetlag Pro") {
+                    Button(Strings.Settings.buyProButton) {
                         NSWorkspace.shared.open(URL(string: "https://jetlag.app")!)
                     }
                 }
             }
 
-            Section("Scripts") {
-                LabeledContent("Scripts directory") {
+            Section(Strings.Settings.scriptsSection) {
+                LabeledContent(Strings.Settings.scriptsDirLabel) {
                     Text(state.scriptsDirectory)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
@@ -48,11 +48,11 @@ struct SettingsView: View {
 
                 HStack {
                     TextField(
-                        "Profiles file (default: scripts_dir/media-profiles.yaml)",
+                        Strings.Settings.profilesFilePlaceholder,
                         text: $state.profilesFilePath
                     )
                     .textFieldStyle(.roundedBorder)
-                    Button("Browse...") { pickFile() }
+                    Button(Strings.Common.browse) { pickFile() }
                 }
             }
 
@@ -64,14 +64,14 @@ struct SettingsView: View {
                             .font(.caption)
                     } else if let config = state.profilesConfig {
                         Label(
-                            "\(config.profiles.count) profiles loaded",
+                            Strings.Settings.profilesLoaded(count: config.profiles.count),
                             systemImage: "checkmark.circle"
                         )
                         .foregroundStyle(.green)
                         .font(.caption)
                     }
                     Spacer()
-                    Button("Reload Profiles") { loadProfiles() }
+                    Button(Strings.Settings.reloadProfilesButton) { loadProfiles() }
                 }
             }
         }

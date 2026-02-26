@@ -16,9 +16,9 @@ struct UpgradeView: View {
                     .font(.system(size: 28))
                     .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Jetlag Pro")
+                    Text(Strings.Upgrade.title)
                         .font(.title2.bold())
-                    Text("Unlimited file processing")
+                    Text(Strings.Upgrade.subtitle)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -28,15 +28,15 @@ struct UpgradeView: View {
 
             // Limit message
             VStack(alignment: .leading, spacing: 6) {
-                Text("This job has \(fileCount) files.")
+                Text(Strings.Upgrade.jobFileCount(fileCount))
                     .font(.body)
-                Text("The free version processes up to \(store.fileLimit) files per run.")
+                Text(Strings.Upgrade.freeLimit(fileLimit: store.fileLimit))
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
 
             // Value prop
-            Text("Unlock Jetlag Pro for unlimited processing — one-time purchase, no subscription.")
+            Text(Strings.Upgrade.valueProp)
                 .font(.body)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -44,15 +44,15 @@ struct UpgradeView: View {
 
             // License key entry
             VStack(alignment: .leading, spacing: 8) {
-                Text("Already purchased?")
+                Text(Strings.Upgrade.alreadyPurchased)
                     .font(.subheadline.weight(.medium))
 
                 HStack(spacing: 8) {
-                    TextField("License key", text: $licenseKey)
+                    TextField(Strings.Settings.licenseKeyPlaceholder, text: $licenseKey)
                         .textFieldStyle(.roundedBorder)
                         .disabled(store.isActivating)
 
-                    Button(store.isActivating ? "Activating…" : "Activate") {
+                    Button(store.isActivating ? Strings.Settings.activatingButton : Strings.Settings.activateButton) {
                         Task { await activate() }
                     }
                     .disabled(licenseKey.trimmingCharacters(in: .whitespaces).isEmpty || store.isActivating)
@@ -67,14 +67,14 @@ struct UpgradeView: View {
 
             // CTA + cancel
             HStack {
-                Button("Buy Jetlag Pro") {
+                Button(Strings.Settings.buyProButton) {
                     NSWorkspace.shared.open(URL(string: "https://jetlag.app")!)
                 }
                 .buttonStyle(.borderedProminent)
 
                 Spacer()
 
-                Button("Cancel", role: .cancel) { onDismiss() }
+                Button(Strings.Common.cancel, role: .cancel) { onDismiss() }
             }
         }
         .padding(24)

@@ -9,12 +9,12 @@ struct LogOutputView: View {
             HStack(spacing: 6) {
                 Image(systemName: "terminal")
                     .foregroundStyle(.secondary)
-                Text("Output")
+                Text(Strings.Log.title)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
                 Spacer()
                 if !lines.isEmpty {
-                    Text("\(lines.count) lines")
+                    Text(Strings.Log.lineCount(lines.count))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -23,13 +23,13 @@ struct LogOutputView: View {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(text, forType: .string)
                 } label: {
-                    Label("Copy All", systemImage: "doc.on.doc")
+                    Label(Strings.Log.copyAllButton, systemImage: "doc.on.doc")
                 }
                 .buttonStyle(.borderless)
                 .font(.caption)
                 .disabled(lines.isEmpty)
 
-                Button("Clear") { onClear() }
+                Button(Strings.Log.clearButton) { onClear() }
                     .buttonStyle(.borderless)
                     .font(.caption)
                     .disabled(lines.isEmpty)

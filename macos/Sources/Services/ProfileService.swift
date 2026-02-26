@@ -21,7 +21,7 @@ struct ProfileService {
 
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw ProfileLoadError(
-                message: "Profiles file not found",
+                message: Strings.Errors.profilesNotFound,
                 filePath: resolved,
                 detail: nil
             )
@@ -32,7 +32,7 @@ struct ProfileService {
             yamlString = try String(contentsOf: url, encoding: .utf8)
         } catch {
             throw ProfileLoadError(
-                message: "Could not read profiles file",
+                message: Strings.Errors.profilesUnreadable,
                 filePath: resolved,
                 detail: error.localizedDescription
             )
@@ -61,13 +61,13 @@ struct ProfileService {
                 detail = error.localizedDescription
             }
             throw ProfileLoadError(
-                message: "Invalid YAML structure",
+                message: Strings.Errors.profilesInvalidYAML,
                 filePath: resolved,
                 detail: detail
             )
         } catch {
             throw ProfileLoadError(
-                message: "Failed to parse YAML",
+                message: Strings.Errors.profilesParseFailed,
                 filePath: resolved,
                 detail: error.localizedDescription
             )

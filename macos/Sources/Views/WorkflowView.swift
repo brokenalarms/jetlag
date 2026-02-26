@@ -22,9 +22,9 @@ struct WorkflowView: View {
         guard !path.isEmpty else { return nil }
         var isDir: ObjCBool = false
         if !FileManager.default.fileExists(atPath: path, isDirectory: &isDir) {
-            return "Directory not found"
+            return Strings.Errors.directoryNotFound
         } else if !isDir.boolValue {
-            return "Path is a file, not a directory"
+            return Strings.Errors.pathIsFile
         }
         return nil
     }
@@ -33,8 +33,8 @@ struct WorkflowView: View {
         if state.useTimezonePicker { return nil }
         if !state.enabledSteps.contains(.fixTimezone) { return nil }
         let tz = state.timezone
-        if tz.isEmpty { return "Timezone required" }
-        if !tz.contains(/^[+-]\d{4}$/) { return "Expected format: +HHMM or -HHMM" }
+        if tz.isEmpty { return Strings.Workflow.timezoneRequired }
+        if !tz.contains(/^[+-]\d{4}$/) { return Strings.Workflow.timezoneFormatHelp }
         return nil
     }
 
@@ -64,7 +64,7 @@ struct WorkflowView: View {
             }
             .inspectorColumnWidth(min: 480, ideal: 680)
         }
-        .navigationTitle("Workflow")
+        .navigationTitle(Strings.Nav.workflow)
         .sheet(isPresented: $showUpgradeSheet) {
             UpgradeView(
                 fileCount: detectedFileCount,
@@ -99,7 +99,7 @@ struct WorkflowView: View {
                                 .font(.caption)
                                 .foregroundStyle(.tertiary)
                                 .textSelection(.enabled)
-                            Button("Reveal in Finder") {
+                            Button(Strings.Common.revealInFinder) {
                                 NSWorkspace.shared.selectFile(error.filePath, inFileViewerRootedAtPath: "")
                             }
                             .controlSize(.small)
@@ -109,7 +109,7 @@ struct WorkflowView: View {
             }
 
             GridRow {
-                Text("Profile").gridColumnAlignment(.trailing)
+                Text(Strings.Workflow.profileLabel).gridColumnAlignment(.trailing)
                 ProfilePicker(selection: $state.selectedProfile, state: state)
                     .onChange(of: state.selectedProfile) { _, newValue in
                         state.resetWorkflowFields(for: newValue)
@@ -178,7 +178,7 @@ struct WorkflowView: View {
                 .frame(width: 16)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(step.rawValue)
+                Text(step.label)
                     .font(.system(size: 12, weight: .medium))
                 Text(step.help)
                     .font(.caption)
@@ -244,10 +244,10 @@ struct WorkflowView: View {
         VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    TextField("SD card or directory path", text: $state.sourceDir)
+                    TextField(Strings.Workflow.sourceDirPlaceholder, text: $state.sourceDir)
                         .textFieldStyle(.roundedBorder)
                         .focused($focusedField, equals: .sourceDir)
-                    Button("Browse...") { pickSourceDir() }
+                    Button(Strings.Common.browse) { pickSourceDir() }
                         .controlSize(.small)
                 }
                 .fieldError(sourceDirError, show: touch.hasBlurred(.sourceDir))
@@ -256,9 +256,9 @@ struct WorkflowView: View {
             HStack(spacing: 4) {
                 Toggle(isOn: $state.copyCompanionFiles) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Copy companion files")
+                        Text(Strings.Workflow.copyCompanionToggle)
                         if companionExtensions.isEmpty {
-                            Text("No companion files noted for this device")
+                            Text(Strings.Workflow.noCompanionFiles)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else {
@@ -269,7 +269,7 @@ struct WorkflowView: View {
                     }
                 }
                 .disabled(companionExtensions.isEmpty)
-                HelpButton(Strings.Workflow.copyCompanionFiles)
+                HelpButton(Strings.Workflow.copyCompanionHelp)
             }
         }
         .padding(10)
@@ -278,23 +278,23 @@ struct WorkflowView: View {
     private var tagOptions: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
-                Text("Tags:")
+                Text(Strings.Workflow.tagsLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(width: 52, alignment: .trailing)
-                TextField("tag1, tag2", text: $state.tags)
+                TextField(Strings.Workflow.tagPlaceholder, text: $state.tags)
                     .textFieldStyle(.roundedBorder)
                     .font(.caption)
             }
             HStack(spacing: 4) {
-                Text("Camera:")
+                Text(Strings.Workflow.cameraLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(width: 52, alignment: .trailing)
-                TextField("Make", text: $state.exifMake)
+                TextField(Strings.Workflow.makePlaceholder, text: $state.exifMake)
                     .textFieldStyle(.roundedBorder)
                     .font(.caption)
-                TextField("Model", text: $state.exifModel)
+                TextField(Strings.Workflow.modelPlaceholder, text: $state.exifModel)
                     .textFieldStyle(.roundedBorder)
                     .font(.caption)
             }
@@ -305,24 +305,24 @@ struct WorkflowView: View {
     private var organizeOptions: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                TextField("Ready directory path", text: $state.readyDir)
+                TextField(Strings.Workflow.readyDirPlaceholder, text: $state.readyDir)
                     .textFieldStyle(.roundedBorder)
-                Button("Browse...") { pickReadyDir() }
+                Button(Strings.Common.browse) { pickReadyDir() }
                     .controlSize(.small)
             }
-            Text(state.readyDir.isEmpty ? "Set ready directory above" : destinationPreview(readyDir: state.readyDir))
+            Text(state.readyDir.isEmpty ? Strings.Workflow.readyDirRequired : destinationPreview(readyDir: state.readyDir))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             HStack(spacing: 4) {
-                HelpLabel("Group", help: Strings.Workflow.group)
-                TextField("Optional", text: $state.group)
+                HelpLabel(Strings.Workflow.groupLabel, help: Strings.Workflow.groupHelp)
+                TextField(Strings.Workflow.groupPlaceholder, text: $state.group)
                     .textFieldStyle(.roundedBorder)
             }
             if state.enabledSteps.contains(.fixTimezone) {
                 HStack(spacing: 4) {
-                    Toggle("Append timezone to group folder", isOn: $state.appendTimezoneToGroup)
+                    Toggle(Strings.Workflow.appendTimezoneToggle, isOn: $state.appendTimezoneToGroup)
                         .disabled(state.group.isEmpty)
-                    HelpButton(Strings.Workflow.appendTimezoneToGroup)
+                    HelpButton(Strings.Workflow.appendTimezoneHelp)
                 }
             }
         }
@@ -333,7 +333,7 @@ struct WorkflowView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 if !state.useTimezonePicker {
-                    TextField("+HHMM", text: $state.timezone)
+                    TextField(Strings.Workflow.timezonePlaceholder, text: $state.timezone)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 90)
                         .focused($focusedField, equals: .timezone)
@@ -352,7 +352,7 @@ struct WorkflowView: View {
                         .padding(4)
                 }
                 .contentShape(Rectangle())
-                .help(state.useTimezonePicker ? "Type manually" : "Pick from list")
+                .help(state.useTimezonePicker ? Strings.Workflow.typeManuallyHelp : Strings.Workflow.pickFromListHelp)
             }
             .fieldError(timezoneError, show: touch.hasBlurred(.timezone))
         }
@@ -362,20 +362,20 @@ struct WorkflowView: View {
     private var archiveSourceOptions: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 4) {
-                Text("Source action:")
+                Text(Strings.Workflow.sourceActionLabel)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Picker("", selection: $state.sourceAction) {
-                    Text("Archive").tag(SourceAction.archive)
-                    Text("Delete").tag(SourceAction.delete)
+                    Text(Strings.Workflow.archiveOption).tag(SourceAction.archive)
+                    Text(Strings.Workflow.deleteOption).tag(SourceAction.delete)
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .frame(width: 220)
-                HelpButton(Strings.Workflow.sourceAction)
+                HelpButton(Strings.Workflow.sourceActionHelp)
             }
             if state.sourceAction == .delete {
-                Label("Deletes processed files and companions from source after successful processing", systemImage: "exclamationmark.triangle.fill")
+                Label(Strings.Workflow.deleteSourceWarning, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.yellow)
             }
@@ -389,17 +389,17 @@ struct WorkflowView: View {
         Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
             Divider().gridCellUnsizedAxes(.horizontal)
             GridRow {
-                Text("Mode").gridColumnAlignment(.trailing)
+                Text(Strings.Workflow.modeLabel).gridColumnAlignment(.trailing)
                 HStack(spacing: 12) {
                     Picker("", selection: $state.applyMode) {
-                        Text("Dry Run").tag(false)
-                        Text("Apply").tag(true)
+                        Text(Strings.Workflow.dryRunOption).tag(false)
+                        Text(Strings.Workflow.applyOption).tag(true)
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
                     .frame(width: 160)
 
-                    Button(state.isRunning ? "Running..." : "Run") { runWorkflow() }
+                    Button(state.isRunning ? Strings.Workflow.runningButton : Strings.Workflow.runButton) { runWorkflow() }
                         .disabled(
                             state.isRunning
                             || state.selectedProfile.isEmpty
@@ -410,7 +410,7 @@ struct WorkflowView: View {
                         .buttonStyle(.borderedProminent)
 
                     if state.isRunning {
-                        Button("Cancel", role: .destructive) { state.cancelRunning() }
+                        Button(Strings.Common.cancel, role: .destructive) { state.cancelRunning() }
                     }
 
                     Spacer()
@@ -422,7 +422,7 @@ struct WorkflowView: View {
                             .foregroundStyle(state.showLog ? .primary : .secondary)
                     }
                     .buttonStyle(.borderless)
-                    .help(state.showLog ? "Hide log" : "Show log")
+                    .help(state.showLog ? Strings.Workflow.hideLogHelp : Strings.Workflow.showLogHelp)
                 }
             }
         }

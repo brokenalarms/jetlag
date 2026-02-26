@@ -56,7 +56,7 @@ struct ScriptRunner {
             } catch {
                 stdoutPipe.fileHandleForReading.readabilityHandler = nil
                 stderrPipe.fileHandleForReading.readabilityHandler = nil
-                continuation.yield(LogLine(text: "Failed to start: \(error.localizedDescription)", stream: .stderr))
+                continuation.yield(LogLine(text: Strings.Errors.scriptStartFailed(error.localizedDescription), stream: .stderr))
                 continuation.finish()
             }
         }

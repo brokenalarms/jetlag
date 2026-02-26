@@ -52,6 +52,39 @@ This dict-key-as-name constraint is shared between the Swift model and the Pytho
 
 ---
 
+## User-facing strings (`Strings.swift`)
+
+All user-facing text in the macOS app is centralized in `macos/Sources/Strings.swift` for i18n readiness. The file uses Apple's `String(localized:defaultValue:)` API, which integrates with String Catalogs (`.xcstrings`) when translations are added later.
+
+**Structure** — strings are organized by feature area as nested enums:
+
+| Enum | Scope |
+|---|---|
+| `Strings.Common` | Shared buttons/actions: Cancel, Delete, Browse |
+| `Strings.Nav` | Sidebar tab labels |
+| `Strings.Pipeline` | Pipeline step labels and help text |
+| `Strings.Workflow` | Workflow view: labels, placeholders, toggles, warnings, help text |
+| `Strings.Profiles` | Profile editor: labels, placeholders, dialog text, help text |
+| `Strings.Settings` | Settings view: sections, status, buttons |
+| `Strings.Upgrade` | Upgrade dialog: titles, messages |
+| `Strings.DiffTable` | Table column headers and status badges |
+| `Strings.Log` | Log output panel: title, buttons |
+| `Strings.Errors` | Error messages from ProfileService, LicenseStore, ScriptRunner |
+
+**Naming conventions:**
+- Localization keys follow `section.element.type` format (e.g. `workflow.sourceDir.placeholder`)
+- Static lets for fixed strings, static functions for interpolated strings (e.g. `Strings.DiffTable.fileCount(42)`)
+- Labels: `fooLabel`, help text: `fooHelp`, placeholders: `fooPlaceholder`, buttons: `fooButton`
+
+**Enum display names** — `PipelineStep` and `SidebarTab` expose a `.label` computed property that delegates to `Strings.Pipeline.*` / `Strings.Nav.*`. Views use `.label` for display instead of `.rawValue`.
+
+**Rules:**
+- All new user-facing strings must go in `Strings.swift` — no hardcoded strings in views or services
+- Strings used in multiple views belong in `Strings.Common`
+- Dynamic data (profile names, file paths, timezone identifiers) stays inline — only static text is centralized
+
+---
+
 ## Testing
 
 Tests live in `scripts/tests/`.
