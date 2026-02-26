@@ -1123,6 +1123,58 @@ class TestPipelineMachineOutput:
         assert f["original_time"], \
             f"@@original_time should be non-empty, got: {f.get('original_time')}"
 
+    def test_pipeline_emits_stage_complete(self, temp_workspace, test_profile):
+        """Pipeline emits @@stage_complete for each step that runs.
+
+        Actual: stdout contains @@stage_complete=ingest, fix-timestamp, output
+        Expected: one stage_complete per pipeline step, in order
+        """
+        source = temp_workspace["source"]
+        create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+        ])
+
+        stages = [
+            line.split("=", 1)[1]
+            for line in result.stdout.strip().split("\n")
+            if line.startswith("@@stage_complete=")
+        ]
+        assert "ingest" in stages, f"Missing ingest stage, got: {stages}"
+        assert "fix-timestamp" in stages, f"Missing fix-timestamp stage, got: {stages}"
+        assert "output" in stages, f"Missing output stage, got: {stages}"
+
+    def test_stage_complete_order(self, temp_workspace, test_profile):
+        """Stage completions are emitted in pipeline order.
+
+        Actual: ingest before tag before fix-timestamp before output
+        Expected: stages appear in pipeline execution order
+        """
+        source = temp_workspace["source"]
+        create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+        ])
+
+        stages = [
+            line.split("=", 1)[1]
+            for line in result.stdout.strip().split("\n")
+            if line.startswith("@@stage_complete=")
+        ]
+        # Tag may or may not be present (depends on platform), but order must be preserved
+        ordered = [s for s in stages if s in ("ingest", "tag", "fix-timestamp", "output")]
+        expected_order = ["ingest", "tag", "fix-timestamp", "output"]
+        filtered_expected = [s for s in expected_order if s in ordered]
+        assert ordered == filtered_expected, f"Stages out of order: {ordered}"
+
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS")
 class TestCLIOverrides:
