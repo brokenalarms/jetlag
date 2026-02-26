@@ -23,7 +23,10 @@ struct LogOutputView: View {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(text, forType: .string)
                 } label: {
-                    Label(Strings.LogOutput.copyAllButton, systemImage: "doc.on.doc")
+                    Label(
+                        Strings.LogOutput.copyAllButton,
+                        systemImage: "doc.on.doc"
+                    )
                 }
                 .buttonStyle(.borderless)
                 .font(.caption)
@@ -37,38 +40,59 @@ struct LogOutputView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
 
-            ScrollViewReader { proxy in
-                ScrollView(.vertical) {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(lines) { line in
-                            Text(line.text)
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(colorFor(line))
-                                .padding(.vertical, 1)
-                                .padding(.horizontal, 10)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .id(line.id)
-                        }
-                    }
-                    .padding(.vertical, 6)
-                    .textSelection(.enabled)
-                }
-                .onChange(of: lines.count) {
-                    if let last = lines.last {
-                        proxy.scrollTo(last.id, anchor: .bottom)
-                    }
-                }
-            }
-            .background(Color(nsColor: .textBackgroundColor).opacity(0.5))
+            LogTextView(lines: lines)
+                .background(Color(nsColor: .textBackgroundColor).opacity(0.5))
         }
         .frame(maxHeight: .infinity)
     }
+}
 
-    private func colorFor(_ line: LogLine) -> Color {
-        if line.isMachineReadable { return .blue }
-        switch line.stream {
-        case .stdout: return .primary
-        case .stderr: return .secondary
+// MARK: - NSTextView wrapper for better performance and text selection
+
+struct LogTextView: NSViewRepresentable {
+    let lines: [LogLine]
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSTextView.scrollableTextView()
+        let textView = scrollView.documentView as! NSTextView
+
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        textView.textColor = .labelColor
+        textView.backgroundColor = .clear
+        textView.textContainerInset = NSSize(width: 10, height: 6)
+        textView.autoresizingMask = [.width]
+
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? NSTextView else {
+            return
         }
+
+        let newText = lines.map(\.text).joined(separator: "\n")
+
+        // Only update if text has changed
+        if textView.string != newText {
+            let wasAtBottom = isScrolledToBottom(scrollView)
+
+            textView.string = newText
+
+            // Auto-scroll to bottom if we were already at the bottom
+            if wasAtBottom {
+                textView.scrollToEndOfDocument(nil)
+            }
+        }
+    }
+
+    private func isScrolledToBottom(_ scrollView: NSScrollView) -> Bool {
+        guard let textView = scrollView.documentView as? NSTextView else {
+            return false
+        }
+        let visibleRect = scrollView.contentView.documentVisibleRect
+        let contentHeight = textView.bounds.height
+        return visibleRect.maxY >= contentHeight - 10  // 10pt threshold
     }
 }

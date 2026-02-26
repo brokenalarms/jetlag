@@ -173,7 +173,7 @@ final class AppState {
         if profile.gyroflowEnabled == true {
             steps.append(.gyroflow)
         }
-        // steps.append(.archiveSource)
+        steps.append(.archiveSource)
         return steps
     }
 
@@ -217,6 +217,7 @@ final class AppState {
             exifModel = ""
         }
         enabledSteps = Set(availableSteps)
+        enabledSteps.remove(.archiveSource)
     }
 
     func buildPipelineArgs() -> (script: String, args: [String]) {
