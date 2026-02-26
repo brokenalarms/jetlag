@@ -90,6 +90,10 @@ struct DiffTableView: View {
             Label(Strings.DiffTable.failedStatus, systemImage: "xmark.circle.fill")
                 .font(.system(size: 11))
                 .foregroundStyle(.red)
+        case "would_change":
+            Label(Strings.DiffTable.wouldChangeStatus, systemImage: "arrow.triangle.2.circlepath.circle.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(Color("NeonCyan").opacity(0.7))
         case nil:
             ProgressView()
                 .controlSize(.small)

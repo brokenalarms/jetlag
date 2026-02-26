@@ -921,7 +921,7 @@ class TestPipelineMachineOutput:
         assert "test2.mp4" in names
         for f in files:
             assert "pipeline_result" in f, f"Missing @@pipeline_result for {f.get('pipeline_file')}"
-            assert f["pipeline_result"] in ("changed", "unchanged"), f"Unexpected pipeline_result: {f['pipeline_result']}"
+            assert f["pipeline_result"] in ("changed", "unchanged", "would_change"), f"Unexpected pipeline_result: {f['pipeline_result']}"
 
     def test_pipeline_re_emits_child_at_lines(self, temp_workspace, test_profile):
         """Pipeline re-emits @@ lines from child scripts (fix-timestamp, organize).
@@ -998,7 +998,96 @@ class TestPipelineMachineOutput:
         files = self._parse_at_lines(result.stdout)
         assert len(files) == 1
         assert "error" not in files[0], f"Gyroflow should be skipped in dry run, got @@error={files[0].get('error')}"
-        assert files[0]["pipeline_result"] in ("changed", "unchanged")
+        assert files[0]["pipeline_result"] in ("changed", "unchanged", "would_change")
+
+    def test_dry_run_emits_would_change(self, temp_workspace, test_profile):
+        """Dry run emits @@pipeline_result=would_change, not changed.
+
+        Actual: @@pipeline_result=would_change in stdout for files with pending changes
+        Expected: dry run distinguishes from apply mode's 'changed' token
+        """
+        source = temp_workspace["source"]
+        create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+        ])
+
+        files = self._parse_at_lines(result.stdout)
+        assert len(files) == 1
+        assert files[0]["pipeline_result"] == "would_change", \
+            f"Dry run should emit would_change, got: {files[0]['pipeline_result']}"
+
+    def test_apply_emits_changed(self, temp_workspace, test_profile):
+        """Apply mode emits @@pipeline_result=changed, not would_change.
+
+        Actual: @@pipeline_result=changed in stdout for files with applied changes
+        Expected: apply mode uses 'changed' token
+        """
+        source = temp_workspace["source"]
+        create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+            "--apply",
+        ])
+
+        files = self._parse_at_lines(result.stdout)
+        assert len(files) == 1
+        assert files[0]["pipeline_result"] == "changed", \
+            f"Apply mode should emit changed, got: {files[0]['pipeline_result']}"
+
+    def test_no_redundant_file_key(self, temp_workspace, test_profile):
+        """Pipeline filters @@file= from child re-emission since @@pipeline_file= covers it.
+
+        Actual: no @@file= lines in stdout
+        Expected: only @@pipeline_file= identifies the file
+        """
+        source = temp_workspace["source"]
+        create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+        ])
+
+        for line in result.stdout.strip().split("\n"):
+            if line.strip():
+                assert not line.startswith("@@file="), \
+                    f"@@file= should be filtered, found: {line}"
+
+    def test_error_path_emits_original_time(self, temp_workspace, test_profile):
+        """Error path emits @@original_time when the file has a known timestamp.
+
+        Actual: @@original_time present alongside @@timestamp_action=error
+        Expected: error paths include available timestamp data for display
+        """
+        source = temp_workspace["source"]
+        create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--tasks", "fix-timestamp",
+        ])
+
+        files = self._parse_at_lines(result.stdout)
+        assert len(files) == 1
+        f = files[0]
+        assert f.get("timestamp_action") == "error", \
+            f"Expected timestamp_action=error, got: {f.get('timestamp_action')}"
+        assert "original_time" in f, \
+            f"Error path should emit @@original_time, got keys: {list(f.keys())}"
+        assert f["original_time"], \
+            f"@@original_time should be non-empty, got: {f.get('original_time')}"
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS")

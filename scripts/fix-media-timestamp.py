@@ -929,6 +929,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
                 print(f"   You provided timezone: {provided_tz}", file=sys.stderr)
                 print(f"   Use --overwrite-datetimeoriginal to force overwrite with new timezone", file=sys.stderr)
                 print(f"@@file={filename}")
+                print(f"@@original_time={exif_data.get('DateTimeOriginal', '')}")
                 print(f"@@timestamp_action=error")
                 return False
 
@@ -946,6 +947,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
             print(f"   CreateDate: {create_date}", file=sys.stderr)
             print("   Use --timezone to specify timezone (e.g., --timezone +09:00)", file=sys.stderr)
             print(f"@@file={filename}")
+            print(f"@@original_time={create_date}")
             print(f"@@timestamp_action=error")
             return False
         print("❌ No valid DateTimeOriginal found", file=sys.stderr)
