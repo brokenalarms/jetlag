@@ -155,9 +155,10 @@ def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], 
     tag_action = "tagged" if actions else "already_correct"
 
     if actions:
-        print(f"📌 Tagged: {filename} ({'; '.join(actions)}){dry_run_suffix}", file=sys.stderr)
+        verb = "would tag" if dry_run else "tagged"
+        print(f"📌 {verb}: {filename} ({'; '.join(actions)}){dry_run_suffix}", file=sys.stderr)
     else:
-        print(f"✓ {filename}: Already tagged correctly{dry_run_suffix}", file=sys.stderr)
+        print(f"✓ already tagged: {filename}{dry_run_suffix}", file=sys.stderr)
 
     return {
         "file": filename,
