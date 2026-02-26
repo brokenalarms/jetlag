@@ -221,7 +221,7 @@ What happens to source files after processing:
         static let noChangeStatus = String(localized: "diffTable.noChange.status", defaultValue: "No change")
         static let failedStatus = String(localized: "diffTable.failed.status", defaultValue: "Failed")
         static let wouldChangeStatus = String(localized: "diffTable.wouldChange.status", defaultValue: "Would change")
-        static let tzMismatchStatus = String(localized: "diffTable.tzMismatch.status", defaultValue: "TZ Mismatch")
+        static let tzMismatchStatus = String(localized: "diffTable.tzMismatch.status", defaultValue: "timezone mismatch")
 
         static func fileCount(_ count: Int) -> String {
             String(localized: "diffTable.fileCount",
