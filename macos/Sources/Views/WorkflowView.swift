@@ -14,8 +14,7 @@ struct WorkflowView: View {
         state.activeProfile?.companionExtensions?.joined(separator: ", ") ?? ""
     }
 
-    private var sourceDirError: String? {
-        let path = sourceDir.current
+    private func validateSourceDir(_ path: String) -> String? {
         guard !path.isEmpty else { return nil }
         var isDir: ObjCBool = false
         if !FileManager.default.fileExists(atPath: path, isDirectory: &isDir) {
@@ -26,16 +25,15 @@ struct WorkflowView: View {
         return nil
     }
 
-    private var timezoneError: String? {
+    private func validateTimezone(_ tz: String) -> String? {
         if state.useTimezonePicker { return nil }
         if !state.enabledSteps.contains(.fixTimezone) { return nil }
-        let tz = timezone.current
         if tz.isEmpty { return Strings.Workflow.timezoneRequired }
         if !tz.contains(/^[+-]\d{4}$/) { return Strings.Workflow.timezoneFormatHelp }
         return nil
     }
 
-    private var timezoneIsValid: Bool { timezoneError == nil }
+    private var timezoneIsValid: Bool { validateTimezone(timezone.current) == nil }
 
     var body: some View {
         ScrollView {
@@ -250,7 +248,7 @@ struct WorkflowView: View {
                     Button(Strings.Common.browse) { pickSourceDir() }
                         .controlSize(.small)
                 }
-                .fieldError(sourceDirError, show: sourceDir.touched)
+                .fieldError(sourceDir, validate: validateSourceDir)
             }
 
             HStack(spacing: 4) {
@@ -353,7 +351,7 @@ struct WorkflowView: View {
                 .contentShape(Rectangle())
                 .help(state.useTimezonePicker ? Strings.Workflow.typeManuallyHelp : Strings.Workflow.pickFromListHelp)
             }
-            .fieldError(timezoneError, show: timezone.touched)
+            .fieldError(timezone, validate: validateTimezone)
         }
         .padding(10)
     }

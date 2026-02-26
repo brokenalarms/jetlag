@@ -63,4 +63,18 @@ extension View {
                 .foregroundStyle(.red)
         }
     }
+
+    @ViewBuilder
+    func fieldError<T: Equatable>(
+        _ field: Dirtyable<T>,
+        show: Bool? = nil,
+        validate: (T) -> String?
+    ) -> some View {
+        self
+        if (show ?? field.touched), let error = validate(field.current) {
+            Label(error, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption)
+                .foregroundStyle(.red)
+        }
+    }
 }
