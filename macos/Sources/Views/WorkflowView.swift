@@ -34,6 +34,13 @@ struct WorkflowView: View {
 
     private var timezoneIsValid: Bool { validateTimezone(state.workflowSession.timezone.current) == nil }
 
+    private var hasValidationErrors: Bool {
+        let session = state.workflowSession
+        return validateDirectory(session.sourceDir.current) != nil
+            || validateDirectory(session.readyDir.current) != nil
+            || !timezoneIsValid
+    }
+
     var body: some View {
         @Bindable var session = state.workflowSession
         ScrollView {
@@ -424,7 +431,7 @@ struct WorkflowView: View {
                             state.isRunning
                             || session.profileName.isEmpty
                             || !session.allStepsReady
-                            || !timezoneIsValid
+                            || hasValidationErrors
                         )
                         .keyboardShortcut(.return, modifiers: .command)
                         .buttonStyle(.borderedProminent)
