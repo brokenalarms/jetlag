@@ -50,7 +50,7 @@ def main():
     files = find_media_files(str(source_dir), args.extensions)
 
     if not files:
-        print(f"No video files found in {source_dir}")
+        print(f"No video files found in {source_dir}", file=sys.stderr)
         sys.exit(0)
 
     print(f"Found {len(files)} video file(s) to process", file=sys.stderr)

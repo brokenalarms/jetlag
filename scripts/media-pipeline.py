@@ -133,7 +133,6 @@ def run_fix_timestamp(
     file_path: Path,
     location_args: list[str],
     apply: bool,
-    verbose: bool
 ) -> tuple[str, bool, int, dict[str, str]]:
     """Run fix-media-timestamp.py on a file.
 
@@ -146,8 +145,6 @@ def run_fix_timestamp(
 
     if apply:
         cmd.append("--apply")
-    if verbose:
-        cmd.append("--verbose")
 
     result = subprocess.run(cmd, capture_output=True, text=True)
 
@@ -358,7 +355,7 @@ def process_file(
     # Fix video timestamp (if in tasks)
     if "fix-timestamp" in tasks:
         print("🔧 Fixing timestamp...", file=sys.stderr)
-        output, changed, rc, at_lines = run_fix_timestamp(active_file, location_args, apply, verbose)
+        output, changed, rc, at_lines = run_fix_timestamp(active_file, location_args, apply)
         for line in output.split("\n"):
             if line.strip():
                 print(f"  {line}", file=sys.stderr)
@@ -579,7 +576,7 @@ def main():
     # Build location args for child scripts
     location_args = []
     if args.location:
-        location_args = ["--location", args.location]
+        location_args = ["--country", args.location]
     elif args.timezone:
         location_args = ["--timezone", args.timezone]
 

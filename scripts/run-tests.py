@@ -17,8 +17,8 @@ def main():
     try:
         import pytest
     except ImportError:
-        print("Error: pytest not found. Install with:")
-        print("  pip install -r scripts/tests/requirements.txt")
+        print("Error: pytest not found. Install with:", file=sys.stderr)
+        print("  pip install -r scripts/tests/requirements.txt", file=sys.stderr)
         return 1
 
     # Run pytest
@@ -32,9 +32,9 @@ def main():
     # Add any command-line arguments passed to this script
     args.extend(sys.argv[1:])
 
-    print(f"Running tests in {tests_dir}")
-    print(f"Arguments: {' '.join(args)}")
-    print()
+    print(f"Running tests in {tests_dir}", file=sys.stderr)
+    print(f"Arguments: {' '.join(args)}", file=sys.stderr)
+    print(file=sys.stderr)
 
     return pytest.main(args)
 

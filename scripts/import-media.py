@@ -258,7 +258,7 @@ def archive_processed_file(file_path: str, source_dir: str, archive_dir: Optiona
 
     # Check for locked source file (macOS) - can't delete after copying
     if is_file_locked(file_path):
-        print(f"⚠️  Skipped archive (source file locked): {os.path.relpath(file_path, source_dir)}")
+        print(f"⚠️  Skipped archive (source file locked): {os.path.relpath(file_path, source_dir)}", file=sys.stderr)
         return True  # Not a failure, just can't archive
 
     # Save the directory before moving the file
@@ -270,7 +270,7 @@ def archive_processed_file(file_path: str, source_dir: str, archive_dir: Optiona
 
     # Check if destination already exists and is locked (from previous failed run)
     if os.path.exists(archive_file_path) and is_file_locked(archive_file_path):
-        print(f"⚠️  Skipped archive (dest file locked): {os.path.relpath(file_path, source_dir)}")
+        print(f"⚠️  Skipped archive (dest file locked): {os.path.relpath(file_path, source_dir)}", file=sys.stderr)
         return True
 
     # Create parent directories if needed
@@ -301,9 +301,9 @@ def archive_processed_file(file_path: str, source_dir: str, archive_dir: Optiona
             except (OSError, PermissionError):
                 # Copy succeeded but delete failed - could be locked file or read-only media
                 if is_file_locked(file_path):
-                    print(f"⚠️  Copied to archive but source locked (delete manually): {os.path.relpath(file_path, source_dir)}")
+                    print(f"⚠️  Copied to archive but source locked (delete manually): {os.path.relpath(file_path, source_dir)}", file=sys.stderr)
                 else:
-                    print(f"   Note: Archived {os.path.relpath(file_path, source_dir)} (source retained on read-only media)")
+                    print(f"   Note: Archived {os.path.relpath(file_path, source_dir)} (source retained on read-only media)", file=sys.stderr)
                 return True
 
         except Exception as copy_error:
@@ -354,19 +354,19 @@ def import_media(source_dir: str, profile: ImportProfile, group: str,
     companion_files_to_archive = [f for f in all_files if f not in import_files_set]
 
     if not import_files and not companion_files_to_archive:
-        print("No media files found to process")
+        print("No media files found to process", file=sys.stderr)
         return [], None, []
 
     if not import_files:
-        print(f"No media files to import ({len(companion_files_to_archive)} companion file(s) to archive)")
+        print(f"No media files to import ({len(companion_files_to_archive)} companion file(s) to archive)", file=sys.stderr)
         return [], None, companion_files_to_archive
 
     if skip_companion:
         companion_count = len(companion_files_to_archive)
-        print(f"Found {len(import_files)} file(s) to import ({companion_count} companion files will be archived only)")
+        print(f"Found {len(import_files)} file(s) to import ({companion_count} companion files will be archived only)", file=sys.stderr)
     else:
-        print(f"Found {len(import_files)} file(s) to process")
-    print()
+        print(f"Found {len(import_files)} file(s) to process", file=sys.stderr)
+    print(file=sys.stderr)
 
     # Process files for import
     results = []
@@ -376,7 +376,7 @@ def import_media(source_dir: str, profile: ImportProfile, group: str,
         filename = os.path.basename(file_path)
 
         if apply_changes:
-            print(f"[{i}/{len(import_files)}] Processing: {filename}")
+            print(f"[{i}/{len(import_files)}] Processing: {filename}", file=sys.stderr)
 
         # Organize the file (copy to destination)
         result = organize_file(file_path, profile.import_dir, group, copy_mode=True, apply_changes=apply_changes)
@@ -390,7 +390,7 @@ def import_media(source_dir: str, profile: ImportProfile, group: str,
         # Skipped files already exist at destination and were presumably already tagged
         if apply_changes and result.action in ('copied', 'moved', 'overwrote') and result.dest_path and os.path.exists(result.dest_path):
             if not tag_file(result.dest_path, tags=profile.tags, make=profile.exif_make, model=profile.exif_model, apply_changes=apply_changes):
-                print(f"   Warning: Tagging failed for {filename}")
+                print(f"   Warning: Tagging failed for {filename}", file=sys.stderr)
 
         # For successfully processed files in apply mode, archive the source file immediately
         # This ensures progress is preserved in case of interruption
@@ -400,7 +400,7 @@ def import_media(source_dir: str, profile: ImportProfile, group: str,
             if not archive_dir:
                 archive_dir = create_archive_directory(source_dir, apply_changes)
                 if archive_dir:
-                    print(f"Created archive folder: {os.path.basename(archive_dir)}")
+                    print(f"Created archive folder: {os.path.basename(archive_dir)}", file=sys.stderr)
 
             # Archive this file and its companions immediately (not at the end)
             if archive_dir:
@@ -450,12 +450,12 @@ Examples:
 
     if args.list_profiles:
         if profiles:
-            print("Available profiles:")
+            print("Available profiles:", file=sys.stderr)
             for name, profile in profiles.items():
-                print(f"  {name:12} → {profile.import_dir}")
+                print(f"  {name:12} → {profile.import_dir}", file=sys.stderr)
         else:
-            print("No profiles found")
-            print(f"Create a profiles file at: {profiles_file}")
+            print("No profiles found", file=sys.stderr)
+            print(f"Create a profiles file at: {profiles_file}", file=sys.stderr)
         return 0
 
     # Validate required arguments
@@ -496,10 +496,10 @@ Examples:
             return 0
 
     # Display configuration
-    print(f"→ Source:      {source_dir}")
-    print(f"→ Import target: {profile.import_dir}")
-    print(f"→ Mode:        {'APPLY' if args.apply else 'DRY RUN (no changes)'}")
-    print()
+    print(f"→ Source:      {source_dir}", file=sys.stderr)
+    print(f"→ Import target: {profile.import_dir}", file=sys.stderr)
+    print(f"→ Mode:        {'APPLY' if args.apply else 'DRY RUN (no changes)'}", file=sys.stderr)
+    print(file=sys.stderr)
 
     # Import media
     results, archive_dir, companion_files = import_media(
@@ -511,7 +511,7 @@ Examples:
     if not results and not companion_files:
         return 0
 
-    print()
+    print(file=sys.stderr)
 
     # Handle post-processing for apply mode
     if args.apply:
@@ -522,9 +522,9 @@ Examples:
                 orphaned_companions.append(file_path)
 
         if orphaned_companions:
-            print(f"\n⚠️  Found {len(orphaned_companions)} companion file(s) to archive:")
+            print(f"\n⚠️  Found {len(orphaned_companions)} companion file(s) to archive:", file=sys.stderr)
             for orphan in orphaned_companions:
-                print(f"   - {os.path.basename(orphan)}")
+                print(f"   - {os.path.basename(orphan)}", file=sys.stderr)
 
             response = input("\nArchive these files? (y/N) ")
             if response.lower().startswith('y'):
@@ -534,27 +534,27 @@ Examples:
                 if archive_dir:
                     for file_path in orphaned_companions:
                         archive_processed_file(file_path, source_dir, archive_dir)
-                    print(f"Archived to: {os.path.basename(archive_dir)}")
+                    print(f"Archived to: {os.path.basename(archive_dir)}", file=sys.stderr)
             else:
-                print("Leaving companion files in source directory.")
+                print("Leaving companion files in source directory.", file=sys.stderr)
 
         # Display summary
-        print("✅ Import complete")
-        print(format_import_summary(results, archive_dir))
+        print("✅ Import complete", file=sys.stderr)
+        print(format_import_summary(results, archive_dir), file=sys.stderr)
     else:
         # Dry run summary
         would_process = sum(1 for r in results if r.success)
         current_date = datetime.now().strftime('%Y-%m-%d')
         new_name = f"{os.path.basename(source_dir)} - copied {current_date}"
 
-        print(f"🧪 Dry run complete. Would process {would_process} file(s)")
+        print(f"🧪 Dry run complete. Would process {would_process} file(s)", file=sys.stderr)
         if would_process > 0:
-            print(f"   Would archive source files to: '{new_name}'")
-            print("   Files would be organized into date folders")
+            print(f"   Would archive source files to: '{new_name}'", file=sys.stderr)
+            print("   Files would be organized into date folders", file=sys.stderr)
         if companion_files:
-            print(f"   Would prompt to archive {len(companion_files)} companion file(s)")
-        print()
-        print("   Re-run with --apply to execute")
+            print(f"   Would prompt to archive {len(companion_files)} companion file(s)", file=sys.stderr)
+        print(file=sys.stderr)
+        print("   Re-run with --apply to execute", file=sys.stderr)
 
     return 0
 

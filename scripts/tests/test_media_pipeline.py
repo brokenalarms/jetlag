@@ -512,16 +512,13 @@ class TestSummaryOutput:
         """Summary lists files that failed processing."""
         source = temp_workspace["source"]
         video = source / "test.mp4"
-        create_test_video(video)
-        # Make file unreadable to cause failure
-        video.chmod(0o000)
+        # Broken symlink: discovered by find_media_files but ingest fails
+        # because the target doesn't exist. Works regardless of user/root.
+        video.symlink_to(source / "nonexistent.mp4")
 
         result = run_pipeline(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
-
-        # Restore permissions for cleanup
-        video.chmod(0o644)
 
         assert "Failed: 1" in result.stderr or result.returncode != 0
 
