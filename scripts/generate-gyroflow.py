@@ -101,24 +101,22 @@ def main():
     gyroflow_path = file_path.with_suffix(".gyroflow")
     rel_path = os.path.join(".", os.path.relpath(gyroflow_path))
 
-    dry_run_suffix = " (DRY RUN)" if not args.apply else ""
-
     if gyroflow_path.exists():
-        print(f"Already exists: {rel_path}{dry_run_suffix}", file=sys.stderr)
+        print(f"Already exists: {rel_path}", file=sys.stderr)
         print(f"@@gyroflow={gyroflow_path}")
         print(f"@@action=skipped")
         return
 
     if not has_motion_data(file_path):
-        print(f"Skipped: {rel_path} (no motion data){dry_run_suffix}", file=sys.stderr)
+        print(f"Skipped: {rel_path} (no motion data)", file=sys.stderr)
         print(f"@@gyroflow={gyroflow_path}")
         print(f"@@action=skipped")
         return
 
     if not args.apply:
-        print(f"Would generate: {rel_path} (DRY RUN)", file=sys.stderr)
+        print(f"Would generate: {rel_path}", file=sys.stderr)
         print(f"@@gyroflow={gyroflow_path}")
-        print(f"@@action=skipped")
+        print(f"@@action=would_generate")
         return
 
     config = load_gyroflow_config()

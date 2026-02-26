@@ -129,7 +129,6 @@ class TestDryRun:
             ])
 
             assert "Already exists" in result.stderr
-            assert "DRY RUN" in result.stderr
             assert "@@action=skipped" in result.stdout
             assert gyroflow_file.read_text() == "{}", "Existing file should not be modified"
 
