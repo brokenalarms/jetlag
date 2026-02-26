@@ -330,6 +330,7 @@ def process_file(
     active_file = Path(dest) if action == "copied" else file_path
     if action == "copied":
         file_changed = True
+    emit("stage_complete", "ingest")
 
     if copy_companion_files and companion_dests:
         source_dir = file_path.parent
@@ -357,6 +358,7 @@ def process_file(
                     emit(key, value)
             if changed:
                 file_changed = True
+            emit("stage_complete", "tag")
 
     # Fix video timestamp (if in tasks)
     if "fix-timestamp" in tasks:
@@ -378,6 +380,7 @@ def process_file(
 
         if changed:
             file_changed = True
+        emit("stage_complete", "fix-timestamp")
 
     # OUTPUT (always): organize active_file to target_dir
     print("📁 Organizing by date...", file=sys.stderr)
@@ -422,6 +425,7 @@ def process_file(
                 print(f"  Companion: {companion_file.name} → {companion_target}", file=sys.stderr)
             elif not apply:
                 print(f"  [DRY RUN] Would move companion: {companion_file.name} → {companion_target}", file=sys.stderr)
+    emit("stage_complete", "output")
 
     # Generate gyroflow project (if in tasks, enabled, and applying)
     gyroflow_enabled = profile.get("gyroflow_enabled", False) if profile else False
@@ -442,6 +446,7 @@ def process_file(
 
         if gf_at_lines.get("action") == "generated":
             file_changed = True
+        emit("stage_complete", "gyroflow")
 
     result["changed"] = file_changed
     if result["failed"]:
