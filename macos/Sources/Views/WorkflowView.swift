@@ -485,7 +485,22 @@ struct WorkflowView: View {
         }
     }
 
+    private func validateAllFields() -> Bool {
+        let session = state.workflowSession
+        session.sourceDir.markTouched()
+        session.readyDir.markTouched()
+        session.timezone.markTouched()
+
+        let sourceDirValid = validateDirectory(session.sourceDir.current) == nil
+        let readyDirValid = validateDirectory(session.readyDir.current) == nil
+        let timezoneValid = validateTimezone(session.timezone.current) == nil
+
+        return sourceDirValid && readyDirValid && timezoneValid
+    }
+
     private func runWorkflow() {
+        guard validateAllFields() else { return }
+
         let fileCount = countMediaFiles()
         if fileCount > licenseStore.fileLimit {
             detectedFileCount = fileCount
