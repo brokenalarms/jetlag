@@ -30,7 +30,7 @@ def get_existing_finder_tags(file_path: str) -> List[str]:
         if not output:
             return []
         return [tag.strip() for tag in output.split(',') if tag.strip()]
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    except (subprocess.CalledProcessError, OSError):
         return []
 
 def apply_finder_tags(file_path: str, tags: List[str], dry_run: bool = False) -> Tuple[bool, List[str]]:
@@ -53,8 +53,8 @@ def apply_finder_tags(file_path: str, tags: List[str], dry_run: bool = False) ->
             subprocess.run(["tag", '--add', ','.join(tags_to_add), file_path],
                           capture_output=True, check=True)
         return True, tags_to_add
-    except FileNotFoundError:
-        print("Warning: 'tag' command not found — install with: brew install tag", file=sys.stderr)
+    except OSError:
+        print("Warning: 'tag' command not available — Finder tags require macOS", file=sys.stderr)
         return False, []
     except subprocess.CalledProcessError as e:
         print(f"Warning: Failed to apply tags to {file_path}: {e}", file=sys.stderr)
@@ -141,13 +141,11 @@ def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], 
                 exif_model = model
             actions.append(f"EXIF: {' / '.join(exif_parts)}")
 
-    # Apply Finder tags
+    # Apply Finder tags (macOS only — skipped on other platforms)
     if finder_tags:
         success, tags_added = apply_finder_tags(file_path, finder_tags, dry_run=dry_run)
-        if not success:
-            return None
 
-        if tags_added:
+        if success and tags_added:
             all_tags_added = tags_added
             actions.append(f"Tags: {', '.join(tags_added)}")
 
