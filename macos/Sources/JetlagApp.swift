@@ -12,10 +12,12 @@ struct JetlagApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(state: state)
-                .frame(minWidth: 900, minHeight: 500)
+                .frame(minWidth: 600, minHeight: 800)
+//                .frame(width: 600)
                 .onAppear { loadProfiles() }
         }
-        .defaultSize(width: 1050, height: 720)
+//        .defaultSize(width: 600, height: 800)
+//        .windowResizability(.contentSize)
         .commands {
             // Single-window utility — no New Window or Open Recent
             CommandGroup(replacing: .newItem) {}

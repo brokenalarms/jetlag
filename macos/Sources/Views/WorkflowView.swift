@@ -6,6 +6,8 @@ struct WorkflowView: View {
     @State private var detectedFileCount = 0
     private var licenseStore: LicenseStore { LicenseStore.shared }
 
+    let defaultColumnWidth = 600.00
+
     private var companionExtensions: String {
         state.workflowSession.workingProfile.companionExtensions?.joined(separator: ", ") ?? ""
     }
@@ -31,7 +33,7 @@ struct WorkflowView: View {
                 )
             }
         }
-        .frame(minWidth: 340)
+        .frame(minWidth: 340, idealWidth: defaultColumnWidth, maxWidth: defaultColumnWidth)
         .inspector(isPresented: $state.showLog) {
             VStack(spacing: 0) {
                 if !state.diffTableRows.isEmpty || state.isRunning {
@@ -39,7 +41,7 @@ struct WorkflowView: View {
                 }
                 LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
             }
-            .inspectorColumnWidth(min: 480, ideal: 680)
+            .inspectorColumnWidth(min: 480, ideal: defaultColumnWidth)
         }
         .navigationTitle(Strings.Nav.workflow)
         .sheet(isPresented: $showUpgradeSheet) {
@@ -111,6 +113,7 @@ struct WorkflowView: View {
                 }
             }
         }
+        .windowResizeBehavior(.automatic)
     }
 
     private func stepCard(_ step: PipelineStep) -> some View {
