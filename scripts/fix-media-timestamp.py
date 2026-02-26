@@ -930,7 +930,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
                 print(f"   Use --overwrite-datetimeoriginal to force overwrite with new timezone", file=sys.stderr)
                 print(f"@@file={filename}")
                 print(f"@@original_time={exif_data.get('DateTimeOriginal', '')}")
-                print(f"@@timestamp_action=error")
+                print(f"@@timestamp_action=tz_mismatch")
                 return False
 
     # Get all data
