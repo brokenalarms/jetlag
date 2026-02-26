@@ -37,7 +37,17 @@ struct WorkflowView: View {
         .inspector(isPresented: $state.showLog) {
             VStack(spacing: 0) {
                 if !state.diffTableRows.isEmpty || state.isRunning {
-                    DiffTableView(rows: state.diffTableRows)
+                    if state.workflowSession.applyMode {
+                        FileProgressCardsView(
+                            rows: state.visibleRows,
+                            enabledSteps: state.workflowSession.availableSteps.filter {
+                                $0.isAlwaysOn || state.workflowSession.enabledSteps.contains($0)
+                            },
+                            isRunning: state.isRunning
+                        )
+                    } else {
+                        DiffTableView(rows: state.diffTableRows)
+                    }
                 }
                 LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
             }

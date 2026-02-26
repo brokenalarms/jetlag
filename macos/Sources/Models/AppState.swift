@@ -73,6 +73,18 @@ enum PipelineStep: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Maps script @@stage_complete values to pipeline steps
+    var stageKey: String? {
+        switch self {
+        case .ingest:        "ingest"
+        case .tag:           "tag"
+        case .fixTimezone:   "fix-timestamp"
+        case .organize:      "output"
+        case .gyroflow:      "gyroflow"
+        case .archiveSource: nil
+        }
+    }
+
     var help: String {
         switch self {
         case .ingest: Strings.Pipeline.ingestHelp
@@ -259,7 +271,15 @@ final class AppState {
     var logOutput: [LogLine] = []
     var currentProcess: Process?
     var diffTableRows: [DiffTableRow] = []
-    private var currentDiffRow: DiffTableRow?
+    var currentDiffRow: DiffTableRow?
+
+    /// All rows including the in-progress file, for live progress display
+    var visibleRows: [DiffTableRow] {
+        if let current = currentDiffRow {
+            return diffTableRows + [current]
+        }
+        return diffTableRows
+    }
 
     init() {
         self.scriptsDirectory = (Bundle.main.resourcePath! as NSString)
@@ -333,6 +353,8 @@ final class AppState {
             currentDiffRow?.dest = value
         case "action":
             currentDiffRow?.organizeAction = value
+        case "stage_complete":
+            currentDiffRow?.markStageComplete(value)
         default:
             break
         }

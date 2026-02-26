@@ -10,12 +10,6 @@
 
 - (2026-02-24) **Timezone map in picker** — MapKit and CoreLocation are already linked in `project.yml` but unused. Replace or augment `TimezoneMapView` with an actual map showing timezone boundaries. When footage timezone differs from current system timezone, show both on the map with a visual arc.
 
-## `scripts/` + `macos/`
-
-- (2026-02-24) **Per-file progress cards** — During apply mode, replace scrolling logs with a card-based UI. Each file gets a card showing pipeline stages as checkmarks: Tagged → Timestamp Fixed → Organized → Gyroflow. Failed stages show red. Cards expand to show details.
-   - `scripts/`: ✅ `media-pipeline.py` now emits `@@stage_complete=<stage>` after each step (ingest, tag, fix-timestamp, output, gyroflow)
-   - `macos/`: card-based progress view consuming `@@stage_complete` events, parse in `AppState.parseMachineReadableLine()`
-
 ## `web/`
 
 (no open tasks)

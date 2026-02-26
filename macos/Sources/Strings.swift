@@ -229,6 +229,14 @@ What happens to source files after processing:
         }
     }
 
+    // MARK: - Progress cards
+
+    enum ProgressCards {
+        static let title = String(localized: "progressCards.title", defaultValue: "Progress")
+        static let expandDetails = String(localized: "progressCards.expandDetails", defaultValue: "Show details")
+        static let collapseDetails = String(localized: "progressCards.collapseDetails", defaultValue: "Hide details")
+    }
+
     // MARK: - Log output
 
     enum LogOutput {
