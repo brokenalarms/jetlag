@@ -68,7 +68,7 @@ All user-facing text in the macOS app is centralized in `macos/Sources/Strings.s
 | `Strings.Settings` | Settings view: sections, status, buttons |
 | `Strings.Upgrade` | Upgrade dialog: titles, messages |
 | `Strings.DiffTable` | Table column headers and status badges |
-| `Strings.Log` | Log output panel: title, buttons |
+| `Strings.LogOutput` | Log output panel: title, buttons |
 | `Strings.Errors` | Error messages from ProfileService, LicenseStore, ScriptRunner |
 
 **Naming conventions:**
