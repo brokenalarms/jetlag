@@ -135,6 +135,13 @@ final class PipelineArgsTests: XCTestCase {
         XCTAssertFalse(args.contains("--apply"))
     }
 
+    func testDryRunExplicitlyOmitsApply() {
+        let state = makeState()
+        state.applyMode = false
+        let (_, args) = state.buildPipelineArgs()
+        XCTAssertFalse(args.contains("--apply"))
+    }
+
     // MARK: - Step readiness
 
     func testIsStepReadyFixTimezoneRequiresTimezone() {

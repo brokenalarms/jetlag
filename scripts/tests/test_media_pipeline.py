@@ -559,8 +559,7 @@ class TestTagging:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
-        # Check that tagging was reported in output (Spotlight indexing unreliable in temp dirs)
-        assert "Tagged:" in result.stderr or "Already tagged" in result.stderr
+        assert "@@tag_action=" in result.stdout, "Pipeline should emit @@tag_action from tag-media"
 
     def test_applies_exif_make_model_from_profile(self, temp_workspace, test_profile):
         """EXIF Make/Model from profile are applied."""
@@ -968,11 +967,11 @@ class TestPipelineMachineOutput:
             if line.strip():
                 assert line.startswith("@@"), f"Actual: stdout line '{line}' is not @@-prefixed, Expected: all stdout lines are @@key=value"
 
-    def test_gyroflow_skipped_in_dry_run(self, temp_workspace, test_profile):
-        """Gyroflow step is skipped in dry run — no @@error from nonexistent output path.
+    def test_gyroflow_runs_in_dry_run(self, temp_workspace, test_profile):
+        """Gyroflow step runs in dry run — base script is --apply-aware.
 
         Actual: no @@error in stdout when gyroflow is enabled but --apply is not passed
-        Expected: gyroflow step doesn't fire in dry run
+        Expected: gyroflow step runs without error in dry run
         """
         profiles_path = SCRIPT_DIR / "media-profiles.yaml"
         with open(profiles_path) as f:

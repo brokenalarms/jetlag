@@ -415,6 +415,7 @@ class TestTagMedia:
         assert result.returncode == 0
         # Human-readable on stderr
         assert "test_video.mp4" in result.stderr
+        assert "would tag" in result.stderr
         assert "(DRY RUN)" in result.stderr
 
     def test_combined_tags_and_exif(self, test_video):
@@ -502,7 +503,7 @@ class TestTagMediaDataPresentation:
         assert "TestMake" in result.stderr
 
     def test_no_output_for_unchanged(self, test_video):
-        """Test that already-correct files report status correctly"""
+        """Test that already-correct files report already_correct action"""
         # Add tags
         subprocess.run([
             sys.executable, str(SCRIPT_DIR / "tag-media.py"),
@@ -519,9 +520,12 @@ class TestTagMediaDataPresentation:
             "--apply"
         ], capture_output=True, text=True)
 
-        assert "Already tagged correctly" in result.stderr
-        # Should NOT say it tagged anything
-        assert "Tagged:" not in result.stderr or "Already" in result.stderr
+        at_lines = {}
+        for line in result.stdout.strip().split("\n"):
+            if line.startswith("@@") and "=" in line:
+                key, value = line[2:].split("=", 1)
+                at_lines[key] = value
+        assert at_lines.get("tag_action") == "already_correct", f"Actual: @@tag_action={at_lines.get('tag_action')}, Expected: already_correct"
 
 
 class TestTagMediaMachineOutput:

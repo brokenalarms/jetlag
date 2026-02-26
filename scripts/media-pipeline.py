@@ -345,7 +345,7 @@ def process_file(
         model = exif.get("model", "")
 
         if tags or make or model:
-            print("🏷️  Checking tags...", file=sys.stderr)
+            print("🏷️  Tagging...", file=sys.stderr)
             output, changed, at_lines = run_tag_media(active_file, tags or None, make or None, model or None, apply)
             for line in output.split("\n"):
                 if line.strip():
@@ -421,13 +421,14 @@ def process_file(
 
     # Generate gyroflow project (if in tasks, enabled, and applying)
     gyroflow_enabled = profile.get("gyroflow_enabled", False) if profile else False
-    if "gyroflow" in tasks and gyroflow_enabled and gyroflow_config and apply:
+    if "gyroflow" in tasks and gyroflow_enabled and gyroflow_config:
         print("🎥 Generating gyroflow project...", file=sys.stderr)
 
         preset = gyroflow_config.get("preset", {})
         preset_json = json.dumps(preset)
 
-        gf_output, _, gf_at_lines = run_generate_gyroflow(Path(dest) if dest else active_file, preset_json, apply)
+        gyroflow_file = Path(dest) if dest and apply else active_file
+        gf_output, _, gf_at_lines = run_generate_gyroflow(gyroflow_file, preset_json, apply)
         for line in gf_output.split("\n"):
             if line.strip():
                 print(f"  {line}", file=sys.stderr)
