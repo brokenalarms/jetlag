@@ -2,52 +2,35 @@ import SwiftUI
 
 struct WorkflowView: View {
     @Bindable var state: AppState
-    @State private var sourceDir = Dirtyable("")
-    @State private var timezone = Dirtyable("")
-    @FocusState private var sourceDirFocused: Bool
-    @FocusState private var timezoneFocused: Bool
     @State private var showUpgradeSheet = false
     @State private var detectedFileCount = 0
     private var licenseStore: LicenseStore { LicenseStore.shared }
 
     private var companionExtensions: String {
-        state.activeProfile?.companionExtensions?.joined(separator: ", ") ?? ""
+        state.workflowSession.workingProfile.companionExtensions?.joined(separator: ", ") ?? ""
     }
-
-    private func validateSourceDir(_ path: String) -> String? {
-        guard !path.isEmpty else { return nil }
-        var isDir: ObjCBool = false
-        if !FileManager.default.fileExists(atPath: path, isDirectory: &isDir) {
-            return Strings.Errors.directoryNotFound
-        } else if !isDir.boolValue {
-            return Strings.Errors.pathIsFile
-        }
-        return nil
-    }
-
-    private func validateTimezone(_ tz: String) -> String? {
-        if state.useTimezonePicker { return nil }
-        if !state.enabledSteps.contains(.fixTimezone) { return nil }
-        if tz.isEmpty { return Strings.Workflow.timezoneRequired }
-        if !tz.contains(/^[+-]\d{4}$/) { return Strings.Workflow.timezoneFormatHelp }
-        return nil
-    }
-
-    private var timezoneIsValid: Bool { validateTimezone(timezone.current) == nil }
 
     var body: some View {
+        @Bindable var session = state.workflowSession
         ScrollView {
             VStack(spacing: 16) {
                 profileSelector
-                if !state.selectedProfile.isEmpty {
+                if !session.profileName.isEmpty {
                     stepsPipeline
                     executionBar
                 }
             }
             .padding()
         }
-        .onChange(of: sourceDir.current) { _, new in state.sourceDir = new }
-        .onChange(of: timezone.current) { _, new in state.timezone = new }
+        .onAppear {
+            let name = state.workflowSession.profileName
+            if !name.isEmpty {
+                state.workflowSession = WorkflowSession(
+                    profile: state.profilesConfig?.profiles[name],
+                    profileName: name
+                )
+            }
+        }
         .frame(minWidth: 340)
         .inspector(isPresented: $state.showLog) {
             VStack(spacing: 0) {
@@ -75,7 +58,8 @@ struct WorkflowView: View {
     // MARK: - Profile selection
 
     private var profileSelector: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
+        @Bindable var session = state.workflowSession
+        return Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
             if let error = state.profileLoadError {
                 GridRow {
                     Text("").gridColumnAlignment(.trailing)
@@ -104,11 +88,12 @@ struct WorkflowView: View {
 
             GridRow {
                 Text(Strings.Workflow.profileLabel).gridColumnAlignment(.trailing)
-                ProfilePicker(selection: $state.selectedProfile, state: state)
-                    .onChange(of: state.selectedProfile) { _, newValue in
-                        state.resetWorkflowFields(for: newValue)
-                        sourceDir = Dirtyable(state.sourceDir)
-                        timezone = Dirtyable(state.timezone)
+                ProfilePicker(selection: $session.profileName, state: state)
+                    .onChange(of: session.profileName) { _, newValue in
+                        state.workflowSession = WorkflowSession(
+                            profile: state.profilesConfig?.profiles[newValue],
+                            profileName: newValue
+                        )
                     }
             }
         }
@@ -117,7 +102,7 @@ struct WorkflowView: View {
     // MARK: - Pipeline steps
 
     private var stepsPipeline: some View {
-        let steps = state.availableSteps
+        let steps = state.workflowSession.availableSteps
         return VStack(spacing: 0) {
             ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
                 stepCard(step)
@@ -129,7 +114,7 @@ struct WorkflowView: View {
     }
 
     private func stepCard(_ step: PipelineStep) -> some View {
-        let isActive = step.isAlwaysOn || state.enabledSteps.contains(step)
+        let isActive = step.isAlwaysOn || state.workflowSession.enabledSteps.contains(step)
         return VStack(spacing: 0) {
             stepHeader(step, isActive: isActive)
             if isActive {
@@ -154,9 +139,9 @@ struct WorkflowView: View {
         } else {
             Button {
                 if isActive {
-                    state.enabledSteps.remove(step)
+                    state.workflowSession.enabledSteps.remove(step)
                 } else {
-                    state.enabledSteps.insert(step)
+                    state.workflowSession.enabledSteps.insert(step)
                 }
             } label: {
                 stepHeaderContent(step, isActive: isActive)
@@ -187,7 +172,7 @@ struct WorkflowView: View {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
-            } else if isActive && !state.isStepReady(step) {
+            } else if isActive && !state.workflowSession.isStepReady(step) {
                 Image(systemName: "exclamationmark.circle.fill")
                     .foregroundStyle(.yellow)
             } else {
@@ -236,23 +221,20 @@ struct WorkflowView: View {
     // MARK: - Inline step options
 
     private var ingestOptions: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        @Bindable var session = state.workflowSession
+        return VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    TextField(Strings.Workflow.sourceDirPlaceholder, text: $sourceDir.value)
+                    TextField(Strings.Workflow.sourceDirPlaceholder, text: $session.sourceDir.value)
                         .textFieldStyle(.roundedBorder)
-                        .focused($sourceDirFocused)
-                        .onChange(of: sourceDirFocused) { _, focused in
-                            if !focused { sourceDir.markTouched() }
-                        }
                     Button(Strings.Common.browse) { pickSourceDir() }
                         .controlSize(.small)
                 }
-                .fieldError(sourceDir, validate: validateSourceDir)
+                .fieldError(validateDirectory(session.sourceDir.current))
             }
 
             HStack(spacing: 4) {
-                Toggle(isOn: $state.copyCompanionFiles) {
+                Toggle(isOn: $session.copyCompanionFiles) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(Strings.Workflow.copyCompanionToggle)
                         if companionExtensions.isEmpty {
@@ -274,52 +256,55 @@ struct WorkflowView: View {
     }
 
     private var tagOptions: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        @Bindable var session = state.workflowSession
+        return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
                 Text(Strings.Workflow.tagsLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(width: 52, alignment: .trailing)
-                TextField(Strings.Workflow.tagPlaceholder, text: $state.tags)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.caption)
+                CommaSeparatedField(items: $session.tags.value, placeholder: Strings.Workflow.tagPlaceholder)
             }
             HStack(spacing: 4) {
                 Text(Strings.Workflow.cameraLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(width: 52, alignment: .trailing)
-                TextField(Strings.Workflow.makePlaceholder, text: $state.exifMake)
-                    .textFieldStyle(.roundedBorder)
+                let make = session.workingProfile.exif?.make ?? ""
+                let model = session.workingProfile.exif?.model ?? ""
+                let device = [make, model].filter { !$0.isEmpty }.joined(separator: " ")
+                Text(device.isEmpty ? "—" : device)
                     .font(.caption)
-                TextField(Strings.Workflow.modelPlaceholder, text: $state.exifModel)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.caption)
+                    .foregroundStyle(device.isEmpty ? .tertiary : .primary)
             }
         }
         .padding(10)
     }
 
     private var organizeOptions: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                TextField(Strings.Workflow.readyDirPlaceholder, text: $state.readyDir)
-                    .textFieldStyle(.roundedBorder)
-                Button(Strings.Common.browse) { pickReadyDir() }
-                    .controlSize(.small)
+        @Bindable var session = state.workflowSession
+        return VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    TextField(Strings.Workflow.readyDirPlaceholder, text: $session.readyDir.value)
+                        .textFieldStyle(.roundedBorder)
+                    Button(Strings.Common.browse) { pickReadyDir() }
+                        .controlSize(.small)
+                }
+                .fieldError(validateDirectory(session.readyDir.current))
             }
-            Text(state.readyDir.isEmpty ? Strings.Workflow.readyDirRequired : destinationPreview(readyDir: state.readyDir))
+            Text(session.readyDir.current.isEmpty ? Strings.Workflow.readyDirRequired : destinationPreview(readyDir: session.readyDir.current))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             HStack(spacing: 4) {
                 HelpLabel(Strings.Workflow.groupLabel, help: Strings.Workflow.groupHelp)
-                TextField(Strings.Workflow.groupPlaceholder, text: $state.group)
+                TextField(Strings.Workflow.groupPlaceholder, text: $session.group)
                     .textFieldStyle(.roundedBorder)
             }
-            if state.enabledSteps.contains(.fixTimezone) {
+            if session.enabledSteps.contains(.fixTimezone) {
                 HStack(spacing: 4) {
-                    Toggle(Strings.Workflow.appendTimezoneToggle, isOn: $state.appendTimezoneToGroup)
-                        .disabled(state.group.isEmpty)
+                    Toggle(Strings.Workflow.appendTimezoneToggle, isOn: $session.appendTimezoneToGroup)
+                        .disabled(session.group.isEmpty)
                     HelpButton(Strings.Workflow.appendTimezoneHelp)
                 }
             }
@@ -328,45 +313,39 @@ struct WorkflowView: View {
     }
 
     private var fixTimezoneOptions: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        @Bindable var session = state.workflowSession
+        return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                if !state.useTimezonePicker {
-                    TextField(Strings.Workflow.timezonePlaceholder, text: $timezone.value)
+                if !session.useTimezonePicker {
+                    TextField(Strings.Workflow.timezonePlaceholder, text: $session.timezone.value)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 90)
-                        .focused($timezoneFocused)
-                        .onChange(of: timezoneFocused) { _, focused in
-                            if !focused { timezone.markTouched() }
-                        }
-                        .id("timezone-textfield-\(timezone.current)")
                 } else {
-                    TimezonePickerView(selectedTimezone: $timezone.value)
-                        .onChange(of: timezone.value) { _, _ in
-                            timezone.markTouched()
-                        }
+                    TimezonePickerView(selectedTimezone: $session.timezone.value)
                 }
                 Spacer()
                 Button {
-                    state.useTimezonePicker.toggle()
+                    state.workflowSession.useTimezonePicker.toggle()
                 } label: {
-                    Image(systemName: state.useTimezonePicker ? "keyboard" : "globe")
+                    Image(systemName: session.useTimezonePicker ? "keyboard" : "globe")
                         .padding(4)
                 }
                 .contentShape(Rectangle())
-                .help(state.useTimezonePicker ? Strings.Workflow.typeManuallyHelp : Strings.Workflow.pickFromListHelp)
+                .help(session.useTimezonePicker ? Strings.Workflow.typeManuallyHelp : Strings.Workflow.pickFromListHelp)
             }
-            .fieldError(timezone, validate: validateTimezone)
+            .fieldError(session.validateTimezone())
         }
         .padding(10)
     }
 
     private var archiveSourceOptions: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        @Bindable var session = state.workflowSession
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 4) {
                 Text(Strings.Workflow.sourceActionLabel)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                Picker("", selection: $state.sourceAction) {
+                Picker("", selection: $session.sourceAction) {
                     Text(Strings.Workflow.archiveOption).tag(SourceAction.archive)
                     Text(Strings.Workflow.deleteOption).tag(SourceAction.delete)
                 }
@@ -375,7 +354,7 @@ struct WorkflowView: View {
                 .frame(width: 220)
                 HelpButton(Strings.Workflow.sourceActionHelp)
             }
-            if state.sourceAction == .delete {
+            if session.sourceAction == .delete {
                 Label(Strings.Workflow.deleteSourceWarning, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.yellow)
@@ -387,12 +366,13 @@ struct WorkflowView: View {
     // MARK: - Execution
 
     private var executionBar: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
+        @Bindable var session = state.workflowSession
+        return Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
             Divider().gridCellUnsizedAxes(.horizontal)
             GridRow {
                 Text(Strings.Workflow.modeLabel).gridColumnAlignment(.trailing)
                 HStack(spacing: 12) {
-                    Picker("", selection: $state.applyMode) {
+                    Picker("", selection: $session.applyMode) {
                         Text(Strings.Workflow.dryRunOption).tag(false)
                         Text(Strings.Workflow.applyOption).tag(true)
                     }
@@ -401,12 +381,7 @@ struct WorkflowView: View {
                     .frame(width: 160)
 
                     Button(state.isRunning ? Strings.Workflow.runningButton : Strings.Workflow.runButton) { runWorkflow() }
-                        .disabled(
-                            state.isRunning
-                            || state.selectedProfile.isEmpty
-                            || !state.allStepsReady
-                            || !timezoneIsValid
-                        )
+                        .disabled(state.isRunning || !session.allStepsReady)
                         .keyboardShortcut(.return, modifiers: .command)
                         .buttonStyle(.borderedProminent)
 
@@ -432,11 +407,12 @@ struct WorkflowView: View {
     // MARK: - Helpers
 
     private func destinationPreview(readyDir: String) -> String {
+        let session = state.workflowSession
         var path = readyDir + "/YYYY"
-        if !state.group.isEmpty {
-            var groupName = state.group
-            if state.appendTimezoneToGroup && state.enabledSteps.contains(.fixTimezone) && !state.timezone.isEmpty {
-                groupName += " (\(state.timezone))"
+        if !session.group.isEmpty {
+            var groupName = session.group
+            if session.appendTimezoneToGroup && session.enabledSteps.contains(.fixTimezone) && !session.timezone.current.isEmpty {
+                groupName += " (\(session.timezone.current))"
             }
             path += "/\(groupName)"
         }
@@ -447,12 +423,12 @@ struct WorkflowView: View {
     // MARK: - Actions
 
     private func countMediaFiles() -> Int {
-        guard let profile = state.activeProfile else { return 0 }
-        let extensions = (profile.fileExtensions ?? []).map {
+        let session = state.workflowSession
+        let extensions = (session.workingProfile.fileExtensions ?? []).map {
             $0.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
         }
         guard !extensions.isEmpty else { return 0 }
-        let dir = state.sourceDir
+        let dir = session.sourceDir.current
         guard !dir.isEmpty else { return 0 }
         guard let enumerator = FileManager.default.enumerator(
             at: URL(fileURLWithPath: dir),
@@ -477,7 +453,7 @@ struct WorkflowView: View {
         state.showLog = true
         state.isRunning = true
 
-        let (script, args) = state.buildPipelineArgs()
+        let (script, args) = state.workflowSession.buildPipelineArgs()
 
         let (process, stream) = ScriptRunner.run(
             script: script,
@@ -503,8 +479,7 @@ struct WorkflowView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
-            sourceDir.value = url.path
-            sourceDir.markTouched()
+            state.workflowSession.sourceDir.value = url.path
         }
     }
 
@@ -514,7 +489,7 @@ struct WorkflowView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
-            state.readyDir = url.path
+            state.workflowSession.readyDir.value = url.path
         }
     }
 }

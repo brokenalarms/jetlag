@@ -3,9 +3,26 @@ import SwiftUI
 struct ProfilesView: View {
     @Bindable var state: AppState
     @State private var selectedProfile: String?
-    @State private var editingProfile: (name: String, profile: MediaProfile)?
+    @State private var editingName: String = ""
+    @State private var editingProfile: MediaProfile?
+    @State private var originalSnapshot: (name: String, profile: MediaProfile)?
     @State private var isCreatingNew = false
     @State private var showDeleteConfirmation = false
+    @State private var showDiscardConfirmation = false
+    @State private var pendingSelection: String?
+    @State private var pendingTabChange: SidebarTab?
+
+    private var isDirty: Bool {
+        guard let snapshot = originalSnapshot, let current = editingProfile else { return false }
+        return editingName != snapshot.name || current != snapshot.profile
+    }
+
+    private var editingProfileBinding: Binding<MediaProfile> {
+        Binding(
+            get: { editingProfile ?? MediaProfile() },
+            set: { editingProfile = $0 }
+        )
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -14,15 +31,20 @@ struct ProfilesView: View {
 
             Divider()
 
-            if let (name, profile) = editingProfile {
+            if editingProfile != nil {
                 ProfileEditorView(
-                    profileName: name,
-                    profile: profile,
+                    profileName: $editingName,
+                    profile: editingProfileBinding,
                     isNew: isCreatingNew,
-                    onSave: { savedName, savedProfile in saveProfile(name: savedName, profile: savedProfile) },
-                    onCancel: { self.editingProfile = nil; isCreatingNew = false }
+                    onSave: { saveCurrentProfile() },
+                    onCancel: {
+                        editingProfile = nil
+                        editingName = ""
+                        originalSnapshot = nil
+                        isCreatingNew = false
+                    }
                 )
-                .id(name)
+                .id(editingName)
                 .frame(maxWidth: .infinity)
             } else {
                 Text(Strings.Profiles.selectPrompt)
@@ -31,6 +53,46 @@ struct ProfilesView: View {
             }
         }
         .navigationTitle(Strings.Nav.mediaProfiles)
+        .onChange(of: state.selectedTab) { oldValue, newValue in
+            if oldValue == .profiles && newValue != .profiles && isDirty {
+                state.selectedTab = .profiles
+                pendingTabChange = newValue
+                showDiscardConfirmation = true
+            }
+        }
+        .confirmationDialog(
+            Strings.Profiles.unsavedChangesTitle,
+            isPresented: $showDiscardConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(Strings.Profiles.saveAndContinue) {
+                saveCurrentProfile()
+                if let tab = pendingTabChange {
+                    pendingTabChange = nil
+                    state.selectedTab = tab
+                } else if let pending = pendingSelection {
+                    pendingSelection = nil
+                    loadProfileForEditing(pending)
+                }
+            }
+            Button(Strings.Profiles.discardChanges, role: .destructive) {
+                if let snapshot = originalSnapshot {
+                    editingName = snapshot.name
+                    editingProfile = snapshot.profile
+                }
+                if let tab = pendingTabChange {
+                    pendingTabChange = nil
+                    state.selectedTab = tab
+                } else if let pending = pendingSelection {
+                    pendingSelection = nil
+                    loadProfileForEditing(pending)
+                }
+            }
+            Button(Strings.Common.cancel, role: .cancel) {
+                pendingTabChange = nil
+                pendingSelection = nil
+            }
+        }
     }
 
     private var profileList: some View {
@@ -63,10 +125,16 @@ struct ProfilesView: View {
                     .tag(name)
                 }
             }
-            .onChange(of: selectedProfile) { _, newValue in
+            .onChange(of: selectedProfile) { oldValue, newValue in
                 guard !isCreatingNew else { return }
-                if let name = newValue, let profile = state.profile(named: name) {
-                    editingProfile = (name: name, profile: profile)
+                if pendingSelection != nil { return }
+
+                if isDirty {
+                    pendingSelection = newValue
+                    selectedProfile = oldValue
+                    showDiscardConfirmation = true
+                } else if let name = newValue {
+                    loadProfileForEditing(name)
                 }
             }
 
@@ -75,9 +143,13 @@ struct ProfilesView: View {
                 Button {
                     isCreatingNew = true
                     selectedProfile = nil
-                    editingProfile = (name: "new-profile", profile: MediaProfile())
+                    editingName = "new-profile"
+                    editingProfile = MediaProfile()
+                    originalSnapshot = nil
                 } label: {
                     Image(systemName: "plus")
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
 
@@ -85,6 +157,8 @@ struct ProfilesView: View {
                     showDeleteConfirmation = true
                 } label: {
                     Image(systemName: "minus")
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
                 .disabled(selectedProfile == nil)
@@ -108,29 +182,42 @@ struct ProfilesView: View {
         }
     }
 
-    private func saveProfile(name: String, profile: MediaProfile) {
-        guard state.profilesConfig != nil else { return }
+    private func loadProfileForEditing(_ name: String) {
+        guard let profile = state.profile(named: name) else { return }
+        editingName = name
+        editingProfile = profile
+        originalSnapshot = (name: name, profile: profile)
+        selectedProfile = name
+    }
+
+    private func saveCurrentProfile() {
+        guard let profile = editingProfile, state.profilesConfig != nil else { return }
 
         if isCreatingNew {
-            state.profilesConfig?.profiles[name] = profile
-        } else if let oldName = selectedProfile {
-            if oldName != name {
-                state.profilesConfig?.profiles.removeValue(forKey: oldName)
+            state.profilesConfig?.profiles[editingName] = profile
+        } else if let snapshot = originalSnapshot {
+            if snapshot.name != editingName {
+                state.profilesConfig?.profiles.removeValue(forKey: snapshot.name)
             }
-            state.profilesConfig?.profiles[name] = profile
+            state.profilesConfig?.profiles[editingName] = profile
         }
 
         writeProfiles()
-        selectedProfile = name
-        editingProfile = (name: name, profile: profile)
+        originalSnapshot = (name: editingName, profile: profile)
+        selectedProfile = editingName
         isCreatingNew = false
     }
 
     private func deleteProfile(_ name: String) {
         state.profilesConfig?.profiles.removeValue(forKey: name)
         writeProfiles()
+        if state.workflowSession.profileName == name {
+            state.workflowSession = WorkflowSession()
+        }
         selectedProfile = nil
         editingProfile = nil
+        editingName = ""
+        originalSnapshot = nil
     }
 
     private func writeProfiles() {
@@ -148,10 +235,10 @@ struct ProfilesView: View {
 }
 
 struct ProfileEditorView: View {
-    @State var profileName: String
-    @State var profile: MediaProfile
+    @Binding var profileName: String
+    @Binding var profile: MediaProfile
     let isNew: Bool
-    let onSave: (String, MediaProfile) -> Void
+    let onSave: () -> Void
     let onCancel: () -> Void
 
     var body: some View {
@@ -227,12 +314,17 @@ struct ProfileEditorView: View {
             }
             .padding()
         }
+        .onAppear {
+            if profile.type == nil {
+                profile.type = .video
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             HStack {
                 Spacer()
                 Button(Strings.Common.cancel) { onCancel() }
                     .keyboardShortcut(.escape)
-                Button(isNew ? Strings.Profiles.createButton : Strings.Profiles.updateButton) { onSave(profileName, profile) }
+                Button(isNew ? Strings.Profiles.createButton : Strings.Profiles.updateButton) { onSave() }
                     .keyboardShortcut(.return, modifiers: .command)
                     .buttonStyle(.borderedProminent)
                     .disabled(profileName.isEmpty)
@@ -331,4 +423,3 @@ struct HelpButton: View {
             }
     }
 }
-

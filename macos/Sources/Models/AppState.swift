@@ -100,38 +100,23 @@ struct LogLine: Identifiable {
 }
 
 @Observable
-final class AppState {
-    var selectedTab: SidebarTab = .workflow
+final class WorkflowSession {
+    var profileName: String
+    var workingProfile: MediaProfile
 
-    let scriptsDirectory: String
-    var profilesFilePath: String {
-        didSet { UserDefaults.standard.set(profilesFilePath, forKey: "profilesFilePath") }
-    }
+    var sourceDir: Dirtyable<String>
+    var readyDir: Dirtyable<String>
+    var tags: Dirtyable<[String]?>
+    var timezone: Dirtyable<String>
 
-    var profilesConfig: ProfilesConfig?
-    var profileLoadError: ProfileLoadError?
-
-    var sortedProfileNames: [String] {
-        profilesConfig?.profiles.keys.sorted() ?? []
-    }
-
-    // Workflow state
-    var selectedProfile: String = ""
     var group: String = ""
-    var sourceDir: String = ""
-    var readyDir: String = ""
-    var tags: String = ""
-    var exifMake: String = ""
-    var exifModel: String = ""
-    var timezone: String = ""
     var useTimezonePicker: Bool = true
     var copyCompanionFiles: Bool = false
     var sourceAction: SourceAction = .archive
     var appendTimezoneToGroup: Bool = false
     var applyMode: Bool = false
 
-    var showLog: Bool = false
-    var enabledSteps: Set<PipelineStep> = Set(PipelineStep.allCases) {
+    var enabledSteps: Set<PipelineStep> = [] {
         didSet {
             if !enabledSteps.contains(.archiveSource) {
                 sourceAction = .archive
@@ -139,36 +124,22 @@ final class AppState {
         }
     }
 
-    // Execution state
-    var isRunning: Bool = false
-    var logOutput: [LogLine] = []
-    var currentProcess: Process?
-    var diffTableRows: [DiffTableRow] = []
-    private var currentDiffRow: DiffTableRow?
-
-    init() {
-        self.scriptsDirectory = (Bundle.main.resourcePath! as NSString)
-            .appendingPathComponent("scripts")
-        self.profilesFilePath = UserDefaults.standard.string(forKey: "profilesFilePath") ?? ""
-    }
-
-    var resolvedProfilesPath: String {
-        if profilesFilePath.isEmpty {
-            return (scriptsDirectory as NSString).appendingPathComponent("media-profiles.yaml")
-        }
-        return profilesFilePath
-    }
-
-    var activeProfile: MediaProfile? {
-        profilesConfig?.profiles[selectedProfile]
-    }
-
-    func profile(named name: String) -> MediaProfile? {
-        profilesConfig?.profiles[name]
+    init(profile: MediaProfile? = nil, profileName: String = "") {
+        self.profileName = profileName
+        self.workingProfile = profile ?? MediaProfile()
+        self.sourceDir = Dirtyable(profile?.sourceDir ?? "")
+        self.readyDir = Dirtyable(profile?.readyDir ?? "")
+        self.tags = Dirtyable(profile?.tags)
+        self.timezone = Dirtyable("")
+        self.enabledSteps = Set(Self.computeAvailableSteps(profile: profile))
     }
 
     var availableSteps: [PipelineStep] {
-        guard let profile = activeProfile else { return [] }
+        Self.computeAvailableSteps(profile: workingProfile)
+    }
+
+    private static func computeAvailableSteps(profile: MediaProfile?) -> [PipelineStep] {
+        guard let profile else { return [] }
         var steps: [PipelineStep] = [.ingest, .tag, .fixTimezone, .organize]
         if profile.gyroflowEnabled == true {
             steps.append(.gyroflow)
@@ -180,61 +151,48 @@ final class AppState {
     func isStepReady(_ step: PipelineStep) -> Bool {
         switch step {
         case .ingest:
-            return !sourceDir.isEmpty
+            return !sourceDir.current.isEmpty
         case .organize:
-            return !readyDir.isEmpty
+            return !readyDir.current.isEmpty
         case .fixTimezone:
-            return !timezone.isEmpty
+            return !timezone.current.isEmpty
         case .tag, .gyroflow, .archiveSource:
             return true
         }
     }
 
-    var allStepsReady: Bool {
-        let active = availableSteps.filter { $0.isAlwaysOn || enabledSteps.contains($0) }
-        return active.allSatisfy { isStepReady($0) }
+    func validateTimezone() -> String? {
+        if useTimezonePicker { return nil }
+        if !enabledSteps.contains(.fixTimezone) { return nil }
+        if timezone.current.isEmpty { return Strings.Workflow.timezoneRequired }
+        if !timezone.current.contains(/^[+-]\d{4}$/) { return Strings.Workflow.timezoneFormatHelp }
+        return nil
     }
 
-    func resetWorkflowFields(for profileName: String) {
-        group = ""
-        timezone = ""
-        useTimezonePicker = true
-        copyCompanionFiles = false
-        sourceAction = .archive
-        appendTimezoneToGroup = false
-        applyMode = false
-        if let profile = profile(named: profileName) {
-            sourceDir = profile.sourceDir ?? ""
-            readyDir = profile.readyDir ?? ""
-            tags = (profile.tags ?? []).joined(separator: ", ")
-            exifMake = profile.exif?.make ?? ""
-            exifModel = profile.exif?.model ?? ""
-        } else {
-            sourceDir = ""
-            readyDir = ""
-            tags = ""
-            exifMake = ""
-            exifModel = ""
-        }
-        enabledSteps = Set(availableSteps)
-        enabledSteps.remove(.archiveSource)
+    var allStepsReady: Bool {
+        let active = availableSteps.filter { $0.isAlwaysOn || enabledSteps.contains($0) }
+        let stepsReady = active.allSatisfy { isStepReady($0) }
+        let fieldsValid = validateDirectory(sourceDir.current) == nil
+            && validateDirectory(readyDir.current) == nil
+            && validateTimezone() == nil
+        return stepsReady && fieldsValid
     }
 
     func buildPipelineArgs() -> (script: String, args: [String]) {
         var args: [String] = []
-        args += ["--profile", selectedProfile]
-        args += ["--source", sourceDir]
-        args += ["--target", readyDir]
+        args += ["--profile", profileName]
+        args += ["--source", sourceDir.current]
+        args += ["--target", readyDir.current]
 
-        let trimmedTags = tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: ",")
-        if !trimmedTags.isEmpty {
-            args += ["--tags", trimmedTags]
+        let tagList = (tags.current ?? []).filter { !$0.isEmpty }.joined(separator: ",")
+        if !tagList.isEmpty {
+            args += ["--tags", tagList]
         }
-        if !exifMake.isEmpty {
-            args += ["--make", exifMake]
+        if let make = workingProfile.exif?.make, !make.isEmpty {
+            args += ["--make", make]
         }
-        if !exifModel.isEmpty {
-            args += ["--model", exifModel]
+        if let model = workingProfile.exif?.model, !model.isEmpty {
+            args += ["--model", model]
         }
 
         if !group.isEmpty {
@@ -265,14 +223,63 @@ final class AppState {
         if copyCompanionFiles {
             args.append("--copy-companion-files")
         }
-        if enabledSteps.contains(.fixTimezone) && !timezone.isEmpty {
-            args += ["--timezone", timezone]
+        if enabledSteps.contains(.fixTimezone) && !timezone.current.isEmpty {
+            args += ["--timezone", timezone.current]
         }
         if applyMode {
             args.append("--apply")
         }
 
         return (script: "media-pipeline.sh", args: args)
+    }
+}
+
+@Observable
+final class AppState {
+    var selectedTab: SidebarTab = .workflow
+
+    let scriptsDirectory: String
+    var profilesFilePath: String {
+        didSet { UserDefaults.standard.set(profilesFilePath, forKey: "profilesFilePath") }
+    }
+
+    var profilesConfig: ProfilesConfig?
+    var profileLoadError: ProfileLoadError?
+
+    var sortedProfileNames: [String] {
+        profilesConfig?.profiles.keys.sorted() ?? []
+    }
+
+    var workflowSession = WorkflowSession()
+
+    var showLog: Bool = false
+
+    // Execution state
+    var isRunning: Bool = false
+    var logOutput: [LogLine] = []
+    var currentProcess: Process?
+    var diffTableRows: [DiffTableRow] = []
+    private var currentDiffRow: DiffTableRow?
+
+    init() {
+        self.scriptsDirectory = (Bundle.main.resourcePath! as NSString)
+            .appendingPathComponent("scripts")
+        self.profilesFilePath = UserDefaults.standard.string(forKey: "profilesFilePath") ?? ""
+    }
+
+    var resolvedProfilesPath: String {
+        if profilesFilePath.isEmpty {
+            return (scriptsDirectory as NSString).appendingPathComponent("media-profiles.yaml")
+        }
+        return profilesFilePath
+    }
+
+    var activeProfile: MediaProfile? {
+        workflowSession.profileName.isEmpty ? nil : workflowSession.workingProfile
+    }
+
+    func profile(named name: String) -> MediaProfile? {
+        profilesConfig?.profiles[name]
     }
 
     func clearLog() {

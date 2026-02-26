@@ -63,7 +63,7 @@ enum MediaType: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-struct MediaProfile: Codable {
+struct MediaProfile: Codable, Equatable {
     var type: MediaType?
     var sourceDir: String?
     var readyDir: String?
@@ -90,7 +90,7 @@ struct MediaProfile: Codable {
     }
 }
 
-struct ExifConfig: Codable {
+struct ExifConfig: Codable, Equatable {
     var make: String?
     var model: String?
 }
