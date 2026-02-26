@@ -87,9 +87,15 @@ struct DiffTableView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         case "failed":
-            Label(Strings.DiffTable.failedStatus, systemImage: "xmark.circle.fill")
-                .font(.system(size: 11))
-                .foregroundStyle(.red)
+            if row.timestampAction == "tz_mismatch" {
+                Label(Strings.DiffTable.tzMismatchStatus, systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color("NeonYellow"))
+            } else {
+                Label(Strings.DiffTable.failedStatus, systemImage: "xmark.circle.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.red)
+            }
         case "would_change":
             Label(Strings.DiffTable.wouldChangeStatus, systemImage: "arrow.triangle.2.circlepath.circle.fill")
                 .font(.system(size: 11))
