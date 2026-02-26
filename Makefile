@@ -5,6 +5,7 @@
 #
 # Usage:
 #   make generate   — generate Xcode project from macos/project.yml
+#   make test       — run unit tests (JetlagTests)
 #   make build      — build Debug app into build/
 #   make archive    — build Release archive (macos/build/Jetlag.xcarchive)
 #   make dmg        — build Release archive and package into build/Jetlag.dmg
@@ -34,13 +35,27 @@ DMG_STAGING     := $(BUILD_DIR)/dmg-staging
 DMG_PATH        := $(BUILD_DIR)/$(APP_NAME).dmg
 EXPORT_PLIST    := $(MACOS_DIR)/ExportOptions.plist
 
-.PHONY: all generate build archive export dmg clean
+.PHONY: all generate test build archive export dmg clean
 
 all: dmg
 
 ## Generate Xcode project from project.yml (requires: brew install xcodegen)
 generate:
 	cd $(MACOS_DIR) && xcodegen generate
+
+## Run unit tests
+test: generate
+	xcodebuild \
+		-scheme $(SCHEME) \
+		-configuration Debug \
+		-derivedDataPath $(DERIVED_DIR) \
+		-project $(MACOS_DIR)/$(APP_NAME).xcodeproj \
+		test | xcpretty 2>/dev/null || xcodebuild \
+		-scheme $(SCHEME) \
+		-configuration Debug \
+		-derivedDataPath $(DERIVED_DIR) \
+		-project $(MACOS_DIR)/$(APP_NAME).xcodeproj \
+		test
 
 ## Build Debug app into build/derived (quick iteration)
 build: generate

@@ -2,43 +2,12 @@ import SwiftUI
 
 struct WorkflowView: View {
     @Bindable var state: AppState
-    @FocusState private var sourceDirFocused: Bool
-    @FocusState private var readyDirFocused: Bool
-    @FocusState private var timezoneFocused: Bool
     @State private var showUpgradeSheet = false
     @State private var detectedFileCount = 0
     private var licenseStore: LicenseStore { LicenseStore.shared }
 
     private var companionExtensions: String {
         state.workflowSession.workingProfile.companionExtensions?.joined(separator: ", ") ?? ""
-    }
-
-    private func validateDirectory(_ path: String) -> String? {
-        guard !path.isEmpty else { return nil }
-        var isDir: ObjCBool = false
-        if !FileManager.default.fileExists(atPath: path, isDirectory: &isDir) {
-            return Strings.Errors.directoryNotFound
-        } else if !isDir.boolValue {
-            return Strings.Errors.pathIsFile
-        }
-        return nil
-    }
-
-    private func validateTimezone(_ tz: String) -> String? {
-        if state.workflowSession.useTimezonePicker { return nil }
-        if !state.workflowSession.enabledSteps.contains(.fixTimezone) { return nil }
-        if tz.isEmpty { return Strings.Workflow.timezoneRequired }
-        if !tz.contains(/^[+-]\d{4}$/) { return Strings.Workflow.timezoneFormatHelp }
-        return nil
-    }
-
-    private var timezoneIsValid: Bool { validateTimezone(state.workflowSession.timezone.current) == nil }
-
-    private var hasValidationErrors: Bool {
-        let session = state.workflowSession
-        return validateDirectory(session.sourceDir.current) != nil
-            || validateDirectory(session.readyDir.current) != nil
-            || !timezoneIsValid
     }
 
     var body: some View {
@@ -258,14 +227,10 @@ struct WorkflowView: View {
                 HStack(spacing: 6) {
                     TextField(Strings.Workflow.sourceDirPlaceholder, text: $session.sourceDir.value)
                         .textFieldStyle(.roundedBorder)
-                        .focused($sourceDirFocused)
-                        .onChange(of: sourceDirFocused) { _, focused in
-                            if !focused { state.workflowSession.sourceDir.markTouched() }
-                        }
                     Button(Strings.Common.browse) { pickSourceDir() }
                         .controlSize(.small)
                 }
-                .fieldError(session.sourceDir, validate: validateDirectory)
+                .fieldError(validateDirectory(session.sourceDir.current))
             }
 
             HStack(spacing: 4) {
@@ -323,14 +288,10 @@ struct WorkflowView: View {
                 HStack(spacing: 6) {
                     TextField(Strings.Workflow.readyDirPlaceholder, text: $session.readyDir.value)
                         .textFieldStyle(.roundedBorder)
-                        .focused($readyDirFocused)
-                        .onChange(of: readyDirFocused) { _, focused in
-                            if !focused { state.workflowSession.readyDir.markTouched() }
-                        }
                     Button(Strings.Common.browse) { pickReadyDir() }
                         .controlSize(.small)
                 }
-                .fieldError(session.readyDir, validate: validateDirectory)
+                .fieldError(validateDirectory(session.readyDir.current))
             }
             Text(session.readyDir.current.isEmpty ? Strings.Workflow.readyDirRequired : destinationPreview(readyDir: session.readyDir.current))
                 .font(.caption)
@@ -359,15 +320,8 @@ struct WorkflowView: View {
                     TextField(Strings.Workflow.timezonePlaceholder, text: $session.timezone.value)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 90)
-                        .focused($timezoneFocused)
-                        .onChange(of: timezoneFocused) { _, focused in
-                            if !focused { state.workflowSession.timezone.markTouched() }
-                        }
                 } else {
                     TimezonePickerView(selectedTimezone: $session.timezone.value)
-                        .onChange(of: session.timezone.value) { _, _ in
-                            state.workflowSession.timezone.markTouched()
-                        }
                 }
                 Spacer()
                 Button {
@@ -379,7 +333,7 @@ struct WorkflowView: View {
                 .contentShape(Rectangle())
                 .help(session.useTimezonePicker ? Strings.Workflow.typeManuallyHelp : Strings.Workflow.pickFromListHelp)
             }
-            .fieldError(session.timezone, validate: validateTimezone)
+            .fieldError(session.validateTimezone())
         }
         .padding(10)
     }
@@ -427,12 +381,7 @@ struct WorkflowView: View {
                     .frame(width: 160)
 
                     Button(state.isRunning ? Strings.Workflow.runningButton : Strings.Workflow.runButton) { runWorkflow() }
-                        .disabled(
-                            state.isRunning
-                            || session.profileName.isEmpty
-                            || !session.allStepsReady
-                            || hasValidationErrors
-                        )
+                        .disabled(state.isRunning || !session.allStepsReady)
                         .keyboardShortcut(.return, modifiers: .command)
                         .buttonStyle(.borderedProminent)
 
@@ -492,22 +441,7 @@ struct WorkflowView: View {
         }
     }
 
-    private func validateAllFields() -> Bool {
-        let session = state.workflowSession
-        session.sourceDir.markTouched()
-        session.readyDir.markTouched()
-        session.timezone.markTouched()
-
-        let sourceDirValid = validateDirectory(session.sourceDir.current) == nil
-        let readyDirValid = validateDirectory(session.readyDir.current) == nil
-        let timezoneValid = validateTimezone(session.timezone.current) == nil
-
-        return sourceDirValid && readyDirValid && timezoneValid
-    }
-
     private func runWorkflow() {
-        guard validateAllFields() else { return }
-
         let fileCount = countMediaFiles()
         if fileCount > licenseStore.fileLimit {
             detectedFileCount = fileCount
@@ -546,7 +480,6 @@ struct WorkflowView: View {
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             state.workflowSession.sourceDir.value = url.path
-            state.workflowSession.sourceDir.markTouched()
         }
     }
 
@@ -557,7 +490,6 @@ struct WorkflowView: View {
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             state.workflowSession.readyDir.value = url.path
-            state.workflowSession.readyDir.markTouched()
         }
     }
 }

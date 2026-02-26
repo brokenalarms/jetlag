@@ -161,9 +161,21 @@ final class WorkflowSession {
         }
     }
 
+    func validateTimezone() -> String? {
+        if useTimezonePicker { return nil }
+        if !enabledSteps.contains(.fixTimezone) { return nil }
+        if timezone.current.isEmpty { return Strings.Workflow.timezoneRequired }
+        if !timezone.current.contains(/^[+-]\d{4}$/) { return Strings.Workflow.timezoneFormatHelp }
+        return nil
+    }
+
     var allStepsReady: Bool {
         let active = availableSteps.filter { $0.isAlwaysOn || enabledSteps.contains($0) }
-        return active.allSatisfy { isStepReady($0) }
+        let stepsReady = active.allSatisfy { isStepReady($0) }
+        let fieldsValid = validateDirectory(sourceDir.current) == nil
+            && validateDirectory(readyDir.current) == nil
+            && validateTimezone() == nil
+        return stepsReady && fieldsValid
     }
 
     func buildPipelineArgs() -> (script: String, args: [String]) {

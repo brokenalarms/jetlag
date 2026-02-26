@@ -4,8 +4,6 @@ import SwiftUI
 struct Dirtyable<T> {
     private(set) var original: T
     private var updated: T?
-    private(set) var touched = false
-
     var current: T { updated ?? original }
 
     init(_ initialValue: T) {
@@ -13,10 +11,6 @@ struct Dirtyable<T> {
     }
 
     var isDirty: Bool { updated != nil }
-
-    mutating func markTouched() {
-        touched = true
-    }
 
     var value: T {
         get { updated ?? original }
@@ -53,25 +47,22 @@ extension Dirtyable where T: Equatable {
     }
 }
 
+func validateDirectory(_ path: String) -> String? {
+    guard !path.isEmpty else { return nil }
+    var isDir: ObjCBool = false
+    if !FileManager.default.fileExists(atPath: path, isDirectory: &isDir) {
+        return Strings.Errors.directoryNotFound
+    } else if !isDir.boolValue {
+        return Strings.Errors.pathIsFile
+    }
+    return nil
+}
+
 extension View {
     @ViewBuilder
-    func fieldError(_ error: String?, show: Bool) -> some View {
+    func fieldError(_ error: String?) -> some View {
         self
-        if let error, show {
-            Label(error, systemImage: "exclamationmark.triangle.fill")
-                .font(.caption)
-                .foregroundStyle(.red)
-        }
-    }
-
-    @ViewBuilder
-    func fieldError<T: Equatable>(
-        _ field: Dirtyable<T>,
-        show: Bool? = nil,
-        validate: (T) -> String?
-    ) -> some View {
-        self
-        if (show ?? field.touched), let error = validate(field.current) {
+        if let error {
             Label(error, systemImage: "exclamationmark.triangle.fill")
                 .font(.caption)
                 .foregroundStyle(.red)

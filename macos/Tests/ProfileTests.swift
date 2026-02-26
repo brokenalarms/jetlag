@@ -262,27 +262,29 @@ final class ProfileTests: XCTestCase {
             ]
         )
 
-        // AppState.selectedProfile (used by WorkflowView) is a String
-        // ProfilesView has its own @State private var selectedProfile: String?
-        // They are separate properties — verify the AppState path works independently
-
-        state.selectedProfile = "gopro"
+        state.workflowSession = WorkflowSession(
+            profile: state.profilesConfig?.profiles["gopro"],
+            profileName: "gopro"
+        )
         XCTAssertNotNil(state.activeProfile)
         XCTAssertEqual(state.activeProfile?.type, .video)
 
-        state.selectedProfile = "sony"
+        state.workflowSession = WorkflowSession(
+            profile: state.profilesConfig?.profiles["sony"],
+            profileName: "sony"
+        )
         XCTAssertNotNil(state.activeProfile)
         XCTAssertEqual(state.activeProfile?.type, .photo)
 
-        // Empty string means nothing selected on workflow side
-        state.selectedProfile = ""
+        state.workflowSession = WorkflowSession()
         XCTAssertNil(state.activeProfile)
 
-        // Modifying profilesConfig (as ProfilesView CRUD does) should not
-        // alter selectedProfile
-        state.selectedProfile = "gopro"
+        state.workflowSession = WorkflowSession(
+            profile: state.profilesConfig?.profiles["gopro"],
+            profileName: "gopro"
+        )
         state.profilesConfig?.profiles["dji"] = MediaProfile(type: .video)
-        XCTAssertEqual(state.selectedProfile, "gopro")
+        XCTAssertEqual(state.workflowSession.profileName, "gopro")
         XCTAssertNotNil(state.activeProfile)
     }
 }

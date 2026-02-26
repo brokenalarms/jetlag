@@ -3,30 +3,39 @@ import XCTest
 
 final class PipelineArgsTests: XCTestCase {
 
-    private func makeState() -> AppState {
-        let state = AppState()
-        state.selectedProfile = "test-profile"
-        state.sourceDir = "/Volumes/TestCard/DCIM"
-        state.profilesConfig = ProfilesConfig(
-            gyroflow: nil,
-            backupConfig: nil,
-            profiles: [
-                "test-profile": MediaProfile(
-                    type: .video,
-                    sourceDir: "/Volumes/TestCard/DCIM",
-                    readyDir: "/tmp/ready",
-                    gyroflowEnabled: true,
-                    fileExtensions: [".mp4"]
-                )
-            ]
+    private var tempDirs: [String] = []
+
+    override func tearDown() {
+        super.tearDown()
+        for dir in tempDirs {
+            try? FileManager.default.removeItem(atPath: dir)
+        }
+        tempDirs = []
+    }
+
+    private func makeTempDir() -> String {
+        let path = NSTemporaryDirectory() + UUID().uuidString
+        try! FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
+        tempDirs.append(path)
+        return path
+    }
+
+    private func makeSession() -> WorkflowSession {
+        let profile = MediaProfile(
+            type: .video,
+            sourceDir: "/Volumes/TestCard/DCIM",
+            readyDir: "/tmp/ready",
+            gyroflowEnabled: true,
+            fileExtensions: [".mp4"]
         )
-        state.enabledSteps = Set(state.availableSteps)
-        return state
+        let session = WorkflowSession(profile: profile, profileName: "test-profile")
+        session.enabledSteps = Set(session.availableSteps)
+        return session
     }
 
     func testDefaultState() {
-        let state = makeState()
-        let (script, args) = state.buildPipelineArgs()
+        let session = makeSession()
+        let (script, args) = session.buildPipelineArgs()
 
         XCTAssertEqual(script, "media-pipeline.sh")
         XCTAssertTrue(args.contains("--source"))
@@ -46,9 +55,9 @@ final class PipelineArgsTests: XCTestCase {
     }
 
     func testAllOptionalStepsDisabled() {
-        let state = makeState()
-        state.enabledSteps = Set(state.availableSteps.filter { $0.isAlwaysOn })
-        let (script, args) = state.buildPipelineArgs()
+        let session = makeSession()
+        session.enabledSteps = Set(session.availableSteps.filter { $0.isAlwaysOn })
+        let (script, args) = session.buildPipelineArgs()
 
         XCTAssertEqual(script, "media-pipeline.sh")
         XCTAssertFalse(args.contains("--tasks"))
@@ -56,53 +65,53 @@ final class PipelineArgsTests: XCTestCase {
     }
 
     func testArchiveSourceWithDelete() {
-        let state = makeState()
-        state.sourceAction = .delete
-        let (_, args) = state.buildPipelineArgs()
+        let session = makeSession()
+        session.sourceAction = .delete
+        let (_, args) = session.buildPipelineArgs()
 
         XCTAssertTrue(args.contains("archive-source"))
         XCTAssertTrue(args.contains("delete"))
     }
 
     func testCopyCompanionFiles() {
-        let state = makeState()
-        state.copyCompanionFiles = true
-        let (_, args) = state.buildPipelineArgs()
+        let session = makeSession()
+        session.copyCompanionFiles = true
+        let (_, args) = session.buildPipelineArgs()
 
         XCTAssertTrue(args.contains("--copy-companion-files"))
     }
 
     func testCopyCompanionFilesNotIncludedByDefault() {
-        let state = makeState()
-        let (_, args) = state.buildPipelineArgs()
+        let session = makeSession()
+        let (_, args) = session.buildPipelineArgs()
 
         XCTAssertFalse(args.contains("--copy-companion-files"))
     }
 
     func testTimezone() {
-        let state = makeState()
-        state.timezone = "+0900"
-        let (_, args) = state.buildPipelineArgs()
+        let session = makeSession()
+        session.timezone.value = "+0900"
+        let (_, args) = session.buildPipelineArgs()
 
         let tzIndex = args.firstIndex(of: "--timezone")!
         XCTAssertEqual(args[tzIndex + 1], "+0900")
     }
 
     func testGroup() {
-        let state = makeState()
-        state.group = "Japan"
-        let (_, args) = state.buildPipelineArgs()
+        let session = makeSession()
+        session.group = "Japan"
+        let (_, args) = session.buildPipelineArgs()
 
         let groupIndex = args.firstIndex(of: "--group")!
         XCTAssertEqual(args[groupIndex + 1], "Japan")
     }
 
     func testAppendTimezoneToGroup() {
-        let state = makeState()
-        state.group = "Japan"
-        state.timezone = "+0900"
-        state.appendTimezoneToGroup = true
-        let (_, args) = state.buildPipelineArgs()
+        let session = makeSession()
+        session.group = "Japan"
+        session.timezone.value = "+0900"
+        session.appendTimezoneToGroup = true
+        let (_, args) = session.buildPipelineArgs()
 
         XCTAssertTrue(args.contains("--group"))
         XCTAssertTrue(args.contains("--append-timezone-to-group"))
@@ -110,27 +119,27 @@ final class PipelineArgsTests: XCTestCase {
     }
 
     func testAppendTimezoneToGroupNotIncludedWhenDisabled() {
-        let state = makeState()
-        state.group = "Japan"
-        state.timezone = "+0900"
-        state.appendTimezoneToGroup = false
-        let (_, args) = state.buildPipelineArgs()
+        let session = makeSession()
+        session.group = "Japan"
+        session.timezone.value = "+0900"
+        session.appendTimezoneToGroup = false
+        let (_, args) = session.buildPipelineArgs()
 
         XCTAssertTrue(args.contains("--group"))
         XCTAssertFalse(args.contains("--append-timezone-to-group"))
     }
 
     func testApplyMode() {
-        let state = makeState()
-        state.applyMode = true
-        let (_, args) = state.buildPipelineArgs()
+        let session = makeSession()
+        session.applyMode = true
+        let (_, args) = session.buildPipelineArgs()
 
         XCTAssertTrue(args.contains("--apply"))
     }
 
     func testApplyModeNotIncludedByDefault() {
-        let state = makeState()
-        let (_, args) = state.buildPipelineArgs()
+        let session = makeSession()
+        let (_, args) = session.buildPipelineArgs()
 
         XCTAssertFalse(args.contains("--apply"))
     }
@@ -138,40 +147,44 @@ final class PipelineArgsTests: XCTestCase {
     // MARK: - Step readiness
 
     func testIsStepReadyFixTimezoneRequiresTimezone() {
-        let state = makeState()
-        state.timezone = ""
-        XCTAssertFalse(state.isStepReady(.fixTimezone))
+        let session = makeSession()
+        session.timezone.value = ""
+        XCTAssertFalse(session.isStepReady(.fixTimezone))
     }
 
     func testIsStepReadyFixTimezoneWithTimezone() {
-        let state = makeState()
-        state.timezone = "+0900"
-        XCTAssertTrue(state.isStepReady(.fixTimezone))
+        let session = makeSession()
+        session.timezone.value = "+0900"
+        XCTAssertTrue(session.isStepReady(.fixTimezone))
     }
 
     func testIsStepReadyIngestRequiresSourceDir() {
-        let state = makeState()
-        state.sourceDir = ""
-        XCTAssertFalse(state.isStepReady(.ingest))
+        let session = makeSession()
+        session.sourceDir.value = ""
+        XCTAssertFalse(session.isStepReady(.ingest))
     }
 
     func testAllStepsReadyWhenFixTimezoneDisabledAndTimezoneEmpty() {
-        let state = makeState()
-        state.timezone = ""
-        state.enabledSteps.remove(.fixTimezone)
-        XCTAssertTrue(state.allStepsReady)
+        let session = makeSession()
+        session.sourceDir.value = makeTempDir()
+        session.readyDir.value = makeTempDir()
+        session.timezone.value = ""
+        session.enabledSteps.remove(.fixTimezone)
+        XCTAssertTrue(session.allStepsReady)
     }
 
     func testAllStepsNotReadyWhenFixTimezoneEnabledAndTimezoneEmpty() {
-        let state = makeState()
-        state.timezone = ""
-        state.enabledSteps.insert(.fixTimezone)
-        XCTAssertFalse(state.allStepsReady)
+        let session = makeSession()
+        session.sourceDir.value = makeTempDir()
+        session.readyDir.value = makeTempDir()
+        session.timezone.value = ""
+        session.enabledSteps.insert(.fixTimezone)
+        XCTAssertFalse(session.allStepsReady)
     }
 
     func testAlwaysOnStepsNeverInTasks() {
-        let state = makeState()
-        let (_, args) = state.buildPipelineArgs()
+        let session = makeSession()
+        let (_, args) = session.buildPipelineArgs()
 
         if let tasksIndex = args.firstIndex(of: "--tasks") {
             let tasksSlice = args[(tasksIndex + 1)...]
