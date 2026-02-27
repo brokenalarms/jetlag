@@ -13,8 +13,6 @@
 
 ## `scripts/` + `macos/`
 
-- (2026-02-27) **Time correction pipeline step** — Refactor: extract tiered timestamp reader into `lib/timestamp_source.py` with generic filename date patterns (prefix-agnostic). Features: `--time-offset` and `--infer-from-filename` on `fix-media-timestamp.py`, new `report-file-dates.py` (pre-flight scanner). Pipeline: inline rename after fix-timestamp using `build_filename()` from shared lib. App: timestamp source selector, offset field (with reference-time calculator), filename update toggle within Fix Timestamps step. Spec: `todos/time-correction-pipeline-step.md`
-
 - (2026-02-27) **Per-profile `filename_timestamp_patterns`** — Allow profiles in `media-profiles.yaml` to define custom filename date patterns for cameras using non-standard formats. Generic detection covers all known cameras today; this is future-proofing for when a real camera needs it. Low priority.
 
 ## `web/`
