@@ -12,7 +12,7 @@ This spec covers two things: a **refactor** that extracts reusable timestamp rea
 
 ### Why
 
-`fix-media-timestamp.py` contains the read-side analysis inline — the logic that asks "what timestamps does this file have, from which sources?" This is needed by multiple scripts (the fixer, a pre-flight scanner, a renamer) and must give consistent answers. Extracting it into a shared lib means one implementation, one set of tests, and guaranteed agreement between scripts.
+`fix-media-timestamp.py` contains the read-side analysis inline — the logic that asks "what timestamps does this file have, from which sources?" This is needed by multiple scripts (the fixer, the pre-flight scanner, the pipeline's inline rename) and must give consistent answers. Extracting it into a shared lib means one implementation, one set of tests, and guaranteed agreement between scripts.
 
 ### What moves out of `fix-media-timestamp.py`
 
@@ -71,7 +71,7 @@ Prefix-agnostic — new cameras with novel prefixes (`INSV_`, `R360_`) work auto
 ### What stays in `fix-media-timestamp.py`
 
 Everything that **decides and writes**:
-- `get_all_timestamp_data()` — orchestration: reads the TimestampReport, applies timezone/overwrite logic, computes UTC
+- `get_all_timestamp_data()` — orchestration: reads the TimestampReport, applies timezone logic, computes UTC
 - EXIF write functions — tightly coupled to exiftool write flow
 - Change detection — `determine_needed_changes()`, `check_*_needs_update()`
 - `fix_media_timestamps()` — main orchestrator
@@ -84,13 +84,11 @@ Everything that **decides and writes**:
 |--------|------|
 | `fix-media-timestamp.py` | `read_timestamp_sources()` — replaces inline functions |
 | `report-file-dates.py` | `read_timestamp_sources()` — pre-flight scanning |
-| `rename-file-dates.py` | `build_filename()` + `TimestampReport.filename_parseable` |
+| `media-pipeline.py` | `build_filename()` — inline rename after fix-timestamp |
 
 ---
 
 ## New features on `fix-media-timestamp.py`
-
-Two new flags, both orthogonal to the existing `--overwrite-datetimeoriginal` safety gate:
 
 ### `--infer-from-filename`
 
@@ -98,14 +96,13 @@ Use `report.filename_date` instead of `report.metadata_date` as the source times
 
 - Requires `--timezone` (filenames don't encode timezone)
 - Error if the filename has no parseable date pattern
-- The safety gate is independent: if DTO already has a timezone and differs from the provided one, `@@timestamp_action=tz_mismatch` still fires unless `--overwrite-datetimeoriginal` is also passed
+- When using filename inference, DTO is typically missing or wrong. If DTO exists with timezone, the diff shows the timezone change as `tz_mismatch` (informational, not blocking). The dry-run-by-default + `--apply` pattern already provides the safety gate — the user sees the before/after diff and explicitly applies
 
 ### `--time-offset [+/-]SECONDS`
 
 Apply a fixed delta to the source timestamp (whichever source is selected).
 
 - Requires `--timezone`
-- Does NOT imply `--overwrite-datetimeoriginal` — safety gate always independent
 - Works with either data source (metadata or filename)
 - Combinable: `--infer-from-filename --time-offset +3600 --timezone +09:00` reads from filename, adds 1 hour, writes with +09:00
 
@@ -123,13 +120,12 @@ Apply a fixed delta to the source timestamp (whichever source is selected).
 | Flag | Behaviour |
 |------|-----------|
 | `--timezone` | Required (no change) |
-| `--overwrite-datetimeoriginal` | Safety gate — refuse if DTO has tz unless this is passed (no change) |
-| `--apply` | Dry run vs apply (no change) |
+| `--apply` | Default dry-run, `--apply` to execute (no change) |
 | `--preserve-wallclock-time` | File system timestamp handling (no change) |
 
 ---
 
-## New scripts
+## New script
 
 ### `report-file-dates.py` — pre-flight scanner
 
@@ -152,33 +148,6 @@ The macOS app runs this **before** the pipeline to discover what timestamp data 
 | `@@sample_filename_date` | Filename date from first file (if parseable) |
 | `@@sample_filename_pattern` | e.g. `YYYYMMDD_HHMMSS` |
 
-### `rename-file-dates.py` — filename date updater
-
-Renames the date portion of a working copy's filename to match a corrected timestamp. Also renames companion files with the same stem.
-
-**Args:**
-
-| Arg | Purpose |
-|-----|---------|
-| `<file>` | The working copy to rename |
-| `--corrected-time YYYY-MM-DD_HH:MM:SS` | Timestamp to write into the filename |
-| `--companion-extensions .lrv .thm ...` | Also rename companion files with same stem |
-| `--dry-run` | Preview without renaming |
-
-**Behaviour:**
-1. Calls `read_timestamp_sources()` to check if filename has a parseable date
-2. If yes: `build_filename()` generates the corrected name, renames the file
-3. If `--companion-extensions`: finds files with same stem + each extension, renames them too (same date swap)
-4. If no parseable date: no-op
-
-**Output:**
-
-| Key | When |
-|-----|------|
-| `@@renamed_to=<new_filename>` | Main file renamed |
-| `@@companion_renamed=<old>\|<new>` | Each companion renamed |
-| `@@rename_action=no_date_pattern` | Filename has no parseable date |
-
 ---
 
 ## Pipeline changes (`media-pipeline.py`)
@@ -186,10 +155,10 @@ Renames the date portion of a working copy's filename to match a corrected times
 ### Updated step order
 
 ```
-INGEST → [tag] → [fix-timestamp] → [rename-dates] → OUTPUT → [gyroflow] → [archive-source]
+INGEST → [tag] → [fix-timestamp] → OUTPUT → [gyroflow] → [archive-source]
 ```
 
-`rename-dates` is a new optional step between `fix-timestamp` and `OUTPUT`.
+Step order unchanged — filename renaming is inline logic within the pipeline after fix-timestamp completes, not a separate subprocess step.
 
 ### Arg pass-through
 
@@ -199,25 +168,18 @@ The pipeline passes new args to `fix-media-timestamp.py`:
 
 These are pipeline-level args that flow through unchanged.
 
-### Data flow between steps
+### Inline rename
 
-```
-fix-timestamp emits @@corrected_time=2025-05-05_13:03:34
-                          │
-                          ▼
-rename-dates receives --corrected-time 2025-05-05_13:03:34
-                     receives --companion-extensions .lrv .thm (from profile)
-                          │
-                          ▼
-rename-dates emits @@renamed_to=VID_20250505_130334_00_001.mp4
-                          │
-                          ▼
-pipeline updates active_file → downstream steps see renamed file
-```
+When filename updating is enabled, the pipeline handles renaming directly after fix-timestamp:
 
-### Companion extensions
+1. Pipeline reads `@@corrected_time` from fix-timestamp output
+2. Imports `build_filename()` from `lib/timestamp_source.py`
+3. Loops over `active_file` + companions (from profile's `companion_extensions`)
+4. Calls `build_filename()` + `os.rename()` for each
+5. Emits `@@renamed_to` for the app's progress view
+6. Updates `active_file` so downstream steps see the renamed file
 
-`rename-file-dates.py` receives `--companion-extensions` from the profile's existing `companion_extensions` field (already used by ingest for copying companions to the working dir).
+This is too thin for a subprocess — just `build_filename()` (shared lib) + `os.rename()`.
 
 ---
 
@@ -242,13 +204,15 @@ All options within the single step, progressively disclosed:
 
 **Timestamp source** — selector at top:
 - **Metadata** (default, always visible): reads from EXIF tiered priority. Shows sample: date + tz status from `@@sample_metadata_*`.
-- **From filenames** (visible only when `@@all_parseable=true`): reads from filename patterns. Shows sample: parsed date + pattern from `@@sample_filename_*`.
+- **From filenames** (visible only when `@@all_parseable=true`): reads from filename patterns. Shows sample: parsed date + pattern from `@@sample_filename_*`. When DTO exists with timezone, `tz_mismatch` is shown as informational in the diff — no separate gate needed since the user sees the before/after and explicitly applies.
 
 **Timezone picker** — always visible, always required (unchanged).
 
-**Time offset** — optional field. Seconds or human-readable (`+3d 7h 22m 15s`). Same delta applied to every file.
+**Time offset** — two input methods, same result:
+- **Direct offset**: seconds or human-readable (`+3d 7h 22m 15s`). Same delta applied to every file.
+- **Reference time**: user picks a file and types the correct time for it. App calculates `target - current = offset`, sends `--time-offset=+N` to the script. The script only knows offsets — the reference-time calculation is app-side.
 
-**Update filename dates** — toggle, visible when `@@all_parseable=true`. Default ON when "From filenames" is selected. Enables the `rename-dates` pipeline step.
+**Update filename dates** — toggle, visible when `@@all_parseable=true`. Default ON when "From filenames" is selected. Pipeline does inline rename when enabled.
 
 ### `buildPipelineArgs()` wiring
 
@@ -256,12 +220,11 @@ All options within the single step, progressively disclosed:
 |-----------|-----------|
 | Timestamp source = filenames | `--infer-from-filename` |
 | Time offset non-zero | `--time-offset=+/-SECONDS` |
-| Update filename dates ON | Enable `rename-dates` task |
-| Force overwrite confirmed | `--overwrite-datetimeoriginal` |
+| Update filename dates ON | Pipeline does inline rename (no separate task arg — pipeline-level config) |
 
 ### `parseMachineReadableLine()` new keys
 
-`@@correction_mode`, `@@time_offset_seconds`, `@@time_offset_display`, `@@renamed_to`, `@@companion_renamed`
+`@@correction_mode`, `@@time_offset_seconds`, `@@time_offset_display`, `@@renamed_to`
 
 ---
 
@@ -280,36 +243,33 @@ All options within the single step, progressively disclosed:
 6. Add flag to `fix-media-timestamp.py` — selects `report.filename_date` over `report.metadata_date`
 7. Requires `--timezone`, error if no parseable filename date
 8. Emit `@@corrected_time` for every file
-9. Tests: various date patterns, interaction with `--overwrite-datetimeoriginal`, error cases
+9. Tests: various date patterns, error cases, `tz_mismatch` shown as informational in diff when DTO has timezone
 
 ### Phase 2: `--time-offset`
 
 10. Add flag to `fix-media-timestamp.py` — applies delta to selected source timestamp
-11. Does NOT imply `--overwrite-datetimeoriginal`
-12. Emit `@@time_offset_seconds`, `@@time_offset_display`, `@@correction_mode`
-13. Tests: positive/negative offsets, combined with `--infer-from-filename`, safety gate still fires
+11. Emit `@@time_offset_seconds`, `@@time_offset_display`, `@@correction_mode`
+12. Tests: positive/negative offsets, combined with `--infer-from-filename`
 
-### Phase 3: New scripts
+### Phase 3: `report-file-dates.py`
 
-14. Create `report-file-dates.py` — scans folder using `read_timestamp_sources()`, emits `@@` lines
-15. Create `rename-file-dates.py` — renames file + companions using `build_filename()`
-16. Tests: mixed parseable/unparseable folders, companion renaming, no-op when no date in filename
+13. Create `report-file-dates.py` — scans folder using `read_timestamp_sources()`, emits `@@` lines
+14. Tests: mixed parseable/unparseable folders, no-op when no date in filename
 
 ### Phase 4: Pipeline integration
 
-17. Add `rename-dates` step to `media-pipeline.py` after `fix-timestamp`
-18. Pass `--time-offset`, `--infer-from-filename` through to fix-timestamp
-19. Read `@@corrected_time` from fix-timestamp, pass to rename step
-20. Read `@@renamed_to` from rename step, update `active_file`
-21. Tests: end-to-end pipeline with offset + rename
+15. Pass `--time-offset`, `--infer-from-filename` through to fix-timestamp
+16. Add inline rename logic: import `build_filename()` from `lib/timestamp_source.py`, loop over `active_file` + companions (from profile's `companion_extensions`), call `build_filename()` + `os.rename()` for each
+17. Emit `@@renamed_to`, update `active_file` so downstream steps see renamed file
+18. Tests: end-to-end pipeline with offset + inline rename, companion renaming
 
 ### Phase 5: macOS app
 
-22. Rename: `fixTimezone` → `fixTimestamps`
-23. Pre-flight: invoke `report-file-dates.py`, parse results
-24. UI: timestamp source selector, time offset field, update filename dates toggle
-25. `buildPipelineArgs()`: wire new flags
-26. `parseMachineReadableLine()`: parse new `@@` keys
+19. Rename: `fixTimezone` → `fixTimestamps`
+20. Pre-flight: invoke `report-file-dates.py`, parse results
+21. UI: timestamp source selector, time offset field (with reference-time calculator), update filename dates toggle
+22. `buildPipelineArgs()`: wire new flags
+23. `parseMachineReadableLine()`: parse new `@@` keys
 
 ---
 
