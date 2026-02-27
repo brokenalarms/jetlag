@@ -132,6 +132,21 @@ INGEST → [tag] → [fix-timestamp] → [rename-dates] → [organize] → [gyro
 
 Both require `--timezone`. Neither implies `--overwrite-datetimeoriginal` — the safety gate is always independent.
 
+### Pre-flight: `scan-filename-dates.py` (new script)
+
+A lightweight script the macOS app runs **before** the pipeline to scan the source folder and report which files have parseable filename timestamps. Not part of `media-pipeline.py` — runs independently.
+
+| Arg | Purpose |
+|-----|---------|
+| `<source-dir>` | Directory to scan (nested) |
+
+Emits:
+- `@@all_parseable=true/false` — whether every media file has a parseable date in its filename
+- `@@parseable_count=N` / `@@total_count=N` — counts for UI display
+- `@@file_date=<filename>|<parsed_datetime>` — per-file results for preview
+
+The app uses `@@all_parseable` to control visibility of the "Read from filenames" checkbox and "Update filename dates" toggle.
+
 ### Rename step: `rename-file-dates.py` (new script)
 
 A lightweight script that renames a file's date portion if the filename has a parseable date pattern. Completely independent of `fix-media-timestamp.py` — it takes a file and a corrected timestamp, and renames accordingly.
@@ -149,19 +164,17 @@ The script:
 
 `media-pipeline.py` reads `@@renamed_to` and updates `active_file` so downstream steps (organize, gyroflow) pick up the new filename.
 
-The rename is available whenever a filename has a parseable date — regardless of whether the corrected timestamp came from EXIF metadata, manual entry, or filename inference. It is not tied to `--time-offset` or `--infer-from-filename`.
+The rename is available whenever a filename has a parseable date — regardless of whether the corrected timestamp came from EXIF metadata or filename inference, or whether an offset was applied. It is not tied to `--time-offset` or `--infer-from-filename`.
 
-### Batch offset concept
+### Batch offset flow
 
-The bash `offset-filename-datetime.sh` calculates the offset from ONE reference file, then applies it to ALL files. In the pipeline:
+The user enters a manual offset (or calculates one externally). The pipeline applies it uniformly:
 
-1. The app lets the user pick a reference file and enter the correct time
-2. The app calculates `offset = correct_time - reference_file_time` (one exiftool read)
-3. The app passes `--time-offset=+/-SECONDS --timezone=+HHMM` to `media-pipeline.py`
-4. The pipeline passes the same `--time-offset` to every `fix-media-timestamp.py` invocation
-5. Each file reads its own best timestamp, applies the offset, writes corrected metadata
-6. `fix-media-timestamp.py` emits `@@corrected_time=...` for each file
-7. If rename step is enabled, the pipeline passes `@@corrected_time` to `rename-file-dates.py`
+1. The app passes `--time-offset=+/-SECONDS --timezone=+HHMM` to `media-pipeline.py`
+2. The pipeline passes the same `--time-offset` to every `fix-media-timestamp.py` invocation
+3. Each file reads its own best timestamp, applies the offset, writes corrected metadata
+4. `fix-media-timestamp.py` emits `@@corrected_time=...` for each file
+5. If rename step is enabled, the pipeline passes `@@corrected_time` to `rename-file-dates.py`
 
 ## macOS app changes
 
@@ -181,26 +194,26 @@ No mode selector. All options live within the single Fix Timestamps step, progre
 
 **Timezone picker** — always visible, always required (unchanged from today).
 
-**Amend time** — source selector for where to read the correct time from, defaulting to "From metadata" (auto-selected):
+**Time offset** — optional field for batch clock correction. Enter offset as seconds or human-readable (e.g. `+3d 7h 22m 15s`). Applies the same delta to every file in the batch. When provided, maps to `--time-offset=+/-SECONDS`.
 
-| Source | Behaviour |
-|--------|-----------|
-| From metadata (default) | Auto-reads existing EXIF timestamp via the 5-tier priority chain. This is today's behaviour — timezone-only correction. |
-| Manual entry | Text field / time picker for directly typing the correct time (YYYYMMDD_HHMMSS format, with inline validation). |
-| From file | File browser accepting absolute or `./` relative path. App parses the selected file's filename timestamp and fills the field. Shows error if filename pattern isn't recognised. |
+**"Read timestamps from filenames" checkbox** — only visible when the pre-flight file parser (see below) reports that all files in the source folder have parseable filename timestamps. When checked, maps to `--infer-from-filename`. This tells the script to read the source time from the filename pattern instead of EXIF metadata.
 
-When "From file" is selected:
-- App scans the source directory (nested) for all matching files by filename pattern
-- Parses all filename timestamps in advance to validate and preview
-- Shows the reference file's parsed timestamp
-- User enters the correct time → computed offset displayed live: "Offset: +3d 7h 22m 15s"
-- Preview shows what all files would look like after applying the offset
+**"Update filename dates" toggle** — only visible when the pre-flight file parser reports parseable filename timestamps. **Default ON.** When enabled, the pipeline runs `rename-file-dates.py` after fix-timestamp to update the filename's date portion to match the corrected time.
 
-When "Manual entry" is selected:
-- Text field for correct time
-- Same offset calculation and preview as "From file"
+### Pre-flight: file parser script
 
-When the amend time source is anything other than "From metadata" and the entered time differs from the existing timestamp, the app computes the offset and passes `--time-offset=+/-SECONDS --timezone=+HHMM` to the pipeline.
+Before the pipeline runs, the macOS app invokes a separate lightweight script (`scan-filename-dates.py`) on the source folder. This is not part of `media-pipeline.py` — it runs independently as a pre-flight check.
+
+The script:
+1. Scans the source directory (nested) for all media files
+2. Attempts to parse each filename for a date pattern using `parse_filename_date()` from `lib/transforms.py`
+3. Reports results via `@@` lines:
+   - `@@parseable_count=N` — how many files had parseable filename dates
+   - `@@total_count=N` — total media files found
+   - `@@all_parseable=true/false` — whether every file has a parseable date
+   - Per-file: `@@file_date=<filename>|<parsed_datetime>` for each parseable file
+
+The app uses `@@all_parseable` to decide whether to show the "Read from filenames" checkbox and "Update filename dates" toggle. If not all files are parseable, these options are hidden — the user can't partially infer from filenames.
 
 ### 3. Overwrite DTO handling (safety gate → UI warning gate)
 
@@ -214,9 +227,7 @@ When the amend time source is anything other than "From metadata" and the entere
 
 Source files are never modified — only read, then at most moved to an archive folder. When filenames encode timestamps (VID_YYYYMMDD_HHMMSS, DJI_*, etc) and the time is corrected, the filename date is now wrong.
 
-Add a toggle within the Fix Timestamps step: **"Update filename dates to match corrected timestamps"**. This is available whenever the pipeline detects that the filename has a parseable date pattern — it's not tied to any particular correction mode.
-
-When enabled:
+The "Update filename dates" toggle (visible only when pre-flight reports parseable dates, default ON) controls this. When enabled:
 - The pipeline runs `rename-file-dates.py` on the working copy after `fix-media-timestamp.py` completes
 - The corrected timestamp is passed via `--corrected-time` (from `@@corrected_time` emitted by fix-media-timestamp.py)
 - The working copy is renamed in-place; `active_file` is updated via `@@renamed_to`
@@ -240,20 +251,15 @@ enum Pipeline {
 }
 
 enum Workflow {
-    static let amendTimeLabel = "Amend time"
-    static let fromMetadataOption = "From metadata"
-    static let manualEntryOption = "Enter manually"
-    static let fromFileOption = "From file"
+    static let timeOffsetLabel = "Time offset"
+    static let timeOffsetPlaceholder = "e.g. +3600 or +1h 0m 0s"
+    static let timeOffsetHelp = "Apply this offset to every file's timestamp"
 
-    static let referenceFileLabel = "Reference file"
-    static let referenceFilePlaceholder = "Select a file to read timestamp from"
-    static let correctTimeLabel = "Correct time"
-    static let correctTimePlaceholder = "YYYYMMDD_HHMMSS"
-    static let correctTimeFormatHelp = "Enter the actual time this file was captured"
-    static let computedOffsetLabel = "Offset"
+    static let readFromFilenamesToggle = "Read timestamps from filenames"
+    static let readFromFilenamesHelp = "Use filename date instead of EXIF metadata as the source timestamp"
 
-    static let renameFileDatesToggle = "Update filename dates to match corrected timestamps"
-    static let renameFileDatesHelp = "Rename working copy so filename date reflects the corrected time"
+    static let updateFilenameDatesToggle = "Update filename dates"
+    static let updateFilenameDatesHelp = "Rename files so filename dates match corrected timestamps"
 
     static let tzMismatchWarning = "Timezone already present in metadata — differs from provided timezone"
     static let forceOverwriteButton = "Overwrite existing timezone"
@@ -264,30 +270,25 @@ enum Workflow {
 
 ```swift
 // New properties
-var amendTimeSource: AmendTimeSource = .fromMetadata
-var referenceFilePath: String = ""
-var correctTime: String = ""  // YYYYMMDD_HHMMSS
-var computedOffsetSeconds: Int? = nil  // calculated when correct time differs from reference
-var renameFileDates: Bool = false
+var timeOffsetSeconds: Int? = nil       // manual offset entry, nil = no offset
+var readFromFilenames: Bool = false     // --infer-from-filename (visible only when pre-flight reports parseable dates)
+var updateFilenameDates: Bool = false   // enable rename-file-dates step (visible only when parseable dates, default ON)
 
-enum AmendTimeSource: String, CaseIterable {
-    case fromMetadata = "metadata"
-    case manual = "manual"
-    case fromFile = "file"
-}
+// Pre-flight results (populated by scan-filename-dates.py before pipeline runs)
+var allFilenamesParseable: Bool = false // controls visibility of filename-related options
 ```
 
 ### 8. buildPipelineArgs changes
 
 Always pass `--timezone` when the step is enabled (no change).
 
-When `amendTimeSource == .fromFile`:
+When `readFromFilenames` is checked:
 - Pass `--infer-from-filename`
 
-When `computedOffsetSeconds` is non-nil and non-zero (time correction active):
+When `timeOffsetSeconds` is non-nil and non-zero:
 - Pass `--time-offset=+/-SECONDS`
 
-When `renameFileDates` is toggled:
+When `updateFilenameDates` is toggled:
 - Pipeline enables the `rename-file-dates` step after fix-timestamp
 - Passes `--corrected-time` from `@@corrected_time` emitted by fix-media-timestamp.py
 
@@ -352,30 +353,33 @@ The transforms file doesn't replace any complex function — it provides the tes
 10. Emit `@@time_offset_seconds`, `@@time_offset_display`, `@@correction_mode` machine lines
 11. Tests: offset calculation, positive/negative offsets, interaction with `--infer-from-filename`, tz_mismatch still fires when DTO has tz
 
-### Phase 3: Script — filename date renaming (`scripts/`)
-12. Create `rename-file-dates.py` — standalone script that renames a file's date portion
-13. Takes `--corrected-time` and the file path; uses `parse_filename_date()` / `build_filename()` from `lib/transforms.py`
-14. Emits `@@renamed_to=<new_filename>` on success, `@@rename_action=no_date_pattern` if no parseable date
-15. Source files are never modified — this operates on the working copy only
-16. Tests: reverse-generation for all supported patterns, no-op when no date in filename, companion file handling
+### Phase 3: Scripts — filename scanning + renaming (`scripts/`)
+12. Create `scan-filename-dates.py` — pre-flight script that scans a folder and reports which files have parseable filename dates
+13. Emits `@@all_parseable=true/false`, `@@parseable_count`, `@@total_count`, per-file `@@file_date=<name>|<datetime>`
+14. Tests: mixed parseable/unparseable folders, nested directories, all-parseable vs partial
+15. Create `rename-file-dates.py` — standalone script that renames a file's date portion
+16. Takes `--corrected-time` and the file path; uses `parse_filename_date()` / `build_filename()` from `lib/transforms.py`
+17. Emits `@@renamed_to=<new_filename>` on success, `@@rename_action=no_date_pattern` if no parseable date
+18. Source files are never modified — this operates on the working copy only
+19. Tests: reverse-generation for all supported patterns, no-op when no date in filename, companion file handling
 
 ### Phase 4: Pipeline integration (`scripts/`)
-17. Add `--time-offset`, `--infer-from-filename` pass-through to fix-media-timestamp.py in `media-pipeline.py`
-18. Add `rename-file-dates` as a new pipeline step after fix-timestamp, conditionally enabled
-19. Pipeline reads `@@corrected_time` from fix-timestamp, passes to rename step
-20. Pipeline reads `@@renamed_to` from rename step, updates `active_file`
-21. Test pipeline end-to-end with time correction + rename
+20. Add `--time-offset`, `--infer-from-filename` pass-through to fix-media-timestamp.py in `media-pipeline.py`
+21. Add `rename-file-dates` as a new pipeline step after fix-timestamp, conditionally enabled
+22. Pipeline reads `@@corrected_time` from fix-timestamp, passes to rename step
+23. Pipeline reads `@@renamed_to` from rename step, updates `active_file`
+24. Test pipeline end-to-end with time correction + rename
 
 ### Phase 5: macOS app (`macos/`)
-22. Rename step: `fixTimezone` → `fixTimestamps`
-23. Add amend time source picker (from metadata / manual entry / from file)
-24. From file: folder scanning, filename parsing, reference file selection
-25. Correct time input + live offset computation + preview
-26. Rename file dates toggle within Fix Timestamps step
-27. Handle tz_mismatch: show warning, offer force overwrite
-28. Wire up `buildPipelineArgs()` for new flags
-29. Parse new `@@` lines in `parseMachineReadableLine()`
-30. Show offset in diff table
+25. Rename step: `fixTimezone` → `fixTimestamps`
+26. Pre-flight: run `scan-filename-dates.py` on source folder before pipeline, store `allFilenamesParseable`
+27. Time offset field — optional manual offset entry
+28. "Read from filenames" checkbox (visible only when `allFilenamesParseable`)
+29. "Update filename dates" toggle (visible only when `allFilenamesParseable`, default ON)
+30. Handle tz_mismatch: show warning, offer force overwrite
+31. Wire up `buildPipelineArgs()` for new flags
+32. Parse new `@@` lines in `parseMachineReadableLine()`
+33. Show offset in diff table
 
 ## What this does NOT cover
 
