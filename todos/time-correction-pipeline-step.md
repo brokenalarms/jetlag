@@ -142,8 +142,8 @@ A lightweight script that renames a file's date portion if the filename has a pa
 | `--dry-run` | Preview the rename without applying |
 
 The script:
-1. Parses the filename using the same patterns as `parse_filename_timestamp()` (shared via `lib/filename_patterns.py`)
-2. If filename has a parseable date → generates corrected filename, renames the working copy
+1. Parses the filename using `parse_filename_date()` from `lib/transforms.py`
+2. If filename has a parseable date → generates corrected filename via `build_filename()`, renames the working copy
 3. If filename has no parseable date → no-op, emits `@@rename_action=no_date_pattern`
 4. Emits `@@renamed_to=<new_filename>` on success
 
@@ -294,43 +294,39 @@ When `renameFileDates` is toggled:
 When user confirms force overwrite after tz_mismatch warning:
 - Pass `--overwrite-datetimeoriginal`
 
-## Script decomposition (`fix-media-timestamp.py`)
+## Testable transforms — extracting generic building blocks
 
-The script is 1118 lines with 50+ functions. Before or during the time correction work, extract shared logic into `lib/` modules for testability and reuse. Natural seams:
+`fix-media-timestamp.py` is 1118 lines. The goal is not to split it into domain-specific files (that just spreads complexity). The goal is to extract **generic, pure transform functions** — small ETL-style conversions where each step can be unit tested in isolation without exiftool or real files.
 
-### Extract to `lib/filename_patterns.py`
-- `parse_filename_timestamp()` (line 253) — 6+ filename pattern matchers (VID/IMG/LRV, DJI, DSC, macOS screenshots, generic YYYYMMDD)
-- New: `generate_corrected_filename(original_name, corrected_time)` — reverse of parse, generates filename with updated date portion
-- Shared by `fix-media-timestamp.py` (parsing), `rename-file-dates.py` (parsing + generation), and the macOS app's folder scanning
+### `lib/transforms.py` — pure conversion functions
 
-### Extract to `lib/timestamp_reader.py`
-- `parse_datetime_original()` (line 189) — regex parsing with timezone extraction
-- `get_best_timestamp()` (line 372) — 5-tier priority system
-- `get_all_timestamp_data()` (line 444) — orchestration with timezone handling, overwrite logic, UTC conversion
-- `extract_metadata_timezone()` (line 862)
-- `is_valid_timestamp()` (line 180)
-- Core "read timestamps from a file" logic — testable with mock EXIF data
+These are the building blocks that the complex functions are composed from. Each takes a value in, returns a value out, no side effects:
 
-### Extract to `lib/timezone_utils.py`
-- `get_timezone_for_country()` (line 70) — CSV-based country→timezone lookup
-- `get_country_name()` (line 130)
-- `normalize_timezone_input()`, `normalize_timezone_format()`, `ensure_colon_tz()`
-- `to_utc()` (line 62)
-- Pure functions (except CSV read), independently testable
+| Transform | Input → Output | Example |
+|-----------|---------------|---------|
+| `parse_exif_datetime(s)` | `"2025:05:14 02:07:00"` → `datetime` | EXIF's colon-separated format → Python datetime |
+| `parse_tz_offset(s)` | `"+09:00"` or `"+0900"` or `"9"` → `timedelta` | Any timezone string → timedelta (normalisation) |
+| `format_exif_datetime(dt)` | `datetime` → `"2025:05:14 02:07:00+09:00"` | Reverse of parse |
+| `apply_offset(dt, seconds)` | `(datetime, int)` → `datetime` | Add/subtract seconds from a timestamp |
+| `parse_filename_date(name)` | `"VID_20250505_130334.mp4"` → `(prefix, datetime, suffix, ext)` | Decompose filename into parts |
+| `build_filename(prefix, dt, suffix, ext)` | `("VID_", datetime, "", ".mp4")` → `"VID_20250505_130334.mp4"` | Reverse of parse |
+| `format_offset_display(seconds)` | `10717414` → `"+124d 1h 3m 34s"` | Human-readable offset string |
+| `country_to_tz(code, csv_path)` | `"JP"` → `"+09:00"` | Country code → timezone offset via CSV |
+| `extract_tz_from_exif_value(s)` | `"2025:05:14 02:07:00+09:00"` → `"+09:00"` or `None` | Pull tz suffix from EXIF string |
 
-### Extract to `lib/timestamp_display.py`
-- `format_original_timestamps()` (line 673)
-- `format_corrected_timestamp()` (line 725)
-- `format_change_description()` (line 770) — 91 lines, largest display function
-- `format_exif_timestamp_display()`, `format_timestamp_display()`, `format_time_delta()`
-- `_source_to_machine_token()`, `_get_raw_original_time()`
-- Presentation layer only — no side effects
+These are generic and discoverable — any script dealing with timestamps, timezones, or media filenames can import them. Unit tests are trivial: pass a string in, assert a value out.
 
-### Stays in `fix-media-timestamp.py` (~400 lines after extraction)
-- `fix_media_timestamps()` — main orchestrator (reads, decides, writes)
-- `main()` — CLI argument parsing
-- EXIF write functions (`write_datetime_original`, `write_keys_creationdate`, `write_quicktime_createdate`) — tightly coupled to the write flow
-- Change detection (`determine_needed_changes`, `check_*_needs_update`) — tightly coupled to write decisions
+### What stays in `fix-media-timestamp.py`
+
+Everything that orchestrates reads/writes/decisions stays in the main script:
+- `get_best_timestamp()` — calls exiftool, applies priority chain (uses `parse_exif_datetime`, `extract_tz_from_exif_value` internally)
+- `get_all_timestamp_data()` — orchestration logic
+- EXIF write functions — tightly coupled to exiftool
+- Change detection — tightly coupled to write decisions
+- `fix_media_timestamps()` — main orchestrator
+- Display/formatting functions — these call the transforms internally but also format for stdout/`@@` output
+
+The transforms file doesn't replace any complex function — it provides the tested building blocks they're composed from. When adding `--time-offset`, the new logic is: `parse_exif_datetime` → `apply_offset` → `format_exif_datetime` — each step already tested.
 
 ### Already in `lib/` (unchanged)
 - `lib/exiftool.py` — persistent exiftool subprocess
@@ -339,49 +335,47 @@ The script is 1118 lines with 50+ functions. Before or during the time correctio
 
 ## Implementation order
 
-### Phase 0: Script decomposition (`scripts/lib/`)
-1. Extract `lib/filename_patterns.py` from `fix-media-timestamp.py` — `parse_filename_timestamp()` + new `generate_corrected_filename()`
-2. Extract `lib/timezone_utils.py` — timezone normalisation, country lookup, UTC conversion
-3. Extract `lib/timestamp_reader.py` — 5-tier priority reader, datetime parsing, metadata timezone extraction
-4. Extract `lib/timestamp_display.py` — all formatting and display functions
-5. Update imports in `fix-media-timestamp.py`, verify existing tests still pass
+### Phase 0: Extract testable transforms (`scripts/lib/`)
+1. Create `lib/transforms.py` — pure conversion functions (parse/format EXIF datetimes, parse/build filenames, tz normalisation, offset arithmetic)
+2. Unit tests for each transform: string in → value out, no exiftool or filesystem needed
+3. Refactor `fix-media-timestamp.py` to call transforms internally, verify existing tests still pass
 
 ### Phase 1: Script — infer from filename (`scripts/`)
-6. Add `--infer-from-filename` flag to `fix-media-timestamp.py` — reads time from filename using `lib/filename_patterns.py`, requires `--timezone`
-7. Keep `--overwrite-datetimeoriginal` as the orthogonal safety gate (unchanged)
-8. Emit `@@corrected_time=YYYY-MM-DD_HH:MM:SS` for every file (needed by rename step)
-9. Tests: filename inference for VID_/IMG_/LRV_/DJI_ patterns, interaction with --overwrite-datetimeoriginal, error when no parseable filename
+4. Add `--infer-from-filename` flag to `fix-media-timestamp.py` — reads time from filename using `parse_filename_date()` from `lib/transforms.py`, requires `--timezone`
+5. Keep `--overwrite-datetimeoriginal` as the orthogonal safety gate (unchanged)
+6. Emit `@@corrected_time=YYYY-MM-DD_HH:MM:SS` for every file (needed by rename step)
+7. Tests: filename inference for VID_/IMG_/LRV_/DJI_ patterns, interaction with --overwrite-datetimeoriginal, error when no parseable filename
 
 ### Phase 2: Script — time offset (`scripts/`)
-10. Add `--time-offset [+/-]SECONDS` to `fix-media-timestamp.py` — applies delta to whatever timestamp source is found
-11. Does NOT imply `--overwrite-datetimeoriginal` — safety gate always independent
-12. Emit `@@time_offset_seconds`, `@@time_offset_display`, `@@correction_mode` machine lines
-13. Tests: offset calculation, positive/negative offsets, interaction with `--infer-from-filename`, tz_mismatch still fires when DTO has tz
+8. Add `--time-offset [+/-]SECONDS` to `fix-media-timestamp.py` — applies delta using `apply_offset()` from `lib/transforms.py`
+9. Does NOT imply `--overwrite-datetimeoriginal` — safety gate always independent
+10. Emit `@@time_offset_seconds`, `@@time_offset_display`, `@@correction_mode` machine lines
+11. Tests: offset calculation, positive/negative offsets, interaction with `--infer-from-filename`, tz_mismatch still fires when DTO has tz
 
 ### Phase 3: Script — filename date renaming (`scripts/`)
-14. Create `rename-file-dates.py` — standalone script that renames a file's date portion
-15. Takes `--corrected-time` and the file path; uses `lib/filename_patterns.py` for parsing + generation
-16. Emits `@@renamed_to=<new_filename>` on success, `@@rename_action=no_date_pattern` if no parseable date
-17. Source files are never modified — this operates on the working copy only
-18. Tests: VID_/IMG_/LRV_/DJI_ pattern reverse-generation, no-op when no date in filename, companion file handling
+12. Create `rename-file-dates.py` — standalone script that renames a file's date portion
+13. Takes `--corrected-time` and the file path; uses `parse_filename_date()` / `build_filename()` from `lib/transforms.py`
+14. Emits `@@renamed_to=<new_filename>` on success, `@@rename_action=no_date_pattern` if no parseable date
+15. Source files are never modified — this operates on the working copy only
+16. Tests: reverse-generation for all supported patterns, no-op when no date in filename, companion file handling
 
 ### Phase 4: Pipeline integration (`scripts/`)
-19. Add `--time-offset`, `--infer-from-filename` pass-through to fix-media-timestamp.py in `media-pipeline.py`
-20. Add `rename-file-dates` as a new pipeline step after fix-timestamp, conditionally enabled
-21. Pipeline reads `@@corrected_time` from fix-timestamp, passes to rename step
-22. Pipeline reads `@@renamed_to` from rename step, updates `active_file`
-23. Test pipeline end-to-end with time correction + rename
+17. Add `--time-offset`, `--infer-from-filename` pass-through to fix-media-timestamp.py in `media-pipeline.py`
+18. Add `rename-file-dates` as a new pipeline step after fix-timestamp, conditionally enabled
+19. Pipeline reads `@@corrected_time` from fix-timestamp, passes to rename step
+20. Pipeline reads `@@renamed_to` from rename step, updates `active_file`
+21. Test pipeline end-to-end with time correction + rename
 
 ### Phase 5: macOS app (`macos/`)
-24. Rename step: `fixTimezone` → `fixTimestamps`
-25. Add amend time source picker (from metadata / manual entry / from file)
-26. From file: folder scanning, filename parsing, reference file selection
-27. Correct time input + live offset computation + preview
-28. Rename file dates toggle within Fix Timestamps step
-29. Handle tz_mismatch: show warning, offer force overwrite
-30. Wire up `buildPipelineArgs()` for new flags
-31. Parse new `@@` lines in `parseMachineReadableLine()`
-32. Show offset in diff table
+22. Rename step: `fixTimezone` → `fixTimestamps`
+23. Add amend time source picker (from metadata / manual entry / from file)
+24. From file: folder scanning, filename parsing, reference file selection
+25. Correct time input + live offset computation + preview
+26. Rename file dates toggle within Fix Timestamps step
+27. Handle tz_mismatch: show warning, offer force overwrite
+28. Wire up `buildPipelineArgs()` for new flags
+29. Parse new `@@` lines in `parseMachineReadableLine()`
+30. Show offset in diff table
 
 ## What this does NOT cover
 
