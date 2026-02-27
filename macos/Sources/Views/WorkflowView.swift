@@ -36,12 +36,25 @@ struct WorkflowView: View {
             }
         }
         .frame(minWidth: 340, idealWidth: defaultColumnWidth, maxWidth: defaultColumnWidth)
-        .inspector(isPresented: $state.showLog) {
+        .inspector(isPresented: $state.showInspector) {
             VStack(spacing: 0) {
+                inspectorTopBar
+
                 if !state.visibleRows.isEmpty || state.isRunning {
                     DiffTableView(rows: state.visibleRows)
+                } else if !state.showLogOutput {
+                    Spacer()
+                    Text(Strings.Workflow.inspectorEmptyLabel)
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                    Spacer()
                 }
-                LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
+
+                if state.showLogOutput {
+                    LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
+                }
+
+                inspectorBottomBar
             }
             .inspectorColumnWidth(min: 480, ideal: defaultColumnWidth)
         }
@@ -485,16 +498,50 @@ struct WorkflowView: View {
                     Spacer()
 
                     Button {
-                        state.showLog.toggle()
+                        state.showInspector.toggle()
                     } label: {
-                        Image(systemName: "terminal")
-                            .foregroundStyle(state.showLog ? .primary : .secondary)
+                        Image(systemName: "sidebar.trailing")
+                            .foregroundStyle(state.showInspector ? .primary : .secondary)
                     }
                     .buttonStyle(.borderless)
-                    .help(state.showLog ? Strings.Workflow.hideLogHelp : Strings.Workflow.showLogHelp)
+                    .help(state.showInspector ? Strings.Workflow.hideInspectorHelp : Strings.Workflow.showInspectorHelp)
                 }
             }
         }
+    }
+
+    // MARK: - Inspector bars
+
+    private var inspectorTopBar: some View {
+        HStack {
+            Spacer()
+            Button {
+                state.showInspector = false
+            } label: {
+                Image(systemName: "sidebar.trailing")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .help(Strings.Workflow.hideInspectorHelp)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+    }
+
+    private var inspectorBottomBar: some View {
+        HStack {
+            Button {
+                withAnimation { state.showLogOutput.toggle() }
+            } label: {
+                Image(systemName: "terminal")
+                    .foregroundStyle(state.showLogOutput ? .primary : .secondary)
+            }
+            .buttonStyle(.borderless)
+            .help(state.showLogOutput ? Strings.Workflow.hideLogOutputHelp : Strings.Workflow.showLogOutputHelp)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
     }
 
     // MARK: - Helpers
@@ -543,7 +590,7 @@ struct WorkflowView: View {
         }
 
         state.clearLog()
-        state.showLog = true
+        state.showInspector = true
         state.isRunning = true
 
         let (script, args) = state.workflowSession.buildPipelineArgs()

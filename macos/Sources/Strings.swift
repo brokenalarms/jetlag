@@ -80,8 +80,11 @@ enum Strings {
 
         static let typeManuallyHelp = String(localized: "workflow.typeManually.help", defaultValue: "Type manually")
         static let pickFromListHelp = String(localized: "workflow.pickFromList.help", defaultValue: "Pick from list")
-        static let hideLogHelp = String(localized: "workflow.hideLog.help", defaultValue: "Hide log")
-        static let showLogHelp = String(localized: "workflow.showLog.help", defaultValue: "Show log")
+        static let hideInspectorHelp = String(localized: "workflow.hideInspector.help", defaultValue: "Hide inspector")
+        static let showInspectorHelp = String(localized: "workflow.showInspector.help", defaultValue: "Show inspector")
+        static let hideLogOutputHelp = String(localized: "workflow.hideLogOutput.help", defaultValue: "Hide output log")
+        static let showLogOutputHelp = String(localized: "workflow.showLogOutput.help", defaultValue: "Show output log")
+        static let inspectorEmptyLabel = String(localized: "workflow.inspectorEmpty.label", defaultValue: "Run a workflow to see results")
 
         static let timezoneFormatHelp = String(localized: "workflow.timezoneFormat.help", defaultValue: "Expected format: +HHMM or -HHMM")
         static let timezoneRequired = String(localized: "workflow.timezoneRequired", defaultValue: "Timezone required")
