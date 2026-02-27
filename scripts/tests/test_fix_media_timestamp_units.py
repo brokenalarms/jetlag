@@ -57,23 +57,26 @@ class TestTimestampParsing:
     def test_parse_filename_insta360_pattern(self):
         """Test parsing Insta360 filename pattern"""
         filename = "/path/to/VID_20250618_072521.mp4"
-        result = fmt.parse_filename_timestamp(filename)
+        result, pattern = fmt.parse_filename_timestamp(filename)
 
         assert result == "2025:06:18 07:25:21"
+        assert pattern == "YYYYMMDD_HHMMSS"
 
     def test_parse_filename_dji_pattern(self):
         """Test parsing DJI filename pattern"""
         filename = "/path/to/DJI_20250618072521_0001.mp4"
-        result = fmt.parse_filename_timestamp(filename)
+        result, pattern = fmt.parse_filename_timestamp(filename)
 
         assert result == "2025:06:18 07:25:21"
+        assert pattern == "YYYYMMDDHHMMSS"
 
     def test_parse_filename_no_match(self):
         """Test that random filenames return None"""
         filename = "/path/to/random_file.mp4"
-        result = fmt.parse_filename_timestamp(filename)
+        result, pattern = fmt.parse_filename_timestamp(filename)
 
         assert result is None
+        assert pattern is None
 
 
 class TestExifDataReading:
