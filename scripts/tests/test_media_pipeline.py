@@ -1065,10 +1065,10 @@ class TestPipelineMachineOutput:
                     f"@@file= should be filtered, found: {line}"
 
     def test_tz_mismatch_emits_distinct_token(self, temp_workspace, test_profile):
-        """Timezone mismatch emits @@timestamp_action=tz_mismatch, not generic error.
+        """Timezone mismatch emits @@timestamp_action=tz_mismatch (informational, not blocking).
 
         Actual: @@timestamp_action=tz_mismatch when file timezone differs from provided
-        Expected: distinct token so the UI can show a specific "TZ Mismatch" badge
+        Expected: distinct token so the UI can show a specific "TZ Mismatch" badge, pipeline continues
         """
         source = temp_workspace["source"]
         video = source / "test.mp4"
@@ -1095,8 +1095,8 @@ class TestPipelineMachineOutput:
             f"TZ mismatch should emit @@original_time, got keys: {list(f.keys())}"
         assert f["original_time"], \
             f"@@original_time should be non-empty, got: {f.get('original_time')}"
-        assert f.get("pipeline_result") == "failed", \
-            f"Expected pipeline_result=failed, got: {f.get('pipeline_result')}"
+        assert f.get("pipeline_result") == "would_change", \
+            f"Expected pipeline_result=would_change (tz_mismatch is informational), got: {f.get('pipeline_result')}"
 
     def test_error_path_emits_original_time(self, temp_workspace, test_profile):
         """Error path emits @@original_time when the file has a known timestamp.
@@ -1223,6 +1223,243 @@ class TestCLIOverrides:
         profile_target = temp_workspace["target"]
         assert not any(profile_target.rglob("*.mp4")), "No files should be in profile's ready_dir"
         assert any(override_target.rglob("*.mp4")), "Files should be in override target directory"
+
+
+class TestInferFromFilename:
+    """Tests for --infer-from-filename pass-through to fix-timestamp."""
+
+    def test_infer_from_filename_passes_through(self, temp_workspace, test_profile):
+        """Pipeline passes --infer-from-filename to fix-timestamp, correcting DateTimeOriginal from filename.
+
+        Actual: DateTimeOriginal on output file matches filename timestamp + timezone
+        Expected: filename timestamp used as source of truth
+        """
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "VID_20250619_063809_00_002.mp4"
+        _create_video_raw(
+            video,
+            MediaCreateDate="2025:06:18 22:38:09",
+            CreateDate="2025:06:18 22:38:09",
+            DateTimeOriginal="2025:06:19 09:38:09+08:00",
+        )
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0800",
+            "--group", "Test",
+            "--infer-from-filename",
+            "--apply",
+        ])
+
+        moved = list(target.rglob("*.mp4"))[0]
+        dto = get_exif_field(moved, "DateTimeOriginal")
+        assert "06:38:09" in dto, f"Should use filename time 06:38:09, got: {dto}"
+        assert "+08:00" in dto, f"Should have +08:00 timezone, got: {dto}"
+
+    def test_infer_from_filename_requires_timezone(self, temp_workspace, test_profile):
+        """--infer-from-filename without --timezone is rejected by pipeline."""
+        source = temp_workspace["source"]
+        video = source / "VID_20250619_063809.mp4"
+        create_test_video(video)
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--group", "Test",
+            "--infer-from-filename",
+        ])
+
+        assert result.returncode != 0
+
+
+class TestTimeOffset:
+    """Tests for --time-offset pass-through to fix-timestamp."""
+
+    def test_time_offset_passes_through(self, temp_workspace, test_profile):
+        """Pipeline passes --time-offset to fix-timestamp, shifting timestamps.
+
+        Actual: DateTimeOriginal on output file is shifted by offset seconds
+        Expected: 3600s offset shifts 01:00:00 UTC → 02:00:00 UTC → 11:00:00+09:00
+        """
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+            "--time-offset", "3600",
+            "--apply",
+        ])
+
+        moved = list(target.rglob("*.mp4"))[0]
+        dto = get_exif_field(moved, "DateTimeOriginal")
+        # 01:00 UTC + 3600s = 02:00 UTC → 11:00 in +0900
+        assert "11:00:00" in dto, f"Expected 11:00:00 (shifted by 1h), got: {dto}"
+
+    def test_time_offset_requires_timezone(self, temp_workspace, test_profile):
+        """--time-offset without --timezone is rejected by pipeline."""
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        create_test_video(video)
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--group", "Test",
+            "--time-offset", "3600",
+        ])
+
+        assert result.returncode != 0
+
+
+class TestUpdateFilenameDates:
+    """Tests for --update-filename-dates inline rename."""
+
+    def test_rename_updates_filename_date(self, temp_workspace, test_profile):
+        """With --update-filename-dates + --time-offset, file is renamed to reflect corrected timestamp.
+
+        Actual: output file has corrected date in filename after time offset
+        Expected: VID_20250505_130334 → VID_20250505_140334 after +3600s offset
+        """
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "VID_20250505_130334_00_001.mp4"
+        _create_video_raw(
+            video,
+            MediaCreateDate="2025:05:05 04:03:34",
+            CreateDate="2025:05:05 04:03:34",
+        )
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+            "--time-offset", "3600",
+            "--update-filename-dates",
+            "--apply",
+        ])
+
+        moved = list(target.rglob("*.mp4"))
+        assert len(moved) == 1
+        assert "20250505_140334" in moved[0].name, \
+            f"Expected corrected timestamp in filename, got: {moved[0].name}"
+
+    def test_rename_emits_renamed_to(self, temp_workspace, test_profile):
+        """--update-filename-dates emits @@renamed_to when filename changes.
+
+        Actual: @@renamed_to in stdout with new filename
+        Expected: machine-readable rename notification
+        """
+        source = temp_workspace["source"]
+        video = source / "VID_20250505_130334_00_001.mp4"
+        _create_video_raw(
+            video,
+            MediaCreateDate="2025:05:05 04:03:34",
+            CreateDate="2025:05:05 04:03:34",
+        )
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+            "--time-offset", "3600",
+            "--update-filename-dates",
+        ])
+
+        assert "@@renamed_to=" in result.stdout, \
+            f"Expected @@renamed_to in stdout, got: {result.stdout}"
+
+    def test_no_rename_when_no_parseable_date(self, temp_workspace, test_profile):
+        """Files without parseable date in filename are not renamed.
+
+        Actual: no @@renamed_to in stdout for unparseable filename
+        Expected: rename is a no-op for files like 'test.mp4'
+        """
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+            "--time-offset", "3600",
+            "--update-filename-dates",
+        ])
+
+        assert "@@renamed_to=" not in result.stdout, \
+            f"Should not rename unparseable filename, got: {result.stdout}"
+
+    def test_no_rename_when_time_unchanged(self, temp_workspace, test_profile):
+        """No rename when corrected time matches filename time.
+
+        Actual: no @@renamed_to when filename already matches corrected timestamp
+        Expected: rename is a no-op when no shift occurs
+        """
+        source = temp_workspace["source"]
+        video = source / "VID_20250505_130334_00_001.mp4"
+        _create_video_raw(
+            video,
+            MediaCreateDate="2025:05:05 04:03:34",
+            CreateDate="2025:05:05 04:03:34",
+        )
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+            "--update-filename-dates",
+        ])
+
+        assert "@@renamed_to=" not in result.stdout, \
+            f"Should not rename when time unchanged, got: {result.stdout}"
+
+    def test_rename_with_companion_files(self, temp_workspace, test_profile):
+        """Companion files are renamed alongside the main file.
+
+        Actual: companion files in target have corrected date in filename
+        Expected: .thm companion renamed to match main file's new name
+        """
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "VID_20250505_130334_00_001.mp4"
+        _create_video_raw(
+            video,
+            MediaCreateDate="2025:05:05 04:03:34",
+            CreateDate="2025:05:05 04:03:34",
+        )
+        (source / "VID_20250505_130334_00_001.thm").write_bytes(b"thumbnail")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+            "--time-offset", "3600",
+            "--update-filename-dates",
+            "--copy-companion-files",
+            "--apply",
+        ])
+
+        target_files = {f.name for f in target.rglob("*") if f.is_file()}
+        renamed_mp4 = [f for f in target_files if f.endswith(".mp4")]
+        renamed_thm = [f for f in target_files if f.endswith(".thm")]
+        assert len(renamed_mp4) == 1
+        assert "20250505_140334" in renamed_mp4[0], \
+            f"Main file should have corrected date, got: {renamed_mp4[0]}"
+        assert len(renamed_thm) == 1
+        assert "20250505_140334" in renamed_thm[0], \
+            f"Companion should have corrected date, got: {renamed_thm[0]}"
 
 
 if __name__ == "__main__":
