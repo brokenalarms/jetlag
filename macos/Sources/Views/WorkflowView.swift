@@ -38,8 +38,6 @@ struct WorkflowView: View {
         .frame(minWidth: 340, idealWidth: defaultColumnWidth, maxWidth: defaultColumnWidth)
         .inspector(isPresented: $state.showInspector) {
             VStack(spacing: 0) {
-                inspectorTopBar
-
                 if !state.visibleRows.isEmpty || state.isRunning {
                     DiffTableView(rows: state.visibleRows)
                 } else if !state.showLogOutput {
@@ -59,6 +57,16 @@ struct WorkflowView: View {
             .inspectorColumnWidth(min: 480, ideal: defaultColumnWidth)
         }
         .navigationTitle(Strings.Nav.workflow)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    state.showInspector.toggle()
+                } label: {
+                    Image(systemName: "sidebar.trailing")
+                }
+                .help(state.showInspector ? Strings.Workflow.hideInspectorHelp : Strings.Workflow.showInspectorHelp)
+            }
+        }
         .sheet(isPresented: $showUpgradeSheet) {
             UpgradeView(
                 fileCount: detectedFileCount,
@@ -496,37 +504,12 @@ struct WorkflowView: View {
                     }
 
                     Spacer()
-
-                    Button {
-                        state.showInspector.toggle()
-                    } label: {
-                        Image(systemName: "sidebar.trailing")
-                            .foregroundStyle(state.showInspector ? .primary : .secondary)
-                    }
-                    .buttonStyle(.borderless)
-                    .help(state.showInspector ? Strings.Workflow.hideInspectorHelp : Strings.Workflow.showInspectorHelp)
                 }
             }
         }
     }
 
     // MARK: - Inspector bars
-
-    private var inspectorTopBar: some View {
-        HStack {
-            Spacer()
-            Button {
-                state.showInspector = false
-            } label: {
-                Image(systemName: "sidebar.trailing")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.borderless)
-            .help(Strings.Workflow.hideInspectorHelp)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-    }
 
     private var inspectorBottomBar: some View {
         HStack {
