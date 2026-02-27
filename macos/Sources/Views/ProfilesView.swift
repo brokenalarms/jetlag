@@ -14,6 +14,9 @@ struct ProfilesView: View {
     private var isDirty: Bool {
         guard let snapshot = originalSnapshot, let current = editingProfile
         else { return false }
+        if state.profile(named: snapshot.name) == nil {
+            return true
+        }
         return editingName != snapshot.name || current != snapshot.profile
     }
 
@@ -57,10 +60,9 @@ struct ProfilesView: View {
                 showDiscardConfirmation = true
             }
         }
-        .confirmationDialog(
+        .alert(
             Strings.Profiles.unsavedChangesTitle,
-            isPresented: $showDiscardConfirmation,
-            titleVisibility: .visible
+            isPresented: $showDiscardConfirmation
         ) {
             Button(Strings.Profiles.saveAndContinue) {
                 saveCurrentProfile()
@@ -90,12 +92,13 @@ struct ProfilesView: View {
                         state.profile(named: pending)
                     )
                 }
-
             }
             Button(Strings.Common.cancel, role: .cancel) {
                 pendingTabChange = nil
                 pendingSelection = nil
             }
+        } message: {
+            Text(Strings.Profiles.unsavedChangesMessage)
         }
     }
 
@@ -202,7 +205,10 @@ struct ProfilesView: View {
         _ name: String,
         _ newProfile: MediaProfile?
     ) {
-        guard let profile = newProfile else { return }
+        guard var profile = newProfile else { return }
+        if profile.type == nil {
+            profile.type = .video
+        }
         editingName = name
         editingProfile = profile
         originalSnapshot = (name: name, profile: profile)
@@ -214,16 +220,13 @@ struct ProfilesView: View {
             return
         }
 
-        if state.profile(named: editingName) == nil {
-            state.profilesConfig?.profiles[editingName] = profile
-        } else if let snapshot = originalSnapshot {
-            if snapshot.name != editingName {
-                state.profilesConfig?.profiles.removeValue(
-                    forKey: snapshot.name
-                )
+        if let snapshot = originalSnapshot, snapshot.name != editingName {
+            state.profilesConfig?.profiles.removeValue(forKey: snapshot.name)
+            if state.workflowSession.profileName == snapshot.name {
+                state.workflowSession.profileName = editingName
             }
-            state.profilesConfig?.profiles[editingName] = profile
         }
+        state.profilesConfig?.profiles[editingName] = profile
 
         writeProfiles()
         originalSnapshot = (name: editingName, profile: profile)
@@ -384,11 +387,6 @@ struct ProfileEditorView: View {
                 }
             }
             .padding()
-        }
-        .onAppear {
-            if profile.type == nil {
-                profile.type = .video
-            }
         }
         .safeAreaInset(edge: .bottom) {
             HStack {

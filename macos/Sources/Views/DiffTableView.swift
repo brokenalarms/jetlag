@@ -44,7 +44,7 @@ struct DiffTableView: View {
                 }
                 .width(min: 130, ideal: 175)
 
-                TableColumn(Strings.DiffTable.changeColumn) { row in
+                TableColumn(Strings.DiffTable.timestampColumn) { row in
                     changeBadge(row)
                 }
                 .width(min: 70, ideal: 90)
@@ -71,6 +71,18 @@ struct DiffTableView: View {
             }
         }
         .frame(maxHeight: .infinity)
+    }
+
+    private func wouldChangeLabel(_ row: DiffTableRow) -> String {
+        if row.timestampAction == "would_fix" { return Strings.DiffTable.wouldFixStatus }
+        if row.dest != nil { return Strings.DiffTable.wouldMoveStatus }
+        return Strings.DiffTable.wouldChangeStatus
+    }
+
+    private func changedLabel(_ row: DiffTableRow) -> String {
+        if row.timestampAction == "fixed" { return Strings.DiffTable.fixedStatus }
+        if row.dest != nil { return Strings.DiffTable.movedStatus }
+        return Strings.DiffTable.changedStatus
     }
 
     @ViewBuilder
@@ -107,7 +119,7 @@ struct DiffTableView: View {
     private func statusBadge(_ row: DiffTableRow) -> some View {
         switch row.pipelineResult {
         case "changed":
-            Label(Strings.DiffTable.changedStatus, systemImage: "checkmark.circle.fill")
+            Label(changedLabel(row), systemImage: "checkmark.circle.fill")
                 .font(.system(size: 11))
                 .foregroundStyle(Color("NeonCyan"))
         case "unchanged":
@@ -125,7 +137,7 @@ struct DiffTableView: View {
                     .foregroundStyle(.red)
             }
         case "would_change":
-            Label(Strings.DiffTable.wouldChangeStatus, systemImage: "arrow.triangle.2.circlepath.circle.fill")
+            Label(wouldChangeLabel(row), systemImage: "arrow.triangle.2.circlepath.circle.fill")
                 .font(.system(size: 11))
                 .foregroundStyle(Color("NeonCyan").opacity(0.7))
         case nil:

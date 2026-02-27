@@ -170,6 +170,8 @@ What happens to source files after processing:
 
         static let unsavedChangesTitle = String(localized: "profiles.unsavedChanges.title",
             defaultValue: "You have unsaved changes")
+        static let unsavedChangesMessage = String(localized: "profiles.unsavedChanges.message",
+            defaultValue: "Your changes will be lost if you don't save them.")
         static let saveAndContinue = String(localized: "profiles.saveAndContinue.button",
             defaultValue: "Save Changes")
         static let discardChanges = String(localized: "profiles.discardChanges.button",
@@ -230,13 +232,17 @@ What happens to source files after processing:
         static let fileColumn = String(localized: "diffTable.file.column", defaultValue: "File")
         static let originalColumn = String(localized: "diffTable.original.column", defaultValue: "Original")
         static let correctedColumn = String(localized: "diffTable.corrected.column", defaultValue: "Corrected")
-        static let changeColumn = String(localized: "diffTable.change.column", defaultValue: "Change")
+        static let timestampColumn = String(localized: "diffTable.timestamp.column", defaultValue: "Timestamp")
         static let destinationColumn = String(localized: "diffTable.destination.column", defaultValue: "Destination")
         static let statusColumn = String(localized: "diffTable.status.column", defaultValue: "Status")
         static let changedStatus = String(localized: "diffTable.changed.status", defaultValue: "Changed")
         static let noChangeStatus = String(localized: "diffTable.noChange.status", defaultValue: "No change")
         static let failedStatus = String(localized: "diffTable.failed.status", defaultValue: "Failed")
         static let wouldChangeStatus = String(localized: "diffTable.wouldChange.status", defaultValue: "Would change")
+        static let wouldFixStatus = String(localized: "diffTable.wouldFix.status", defaultValue: "Would fix")
+        static let wouldMoveStatus = String(localized: "diffTable.wouldMove.status", defaultValue: "Would move")
+        static let fixedStatus = String(localized: "diffTable.fixed.status", defaultValue: "Fixed")
+        static let movedStatus = String(localized: "diffTable.moved.status", defaultValue: "Moved")
         static let tzMismatchStatus = String(localized: "diffTable.tzMismatch.status", defaultValue: "TZ mismatch")
         static let wouldFixChange = String(localized: "diffTable.wouldFix.change", defaultValue: "Would fix")
         static let fixedChange = String(localized: "diffTable.fixed.change", defaultValue: "Fixed")
