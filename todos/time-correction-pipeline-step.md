@@ -190,15 +190,22 @@ The step handles timezone correction and (now) time correction. Update:
 
 ### 2. Fix Timestamps step layout
 
-No mode selector. All options live within the single Fix Timestamps step, progressively disclosed:
+All options live within the single Fix Timestamps step, progressively disclosed:
+
+**Timestamp source** — selector at the top of the step:
+
+| Option | When visible | Behaviour |
+|--------|-------------|-----------|
+| **Metadata** (default) | Always | Reads timestamp from the existing tiered EXIF priority system. Shows a sample preview: the date found from the first file + whether timezone is present or missing. |
+| **From filenames** | Only when pre-flight reports all files have parseable filename dates | Reads timestamp from filename patterns. Shows the first file as a sample: filename displayed with parsed date in demo boxes (date, time, tz — tz likely missing since filenames rarely encode it). Text below: "All files in this group must follow this naming format." |
+
+When "From filenames" is selected, maps to `--infer-from-filename`. Also enables the "Update filename dates" toggle (default ON) since filenames are the source of truth and will need updating after correction.
 
 **Timezone picker** — always visible, always required (unchanged from today).
 
 **Time offset** — optional field for batch clock correction. Enter offset as seconds or human-readable (e.g. `+3d 7h 22m 15s`). Applies the same delta to every file in the batch. When provided, maps to `--time-offset=+/-SECONDS`.
 
-**"Read timestamps from filenames" checkbox** — only visible when the pre-flight file parser (see below) reports that all files in the source folder have parseable filename timestamps. When checked, maps to `--infer-from-filename`. This tells the script to read the source time from the filename pattern instead of EXIF metadata.
-
-**"Update filename dates" toggle** — only visible when the pre-flight file parser reports parseable filename timestamps. **Default ON.** When enabled, the pipeline runs `rename-file-dates.py` after fix-timestamp to update the filename's date portion to match the corrected time.
+**"Update filename dates" toggle** — only visible when pre-flight reports parseable filename dates. **Default ON when "From filenames" is selected** (the filenames will need updating). When enabled, the pipeline runs `rename-file-dates.py` after fix-timestamp to update the filename's date portion to match the corrected time.
 
 ### Pre-flight: file parser script
 
@@ -207,13 +214,17 @@ Before the pipeline runs, the macOS app invokes a separate lightweight script (`
 The script:
 1. Scans the source directory (nested) for all media files
 2. Attempts to parse each filename for a date pattern using `parse_filename_date()` from `lib/transforms.py`
-3. Reports results via `@@` lines:
-   - `@@parseable_count=N` — how many files had parseable filename dates
-   - `@@total_count=N` — total media files found
-   - `@@all_parseable=true/false` — whether every file has a parseable date
-   - Per-file: `@@file_date=<filename>|<parsed_datetime>` for each parseable file
+3. For the first file, also reads EXIF metadata via the tiered priority system to provide the "Metadata" sample preview
+4. Reports results via `@@` lines:
+   - `@@all_parseable=true/false` — whether every media file has a parseable date in its filename
+   - `@@parseable_count=N` / `@@total_count=N` — counts
+   - `@@sample_file=<filename>` — first file used for previews
+   - `@@sample_metadata_date=<datetime>` — date from tiered EXIF read of sample file
+   - `@@sample_metadata_tz=present/missing` — whether sample file has timezone in metadata
+   - `@@sample_filename_date=<datetime>` — parsed date from sample filename (if parseable)
+   - `@@sample_filename_pattern=<pattern>` — the naming format detected (e.g. `VID_YYYYMMDD_HHMMSS`)
 
-The app uses `@@all_parseable` to decide whether to show the "Read from filenames" checkbox and "Update filename dates" toggle. If not all files are parseable, these options are hidden — the user can't partially infer from filenames.
+The app uses these to populate the timestamp source preview boxes and control option visibility.
 
 ### 3. Overwrite DTO handling (safety gate → UI warning gate)
 
@@ -227,7 +238,7 @@ The app uses `@@all_parseable` to decide whether to show the "Read from filename
 
 Source files are never modified — only read, then at most moved to an archive folder. When filenames encode timestamps (VID_YYYYMMDD_HHMMSS, DJI_*, etc) and the time is corrected, the filename date is now wrong.
 
-The "Update filename dates" toggle (visible only when pre-flight reports parseable dates, default ON) controls this. When enabled:
+The "Update filename dates" toggle (visible when pre-flight reports parseable dates, default ON when "From filenames" source is selected) controls this. When enabled:
 - The pipeline runs `rename-file-dates.py` on the working copy after `fix-media-timestamp.py` completes
 - The corrected timestamp is passed via `--corrected-time` (from `@@corrected_time` emitted by fix-media-timestamp.py)
 - The working copy is renamed in-place; `active_file` is updated via `@@renamed_to`
@@ -251,12 +262,16 @@ enum Pipeline {
 }
 
 enum Workflow {
+    static let timestampSourceLabel = "Timestamp source"
+    static let timestampSourceMetadata = "Metadata"
+    static let timestampSourceFilenames = "From filenames"
+
+    static let sampleMetadataDate = "Sample: %@ — timezone %@"  // e.g. "Sample: 2025-05-14 02:07:00 — timezone missing"
+    static let sampleFilenameFormat = "All files in this group must follow this naming format"
+
     static let timeOffsetLabel = "Time offset"
     static let timeOffsetPlaceholder = "e.g. +3600 or +1h 0m 0s"
     static let timeOffsetHelp = "Apply this offset to every file's timestamp"
-
-    static let readFromFilenamesToggle = "Read timestamps from filenames"
-    static let readFromFilenamesHelp = "Use filename date instead of EXIF metadata as the source timestamp"
 
     static let updateFilenameDatesToggle = "Update filename dates"
     static let updateFilenameDatesHelp = "Rename files so filename dates match corrected timestamps"
@@ -269,20 +284,29 @@ enum Workflow {
 ### 7. WorkflowSession additions
 
 ```swift
+enum TimestampSource: String, CaseIterable {
+    case metadata = "metadata"      // default — read from EXIF tiered priority
+    case fromFilenames = "filenames" // read from filename date patterns
+}
+
 // New properties
+var timestampSource: TimestampSource = .metadata
 var timeOffsetSeconds: Int? = nil       // manual offset entry, nil = no offset
-var readFromFilenames: Bool = false     // --infer-from-filename (visible only when pre-flight reports parseable dates)
-var updateFilenameDates: Bool = false   // enable rename-file-dates step (visible only when parseable dates, default ON)
+var updateFilenameDates: Bool = false   // enable rename-file-dates step (default ON when source is .fromFilenames)
 
 // Pre-flight results (populated by scan-filename-dates.py before pipeline runs)
-var allFilenamesParseable: Bool = false // controls visibility of filename-related options
+var allFilenamesParseable: Bool = false // controls whether .fromFilenames option is available
+var sampleMetadataDate: String? = nil   // e.g. "2025-05-14 02:07:00"
+var sampleMetadataTz: String? = nil     // "present" or "missing"
+var sampleFilenameDate: String? = nil   // e.g. "2025-05-14 02:07:00"
+var sampleFilenamePattern: String? = nil // e.g. "VID_YYYYMMDD_HHMMSS"
 ```
 
 ### 8. buildPipelineArgs changes
 
 Always pass `--timezone` when the step is enabled (no change).
 
-When `readFromFilenames` is checked:
+When `timestampSource == .fromFilenames`:
 - Pass `--infer-from-filename`
 
 When `timeOffsetSeconds` is non-nil and non-zero:
@@ -372,10 +396,10 @@ The transforms file doesn't replace any complex function — it provides the tes
 
 ### Phase 5: macOS app (`macos/`)
 25. Rename step: `fixTimezone` → `fixTimestamps`
-26. Pre-flight: run `scan-filename-dates.py` on source folder before pipeline, store `allFilenamesParseable`
-27. Time offset field — optional manual offset entry
-28. "Read from filenames" checkbox (visible only when `allFilenamesParseable`)
-29. "Update filename dates" toggle (visible only when `allFilenamesParseable`, default ON)
+26. Pre-flight: run `scan-filename-dates.py` on source folder, populate sample preview data
+27. Timestamp source selector: Metadata (with sample date + tz status) / From filenames (with sample filename demo boxes + format note)
+28. Time offset field — optional manual offset entry
+29. "Update filename dates" toggle (visible when parseable dates, default ON when source is filenames)
 30. Handle tz_mismatch: show warning, offer force overwrite
 31. Wire up `buildPipelineArgs()` for new flags
 32. Parse new `@@` lines in `parseMachineReadableLine()`
