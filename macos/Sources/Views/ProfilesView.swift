@@ -60,7 +60,7 @@ struct ProfilesView: View {
                 showDiscardConfirmation = true
             }
         }
-        .alert(
+        .confirmationDialog(
             Strings.Profiles.unsavedChangesTitle,
             isPresented: $showDiscardConfirmation
         ) {
