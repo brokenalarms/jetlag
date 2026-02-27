@@ -402,6 +402,130 @@ class TestGetAllTimestampData:
         assert "--timezone flag" in data["timezone_source"]
 
 
+class TestTimeOffset:
+    """Test --time-offset functionality"""
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    def _create_video(self, name, exif_args=None):
+        path = os.path.join(self.temp_dir, name)
+        create_test_video(path, **({"DateTimeOriginal": exif_args[0].split("=")[1]} if exif_args else {}))
+        return path
+
+    def _parse_at_lines(self, stdout: str) -> dict:
+        result = {}
+        for line in stdout.strip().split("\n"):
+            if line.startswith("@@"):
+                key_value = line[2:]
+                if "=" in key_value:
+                    key, value = key_value.split("=", 1)
+                    result[key] = value
+        return result
+
+    def test_positive_offset_applied(self):
+        """Positive offset shifts timestamp forward"""
+        video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
+
+        result = subprocess.run([
+            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            video,
+            "--timezone", "+0800",
+            "--time-offset", "3600",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        at_lines = self._parse_at_lines(result.stdout)
+        assert "08:25:21" in at_lines.get("corrected_time", "")
+        assert at_lines.get("correction_mode") == "time"
+        assert at_lines.get("time_offset_seconds") == "3600"
+
+    def test_negative_offset_applied(self):
+        """Negative offset shifts timestamp backward"""
+        video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
+
+        result = subprocess.run([
+            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            video,
+            "--timezone", "+0800",
+            "--time-offset", "-3600",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        at_lines = self._parse_at_lines(result.stdout)
+        assert "06:25:21" in at_lines.get("corrected_time", "")
+        assert at_lines.get("correction_mode") == "time"
+
+    def test_offset_combined_with_infer(self):
+        """--time-offset works with --infer-from-filename"""
+        video = self._create_video("VID_20250618_072521.mp4")
+
+        result = subprocess.run([
+            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            video,
+            "--timezone", "+0800",
+            "--infer-from-filename",
+            "--time-offset", "7200",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        at_lines = self._parse_at_lines(result.stdout)
+        # 07:25:21 + 2h = 09:25:21
+        assert "09:25:21" in at_lines.get("corrected_time", "")
+
+    def test_offset_without_timezone_fails(self):
+        """--time-offset without --timezone should fail"""
+        video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
+
+        result = subprocess.run([
+            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            video,
+            "--time-offset", "3600",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode != 0
+        assert "requires --timezone" in result.stderr
+
+    def test_offset_display_emitted(self):
+        """@@time_offset_display is emitted when offset is non-zero"""
+        video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
+
+        result = subprocess.run([
+            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            video,
+            "--timezone", "+0800",
+            "--time-offset", "93784",
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("time_offset_display") == "+1d 2h 3m 4s"
+
+
+class TestFormatOffsetDisplay:
+    """Test format_offset_display helper"""
+
+    def test_positive_offset(self):
+        assert fmt.format_offset_display(93784) == "+1d 2h 3m 4s"
+
+    def test_negative_offset(self):
+        assert fmt.format_offset_display(-5400) == "-0d 1h 30m 0s"
+
+    def test_zero(self):
+        assert fmt.format_offset_display(0) == "+0d 0h 0m 0s"
+
+    def test_small_offset(self):
+        assert fmt.format_offset_display(300) == "+0d 0h 5m 0s"
+
+
 class TestFormattingFunctions:
     """Test display formatting functions"""
 
