@@ -18,6 +18,7 @@
   - testing that returncode is 0 is not testing the actual behavior or effect of the code, just that it ran without error, so would make for a useless test
   - similarly testing result.stdout reveals nothing but what the logs said, which could lie. the changes to the fake test file need to be recorded before and after with actual/expected human readable messages. Strings for users are brittle and should not be tested directly - that's why we have the scripts passing @@key=value for machines.
   - Don't run the entire suite to validate every change. Try to run local relevant tests for that script or module first to avoid time wasted on redundant testing. Only perform a full test suite run if the work is complex or interrelated, or before the final push.
+  - Never re-run /scripts/tests if you have not made any changes inside /scripts, but if in the right environment (local MacOS only), always run /macos/tests if you made any changes inside of either /macos or /scripts.
   - visually verify any web changes yourself in playwright if you can
   - if you cannot visually build and verify (eg XCode projects), include on the PR a test plan checklist that the reviewer may follow to visually verify the changes in the live app.
 - COMMITS & PULL REQUESTS — see docs/committing.md for all rules on commits, branches, and PRs
