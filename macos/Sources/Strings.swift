@@ -25,7 +25,7 @@ enum Strings {
     enum Pipeline {
         static let ingestLabel = String(localized: "pipeline.ingest.label", defaultValue: "Ingest")
         static let tagLabel = String(localized: "pipeline.tag.label", defaultValue: "Tag")
-        static let fixTimezoneLabel = String(localized: "pipeline.fixTimezone.label", defaultValue: "Fix Timezone")
+        static let fixTimestampsLabel = String(localized: "pipeline.fixTimestamps.label", defaultValue: "Fix Timestamps")
         static let organizeLabel = String(localized: "pipeline.organize.label", defaultValue: "Organize")
         static let gyroflowLabel = String(localized: "pipeline.gyroflow.label", defaultValue: "Gyroflow")
         static let archiveSourceLabel = String(localized: "pipeline.archiveSource.label", defaultValue: "Archive Source")
@@ -34,8 +34,8 @@ enum Strings {
             defaultValue: "Copy files from source to working directory for processing")
         static let tagHelp = String(localized: "pipeline.tag.help",
             defaultValue: "Apply Finder tags and EXIF metadata from profile")
-        static let fixTimezoneHelp = String(localized: "pipeline.fixTimezone.help",
-            defaultValue: "Correct timestamps for your video editor using the selected timezone")
+        static let fixTimestampsHelp = String(localized: "pipeline.fixTimestamps.help",
+            defaultValue: "Correct timezone labelling and/or camera clock errors")
         static let organizeHelp = String(localized: "pipeline.organize.help",
             defaultValue: "Move processed files into date-based folders in ready directory")
         static let gyroflowHelp = String(localized: "pipeline.gyroflow.help",
@@ -108,6 +108,16 @@ What happens to source files after processing:
             defaultValue: "Appends the timezone offset to the group folder name, e.g. 'Japan (+0900)'. Useful when a trip spans multiple timezones.")
         static let timezoneHelp = String(localized: "workflow.timezone.help",
             defaultValue: "Timezone the footage was shot in, used to fix timestamps for your video editor")
+        static let timestampSourceLabel = String(localized: "workflow.timestampSource.label", defaultValue: "Source:")
+        static let timestampSourceMetadata = String(localized: "workflow.timestampSource.metadata", defaultValue: "Metadata")
+        static let timestampSourceFilenames = String(localized: "workflow.timestampSource.filenames", defaultValue: "From filenames")
+        static let timeOffsetLabel = String(localized: "workflow.timeOffset.label", defaultValue: "Clock correction:")
+        static let timeOffsetPlaceholder = String(localized: "workflow.timeOffset.placeholder", defaultValue: "seconds")
+        static let timeOffsetHelp = String(localized: "workflow.timeOffset.help",
+            defaultValue: "Shift all timestamps by this many seconds to correct camera clock drift. Positive = forward, negative = backward.")
+        static let updateFilenameDatesToggle = String(localized: "workflow.updateFilenameDates.toggle", defaultValue: "Update filename dates")
+        static let updateFilenameDatesHelp = String(localized: "workflow.updateFilenameDates.help",
+            defaultValue: "Rename files to reflect corrected timestamps after fixing. Only affects files with parseable date patterns in their names.")
         static let timezoneManualHelp = String(localized: "workflow.timezoneManual.help",
             defaultValue: "Enter timezone manually in +HHMM or -HHMM format (e.g. +0900 for Japan)")
         static let dryRunHelp = String(localized: "workflow.dryRun.help",

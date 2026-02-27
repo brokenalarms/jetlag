@@ -10,6 +10,9 @@ struct DiffTableRow: Identifiable {
     var timestampSource: String?
     var timestampAction: String?
     var timezone: String?
+    var correctionMode: String?
+    var timeOffsetDisplay: String?
+    var renamedTo: String?
     var dest: String?
     var organizeAction: String?
     var pipelineResult: String?
@@ -36,7 +39,7 @@ struct DiffTableRow: Identifiable {
     private static let stageLabelMap: [String: String] = [
         "ingest": "Ingest",
         "tag": "Tag",
-        "fix-timestamp": "Fix TZ",
+        "fix-timestamp": "Fix TS",
         "output": "Organize",
         "gyroflow": "Gyroflow",
     ]

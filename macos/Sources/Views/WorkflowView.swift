@@ -247,9 +247,9 @@ struct WorkflowView: View {
         case .organize:
             Divider()
             organizeOptions
-        case .fixTimezone:
+        case .fixTimestamps:
             Divider()
-            fixTimezoneOptions
+            fixTimestampsOptions
         case .archiveSource:
             Divider()
             archiveSourceOptions
@@ -341,7 +341,7 @@ struct WorkflowView: View {
                 TextField(Strings.Workflow.groupPlaceholder, text: $session.group)
                     .textFieldStyle(.roundedBorder)
             }
-            if session.enabledSteps.contains(.fixTimezone) {
+            if session.enabledSteps.contains(.fixTimestamps) {
                 HStack(spacing: 4) {
                     Toggle(Strings.Workflow.appendTimezoneToggle, isOn: $session.appendTimezoneToGroup)
                         .disabled(session.group.isEmpty)
@@ -352,7 +352,7 @@ struct WorkflowView: View {
         .padding(10)
     }
 
-    private var fixTimezoneOptions: some View {
+    private var fixTimestampsOptions: some View {
         @Bindable var session = state.workflowSession
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
@@ -374,6 +374,31 @@ struct WorkflowView: View {
                 .help(session.useTimezonePicker ? Strings.Workflow.typeManuallyHelp : Strings.Workflow.pickFromListHelp)
             }
             .fieldError(session.validateTimezone())
+
+            HStack(spacing: 4) {
+                Text(Strings.Workflow.timestampSourceLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Picker("", selection: $session.inferFromFilenames) {
+                    Text(Strings.Workflow.timestampSourceMetadata).tag(false)
+                    Text(Strings.Workflow.timestampSourceFilenames).tag(true)
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 220)
+            }
+
+            HStack(spacing: 4) {
+                HelpLabel(Strings.Workflow.timeOffsetLabel, help: Strings.Workflow.timeOffsetHelp)
+                TextField(Strings.Workflow.timeOffsetPlaceholder, value: $session.timeOffsetSeconds, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 90)
+            }
+
+            HStack(spacing: 4) {
+                Toggle(Strings.Workflow.updateFilenameDatesToggle, isOn: $session.updateFilenameDates)
+                HelpButton(Strings.Workflow.updateFilenameDatesHelp)
+            }
         }
         .padding(10)
     }
@@ -534,7 +559,7 @@ struct WorkflowView: View {
         var path = readyDir + "/YYYY"
         if !session.group.isEmpty {
             var groupName = session.group
-            if session.appendTimezoneToGroup && session.enabledSteps.contains(.fixTimezone) && !session.timezone.current.isEmpty {
+            if session.appendTimezoneToGroup && session.enabledSteps.contains(.fixTimestamps) && !session.timezone.current.isEmpty {
                 groupName += " (\(session.timezone.current))"
             }
             path += "/\(groupName)"
