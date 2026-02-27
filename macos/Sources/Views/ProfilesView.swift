@@ -203,7 +203,8 @@ struct ProfilesView: View {
 
     private func loadProfileForEditing(
         _ name: String,
-        _ newProfile: MediaProfile?
+        _ newProfile: MediaProfile?,
+        _ isCreatingNew: Bool = false
     ) {
         guard var profile = newProfile else { return }
         if profile.type == nil {
