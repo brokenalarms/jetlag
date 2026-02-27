@@ -38,8 +38,8 @@ struct WorkflowView: View {
         .frame(minWidth: 340, idealWidth: defaultColumnWidth, maxWidth: defaultColumnWidth)
         .inspector(isPresented: $state.showLog) {
             VStack(spacing: 0) {
-                if !state.diffTableRows.isEmpty || state.isRunning {
-                    DiffTableView(rows: state.diffTableRows)
+                if !state.visibleRows.isEmpty || state.isRunning {
+                    DiffTableView(rows: state.visibleRows)
                 }
                 LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
             }
@@ -469,6 +469,9 @@ struct WorkflowView: View {
                     .labelsHidden()
                     .pickerStyle(.segmented)
                     .frame(width: 160)
+                    .onChange(of: session.applyMode) { _, _ in
+                        state.clearLog()
+                    }
 
                     Button(state.isRunning ? Strings.Workflow.runningButton : Strings.Workflow.runButton) { runWorkflow() }
                         .disabled(state.isRunning || !session.allStepsReady)

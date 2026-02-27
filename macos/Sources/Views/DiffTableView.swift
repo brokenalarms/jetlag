@@ -44,12 +44,10 @@ struct DiffTableView: View {
                 }
                 .width(min: 130, ideal: 175)
 
-                TableColumn(Strings.DiffTable.tzColumn) { row in
-                    Text(row.timezone ?? "—")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(row.timezone != nil ? .primary : .tertiary)
+                TableColumn(Strings.DiffTable.changeColumn) { row in
+                    changeBadge(row)
                 }
-                .width(min: 50, ideal: 60)
+                .width(min: 70, ideal: 90)
 
                 TableColumn(Strings.DiffTable.destinationColumn) { row in
                     if let dest = row.dest {
@@ -73,6 +71,36 @@ struct DiffTableView: View {
             }
         }
         .frame(maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private func changeBadge(_ row: DiffTableRow) -> some View {
+        switch row.timestampAction {
+        case "would_fix":
+            Text(Strings.DiffTable.wouldFixChange)
+                .font(.system(size: 11))
+                .foregroundStyle(Color("NeonCyan").opacity(0.7))
+        case "fixed":
+            Text(Strings.DiffTable.fixedChange)
+                .font(.system(size: 11))
+                .foregroundStyle(Color("NeonCyan"))
+        case "no_change":
+            Text(Strings.DiffTable.noChangeChange)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        case "tz_mismatch":
+            Text(Strings.DiffTable.tzMismatchStatus)
+                .font(.system(size: 11))
+                .foregroundStyle(Color("NeonYellow"))
+        case "error":
+            Text(Strings.DiffTable.errorChange)
+                .font(.system(size: 11))
+                .foregroundStyle(.red)
+        default:
+            Text("—")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+        }
     }
 
     @ViewBuilder
@@ -101,8 +129,15 @@ struct DiffTableView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(Color("NeonCyan").opacity(0.7))
         case nil:
-            ProgressView()
-                .controlSize(.small)
+            HStack(spacing: 4) {
+                ProgressView()
+                    .controlSize(.small)
+                if let stage = row.lastCompletedStageLabel {
+                    Text(stage)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+            }
         default:
             Text(row.pipelineResult ?? "")
                 .font(.system(size: 11))
