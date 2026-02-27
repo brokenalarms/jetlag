@@ -16,7 +16,7 @@
    - `scripts/`: ✅ `media-pipeline.py` now emits `@@stage_complete=<stage>` after each step (ingest, tag, fix-timestamp, output, gyroflow)
    - `macos/`: card-based progress view consuming `@@stage_complete` events, parse in `AppState.parseMachineReadableLine()`
 
-- (2026-02-27) **Time correction pipeline step** — Extend `fix-media-timestamp.py` to handle camera clock errors (not just timezone). Add `--time-offset`, `--infer-from-filename`, `--rename-files`, smart warnings. Surface in macOS app as additional options within Fix Timestamps step (amend time source picker, folder scanning, filename renaming in output). Full spec: `todos/time-correction-pipeline-step.md`
+- (2026-02-27) **Time correction pipeline step** — Extend `fix-media-timestamp.py` to handle camera clock errors (not just timezone). Add `--time-offset`, `--infer-from-filename`, smart warnings. New `rename-file-dates.py` script for updating filename dates. Decompose `fix-media-timestamp.py` into `lib/` modules (filename_patterns, timestamp_reader, timezone_utils, timestamp_display). Surface in macOS app as additional options within Fix Timestamps step (amend time source picker, folder scanning, filename date renaming). Full spec: `todos/time-correction-pipeline-step.md`
 
 ## `web/`
 

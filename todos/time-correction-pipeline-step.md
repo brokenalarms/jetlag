@@ -112,23 +112,44 @@ Offset   : +124d 1h 3m 34s (applied from reference)
 
 ## Pipeline integration (`media-pipeline.py`)
 
-The existing `fix-timestamp` task stays as-is. Time correction is a **mode** of fix-timestamp, not a separate task. This keeps the pipeline simple:
+The existing `fix-timestamp` task stays as-is. Time correction and filename renaming are additional flags on the same step, not separate tasks:
 
 ```
-INGEST → [tag] → [fix-timestamp] → OUTPUT → [gyroflow] → [archive-source]
-                      ↑
-            timezone mode (default)
-            OR time correction mode
+INGEST → [tag] → [fix-timestamp] → [rename-dates] → [organize] → [gyroflow] → [archive-source]
+                       ↑                  ↑
+              writes corrected       renames working copy
+              metadata               if filename has date
+                       │                  ↑
+                       └──── @@corrected_time=... ────┘
 ```
 
-### New pipeline args
+### New pipeline args passed to `fix-media-timestamp.py`
 
-| Arg | Passed to fix-media-timestamp.py |
-|-----|----------------------------------|
-| `--time-offset [+/-]SECONDS` | `--time-offset` |
-| `--infer-from-filename` | `--infer-from-filename` |
+| Arg | Purpose |
+|-----|---------|
+| `--time-offset [+/-]SECONDS` | Apply delta to file's best timestamp |
+| `--infer-from-filename` | Read source time from filename instead of EXIF |
 
 Both require `--timezone`. Neither implies `--overwrite-datetimeoriginal` — the safety gate is always independent.
+
+### Rename step: `rename-file-dates.py` (new script)
+
+A lightweight script that renames a file's date portion if the filename has a parseable date pattern. Completely independent of `fix-media-timestamp.py` — it takes a file and a corrected timestamp, and renames accordingly.
+
+| Arg | Purpose |
+|-----|---------|
+| `--corrected-time YYYY-MM-DD_HH:MM:SS` | The corrected timestamp to write into the filename |
+| `--dry-run` | Preview the rename without applying |
+
+The script:
+1. Parses the filename using the same patterns as `parse_filename_timestamp()` (shared via `lib/filename_patterns.py`)
+2. If filename has a parseable date → generates corrected filename, renames the working copy
+3. If filename has no parseable date → no-op, emits `@@rename_action=no_date_pattern`
+4. Emits `@@renamed_to=<new_filename>` on success
+
+`media-pipeline.py` reads `@@renamed_to` and updates `active_file` so downstream steps (organize, gyroflow) pick up the new filename.
+
+The rename is available whenever a filename has a parseable date — regardless of whether the corrected timestamp came from EXIF metadata, manual entry, or filename inference. It is not tied to `--time-offset` or `--infer-from-filename`.
 
 ### Batch offset concept
 
@@ -139,6 +160,8 @@ The bash `offset-filename-datetime.sh` calculates the offset from ONE reference 
 3. The app passes `--time-offset=+/-SECONDS --timezone=+HHMM` to `media-pipeline.py`
 4. The pipeline passes the same `--time-offset` to every `fix-media-timestamp.py` invocation
 5. Each file reads its own best timestamp, applies the offset, writes corrected metadata
+6. `fix-media-timestamp.py` emits `@@corrected_time=...` for each file
+7. If rename step is enabled, the pipeline passes `@@corrected_time` to `rename-file-dates.py`
 
 ## macOS app changes
 
@@ -187,11 +210,17 @@ When the amend time source is anything other than "From metadata" and the entere
 - Offer a "Force overwrite" action (per-file or global) that re-runs with `--overwrite-datetimeoriginal`
 - The script's safety gate always maps to a UI warning gate — the user must consciously confirm
 
-### 4. Filename renaming in output
+### 4. Filename date renaming
 
-Source files are never modified — only read, then at most moved to an archive folder. When filenames encode timestamps (VID_YYYYMMDD_HHMMSS, DJI_*, etc) and a time offset is applied, the filename is now wrong.
+Source files are never modified — only read, then at most moved to an archive folder. When filenames encode timestamps (VID_YYYYMMDD_HHMMSS, DJI_*, etc) and the time is corrected, the filename date is now wrong.
 
-Add an option in the OUTPUT/organize step: **"Rename files to match corrected timestamps"** (maps to `--rename-files` in the organize step). Uses `parse_filename_timestamp()` pattern in reverse to generate corrected filenames when writing to the target directory.
+Add a toggle within the Fix Timestamps step: **"Update filename dates to match corrected timestamps"**. This is available whenever the pipeline detects that the filename has a parseable date pattern — it's not tied to any particular correction mode.
+
+When enabled:
+- The pipeline runs `rename-file-dates.py` on the working copy after `fix-media-timestamp.py` completes
+- The corrected timestamp is passed via `--corrected-time` (from `@@corrected_time` emitted by fix-media-timestamp.py)
+- The working copy is renamed in-place; `active_file` is updated via `@@renamed_to`
+- Downstream steps (organize, gyroflow) see the correctly-named file
 
 ### 5. Show offset in diff table
 
@@ -223,8 +252,8 @@ enum Workflow {
     static let correctTimeFormatHelp = "Enter the actual time this file was captured"
     static let computedOffsetLabel = "Offset"
 
-    static let renameFilesToggle = "Rename files to match corrected timestamps"
-    static let renameFilesHelp = "Update filename timestamps in output directory to reflect corrected time"
+    static let renameFileDatesToggle = "Update filename dates to match corrected timestamps"
+    static let renameFileDatesHelp = "Rename working copy so filename date reflects the corrected time"
 
     static let tzMismatchWarning = "Timezone already present in metadata — differs from provided timezone"
     static let forceOverwriteButton = "Overwrite existing timezone"
@@ -239,7 +268,7 @@ var amendTimeSource: AmendTimeSource = .fromMetadata
 var referenceFilePath: String = ""
 var correctTime: String = ""  // YYYYMMDD_HHMMSS
 var computedOffsetSeconds: Int? = nil  // calculated when correct time differs from reference
-var renameFiles: Bool = false
+var renameFileDates: Bool = false
 
 enum AmendTimeSource: String, CaseIterable {
     case fromMetadata = "metadata"
@@ -258,45 +287,101 @@ When `amendTimeSource == .fromFile`:
 When `computedOffsetSeconds` is non-nil and non-zero (time correction active):
 - Pass `--time-offset=+/-SECONDS`
 
-When `renameFiles` is toggled:
-- Pass `--rename-files`
+When `renameFileDates` is toggled:
+- Pipeline enables the `rename-file-dates` step after fix-timestamp
+- Passes `--corrected-time` from `@@corrected_time` emitted by fix-media-timestamp.py
 
 When user confirms force overwrite after tz_mismatch warning:
 - Pass `--overwrite-datetimeoriginal`
 
+## Script decomposition (`fix-media-timestamp.py`)
+
+The script is 1118 lines with 50+ functions. Before or during the time correction work, extract shared logic into `lib/` modules for testability and reuse. Natural seams:
+
+### Extract to `lib/filename_patterns.py`
+- `parse_filename_timestamp()` (line 253) — 6+ filename pattern matchers (VID/IMG/LRV, DJI, DSC, macOS screenshots, generic YYYYMMDD)
+- New: `generate_corrected_filename(original_name, corrected_time)` — reverse of parse, generates filename with updated date portion
+- Shared by `fix-media-timestamp.py` (parsing), `rename-file-dates.py` (parsing + generation), and the macOS app's folder scanning
+
+### Extract to `lib/timestamp_reader.py`
+- `parse_datetime_original()` (line 189) — regex parsing with timezone extraction
+- `get_best_timestamp()` (line 372) — 5-tier priority system
+- `get_all_timestamp_data()` (line 444) — orchestration with timezone handling, overwrite logic, UTC conversion
+- `extract_metadata_timezone()` (line 862)
+- `is_valid_timestamp()` (line 180)
+- Core "read timestamps from a file" logic — testable with mock EXIF data
+
+### Extract to `lib/timezone_utils.py`
+- `get_timezone_for_country()` (line 70) — CSV-based country→timezone lookup
+- `get_country_name()` (line 130)
+- `normalize_timezone_input()`, `normalize_timezone_format()`, `ensure_colon_tz()`
+- `to_utc()` (line 62)
+- Pure functions (except CSV read), independently testable
+
+### Extract to `lib/timestamp_display.py`
+- `format_original_timestamps()` (line 673)
+- `format_corrected_timestamp()` (line 725)
+- `format_change_description()` (line 770) — 91 lines, largest display function
+- `format_exif_timestamp_display()`, `format_timestamp_display()`, `format_time_delta()`
+- `_source_to_machine_token()`, `_get_raw_original_time()`
+- Presentation layer only — no side effects
+
+### Stays in `fix-media-timestamp.py` (~400 lines after extraction)
+- `fix_media_timestamps()` — main orchestrator (reads, decides, writes)
+- `main()` — CLI argument parsing
+- EXIF write functions (`write_datetime_original`, `write_keys_creationdate`, `write_quicktime_createdate`) — tightly coupled to the write flow
+- Change detection (`determine_needed_changes`, `check_*_needs_update`) — tightly coupled to write decisions
+
+### Already in `lib/` (unchanged)
+- `lib/exiftool.py` — persistent exiftool subprocess
+- `lib/file_timestamps.py` — macOS file system timestamps
+- `lib/filesystem.py` — `find_media_files()`, `parse_machine_output()`
+
 ## Implementation order
 
+### Phase 0: Script decomposition (`scripts/lib/`)
+1. Extract `lib/filename_patterns.py` from `fix-media-timestamp.py` — `parse_filename_timestamp()` + new `generate_corrected_filename()`
+2. Extract `lib/timezone_utils.py` — timezone normalisation, country lookup, UTC conversion
+3. Extract `lib/timestamp_reader.py` — 5-tier priority reader, datetime parsing, metadata timezone extraction
+4. Extract `lib/timestamp_display.py` — all formatting and display functions
+5. Update imports in `fix-media-timestamp.py`, verify existing tests still pass
+
 ### Phase 1: Script — infer from filename (`scripts/`)
-1. Add `--infer-from-filename` flag to `fix-media-timestamp.py` — reads time from filename using existing `parse_filename_timestamp()`, requires `--timezone`
-2. Keep `--overwrite-datetimeoriginal` as the orthogonal safety gate (unchanged)
-3. Tests: filename inference for VID_/IMG_/LRV_/DJI_ patterns, interaction with --overwrite-datetimeoriginal, error when no parseable filename
+6. Add `--infer-from-filename` flag to `fix-media-timestamp.py` — reads time from filename using `lib/filename_patterns.py`, requires `--timezone`
+7. Keep `--overwrite-datetimeoriginal` as the orthogonal safety gate (unchanged)
+8. Emit `@@corrected_time=YYYY-MM-DD_HH:MM:SS` for every file (needed by rename step)
+9. Tests: filename inference for VID_/IMG_/LRV_/DJI_ patterns, interaction with --overwrite-datetimeoriginal, error when no parseable filename
 
 ### Phase 2: Script — time offset (`scripts/`)
-4. Add `--time-offset [+/-]SECONDS` to `fix-media-timestamp.py` — applies delta to whatever timestamp source is found
-5. Does NOT imply `--overwrite-datetimeoriginal` — safety gate always independent
-6. Emit `@@time_offset_seconds`, `@@time_offset_display`, `@@correction_mode` machine lines
-7. Tests: offset calculation, positive/negative offsets, interaction with `--infer-from-filename`, tz_mismatch still fires when DTO has tz
+10. Add `--time-offset [+/-]SECONDS` to `fix-media-timestamp.py` — applies delta to whatever timestamp source is found
+11. Does NOT imply `--overwrite-datetimeoriginal` — safety gate always independent
+12. Emit `@@time_offset_seconds`, `@@time_offset_display`, `@@correction_mode` machine lines
+13. Tests: offset calculation, positive/negative offsets, interaction with `--infer-from-filename`, tz_mismatch still fires when DTO has tz
 
-### Phase 3: Script — filename renaming (`scripts/`)
-8. Add `--rename-files` flag to the organize/output step — renames files in the target directory to match corrected timestamps
-9. Uses `parse_filename_timestamp()` pattern in reverse to generate corrected filenames
-10. Source files are never modified — renaming only applies to output copies
-11. Tests: VID_/IMG_/LRV_/DJI_ pattern reverse-generation, companion file renaming
+### Phase 3: Script — filename date renaming (`scripts/`)
+14. Create `rename-file-dates.py` — standalone script that renames a file's date portion
+15. Takes `--corrected-time` and the file path; uses `lib/filename_patterns.py` for parsing + generation
+16. Emits `@@renamed_to=<new_filename>` on success, `@@rename_action=no_date_pattern` if no parseable date
+17. Source files are never modified — this operates on the working copy only
+18. Tests: VID_/IMG_/LRV_/DJI_ pattern reverse-generation, no-op when no date in filename, companion file handling
 
-### Phase 4: Pipeline pass-through (`scripts/`)
-12. Add `--time-offset`, `--infer-from-filename`, `--rename-files` pass-through in `media-pipeline.py`
-13. Test pipeline end-to-end with time correction + rename
+### Phase 4: Pipeline integration (`scripts/`)
+19. Add `--time-offset`, `--infer-from-filename` pass-through to fix-media-timestamp.py in `media-pipeline.py`
+20. Add `rename-file-dates` as a new pipeline step after fix-timestamp, conditionally enabled
+21. Pipeline reads `@@corrected_time` from fix-timestamp, passes to rename step
+22. Pipeline reads `@@renamed_to` from rename step, updates `active_file`
+23. Test pipeline end-to-end with time correction + rename
 
 ### Phase 5: macOS app (`macos/`)
-14. Rename step: `fixTimezone` → `fixTimestamps`
-15. Add amend time source picker (from metadata / manual entry / from file)
-16. From file: folder scanning, filename parsing, reference file selection
-17. Correct time input + live offset computation + preview
-18. Rename files toggle in output step
-19. Handle tz_mismatch: show warning, offer force overwrite
-20. Wire up `buildPipelineArgs()` for new flags
-21. Parse new `@@` lines in `parseMachineReadableLine()`
-22. Show offset in diff table
+24. Rename step: `fixTimezone` → `fixTimestamps`
+25. Add amend time source picker (from metadata / manual entry / from file)
+26. From file: folder scanning, filename parsing, reference file selection
+27. Correct time input + live offset computation + preview
+28. Rename file dates toggle within Fix Timestamps step
+29. Handle tz_mismatch: show warning, offer force overwrite
+30. Wire up `buildPipelineArgs()` for new flags
+31. Parse new `@@` lines in `parseMachineReadableLine()`
+32. Show offset in diff table
 
 ## What this does NOT cover
 
