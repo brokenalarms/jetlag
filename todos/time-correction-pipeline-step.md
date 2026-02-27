@@ -20,44 +20,80 @@ This works, but it's bash-only, Insta360-specific, not integrated into the pipel
 Rather than creating a parallel script, time correction should be incorporated into the existing `fix-media-timestamp.py`. The script already has the infrastructure:
 
 - `parse_filename_timestamp()` — recognises VID_/IMG_/LRV_/DJI_/DSC_ filename patterns
-- `--overwrite-datetimeoriginal` — replaces DTO with filename-derived time + timezone (exists, but not surfaced in UI or clearly documented as the "filename is correct, EXIF is wrong" mode)
+- `--overwrite-datetimeoriginal` — safety gate that allows overwriting DTO even when it already contains timezone metadata. Where the replacement timestamp comes from is determined separately by the data source priority. Exists but not surfaced in the UI.
 - Timezone mismatch detection — warns when provided timezone differs from DTO's embedded timezone
 - `@@key=value` machine-readable output — already consumed by the macOS app
 
-### New CLI arguments
+### Two orthogonal axes
+
+Time correction involves two independent decisions:
+
+**Axis 1 — Where to read the source time from:**
+
+| Flag | Reads time from | When to use |
+|------|----------------|-------------|
+| *(default)* | DateTimeOriginal / CreationDate / MediaCreateDate (existing 5-tier priority) | Camera EXIF has the right local time, just needs timezone |
+| `--infer-from-filename` | Filename timestamp (VID_YYYYMMDD_HHMMSS, DJI_*, etc) | Camera EXIF is corrupt/wrong, but the filename recorded the correct capture time |
+
+**Axis 2 — Whether to overwrite existing timezone in DTO:**
+
+| Flag | Behaviour | When to use |
+|------|-----------|-------------|
+| *(default)* | Refuse if DTO already has timezone embedded (`@@timestamp_action=tz_mismatch`) | Normal operation — don't accidentally overwrite correct metadata |
+| `--overwrite-datetimeoriginal` | Overwrite DTO even if it already has timezone | You know the existing tz in DTO is wrong and want to replace it |
+
+These are orthogonal. Any combination is valid:
+
+| Infer from filename? | Overwrite DTO? | Use case |
+|---------------------|----------------|----------|
+| No | No | Standard timezone fix: DTO has right time, no tz, add it |
+| No | Yes | DTO has time + wrong tz, keep the time but replace the tz |
+| Yes | No | EXIF is missing/corrupt, filename has right time, DTO has no tz yet |
+| Yes | Yes | EXIF has wrong time + wrong tz, filename is correct, overwrite everything |
+
+### Time offset (the new capability)
+
+In addition to the two axes above, add a third concept for batch clock correction:
 
 | Arg | Purpose |
 |-----|---------|
-| `--correct-time YYYYMMDD_HHMMSS` | "This file was actually taken at this time." Manual override when neither EXIF nor filename has the right time. Mutually exclusive with `--infer-from-filename`. |
-| `--infer-from-filename` | "The filename has the correct time, use it as source of truth." Equivalent to the existing `--overwrite-datetimeoriginal` behaviour for Insta360/DJI files but with clearer intent. Should emit a warning if DTO already has a timezone and the time matches — signalling the user probably wants timezone correction, not time correction. |
+| `--time-offset [+/-]SECONDS` | Apply this delta to the file's existing timestamp. For when the camera clock was simply wrong by a fixed amount. |
 
-Both of these are **time correction** modes — they change the actual time, not just the timezone. They should:
+This works with either data source (EXIF or filename). The script:
+1. Reads the best timestamp (from EXIF or filename depending on flags)
+2. Adds the offset in seconds
+3. Writes the corrected time + timezone to all metadata fields
+4. Requires `--timezone`
+5. Does NOT imply `--overwrite-datetimeoriginal` — the safety gate is always independent. If DTO already has timezone metadata, the script still returns `tz_mismatch` unless `--overwrite-datetimeoriginal` is explicitly provided. In the app this translates to a warning dialog, not an auto-bypass.
 
-1. Read the existing DTO/CreationDate/filename time
-2. Calculate the delta between the old time and the correct time
-3. In dry run: show the delta ("Offset: +3d 7h 22m 15s") and the before/after for each file
-4. In apply: write the corrected time with timezone to all metadata fields
-5. Emit `@@time_offset_seconds=N` and `@@time_offset_display=+3d 7h 22m 15s` for the macOS app
+Dry run output:
+```
+Original : 2025-01-01 12:00:00 (DateTimeOriginal)
+Corrected: 2025-05-05 13:03:34+09:00 (time correction)
+Offset   : +124d 1h 3m 34s
+```
+
+New machine-readable lines:
+- `@@time_offset_seconds=10717414` — raw delta for programmatic use
+- `@@time_offset_display=+124d 1h 3m 34s` — human-friendly for UI display
+- `@@correction_mode=time` vs `@@correction_mode=timezone` — tells the app which mode was used
 
 ### Interaction with `--timezone`
 
-- `--correct-time` + `--timezone`: corrects both time and timezone. The correct time is interpreted as local time in the provided timezone.
-- `--infer-from-filename` + `--timezone`: uses filename time + provided timezone as source of truth (existing `--overwrite-datetimeoriginal` behaviour, reframed).
-- `--correct-time` without `--timezone`: error — must know the timezone to write correct metadata.
-- `--infer-from-filename` without `--timezone`: error unless DTO already has a timezone embedded (in which case, warn that this looks like a pure time correction).
+- `--time-offset` requires `--timezone` — must know the timezone to write correct metadata
+- `--infer-from-filename` requires `--timezone` — the filename has no tz, so one must be provided
+- `--infer-from-filename` without `--timezone`: error
+- `--time-offset` + `--infer-from-filename`: valid — read from filename, apply offset, write with timezone
 
 ### Signals and warnings
 
-The script should provide intelligent signals about what it's doing, especially when the data is ambiguous:
-
 | Scenario | Signal |
 |----------|--------|
-| DTO has timezone, user provides same timezone, no time correction args | `@@timestamp_action=no_change` — everything matches, nothing to do |
-| DTO has timezone, user provides different timezone, no `--overwrite-*` | `@@timestamp_action=tz_mismatch` — existing behaviour, refuses without force flag |
-| DTO has timezone matching user's, but `--correct-time` differs from DTO time | Time correction mode — apply offset, emit `@@time_offset_seconds=N` |
-| `--infer-from-filename` but filename time matches DTO time | Warn: "Filename and DTO agree — time correction unnecessary. Did you mean timezone correction?" |
-| `--infer-from-filename` but file has no parseable filename timestamp | Error: "Cannot infer time from filename — use `--correct-time` instead" |
-| `--overwrite-datetimeoriginal` used without `--infer-from-filename` or `--correct-time` | Existing behaviour preserved for backwards compat, but deprecation notice pointing to the new flags |
+| DTO has timezone, user provides same timezone, no overwrite flag | `@@timestamp_action=no_change` — everything matches, nothing to do |
+| DTO has timezone, user provides different timezone, no overwrite flag | `@@timestamp_action=tz_mismatch` — existing behaviour, refuses. Script emits warning with hint about `--overwrite-datetimeoriginal` |
+| DTO has timezone, user provides `--overwrite-datetimeoriginal` | Proceeds with overwrite, emits warning to stderr for awareness |
+| `--infer-from-filename` but file has no parseable filename timestamp | Error: "Cannot infer time from filename — no recognised pattern" |
+| `--infer-from-filename` and filename time matches DTO time | Info: "Filename and DTO agree on time — applying timezone only" (not an error, just informational) |
 
 ### Dry run diff output
 
@@ -74,11 +110,6 @@ Corrected: 2025-05-05 13:03:34+09:00 (time correction)
 Offset   : +124d 1h 3m 34s (applied from reference)
 ```
 
-New machine-readable lines:
-- `@@time_offset_seconds=10717414` — raw delta for programmatic use
-- `@@time_offset_display=+124d 1h 3m 34s` — human-friendly for UI display
-- `@@correction_mode=time` vs `@@correction_mode=timezone` — tells the app which mode was used
-
 ## Pipeline integration (`media-pipeline.py`)
 
 The existing `fix-timestamp` task stays as-is. Time correction is a **mode** of fix-timestamp, not a separate task. This keeps the pipeline simple:
@@ -94,85 +125,84 @@ INGEST → [tag] → [fix-timestamp] → OUTPUT → [gyroflow] → [archive-sour
 
 | Arg | Passed to fix-media-timestamp.py |
 |-----|----------------------------------|
-| `--correct-time YYYYMMDD_HHMMSS` | `--correct-time` |
+| `--time-offset [+/-]SECONDS` | `--time-offset` |
 | `--infer-from-filename` | `--infer-from-filename` |
 
-These are mutually exclusive with each other. Both require `--timezone`.
+Both require `--timezone`. Neither implies `--overwrite-datetimeoriginal` — the safety gate is always independent.
 
 ### Batch offset concept
 
-The bash `offset-filename-datetime.sh` calculates the offset from ONE reference file, then applies it to ALL files. In the pipeline, this works naturally:
+The bash `offset-filename-datetime.sh` calculates the offset from ONE reference file, then applies it to ALL files. In the pipeline:
 
-1. **All files get the same `--correct-time` or `--infer-from-filename`** — the offset is per-file (each file's own filename/DTO vs the corrected time)
-2. **For the "reference file" pattern**: the user picks one file, enters the correct time, and the app calculates the offset once. Then it passes `--correct-time` to each file with that file's own corrected time (original time + offset).
-
-This means the app needs to:
-1. Let the user pick a reference file and enter the correct time
-2. Calculate `offset = correct_time - reference_file_time`
-3. For each file: `file_correct_time = file_original_time + offset`
-4. Pass per-file `--correct-time` to fix-media-timestamp.py
-
-Alternatively, a simpler approach: add `--time-offset +/-SECONDS` to fix-media-timestamp.py, so the pipeline just passes one offset to every file. This avoids the app needing to pre-read every file's time.
-
-**Recommendation: `--time-offset` is simpler.** The app calculates the offset from the reference file, then passes `--time-offset=+10717414` to fix-media-timestamp.py for every file. The script applies the offset to whatever timestamp source it finds (DTO, filename, etc).
-
-### New arg (preferred approach)
-
-| Arg | Purpose |
-|-----|---------|
-| `--time-offset [+/-]SECONDS` | Apply this delta to the file's existing timestamp. Requires `--timezone`. |
-
-This replaces the per-file `--correct-time` approach. The script:
-1. Reads the existing best timestamp (same 5-tier priority as today)
-2. Adds the offset in seconds
-3. Writes the corrected time + timezone to all metadata fields
+1. The app lets the user pick a reference file and enter the correct time
+2. The app calculates `offset = correct_time - reference_file_time` (one exiftool read)
+3. The app passes `--time-offset=+/-SECONDS --timezone=+HHMM` to `media-pipeline.py`
+4. The pipeline passes the same `--time-offset` to every `fix-media-timestamp.py` invocation
+5. Each file reads its own best timestamp, applies the offset, writes corrected metadata
 
 ## macOS app changes
 
-### 1. Surface `--overwrite-datetimeoriginal` / `--infer-from-filename`
+### 1. Rename the pipeline step
 
-The fix timezone step currently has one control: the timezone picker. Add a toggle:
+`Fix Timezone` → `Fix Timestamps`
 
-**"Use filename as source of truth"** (maps to `--infer-from-filename`)
-- Help text: "Use when the camera's embedded EXIF time is wrong but the filename has the correct time. Common for Insta360 and DJI cameras after a factory reset."
-- When toggled on:
-  - Show a note: "Filename timestamp will replace DateTimeOriginal"
-  - If the selected profile has no filename-parseable patterns (check against known patterns), show a warning
-
-### 2. Time correction mode
-
-Add a second mode to the fix timezone step — effectively making it "Fix Time & Timezone":
-
-**Mode selector** (radio/segmented):
-- **Timezone only** (default) — existing behaviour, just adds/fixes timezone
-- **Time correction** — enables the offset UI:
-  - Reference file picker (Browse button, shows selected filename)
-  - "Correct time" input field (YYYYMMDD_HHMMSS format, with inline validation)
-  - Computed offset display: "Offset: +3d 7h 22m 15s" (computed live from reference file's time vs entered correct time)
-  - This requires reading the reference file's timestamp at selection time — a quick exiftool call from the app
-
-The app computes the offset (`correct_time - reference_file_time`) and passes `--time-offset=SECONDS --timezone=+HHMM` to the pipeline.
-
-### 3. Rename the pipeline step
-
-`Fix Timezone` → `Fix Timestamps` (or `Fix Time`)
-
-The step now handles both timezone correction and time correction. The label should reflect this. Update:
+The step handles timezone correction and (now) time correction. Update:
 - `PipelineStep.fixTimezone` → `PipelineStep.fixTimestamps`
 - `Strings.Pipeline.fixTimezoneLabel` → `Strings.Pipeline.fixTimestampsLabel`
-- `Strings.Pipeline.fixTimezoneHelp` — update help text to mention both modes
+- `Strings.Pipeline.fixTimezoneHelp` → update help text to cover both capabilities
 - Task name stays `fix-timestamp` (already correct)
 
-### 4. Show offset in diff table
+### 2. Fix Timestamps step layout
 
-When time correction is used, the diff table should show:
+No mode selector. All options live within the single Fix Timestamps step, progressively disclosed:
+
+**Timezone picker** — always visible, always required (unchanged from today).
+
+**Amend time** — source selector for where to read the correct time from, defaulting to "From metadata" (auto-selected):
+
+| Source | Behaviour |
+|--------|-----------|
+| From metadata (default) | Auto-reads existing EXIF timestamp via the 5-tier priority chain. This is today's behaviour — timezone-only correction. |
+| Manual entry | Text field / time picker for directly typing the correct time (YYYYMMDD_HHMMSS format, with inline validation). |
+| From file | File browser accepting absolute or `./` relative path. App parses the selected file's filename timestamp and fills the field. Shows error if filename pattern isn't recognised. |
+
+When "From file" is selected:
+- App scans the source directory (nested) for all matching files by filename pattern
+- Parses all filename timestamps in advance to validate and preview
+- Shows the reference file's parsed timestamp
+- User enters the correct time → computed offset displayed live: "Offset: +3d 7h 22m 15s"
+- Preview shows what all files would look like after applying the offset
+
+When "Manual entry" is selected:
+- Text field for correct time
+- Same offset calculation and preview as "From file"
+
+When the amend time source is anything other than "From metadata" and the entered time differs from the existing timestamp, the app computes the offset and passes `--time-offset=+/-SECONDS --timezone=+HHMM` to the pipeline.
+
+### 3. Overwrite DTO handling (safety gate → UI warning gate)
+
+`--overwrite-datetimeoriginal` is never auto-bypassed, not even by `--time-offset`. In the app:
+
+- When a dry run returns files with `@@timestamp_action=tz_mismatch`, show a warning in the diff table: "Timezone already present in metadata — differs from provided timezone"
+- Offer a "Force overwrite" action (per-file or global) that re-runs with `--overwrite-datetimeoriginal`
+- The script's safety gate always maps to a UI warning gate — the user must consciously confirm
+
+### 4. Filename renaming in output
+
+Source files are never modified — only read, then at most moved to an archive folder. When filenames encode timestamps (VID_YYYYMMDD_HHMMSS, DJI_*, etc) and a time offset is applied, the filename is now wrong.
+
+Add an option in the OUTPUT/organize step: **"Rename files to match corrected timestamps"** (maps to `--rename-files` in the organize step). Uses `parse_filename_timestamp()` pattern in reverse to generate corrected filenames when writing to the target directory.
+
+### 5. Show offset in diff table
+
+When time correction is used (offset is non-zero), the diff table shows:
 - `originalTime` — as today
-- `correctedTime` — as today, but now includes the offset
+- `correctedTime` — as today, but with the corrected time
 - New annotation or tooltip showing the offset applied
 
 The `@@time_offset_display` machine line provides this for each file.
 
-### 5. New Strings
+### 6. New Strings
 
 ```swift
 enum Pipeline {
@@ -181,75 +211,94 @@ enum Pipeline {
 }
 
 enum Workflow {
-    static let correctionModeLabel = "Correction type"
-    static let timezoneOnlyOption = "Timezone"
-    static let timeCorrectionOption = "Time correction"
+    static let amendTimeLabel = "Amend time"
+    static let fromMetadataOption = "From metadata"
+    static let manualEntryOption = "Enter manually"
+    static let fromFileOption = "From file"
 
     static let referenceFileLabel = "Reference file"
-    static let referenceFilePlaceholder = "Select a file with known correct time"
+    static let referenceFilePlaceholder = "Select a file to read timestamp from"
     static let correctTimeLabel = "Correct time"
     static let correctTimePlaceholder = "YYYYMMDD_HHMMSS"
-    static let correctTimeFormatHelp = "Enter the correct time for the reference file"
+    static let correctTimeFormatHelp = "Enter the actual time this file was captured"
     static let computedOffsetLabel = "Offset"
 
-    static let inferFromFilenameToggle = "Use filename as source of truth"
-    static let inferFromFilenameHelp = "Use when embedded EXIF time is wrong but the filename has the correct capture time"
+    static let renameFilesToggle = "Rename files to match corrected timestamps"
+    static let renameFilesHelp = "Update filename timestamps in output directory to reflect corrected time"
 
-    static let timezoneAlreadyInDTO = "This file already has a timezone in DateTimeOriginal"
-    static let timeCorrectionUnnecessary = "Filename and EXIF time agree — did you mean timezone correction?"
+    static let tzMismatchWarning = "Timezone already present in metadata — differs from provided timezone"
+    static let forceOverwriteButton = "Overwrite existing timezone"
 }
 ```
 
-### 6. WorkflowSession additions
+### 7. WorkflowSession additions
 
 ```swift
 // New properties
-var correctionMode: CorrectionMode = .timezoneOnly  // .timezoneOnly or .timeCorrection
+var amendTimeSource: AmendTimeSource = .fromMetadata
 var referenceFilePath: String = ""
 var correctTime: String = ""  // YYYYMMDD_HHMMSS
-var inferFromFilename: Bool = false
-var computedOffsetSeconds: Int? = nil  // calculated when reference file + correct time are set
+var computedOffsetSeconds: Int? = nil  // calculated when correct time differs from reference
+var renameFiles: Bool = false
 
-enum CorrectionMode: String, CaseIterable {
-    case timezoneOnly = "timezone"
-    case timeCorrection = "time"
+enum AmendTimeSource: String, CaseIterable {
+    case fromMetadata = "metadata"
+    case manual = "manual"
+    case fromFile = "file"
 }
 ```
 
-### 7. buildPipelineArgs changes
+### 8. buildPipelineArgs changes
 
-When `correctionMode == .timeCorrection`:
-- If `computedOffsetSeconds` is set: pass `--time-offset=+/-SECONDS`
-- Always pass `--timezone`
-- Pass `--overwrite-datetimeoriginal` (needed for the script to apply the corrected time)
+Always pass `--timezone` when the step is enabled (no change).
 
-When `inferFromFilename` is toggled:
-- Pass `--infer-from-filename` (or `--overwrite-datetimeoriginal` until the new flag is implemented)
+When `amendTimeSource == .fromFile`:
+- Pass `--infer-from-filename`
+
+When `computedOffsetSeconds` is non-nil and non-zero (time correction active):
+- Pass `--time-offset=+/-SECONDS`
+
+When `renameFiles` is toggled:
+- Pass `--rename-files`
+
+When user confirms force overwrite after tz_mismatch warning:
+- Pass `--overwrite-datetimeoriginal`
 
 ## Implementation order
 
-### Phase 1: Script (`scripts/`)
-1. Add `--time-offset [+/-]SECONDS` to `fix-media-timestamp.py`
-2. Add `--infer-from-filename` as alias/replacement for `--overwrite-datetimeoriginal`
-3. Emit `@@time_offset_seconds`, `@@time_offset_display`, `@@correction_mode` machine lines
-4. Smart warnings (filename matches DTO, no filename pattern found, etc.)
-5. Tests: offset calculation, filename inference, warning triggers, companion file handling
+### Phase 1: Script — infer from filename (`scripts/`)
+1. Add `--infer-from-filename` flag to `fix-media-timestamp.py` — reads time from filename using existing `parse_filename_timestamp()`, requires `--timezone`
+2. Keep `--overwrite-datetimeoriginal` as the orthogonal safety gate (unchanged)
+3. Tests: filename inference for VID_/IMG_/LRV_/DJI_ patterns, interaction with --overwrite-datetimeoriginal, error when no parseable filename
 
-### Phase 2: Pipeline (`scripts/`)
-6. Add `--time-offset` and `--infer-from-filename` pass-through in `media-pipeline.py`
-7. Test pipeline end-to-end with time correction mode
+### Phase 2: Script — time offset (`scripts/`)
+4. Add `--time-offset [+/-]SECONDS` to `fix-media-timestamp.py` — applies delta to whatever timestamp source is found
+5. Does NOT imply `--overwrite-datetimeoriginal` — safety gate always independent
+6. Emit `@@time_offset_seconds`, `@@time_offset_display`, `@@correction_mode` machine lines
+7. Tests: offset calculation, positive/negative offsets, interaction with `--infer-from-filename`, tz_mismatch still fires when DTO has tz
 
-### Phase 3: macOS app (`macos/`)
-8. Rename step: `fixTimezone` → `fixTimestamps`
-9. Add correction mode selector (timezone only vs time correction)
-10. Add reference file picker + correct time input + live offset display
-11. Add infer-from-filename toggle
-12. Wire up `buildPipelineArgs()` for new flags
-13. Parse new `@@` lines in `parseMachineReadableLine()`
-14. Update diff table to show offset info
+### Phase 3: Script — filename renaming (`scripts/`)
+8. Add `--rename-files` flag to the organize/output step — renames files in the target directory to match corrected timestamps
+9. Uses `parse_filename_timestamp()` pattern in reverse to generate corrected filenames
+10. Source files are never modified — renaming only applies to output copies
+11. Tests: VID_/IMG_/LRV_/DJI_ pattern reverse-generation, companion file renaming
+
+### Phase 4: Pipeline pass-through (`scripts/`)
+12. Add `--time-offset`, `--infer-from-filename`, `--rename-files` pass-through in `media-pipeline.py`
+13. Test pipeline end-to-end with time correction + rename
+
+### Phase 5: macOS app (`macos/`)
+14. Rename step: `fixTimezone` → `fixTimestamps`
+15. Add amend time source picker (from metadata / manual entry / from file)
+16. From file: folder scanning, filename parsing, reference file selection
+17. Correct time input + live offset computation + preview
+18. Rename files toggle in output step
+19. Handle tz_mismatch: show warning, offer force overwrite
+20. Wire up `buildPipelineArgs()` for new flags
+21. Parse new `@@` lines in `parseMachineReadableLine()`
+22. Show offset in diff table
 
 ## What this does NOT cover
 
-- **Filename renaming** — `offset-filename-datetime.sh` renames files (VID_20250101_120000.mp4 → VID_20250505_130334.mp4). The pipeline doesn't rename files; it writes metadata. Filename renaming could be a separate future feature.
 - **Automatic clock drift detection** — comparing timestamps across cameras to detect drift automatically. Would require analyzing multiple files from multiple cameras together. Future feature.
-- **Timeline visualization** — covered in the separate `todos/timeline-visualization.md` spec, but the `@@time_offset_*` data feeds directly into showing before/after positions.
+- **Timeline visualization** — covered separately in TODO.md, but the `@@time_offset_*` data feeds directly into showing before/after positions.
