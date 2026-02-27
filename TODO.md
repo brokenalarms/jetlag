@@ -16,7 +16,9 @@
    - `scripts/`: ✅ `media-pipeline.py` now emits `@@stage_complete=<stage>` after each step (ingest, tag, fix-timestamp, output, gyroflow)
    - `macos/`: card-based progress view consuming `@@stage_complete` events, parse in `AppState.parseMachineReadableLine()`
 
-- (2026-02-27) **Time correction pipeline step** — Extend `fix-media-timestamp.py` to handle camera clock errors (not just timezone). Add `--time-offset`, `--infer-from-filename`, smart warnings. Extract tiered timestamp reader into `lib/timestamp_source.py` (shared by all scripts). New `report-file-dates.py` (pre-flight scanner) and `rename-file-dates.py` (filename date updates) both use the shared lib. Surface in macOS app as timestamp source selector + offset field within Fix Timestamps step. Full spec: `todos/time-correction-pipeline-step.md`
+- (2026-02-27) **Time correction pipeline step** — Extend `fix-media-timestamp.py` to handle camera clock errors (not just timezone). Add `--time-offset`, `--infer-from-filename`, smart warnings. Extract tiered timestamp reader into `lib/timestamp_source.py` (shared by all scripts). New `report-file-dates.py` (pre-flight scanner) and `rename-file-dates.py` (filename date updates + companion files) both use the shared lib. Filename parsing is generic date patterns (not prefix-specific). Surface in macOS app as timestamp source selector + offset field within Fix Timestamps step. Full spec: `todos/time-correction-pipeline-step.md`
+
+- (2026-02-27) **Per-profile `filename_timestamp_patterns`** — Allow profiles in `media-profiles.yaml` to define custom filename date patterns for cameras using non-standard formats. Generic detection covers all known cameras today; this is future-proofing for when a real camera needs it. Low priority.
 
 ## `web/`
 
