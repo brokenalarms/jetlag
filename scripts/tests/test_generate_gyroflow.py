@@ -157,8 +157,8 @@ class TestAlreadyExists:
 class TestMissingBinary:
     """Tests for missing Gyroflow binary."""
 
-    def test_missing_binary_error(self):
-        """Clear error if Gyroflow binary not found at configured path."""
+    def test_missing_binary_skips_gracefully(self):
+        """Missing Gyroflow binary should skip gracefully, not crash the pipeline."""
         with tempfile.TemporaryDirectory() as tmpdir:
             video = Path(tmpdir) / "test.mp4"
             create_test_video(video)
@@ -182,7 +182,9 @@ class TestMissingBinary:
                     yaml.dump(data, f, default_flow_style=False, sort_keys=False)
 
                 env = os.environ.copy()
-                env["PATH"] = f"{tmpdir}:{env['PATH']}"
+                # Restrict PATH to tmpdir (fake ffprobe) + essentials only,
+                # so shutil.which("gyroflow") won't find a real install
+                env["PATH"] = f"{tmpdir}:/usr/bin:/bin"
 
                 result = subprocess.run(
                     [sys.executable, str(SCRIPT_DIR / "generate-gyroflow.py"),
@@ -190,9 +192,10 @@ class TestMissingBinary:
                     capture_output=True, text=True, env=env, cwd=SCRIPT_DIR,
                 )
 
-                assert result.returncode != 0
-                assert "not found" in result.stderr.lower() or "ERROR" in result.stderr
-                assert "@@error=" in result.stdout, "Machine-readable @@error should be emitted on failure"
+                assert result.returncode == 0, "Missing binary should not crash — exit 0 and skip"
+                assert "not found" in result.stderr.lower()
+                assert "@@error=" in result.stdout
+                assert "@@action=skipped" in result.stdout
 
             finally:
                 with open(PROFILES_FILE, "w") as f:
