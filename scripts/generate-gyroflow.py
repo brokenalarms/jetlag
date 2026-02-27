@@ -12,6 +12,7 @@ Used by the Gyroflow Toolbox plugin for real-time stabilization.
 import argparse
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -103,22 +104,21 @@ def main():
         sys.exit(1)
 
     gyroflow_path = file_path.with_suffix(".gyroflow")
-    rel_path = os.path.join(".", os.path.relpath(gyroflow_path))
 
     if gyroflow_path.exists():
-        print(f"Already exists: {rel_path}", file=sys.stderr)
+        print(f"Already exists: {gyroflow_path}", file=sys.stderr)
         print(f"@@gyroflow={gyroflow_path}")
         print(f"@@action=skipped")
         return
 
     if not has_motion_data(file_path):
-        print(f"Skipped: {rel_path} (no motion data)", file=sys.stderr)
+        print(f"Skipped: {gyroflow_path} (no motion data)", file=sys.stderr)
         print(f"@@gyroflow={gyroflow_path}")
         print(f"@@action=skipped")
         return
 
     if not args.apply:
-        print(f"Would generate: {rel_path}", file=sys.stderr)
+        print(f"Would generate: {gyroflow_path}", file=sys.stderr)
         print(f"@@gyroflow={gyroflow_path}")
         print(f"@@action=would_generate")
         return
@@ -127,10 +127,16 @@ def main():
     binary = config["binary"]
 
     if not os.path.isfile(binary):
-        print(f"ERROR: Gyroflow binary not found at: {binary}", file=sys.stderr)
-        print("Install Gyroflow or update the 'binary' path in media-profiles.yaml", file=sys.stderr)
-        print(f"@@error=Gyroflow binary not found at: {binary}")
-        sys.exit(1)
+        # Configured path missing — try PATH (e.g. Homebrew install)
+        path_binary = shutil.which("gyroflow")
+        if path_binary:
+            binary = path_binary
+        else:
+            print(f"Warning: Gyroflow not found at configured path ({binary}) or in $PATH", file=sys.stderr)
+            print("Install Gyroflow or update the 'binary' path in media-profiles.yaml", file=sys.stderr)
+            print(f"@@error=Gyroflow not found at {binary} or in $PATH")
+            print(f"@@action=skipped")
+            return
 
     preset_json = args.preset or json.dumps(config.get("preset", {}))
 
@@ -149,12 +155,12 @@ def main():
         return
 
     if not gyroflow_path.exists():
-        print(f"Gyroflow ran but no project file created for {rel_path}", file=sys.stderr)
-        print(f"@@error=No project file created for {rel_path}")
+        print(f"Gyroflow ran but no project file created for {gyroflow_path}", file=sys.stderr)
+        print(f"@@error=No project file created for {gyroflow_path}")
         print(f"@@action=skipped")
         return
 
-    print(f"Generated: {rel_path}", file=sys.stderr)
+    print(f"Generated: {gyroflow_path}", file=sys.stderr)
     print(f"@@gyroflow={gyroflow_path}")
     print(f"@@action=generated")
 

@@ -10,7 +10,6 @@ generate-gyroflow.py on each one. All other arguments are passed through.
 """
 
 import argparse
-import os
 import signal
 import subprocess
 import sys
@@ -60,7 +59,7 @@ def main():
 
     for i, file_path in enumerate(files, 1):
         stats["processed"] += 1
-        print(f"[{i}/{len(files)}] ./{os.path.relpath(file_path)}", file=sys.stderr)
+        print(f"[{i}/{len(files)}] {file_path}", file=sys.stderr)
 
         cmd = [sys.executable, str(SCRIPT_DIR / "generate-gyroflow.py"), str(file_path)]
 

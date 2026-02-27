@@ -4,6 +4,8 @@ struct WorkflowView: View {
     @Bindable var state: AppState
     @State private var showUpgradeSheet = false
     @State private var detectedFileCount = 0
+    @State private var showGyroflowDeps = false
+    @State private var gyroflowToolStatus: WorkflowSession.GyroflowToolStatus?
     private var licenseStore: LicenseStore { LicenseStore.shared }
 
     let defaultColumnWidth = 600.00
@@ -133,6 +135,11 @@ struct WorkflowView: View {
                     lineWidth: 1
                 )
         )
+        .popover(isPresented: step == .gyroflow ? $showGyroflowDeps : .constant(false), arrowEdge: .trailing) {
+            if let status = gyroflowToolStatus {
+                gyroflowDepsContent(status)
+            }
+        }
     }
 
     @ViewBuilder
@@ -145,6 +152,15 @@ struct WorkflowView: View {
                     state.workflowSession.enabledSteps.remove(step)
                 } else {
                     state.workflowSession.enabledSteps.insert(step)
+                    if step == .gyroflow {
+                        let status = WorkflowSession.checkGyroflowTools(
+                            gyroflowConfig: state.profilesConfig?.gyroflow
+                        )
+                        if status.anyMissing {
+                            gyroflowToolStatus = status
+                            showGyroflowDeps = true
+                        }
+                    }
                 }
             } label: {
                 stepHeaderContent(step, isActive: isActive)
@@ -364,6 +380,77 @@ struct WorkflowView: View {
             }
         }
         .padding(10)
+    }
+
+    // MARK: - Gyroflow dependency popup
+
+    private func gyroflowDepsContent(_ status: WorkflowSession.GyroflowToolStatus) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(Strings.Workflow.gyroflowDepsTitle, systemImage: "exclamationmark.triangle.fill")
+                .font(.headline)
+                .foregroundStyle(.yellow)
+
+            Text(Strings.Workflow.gyroflowDepsMessage)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(Strings.Workflow.gyroflowDepsBrewPreamble)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text(Strings.Workflow.gyroflowDepsBrewInstall)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .padding(6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.quaternary)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                if status.ffprobeMissing {
+                    Label("ffprobe missing", systemImage: "xmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.yellow)
+                }
+                Text(Strings.Workflow.gyroflowDepsFfprobe)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .padding(6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.quaternary)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                if status.gyroflowMissing {
+                    Label("gyroflow missing", systemImage: "xmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.yellow)
+                }
+                Text(Strings.Workflow.gyroflowDepsGyroflow)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .padding(6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.quaternary)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+
+            Button(Strings.Workflow.gyroflowDepsCopy) {
+                var commands: [String] = []
+                commands.append(Strings.Workflow.gyroflowDepsBrewInstall)
+                if status.ffprobeMissing {
+                    commands.append(Strings.Workflow.gyroflowDepsFfprobe)
+                }
+                if status.gyroflowMissing {
+                    commands.append(Strings.Workflow.gyroflowDepsGyroflow)
+                }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(commands.joined(separator: "\n"), forType: .string)
+            }
+            .controlSize(.small)
+        }
+        .padding(12)
+        .frame(width: 380)
     }
 
     // MARK: - Execution
