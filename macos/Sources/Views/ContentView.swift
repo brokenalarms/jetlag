@@ -18,6 +18,6 @@ struct ContentView: View {
                 ProfilesView(state: state)
             }
         }
-        .toolbar(removing: .sidebarToggle)
+//        .toolbar(removing: .sidebarToggle)
     }
 }

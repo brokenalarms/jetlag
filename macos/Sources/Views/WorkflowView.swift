@@ -122,13 +122,13 @@ struct WorkflowView: View {
         let steps = state.workflowSession.availableSteps
         return VStack(spacing: 0) {
             ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
+//                    .windowResizeBehavior(.automatic)
                 stepCard(step)
                 if index < steps.count - 1 {
                     stepArrow
                 }
             }
         }
-        .windowResizeBehavior(.automatic)
     }
 
     private func stepCard(_ step: PipelineStep) -> some View {
