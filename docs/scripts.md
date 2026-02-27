@@ -44,7 +44,7 @@ These behaviors are not in our code — they're observed from external tools and
 Priority order — each level has specific rules:
 
 1. **Filename** — `YYYYMMDD_HHMMSS` pattern is the highest-priority source. Never modify filenames.
-2. **DateTimeOriginal** — contains local time + timezone offset. Source of truth for shoot time. Never modify unless `--overwrite-datetimeoriginal` is explicitly passed (which also requires `--timezone`).
+2. **DateTimeOriginal** — contains local time + timezone offset. Source of truth for shoot time. Never modify unless `--infer-from-filename` is explicitly passed (which also requires `--timezone`).
 3. **QuickTime UTC fields** — `MediaCreateDate` etc. Stored as real UTC on our devices. Verify by cross-checking against `DateTimeOriginal` + timezone offset.
 4. **File birth time** — FCP fallback. Set by scripts via `setfile -d`.
 
@@ -75,11 +75,11 @@ INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow]
 Expected behaviors that regression tests must verify:
 
 ### fix-media-timestamp
-- If `--overwrite-datetimeoriginal` is specified, `--timezone` must be provided
+- If `--infer-from-filename` is specified, `--timezone` must be provided
 - Files with `YYYYMMDD_HHMMSS` in the filename are first source of truth — filename should never be modified
-- `DateTimeOriginal` is next source of truth — should never be modified unless `--overwrite-datetimeoriginal` is specified
+- `DateTimeOriginal` is next source of truth — should never be modified unless `--infer-from-filename` is specified
 - If a file was shot in timezone +0800, with the script run in +0900, then `Keys:CreationDate` should end up with the +0800 timezone, and the birthdate should end up as one hour later
-- If a different `--timezone` is specified that doesn't match `DateTimeOriginal`, exit with a warning unless `--overwrite-datetimeoriginal` is specified
+- If a different `--timezone` is specified that doesn't match `DateTimeOriginal`, this is informational (shown in diff) — not blocking
 - If `DateTimeOriginal` is missing and we change timezones, the QuickTime UTC fields `MediaCreateDate`, file birth date, and `Keys:CreationDate` should all be updated
 - If `--preserve-wallclock-time` is specified, the file birthtime should be set back one hour to make the edited file appear in this timezone as if it was shot at the same time
 

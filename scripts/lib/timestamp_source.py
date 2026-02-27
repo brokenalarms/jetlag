@@ -267,24 +267,13 @@ def extract_metadata_timezone(file_path: str) -> Optional[str]:
 def get_best_timestamp(
     file_path: str,
     timezone_offset: Optional[str] = None,
-    overwrite_datetimeoriginal: bool = False,
 ) -> tuple[Optional[str], str]:
     """Get the best timestamp using 6-tier priority system.
 
     Returns: (timestamp_string, source_description)
-
-    When overwrite_datetimeoriginal=True:
-    - Filename is Priority 1 for Insta360/DJI files (source of truth at capture time)
-    - Ignores existing DateTimeOriginal (which may be corrupted)
     """
     exif_data = read_exif_data(file_path)
     base = os.path.basename(file_path)
-
-    if overwrite_datetimeoriginal:
-        ts, _ = parse_filename_timestamp(file_path)
-        if ts and (re.match(r'^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6}', base) or
-                   re.match(r'^DJI_[0-9]{14}_', base)):
-            return ts, "filename (overwrite mode)"
 
     # Priority 1: DateTimeOriginal with timezone
     datetime_original = exif_data.get("DateTimeOriginal", "")
@@ -365,11 +354,10 @@ class TimestampReport:
 def read_timestamp_sources(
     file_path: str,
     timezone_offset: Optional[str] = None,
-    overwrite_datetimeoriginal: bool = False,
 ) -> TimestampReport:
     """Analyse a file and report all available timestamp sources."""
     # Metadata side — use the existing priority system
-    best_ts, source = get_best_timestamp(file_path, timezone_offset, overwrite_datetimeoriginal)
+    best_ts, source = get_best_timestamp(file_path, timezone_offset)
 
     metadata_date = None
     metadata_tz = extract_metadata_timezone(file_path)

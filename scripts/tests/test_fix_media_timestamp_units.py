@@ -353,8 +353,8 @@ class TestGetAllTimestampData:
         assert data["datetime_original"].minute == 25
         assert data["datetime_original"].second == 21
 
-    def test_overwrite_mode_uses_filename(self):
-        """--overwrite-datetimeoriginal uses filename even when EXIF exists"""
+    def test_infer_from_filename_uses_filename(self):
+        """--infer-from-filename uses filename even when EXIF exists"""
         # Filename says 06:38:09, but EXIF says 09:38:09 (corrupted)
         video = self._create_video(
             "VID_20250619_063809.mp4",
@@ -364,22 +364,31 @@ class TestGetAllTimestampData:
         data = fmt.get_all_timestamp_data(
             video,
             timezone_offset="+08:00",
-            overwrite_datetimeoriginal=True
+            infer_from_filename=True
         )
 
-        assert data["timestamp_source"] == "filename (overwrite mode)"
+        assert data["timestamp_source"] == "filename (infer mode)"
         assert data["datetime_original"].hour == 6  # From filename, not 9 from EXIF
         assert data["datetime_original"].minute == 38
         assert data["datetime_original"].second == 9
 
-    def test_overwrite_requires_timezone(self):
-        """--overwrite-datetimeoriginal requires --timezone"""
+    def test_infer_from_filename_requires_timezone(self):
+        """--infer-from-filename requires --timezone"""
+        video = self._create_video("VID_20250618_072521.mp4")
+
+        with pytest.raises(ValueError) as exc_info:
+            fmt.get_all_timestamp_data(video, infer_from_filename=True)
+
+        assert "requires --timezone" in str(exc_info.value)
+
+    def test_infer_from_filename_requires_parseable_name(self):
+        """--infer-from-filename with unparseable filename raises error"""
         video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
 
         with pytest.raises(ValueError) as exc_info:
-            fmt.get_all_timestamp_data(video, overwrite_datetimeoriginal=True)
+            fmt.get_all_timestamp_data(video, timezone_offset="+08:00", infer_from_filename=True)
 
-        assert "requires --timezone" in str(exc_info.value)
+        assert "no parseable date" in str(exc_info.value)
 
     def test_datetimeoriginal_without_timezone_adds_flag_timezone(self):
         """DateTimeOriginal without timezone uses --timezone flag"""
