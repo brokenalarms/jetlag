@@ -12,14 +12,13 @@ import signal
 import sys
 import time
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from typing import Dict, Optional, Callable
 
 # Handle Ctrl-C gracefully
 def signal_handler(sig, frame):
     print("\n\nInterrupted by user", file=sys.stderr)
     sys.exit(130)
-
-signal.signal(signal.SIGINT, signal_handler)
 
 try:
     import humanize
@@ -36,6 +35,15 @@ if sys.platform == "darwin":
         check_file_system_timestamps_need_update,
         get_expected_file_system_time,
     )
+else:
+    def get_file_system_timestamps(file_path: str) -> Dict[str, str]:
+        return {"birth": "", "modify": ""}
+    def set_file_system_timestamps(file_path: str, timestamp_str: str) -> bool:
+        return False
+    def check_file_system_timestamps_need_update(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False) -> bool:
+        return False
+    def get_expected_file_system_time(datetime_original: datetime, preserve_wallclock: bool = False) -> str:
+        return ""
 
 # Global cache for exiftool data to avoid reading same file multiple times
 _exif_cache: Dict[str, Dict[str, str]] = {}
@@ -430,7 +438,7 @@ def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None, ov
     try:
         st = os.stat(file_path)
         try:
-            birth = datetime.fromtimestamp(st.st_birthtime).strftime('%Y:%m:%d %H:%M:%S')
+            birth = datetime.fromtimestamp(st.st_birthtime).strftime('%Y:%m:%d %H:%M:%S')  # pyrefly: ignore[missing-attribute]
             return birth, "file birthtime"
         except AttributeError:
             pass
@@ -817,13 +825,14 @@ def format_change_description(changes: dict, timestamp_data: Optional[dict] = No
                 expected_dt = datetime.strptime(timestamp_data["expected_time"], '%Y:%m:%d %H:%M:%S')
 
                 # Check if dates differ (not just times)
+                current_birth_dt: Optional[datetime] = None
                 if current_birth_str:
                     current_birth_dt = datetime.strptime(current_birth_str, '%Y:%m:%d %H:%M:%S')
                     dates_differ = current_birth_dt.date() != expected_dt.date()
                 else:
                     dates_differ = False
 
-                if dates_differ:
+                if dates_differ and current_birth_dt is not None:
                     # Show full date change: "2025-12-06 → 2025-10-05 10:00"
                     current_display = current_birth_dt.strftime('%Y-%m-%d %H:%M')
                     expected_display = expected_dt.strftime('%Y-%m-%d %H:%M')
@@ -1078,6 +1087,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
 
 def main():
     """Command line interface"""
+    signal.signal(signal.SIGINT, signal_handler)
     parser = argparse.ArgumentParser(description='Fix media timestamps - ensures file system timestamps match EXIF data')
     parser.add_argument('file', help='Media file (photo or video) to process')
     parser.add_argument('--timezone', help='Timezone offset (e.g. +09:00) - required when DateTimeOriginal lacks timezone info')

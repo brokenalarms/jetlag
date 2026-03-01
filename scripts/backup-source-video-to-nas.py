@@ -68,7 +68,7 @@ def transform_local_to_remote_path(local_path: str, local_base_path: str, remote
     relative_path = local_path[len(local_base_path):]
     return os.path.join(remote_base_path, relative_path)
 
-def format_bytes(num_bytes: int) -> str:
+def format_bytes(num_bytes: float) -> str:
     """Format bytes as human-readable string"""
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
         if abs(num_bytes) < 1024:
