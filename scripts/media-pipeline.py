@@ -341,7 +341,7 @@ def process_file(
                 result["source_files"].append(str(companion_source))
 
     # Tag media (if in tasks and profile has tags/make/model)
-    if "tag" in tasks and profile:
+    if tasks and "tag" in tasks and profile:
         tags = ",".join(profile.get("tags", []))
         exif = profile.get("exif", {})
         make = exif.get("make", "")
@@ -361,7 +361,7 @@ def process_file(
             emit("stage_complete", "tag")
 
     # Fix video timestamp (if in tasks)
-    if "fix-timestamp" in tasks:
+    if tasks and "fix-timestamp" in tasks:
         print("🔧 Fixing timestamp...", file=sys.stderr)
         output, changed, rc, at_lines = run_fix_timestamp(active_file, location_args, apply, verbose)
         for line in output.split("\n"):
@@ -429,7 +429,7 @@ def process_file(
 
     # Generate gyroflow project (if in tasks, enabled, and applying)
     gyroflow_enabled = profile.get("gyroflow_enabled", False) if profile else False
-    if "gyroflow" in tasks and gyroflow_enabled and gyroflow_config:
+    if tasks and "gyroflow" in tasks and gyroflow_enabled and gyroflow_config:
         print("🎥 Generating gyroflow project...", file=sys.stderr)
 
         preset = gyroflow_config.get("preset", {})

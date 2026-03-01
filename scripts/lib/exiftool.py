@@ -47,6 +47,7 @@ class ExifTool:
         """Send a command and block until the sentinel line is returned."""
         with self._lock:
             self._ensure_running()
+            assert self._process is not None  # guaranteed by _ensure_running
             self._exec_id += 1
             sentinel = f"{{ready{self._exec_id}}}"
 
