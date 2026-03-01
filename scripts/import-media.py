@@ -246,7 +246,7 @@ def is_file_locked(file_path: str) -> bool:
     """Check if file has macOS locked (uchg) flag"""
     try:
         import stat
-        flags = os.stat(file_path).st_flags
+        flags = os.stat(file_path).st_flags  # pyrefly: ignore[missing-attribute]
         return bool(flags & stat.UF_IMMUTABLE)
     except (OSError, AttributeError):
         return False
@@ -370,7 +370,7 @@ def import_media(source_dir: str, profile: ImportProfile, group: str,
 
     # Process files for import
     results = []
-    archive_dir = None
+    archive_dir: Optional[str] = None
 
     for i, file_path in enumerate(import_files, 1):
         filename = os.path.basename(file_path)

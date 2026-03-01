@@ -1,2 +1,7 @@
 [tool.pytest.ini_options]
 addopts = "-q"
+
+[tool.pyrefly]
+project_includes = ["scripts/*.py", "scripts/lib/*.py"]
+project_excludes = ["scripts/tests/*"]
+search_path = ["scripts"]

@@ -1,15 +1,17 @@
-# Jetlag — macOS app build system
+# Jetlag — build system
 #
 # Prerequisites (install via Homebrew):
 #   brew install xcodegen
 #
 # Usage:
-#   make generate   — generate Xcode project from macos/project.yml
-#   make test       — run unit tests (JetlagTests)
-#   make build      — build Debug app into build/
-#   make archive    — build Release archive (macos/build/Jetlag.xcarchive)
-#   make dmg        — build Release archive and package into build/Jetlag.dmg
-#   make clean      — remove build artifacts
+#   make generate      — generate Xcode project from macos/project.yml
+#   make test-scripts  — run script tests (works on Linux and macOS)
+#   make test-macos    — run Swift unit tests (macOS only, requires Xcode)
+#   make test          — run all tests available on this platform
+#   make build         — build Debug app into build/
+#   make archive       — build Release archive (macos/build/Jetlag.xcarchive)
+#   make dmg           — build Release archive and package into build/Jetlag.dmg
+#   make clean         — remove build artifacts
 #
 # Code signing:
 #   By default the DMG is built with the Xcode automatic signing identity
@@ -35,7 +37,7 @@ DMG_STAGING     := $(BUILD_DIR)/dmg-staging
 DMG_PATH        := $(BUILD_DIR)/$(APP_NAME).dmg
 EXPORT_PLIST    := $(MACOS_DIR)/ExportOptions.plist
 
-.PHONY: all generate test build archive export dmg clean
+.PHONY: all generate test test-scripts test-macos build archive export dmg clean
 
 all: dmg
 
@@ -43,8 +45,12 @@ all: dmg
 generate:
 	cd $(MACOS_DIR) && xcodegen generate
 
-## Run unit tests
-test: generate
+## Run script tests (any platform)
+test-scripts:
+	pytest scripts/tests/ -x --ignore=scripts/tests/test_performance.py
+
+## Run Swift unit tests (macOS only, requires Xcode)
+test-macos: generate
 	xcodebuild \
 		-scheme $(SCHEME) \
 		-configuration Debug \
@@ -56,6 +62,12 @@ test: generate
 		-derivedDataPath $(DERIVED_DIR) \
 		-project $(MACOS_DIR)/$(APP_NAME).xcodeproj \
 		test
+
+## Run all tests available on this platform
+test: test-scripts
+ifeq ($(shell uname),Darwin)
+test: test-macos
+endif
 
 ## Build Debug app into build/derived (quick iteration)
 build: generate
