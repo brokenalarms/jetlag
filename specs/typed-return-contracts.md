@@ -11,7 +11,7 @@ This is the first step in a three-part migration:
 
 ## Design
 
-Each script gets a result dataclass. The function returns it. `@@` lines are only consumed by the macOS app via `media-pipeline.py`'s `emit()` — individual scripts don't need to emit them. With typed returns, `media-pipeline.py` reads the dataclass fields and emits `@@` (or later JSONL) itself. The scripts' `main()` functions can print human-readable summaries to stderr for CLI use, but no `@@` serialisation is needed there.
+Each script gets a result dataclass. The function returns it and stops printing `@@` lines entirely — those prints are deleted from the function bodies. The subprocess callers in `media-pipeline.py` still parse `@@` from stdout (since scripts are still invoked via subprocess at this stage), so each script's `main()` serialises the dataclass to `@@` before printing. This is a temporary bridge: step 2 (module calls) removes the subprocess, step 3 (JSONL) replaces `@@` at the process boundary and deletes it for good.
 
 ### `tag-media.py`
 
@@ -44,7 +44,7 @@ class TimestampFixResult:
     timezone: str          # detected timezone, empty if none
 ```
 
-The function returns `TimestampFixResult`. All `print(f"@@...")` calls inside the function are removed — replaced with populating the dataclass fields. `media-pipeline.py` reads the fields and emits `@@`/JSONL at the process boundary.
+The function returns `TimestampFixResult`. All `print(f"@@...")` calls inside the function body are removed — replaced with populating the dataclass fields. `main()` serialises the result to `@@` for subprocess callers (temporary — removed when module calls land).
 
 This is the largest change — the `@@` prints are currently scattered across 5+ code paths (early returns, success, error). Each becomes a field assignment on the result object.
 
@@ -82,16 +82,27 @@ class ArchiveResult:
     failed: bool
 ```
 
-### No serialisation helper needed in scripts
+### Serialisation in `main()` (temporary)
 
-`@@` output was only consumed by the macOS app. With typed returns, `media-pipeline.py` handles all serialisation at the process boundary. Individual scripts just return dataclasses. Their `main()` functions print human-readable output to stderr for CLI users.
+Each script's `main()` serialises the returned dataclass to `@@` lines on stdout — this keeps `media-pipeline.py`'s subprocess-based callers working unchanged. A shared helper in `lib/` keeps this DRY:
+
+```python
+def emit_result(result) -> None:
+    for field in dataclasses.fields(result):
+        value = getattr(result, field.name)
+        if isinstance(value, list):
+            value = ",".join(value)
+        print(f"@@{field.name}={value}")
+```
+
+This serialisation code is deleted in step 2 (module calls) when `media-pipeline.py` receives the dataclass directly. The `@@` format itself is deleted in step 3 (JSONL) when the app switches to JSON parsing.
 
 ## Implementation order
 
-1. Add dataclasses to each script (no behavior change yet)
-2. Refactor functions to build and return the dataclass
-3. Replace inline `print(f"@@...")` with `emit_result()` in `main()`
-4. Verify all existing tests pass — output should be identical
+1. Add dataclasses to each script
+2. Refactor functions to build and return the dataclass instead of printing `@@`
+3. Update `main()` to serialise the returned dataclass to `@@` via `emit_result()` — subprocess callers see identical output
+4. Verify all existing tests pass — `@@` output identical, stderr identical
 
 Do `fix-media-timestamp.py` last since it has the most scattered `@@` prints.
 
@@ -106,7 +117,8 @@ Do `fix-media-timestamp.py` last since it has the most scattered `@@` prints.
 ## Verification
 
 - All existing tests pass unchanged
-- CLI output identical (same `@@key=value` lines, same stderr messages)
+- `@@key=value` output identical (subprocess callers still parse it)
+- stderr messages identical
 - `pyrefly check` passes
 
 ## Relationship to other specs

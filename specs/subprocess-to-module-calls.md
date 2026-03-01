@@ -133,7 +133,7 @@ After all 5 migrations, `subprocess` is no longer used in `media-pipeline.py`.
 4. Migrate `run_archive_source()` — functions already have clean signatures
 5. Migrate `run_generate_gyroflow()` — requires function extraction
 6. Migrate `run_fix_timestamp()` — largest change due to `location_args` → `timezone_offset` refactor
-7. Remove `subprocess` import, clean up `_parse_at_lines()` if unused
+7. Remove `subprocess` import, delete `_parse_at_lines()`, delete `emit_result()` and `@@` serialisation from each script's `main()`
 
 ## Files to modify
 
@@ -149,6 +149,8 @@ After all 5 migrations, `subprocess` is no longer used in `media-pipeline.py`.
 
 ## Relationship to other specs
 
-- **Depends on**: typed-return-contracts.md (functions must return dataclasses first)
-- **Enables**: JSONL + schema spec (structured data in-process, only needs serialisation at the process boundary for the macOS app)
+- **Depends on**: typed-return-contracts.md (functions must return dataclasses first — otherwise module callers would need to capture and parse `@@` text)
+- **Deletes**: `@@` serialisation in each script's `main()` (added temporarily in step 2, now dead code since pipeline calls functions directly). `_parse_at_lines()` in media-pipeline.py also deleted.
+- **Preserves**: `@@` in `media-pipeline.py`'s `emit()` — the app still depends on it. This is replaced in step 4 (JSONL).
+- **Enables**: JSONL + schema spec (with module calls done, `@@` only exists in `media-pipeline.py`'s `emit()` — one place to replace atomically)
 - **Foundation for**: time-correction-pipeline-step.md (inline rename logic imports `build_filename()` from shared lib — needs module-call architecture to work without subprocess)

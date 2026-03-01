@@ -15,9 +15,9 @@
 
 - (2026-03-01) **Pipeline internal migration** — four ordered specs, each enabling the next. Pyrefly (step 1) is done. Steps 2-3 are scripts-only; step 4 touches both scripts and macOS app:
   1. Pyrefly type checking — static type enforcement across Python scripts (done, shipped)
-  2. Typed return contracts (`specs/typed-return-contracts.md`) — replace `@@` prints inside functions with dataclass returns; `@@` moves to pipeline boundary only
-  3. Subprocess → module calls (`specs/subprocess-to-module-calls.md`) — callers import and call directly, receive typed objects; eliminates Python-spawning-Python overhead
-  4. JSONL + schema for app IPC (`specs/jsonl-app-ipc.md`) — replace `@@key=value` at the process boundary with structured JSONL; app parser switches to JSONDecoder
+  2. Typed return contracts (`specs/typed-return-contracts.md`) — functions return dataclasses instead of printing `@@`; `main()` serialises to `@@` temporarily so subprocess callers (media-pipeline) still work
+  3. Subprocess → module calls (`specs/subprocess-to-module-calls.md`) — pipeline imports and calls directly, receives typed objects; `@@` serialisation in scripts' `main()` deleted (dead code); pipeline's `emit()` still prints `@@` for the app
+  4. JSONL + schema for app IPC (`specs/jsonl-app-ipc.md`) — atomic switchover: pipeline emits JSON, app parser switches to JSONDecoder, `@@` in `emit()` deleted. Dual-format flag during transition if needed
 
 - (2026-02-27) **Time correction pipeline step** — Depends on pipeline internal migration (steps 2-3 above). Refactor: extract tiered timestamp reader into `lib/timestamp_source.py` with generic filename date patterns (prefix-agnostic). Features: `--time-offset` and `--infer-from-filename` on `fix-media-timestamp.py`, new `report-file-dates.py` (pre-flight scanner). Pipeline: inline rename after fix-timestamp using `build_filename()` from shared lib. App: timestamp source selector, offset field (with reference-time calculator), filename update toggle within Fix Timestamps step. Spec: `specs/time-correction-pipeline-step.md`
 
