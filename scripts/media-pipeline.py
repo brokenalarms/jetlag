@@ -126,7 +126,7 @@ def run_tag_media(
     at_lines = _parse_at_lines(result.stdout)
 
     # Check if tags were changed via machine token
-    changed = at_lines.get("tag_action") == "tagged"
+    changed = at_lines.get("action") == "tagged"
 
     # stderr contains user-visible output
     return result.stderr.strip(), changed, at_lines

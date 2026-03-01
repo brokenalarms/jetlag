@@ -8,11 +8,22 @@ import subprocess
 import sys
 import os
 import signal
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 import argparse
 
 from lib.exiftool import exiftool
+from lib.results import emit_result
+
+
+@dataclass
+class TagResult:
+    file: str
+    tags_added: list[str]
+    exif_make: str
+    exif_model: str
+    action: str  # "tagged" | "already_correct"
 
 # Handle Ctrl-C gracefully
 def signal_handler(sig, frame):  # noqa: ARG001
@@ -106,12 +117,11 @@ def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Option
         print(f"Warning: Failed to add camera info to {file_path}: {e}", file=sys.stderr)
         return False, []
 
-def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], model: Optional[str], dry_run: bool) -> Optional[dict]:
-    """Process a single file: apply tags and EXIF, return machine-readable result.
+def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], model: Optional[str], dry_run: bool) -> Optional[TagResult]:
+    """Process a single file: apply tags and EXIF, return structured result.
 
     Returns:
-        dict with keys: file, tags_added, exif_make, exif_model, tag_action
-        None if file not found or processing failed
+        TagResult on success, None if file not found or processing failed
     """
     if not os.path.exists(file_path):
         print(f"Warning: File not found: {file_path}", file=sys.stderr)
@@ -119,7 +129,7 @@ def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], 
 
     filename = os.path.basename(file_path)
     actions = []
-    all_tags_added = []
+    all_tags_added: list[str] = []
     exif_make = ""
     exif_model = ""
 
@@ -156,13 +166,13 @@ def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], 
     else:
         print(f"✓ already tagged: {filename}{dry_run_suffix}", file=sys.stderr)
 
-    return {
-        "file": filename,
-        "tags_added": all_tags_added,
-        "exif_make": exif_make,
-        "exif_model": exif_model,
-        "tag_action": tag_action,
-    }
+    return TagResult(
+        file=filename,
+        tags_added=all_tags_added,
+        exif_make=exif_make,
+        exif_model=exif_model,
+        action=tag_action,
+    )
 
 
 def main():
@@ -189,12 +199,7 @@ def main():
         if result is None:
             continue
 
-        # Emit machine-readable @@ lines on stdout
-        print(f"@@file={result['file']}")
-        print(f"@@tags_added={','.join(result['tags_added'])}")
-        print(f"@@exif_make={result['exif_make']}")
-        print(f"@@exif_model={result['exif_model']}")
-        print(f"@@tag_action={result['tag_action']}")
+        emit_result(result)
 
         success_count += 1
 

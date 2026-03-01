@@ -12,11 +12,19 @@ import argparse
 import os
 import signal
 import sys
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.filesystem import cleanup_empty_parent_dirs
+from lib.results import emit_result
+
+
+@dataclass
+class ArchiveResult:
+    action: str  # "archived" | "deleted" | "would_archive" | "would_delete"
+    failed: bool
 
 
 def signal_handler(sig, frame):
@@ -25,35 +33,29 @@ def signal_handler(sig, frame):
     sys.exit(130)
 
 
-def archive_source(source: str, apply: bool) -> int:
-    """Rename source folder to '<source> - copied <date>'.
-
-    Returns 0 on success, 1 on failure.
-    """
+def archive_source(source: str, apply: bool) -> ArchiveResult:
+    """Rename source folder to '<source> - copied <date>'."""
     current_date = datetime.now().strftime("%Y-%m-%d")
     archived_name = f"{source} - copied {current_date}"
 
     if not apply:
         print(f"Would rename: {source} → {os.path.basename(archived_name)}", file=sys.stderr)
-        return 0
+        return ArchiveResult(action="would_archive", failed=False)
 
     try:
         os.rename(source, archived_name)
         print(f"Archived: {source} → {os.path.basename(archived_name)}", file=sys.stderr)
-        return 0
+        return ArchiveResult(action="archived", failed=False)
     except OSError as e:
         print(f"Read-only source, couldn't archive: {source} ({e})", file=sys.stderr)
-        return 1
+        return ArchiveResult(action="archived", failed=True)
 
 
-def delete_files(source: str, files: list[str], apply: bool) -> int:
-    """Delete listed files from source, then clean up empty directories.
-
-    Returns 0 on success, 1 on failure.
-    """
+def delete_files(source: str, files: list[str], apply: bool) -> ArchiveResult:
+    """Delete listed files from source, then clean up empty directories."""
     if not files:
         print("No files to delete", file=sys.stderr)
-        return 0
+        return ArchiveResult(action="would_delete" if not apply else "deleted", failed=False)
 
     failed = False
 
@@ -81,7 +83,10 @@ def delete_files(source: str, files: list[str], apply: bool) -> int:
                 cleanup_empty_parent_dirs(parent, stop_at=source)
                 cleaned_dirs.add(parent)
 
-    return 1 if failed else 0
+    return ArchiveResult(
+        action="would_delete" if not apply else "deleted",
+        failed=failed,
+    )
 
 
 def main():
@@ -116,13 +121,17 @@ def main():
         sys.exit(1)
 
     if args.action == "archive":
-        sys.exit(archive_source(source, args.apply))
+        result = archive_source(source, args.apply)
+        emit_result(result)
+        sys.exit(1 if result.failed else 0)
 
     if args.action == "delete":
         if not args.files:
             print("ERROR: --files is required for delete action", file=sys.stderr)
             sys.exit(1)
-        sys.exit(delete_files(source, args.files, args.apply))
+        result = delete_files(source, args.files, args.apply)
+        emit_result(result)
+        sys.exit(1 if result.failed else 0)
 
 
 if __name__ == "__main__":

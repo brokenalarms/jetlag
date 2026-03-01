@@ -16,12 +16,24 @@ import shutil
 import signal
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).parent))
+from lib.results import emit_result
+
 
 SCRIPT_DIR = Path(__file__).parent
+
+
+@dataclass
+class GyroflowResult:
+    gyroflow_path: str
+    action: str  # "generated" | "skipped" | "would_generate"
+    error: Optional[str] = None  # populated on error, None on success
 
 
 def signal_handler(sig, frame):
@@ -64,7 +76,6 @@ def load_gyroflow_config() -> dict:
     if not profiles_file.exists():
         print(f"ERROR: Config file not found: {profiles_file}", file=sys.stderr)
         print("Add a 'gyroflow' section to media-profiles.yaml with 'binary' path", file=sys.stderr)
-        print(f"@@error=Config file not found: {profiles_file}")
         sys.exit(1)
 
     with open(profiles_file) as f:
@@ -74,15 +85,80 @@ def load_gyroflow_config() -> dict:
     if not config:
         print("ERROR: No 'gyroflow' section found in media-profiles.yaml", file=sys.stderr)
         print("Add a 'gyroflow' section with at minimum a 'binary' path", file=sys.stderr)
-        print("@@error=No 'gyroflow' section in media-profiles.yaml")
         sys.exit(1)
 
     if not config.get("binary"):
         print("ERROR: No 'binary' path in gyroflow config in media-profiles.yaml", file=sys.stderr)
-        print("@@error=No 'binary' path in gyroflow config")
         sys.exit(1)
 
     return config
+
+
+def generate_gyroflow_project(
+    file_path: Path,
+    apply: bool,
+    binary: Optional[str] = None,
+    preset_json: Optional[str] = None,
+) -> GyroflowResult:
+    """Generate a .gyroflow project file for a video.
+
+    Args:
+        file_path: Resolved path to the video file
+        apply: Whether to actually generate (False = dry run)
+        binary: Path to gyroflow CLI binary (required when apply=True)
+        preset_json: JSON preset string for stabilization settings
+
+    Returns:
+        GyroflowResult with path, action, and optional error
+    """
+    gyroflow_path = str(file_path.with_suffix(".gyroflow"))
+
+    if Path(gyroflow_path).exists():
+        print(f"Already exists: {gyroflow_path}", file=sys.stderr)
+        return GyroflowResult(gyroflow_path=gyroflow_path, action="skipped")
+
+    if not has_motion_data(file_path):
+        print(f"Skipped: {gyroflow_path} (no motion data)", file=sys.stderr)
+        return GyroflowResult(gyroflow_path=gyroflow_path, action="skipped")
+
+    if not apply:
+        print(f"Would generate: {gyroflow_path}", file=sys.stderr)
+        return GyroflowResult(gyroflow_path=gyroflow_path, action="would_generate")
+
+    if not binary or not os.path.isfile(binary):
+        # Configured path missing — try PATH (e.g. Homebrew install)
+        path_binary = shutil.which("gyroflow")
+        if path_binary:
+            binary = path_binary
+        else:
+            configured = binary or "(not set)"
+            print(f"Warning: Gyroflow not found at configured path ({configured}) or in $PATH", file=sys.stderr)
+            print("Install Gyroflow or update the 'binary' path in media-profiles.yaml", file=sys.stderr)
+            return GyroflowResult(
+                gyroflow_path=gyroflow_path,
+                action="skipped",
+                error=f"Gyroflow not found at {configured} or in $PATH",
+            )
+
+    cmd = [binary, str(file_path), "--export-project", "2"]
+
+    if preset_json and preset_json != "{}":
+        cmd.extend(["--preset", preset_json])
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        error_msg = result.stderr.rstrip() if result.stderr else f"exit code {result.returncode}"
+        print(error_msg, file=sys.stderr)
+        return GyroflowResult(gyroflow_path=gyroflow_path, action="skipped", error=error_msg)
+
+    if not Path(gyroflow_path).exists():
+        error_msg = f"No project file created for {gyroflow_path}"
+        print(f"Gyroflow ran but {error_msg}", file=sys.stderr)
+        return GyroflowResult(gyroflow_path=gyroflow_path, action="skipped", error=error_msg)
+
+    print(f"Generated: {gyroflow_path}", file=sys.stderr)
+    return GyroflowResult(gyroflow_path=gyroflow_path, action="generated")
 
 
 def main():
@@ -103,66 +179,17 @@ def main():
         print(f"@@error=File not found: {file_path}")
         sys.exit(1)
 
-    gyroflow_path = file_path.with_suffix(".gyroflow")
+    # Config and binary are only needed when applying
+    binary = None
+    preset_json = args.preset
+    if args.apply:
+        config = load_gyroflow_config()
+        binary = config["binary"]
+        if not preset_json:
+            preset_json = json.dumps(config.get("preset", {}))
 
-    if gyroflow_path.exists():
-        print(f"Already exists: {gyroflow_path}", file=sys.stderr)
-        print(f"@@gyroflow={gyroflow_path}")
-        print(f"@@action=skipped")
-        return
-
-    if not has_motion_data(file_path):
-        print(f"Skipped: {gyroflow_path} (no motion data)", file=sys.stderr)
-        print(f"@@gyroflow={gyroflow_path}")
-        print(f"@@action=skipped")
-        return
-
-    if not args.apply:
-        print(f"Would generate: {gyroflow_path}", file=sys.stderr)
-        print(f"@@gyroflow={gyroflow_path}")
-        print(f"@@action=would_generate")
-        return
-
-    config = load_gyroflow_config()
-    binary = config["binary"]
-
-    if not os.path.isfile(binary):
-        # Configured path missing — try PATH (e.g. Homebrew install)
-        path_binary = shutil.which("gyroflow")
-        if path_binary:
-            binary = path_binary
-        else:
-            print(f"Warning: Gyroflow not found at configured path ({binary}) or in $PATH", file=sys.stderr)
-            print("Install Gyroflow or update the 'binary' path in media-profiles.yaml", file=sys.stderr)
-            print(f"@@error=Gyroflow not found at {binary} or in $PATH")
-            print(f"@@action=skipped")
-            return
-
-    preset_json = args.preset or json.dumps(config.get("preset", {}))
-
-    cmd = [binary, str(file_path), "--export-project", "2"]
-
-    if preset_json and preset_json != "{}":
-        cmd.extend(["--preset", preset_json])
-
-    result = subprocess.run(cmd, capture_output=True, text=True)
-
-    if result.returncode != 0:
-        error_msg = result.stderr.rstrip() if result.stderr else f"exit code {result.returncode}"
-        print(error_msg, file=sys.stderr)
-        print(f"@@error={error_msg}")
-        print(f"@@action=skipped")
-        return
-
-    if not gyroflow_path.exists():
-        print(f"Gyroflow ran but no project file created for {gyroflow_path}", file=sys.stderr)
-        print(f"@@error=No project file created for {gyroflow_path}")
-        print(f"@@action=skipped")
-        return
-
-    print(f"Generated: {gyroflow_path}", file=sys.stderr)
-    print(f"@@gyroflow={gyroflow_path}")
-    print(f"@@action=generated")
+    result = generate_gyroflow_project(file_path, args.apply, binary, preset_json)
+    emit_result(result)
 
 
 if __name__ == "__main__":

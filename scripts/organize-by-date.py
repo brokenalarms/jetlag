@@ -10,12 +10,20 @@ import os
 import re
 import shutil
 import sys
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.exiftool import exiftool
+from lib.results import emit_result
+
+
+@dataclass
+class OrganizeResult:
+    dest: str
+    action: str  # "copied" | "moved" | "skipped" | "overwrote" | "would_copy" | "would_move" | "would_overwrite"
 
 MONTH_ABBREVS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -115,14 +123,14 @@ def _handle_existing_target(file_path, target_file, target_path, abs_target,
             if copy_mode:
                 shutil.copy2(file_path, target_file)
                 print(f"\u267b\ufe0f  Overwrote: {base} \u2192 {organized_path}/", file=sys.stderr)
-                return abs_target, "overwrote"
+                return OrganizeResult(dest=abs_target, action="overwrote")
             else:
                 shutil.move(file_path, target_file)
                 print(f"\u267b\ufe0f  Overwrote: {base} \u2192 {organized_path}/", file=sys.stderr)
-                return abs_target, "overwrote"
+                return OrganizeResult(dest=abs_target, action="overwrote")
         else:
             print(f"[DRY RUN] Would overwrite: {file_path} \u2192 {abs_target}", file=sys.stderr)
-            return abs_target, "would_overwrite"
+            return OrganizeResult(dest=abs_target, action="would_overwrite")
 
     # Skip
     size_mb = src_size / 1048576
@@ -131,16 +139,16 @@ def _handle_existing_target(file_path, target_file, target_path, abs_target,
     else:
         print(f"\u23ed\ufe0f  Skipped (user choice): {base}", file=sys.stderr)
 
-    return abs_target, "skipped"
+    return OrganizeResult(dest=abs_target, action="skipped")
 
 
 def process_file(file_path: str, target_dir: str, template: str,
                  copy_mode: bool, overwrite: bool, apply: bool,
-                 verbose: bool) -> tuple[str, str]:
+                 verbose: bool) -> OrganizeResult:
     """Process a single file for organization.
 
     Returns:
-        (dest_path, action) tuple
+        OrganizeResult with dest path and action taken
     """
     base = os.path.basename(file_path)
 
@@ -174,7 +182,7 @@ def process_file(file_path: str, target_dir: str, template: str,
 
     if file_realdir == target_realpath:
         print(f"\u2713 Already organized: {base} ({organized_path})", file=sys.stderr)
-        return abs_target, "skipped"
+        return OrganizeResult(dest=abs_target, action="skipped")
 
     if os.path.exists(target_file):
         return _handle_existing_target(
@@ -187,18 +195,18 @@ def process_file(file_path: str, target_dir: str, template: str,
         if copy_mode:
             shutil.copy2(file_path, target_file)
             print(f"\u2705 Copied: {file_path} \u2192 {abs_target}", file=sys.stderr)
-            return abs_target, "copied"
+            return OrganizeResult(dest=abs_target, action="copied")
         else:
             shutil.move(file_path, target_file)
             print(f"\u2705 Moved: {file_path} \u2192 {abs_target}", file=sys.stderr)
-            return abs_target, "moved"
+            return OrganizeResult(dest=abs_target, action="moved")
     else:
         if copy_mode:
             print(f"[DRY RUN] Would copy: {file_path} \u2192 {abs_target}", file=sys.stderr)
-            return abs_target, "would_copy"
+            return OrganizeResult(dest=abs_target, action="would_copy")
         else:
             print(f"[DRY RUN] Would move: {file_path} \u2192 {abs_target}", file=sys.stderr)
-            return abs_target, "would_move"
+            return OrganizeResult(dest=abs_target, action="would_move")
 
 
 def main():
@@ -228,14 +236,13 @@ def main():
 
     target_dir = os.path.expanduser(args.target)
 
-    dest, action = process_file(
+    result = process_file(
         args.file, target_dir, args.template,
         copy_mode=args.copy, overwrite=args.overwrite,
         apply=args.apply, verbose=args.verbose
     )
 
-    print(f"@@dest={dest}")
-    print(f"@@action={action}")
+    emit_result(result)
 
 
 if __name__ == "__main__":

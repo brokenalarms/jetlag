@@ -525,7 +525,7 @@ class TestTagMediaDataPresentation:
             if line.startswith("@@") and "=" in line:
                 key, value = line[2:].split("=", 1)
                 at_lines[key] = value
-        assert at_lines.get("tag_action") == "already_correct", f"Actual: @@tag_action={at_lines.get('tag_action')}, Expected: already_correct"
+        assert at_lines.get("action") == "already_correct", f"Actual: @@action={at_lines.get('action')}, Expected: already_correct"
 
 
 class TestTagMediaMachineOutput:
@@ -554,9 +554,9 @@ class TestTagMediaMachineOutput:
         return result
 
     def test_tagged_emits_correct_action(self, test_video):
-        """Tagging a file emits @@tag_action=tagged
+        """Tagging a file emits @@action=tagged
 
-        Actual: stdout contains @@tag_action=tagged with tags listed
+        Actual: stdout contains @@action=tagged with tags listed
         Expected: tagged action when new tags are applied
         """
         result = subprocess.run([
@@ -570,15 +570,15 @@ class TestTagMediaMachineOutput:
 
         at_lines = self._parse_at_lines(result.stdout)
         assert at_lines.get("file") == "test.mp4", f"Actual: @@file={at_lines.get('file')}, Expected: test.mp4"
-        assert at_lines.get("tag_action") == "tagged", f"Actual: @@tag_action={at_lines.get('tag_action')}, Expected: tagged"
+        assert at_lines.get("action") == "tagged", f"Actual: @@action={at_lines.get('action')}, Expected: tagged"
         assert "test-tag" in at_lines.get("tags_added", ""), f"Actual: @@tags_added={at_lines.get('tags_added')}, Expected: contains test-tag"
         assert at_lines.get("exif_make") == "GoPro", f"Actual: @@exif_make={at_lines.get('exif_make')}, Expected: GoPro"
         assert at_lines.get("exif_model") == "HERO12", f"Actual: @@exif_model={at_lines.get('exif_model')}, Expected: HERO12"
 
     def test_already_correct_emits_already_correct(self, test_video):
-        """Already-tagged file emits @@tag_action=already_correct
+        """Already-tagged file emits @@action=already_correct
 
-        Actual: stdout contains @@tag_action=already_correct
+        Actual: stdout contains @@action=already_correct
         Expected: already_correct for idempotent second run
         """
         # First run
@@ -594,7 +594,7 @@ class TestTagMediaMachineOutput:
         ], capture_output=True, text=True)
 
         at_lines = self._parse_at_lines(result.stdout)
-        assert at_lines.get("tag_action") == "already_correct", f"Actual: @@tag_action={at_lines.get('tag_action')}, Expected: already_correct"
+        assert at_lines.get("action") == "already_correct", f"Actual: @@action={at_lines.get('action')}, Expected: already_correct"
         assert at_lines.get("tags_added") == "", f"Actual: @@tags_added={at_lines.get('tags_added')}, Expected: empty"
 
     def test_stdout_only_has_at_lines(self, test_video):

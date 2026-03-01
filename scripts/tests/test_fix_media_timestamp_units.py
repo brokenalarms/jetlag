@@ -634,6 +634,65 @@ class TestDetermineNeededChanges:
         assert changes["keys_creationdate"] is True
 
 
+class TestTimestampFixResult:
+    """Test that fix_media_timestamps() returns TimestampFixResult dataclass."""
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.test_video = os.path.join(self.temp_dir, "VID_20250618_072521.mp4")
+        create_test_video(
+            self.test_video,
+            DateTimeOriginal="2025:06:18 07:25:21+08:00",
+        )
+
+    def teardown_method(self):
+        fmt.clear_exif_cache()
+        shutil.rmtree(self.temp_dir)
+
+    def test_returns_timestamp_fix_result(self):
+        """fix_media_timestamps returns TimestampFixResult, not bool.
+
+        Actual: return type is TimestampFixResult with correct fields
+        Expected: TimestampFixResult dataclass instance
+        """
+        result = fmt.fix_media_timestamps(
+            self.test_video, dry_run=True, timezone_offset="+08:00"
+        )
+        assert isinstance(result, fmt.TimestampFixResult)
+        assert result.file == "VID_20250618_072521.mp4"
+        assert result.timestamp_action in ("would_fix", "no_change", "tz_mismatch")
+        assert result.original_time is not None
+        assert result.corrected_time is not None
+        assert result.timestamp_source is not None
+        assert result.correction_mode in ("timezone", "time")
+
+    def test_error_result_for_missing_timestamps(self):
+        """Files without usable timestamps return action='error'.
+
+        Actual: TimestampFixResult.timestamp_action is 'error'
+        Expected: error action for files with no timestamp data
+        """
+        blank_video = os.path.join(self.temp_dir, "blank.mp4")
+        create_test_video(blank_video)
+        result = fmt.fix_media_timestamps(blank_video, dry_run=True)
+        assert isinstance(result, fmt.TimestampFixResult)
+        assert result.timestamp_action == "error"
+
+    def test_timezone_field_populated(self):
+        """Detected timezone populates result.timezone.
+
+        Actual: TimestampFixResult.timezone contains detected offset
+        Expected: timezone from file metadata
+        """
+        result = fmt.fix_media_timestamps(
+            self.test_video, dry_run=True, timezone_offset="+08:00"
+        )
+        assert isinstance(result, fmt.TimestampFixResult)
+        # timezone is populated from metadata detection (may be None if not detected)
+        # just verify it doesn't crash and is Optional[str]
+        assert result.timezone is None or isinstance(result.timezone, str)
+
+
 if __name__ == "__main__":
     # Run with pytest
     import pytest

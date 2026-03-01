@@ -11,6 +11,7 @@ import re
 import signal
 import sys
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, Optional, Callable
@@ -27,6 +28,7 @@ except ImportError:
     sys.exit(1)
 
 from lib.exiftool import exiftool
+from lib.results import emit_result
 from lib.timestamp_source import (
     read_exif_data,
     _exif_cache,
@@ -59,6 +61,19 @@ else:
         return False
     def get_expected_file_system_time(datetime_original: datetime, preserve_wallclock: bool = False) -> str:
         return ""
+
+@dataclass
+class TimestampFixResult:
+    file: str
+    timestamp_action: str  # "fixed" | "would_fix" | "no_change" | "error" | "tz_mismatch"
+    original_time: Optional[str] = None
+    corrected_time: Optional[str] = None
+    timestamp_source: Optional[str] = None
+    correction_mode: Optional[str] = None
+    timezone: Optional[str] = None
+    time_offset_seconds: Optional[int] = None
+    time_offset_display: Optional[str] = None
+
 
 def same_as_original(dt_with_tz: datetime) -> str:
     """Keep same as DateTimeOriginal with timezone"""
@@ -673,24 +688,17 @@ def _source_to_machine_token(source: str) -> str:
     return source_lower
 
 
-def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None) -> bool:
-    """Main function to fix media (photo/video) timestamps
+def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None) -> TimestampFixResult:
+    """Fix media (photo/video) timestamps.
 
-    Args:
-        file_path: Path to media file
-        dry_run: If True, show changes without applying them
-        timezone_offset: Timezone offset (e.g. +09:00) for files missing timezone
-        infer_from_filename: If True, use filename timestamp as source of truth
-        preserve_wallclock: If True, preserve literal wall-clock shooting time (10:30 stays 10:30)
-                          If False (default), convert to current timezone for correct equivalent display
-        time_offset_seconds: Integer seconds to add/subtract from the resolved timestamp
+    Returns:
+        TimestampFixResult with all machine-readable fields populated.
+        The caller (main) serialises this to @@key=value via emit_result().
     """
 
     filename = os.path.basename(file_path)
 
-    detected_tz = extract_metadata_timezone(file_path)
-    if detected_tz:
-        print(f"@@timezone={detected_tz}")
+    detected_tz = extract_metadata_timezone(file_path) or None
 
     # Timezone mismatch detection (informational only)
     tz_mismatch = False
@@ -723,14 +731,18 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
             print("❌ File has CreateDate but no DateTimeOriginal", file=sys.stderr)
             print(f"   CreateDate: {create_date}", file=sys.stderr)
             print("   Use --timezone to specify timezone (e.g., --timezone +09:00)", file=sys.stderr)
-            print(f"@@file={filename}")
-            print(f"@@original_time={create_date}")
-            print(f"@@timestamp_action=error")
-            return False
+            return TimestampFixResult(
+                file=filename,
+                timestamp_action="error",
+                original_time=create_date,
+                timezone=detected_tz,
+            )
         print("❌ No valid DateTimeOriginal found", file=sys.stderr)
-        print(f"@@file={filename}")
-        print(f"@@timestamp_action=error")
-        return False
+        return TimestampFixResult(
+            file=filename,
+            timestamp_action="error",
+            timezone=detected_tz,
+        )
 
     datetime_original = current_data["datetime_original"]
     datetime_original_str = current_data["datetime_original_str"]
@@ -785,34 +797,32 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
     change_desc = format_change_description(changes, timestamp_data, current_data, preserve_wallclock, datetime_original)
     has_changes = changes.get("keys_creationdate", False) or changes["file_timestamps"] or changes.get("quicktime_createdate", False)
 
-    # Determine machine output fields
-    action = "tz_mismatch" if tz_mismatch else None
+    # Build common result fields
     correction_mode = "time" if (time_offset_seconds is not None and time_offset_seconds != 0) else "timezone"
+    result_base = dict(
+        file=filename,
+        original_time=_get_raw_original_time(current_data),
+        corrected_time=datetime_original_str,
+        timestamp_source=_source_to_machine_token(timestamp_source),
+        correction_mode=correction_mode,
+        timezone=detected_tz,
+        time_offset_seconds=time_offset_seconds if (time_offset_seconds is not None and time_offset_seconds != 0) else None,
+        time_offset_display=format_offset_display(time_offset_seconds) if (time_offset_seconds is not None and time_offset_seconds != 0) else None,
+    )
 
-    def _emit_machine_lines(timestamp_action: str):
-        print(f"@@file={filename}")
-        print(f"@@original_time={_get_raw_original_time(current_data)}")
-        print(f"@@corrected_time={datetime_original_str}")
-        print(f"@@timestamp_source={_source_to_machine_token(timestamp_source)}")
-        print(f"@@correction_mode={correction_mode}")
-        if time_offset_seconds is not None and time_offset_seconds != 0:
-            print(f"@@time_offset_seconds={time_offset_seconds}")
-            print(f"@@time_offset_display={format_offset_display(time_offset_seconds)}")
-        print(f"@@timestamp_action={timestamp_action}")
+    tz_action = "tz_mismatch" if tz_mismatch else None
 
     if dry_run and has_changes:
         print(f"📊 Change   : {change_desc} (DRY RUN)", file=sys.stderr)
-        _emit_machine_lines(action or "would_fix")
-        return True
+        return TimestampFixResult(**result_base, timestamp_action=tz_action or "would_fix")
     else:
         print(f"📊 Change   : {change_desc}", file=sys.stderr)
 
     if not has_changes:
-        _emit_machine_lines(action or "no_change")
-        return True
+        return TimestampFixResult(**result_base, timestamp_action=tz_action or "no_change")
 
     if dry_run:
-        return True
+        return TimestampFixResult(**result_base, timestamp_action=tz_action or "no_change")
 
     # Apply changes
     success = True
@@ -857,9 +867,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
             print("   ❌ Failed to apply file timestamps", file=sys.stderr)
             success = False
 
-    _emit_machine_lines("fixed" if success else "error")
-
-    return success
+    return TimestampFixResult(**result_base, timestamp_action="fixed" if success else "error")
 
 def main():
     """Command line interface"""
@@ -900,7 +908,7 @@ def main():
         print("Error: --time-offset requires --timezone", file=sys.stderr)
         return 1
 
-    success = fix_media_timestamps(
+    result = fix_media_timestamps(
         file_path,
         dry_run=not args.apply,
         timezone_offset=timezone_offset,
@@ -909,7 +917,9 @@ def main():
         time_offset_seconds=args.time_offset
     )
 
-    return 0 if success else 1
+    emit_result(result)
+
+    return 0 if result.timestamp_action != "error" else 1
 
 if __name__ == "__main__":
     sys.exit(main())
