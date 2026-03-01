@@ -559,7 +559,7 @@ class TestTagging:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
-        assert "@@tag_action=" in result.stdout, "Pipeline should emit @@tag_action from tag-media"
+        assert "@@action=" in result.stdout, "Pipeline should emit @@action from tag-media"
 
     def test_applies_exif_make_model_from_profile(self, temp_workspace, test_profile):
         """EXIF Make/Model from profile are applied."""
@@ -943,7 +943,7 @@ class TestPipelineMachineOutput:
         assert len(files) == 1
         f = files[0]
         if sys.platform == "darwin" and _has_tag_cmd():
-            assert "tag_action" in f, "Missing @@tag_action from tag-media child"
+            assert "action" in f, "Missing @@action from tag-media child"
         assert "timestamp_action" in f, "Missing @@timestamp_action from fix-timestamp child"
         assert "original_time" in f, f"Missing @@original_time from fix-timestamp child, got keys: {list(f.keys())}"
         assert f["original_time"], f"@@original_time is empty, expected a timestamp value"

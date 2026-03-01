@@ -455,6 +455,76 @@ class TestDataPresentation:
         assert isinstance(exif, dict)
 
 
+class TestTagMediaFileResult:
+    """Test that tag_media_file() returns TagResult dataclass."""
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.test_video = os.path.join(self.temp_dir, "test.mp4")
+        create_test_video(self.test_video)
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+
+    def test_returns_tag_result(self):
+        """tag_media_file returns TagResult, not dict.
+
+        Actual: return type is TagResult with correct field types
+        Expected: TagResult dataclass instance
+        """
+        result = tm.tag_media_file(
+            self.test_video, [], None, None, dry_run=True
+        )
+        assert isinstance(result, tm.TagResult)
+        assert result.file == "test.mp4"
+        assert isinstance(result.tags_added, list)
+        assert isinstance(result.exif_make, str)
+        assert isinstance(result.exif_model, str)
+        assert result.action in ("tagged", "already_correct")
+
+    def test_exif_tagged_action(self):
+        """Applying EXIF data returns action='tagged'.
+
+        Actual: TagResult.action is 'tagged' when EXIF fields are written
+        Expected: action reflects that tagging occurred
+        """
+        result = tm.tag_media_file(
+            self.test_video, [], "GoPro", "HERO12", dry_run=False
+        )
+        assert result is not None
+        assert result.action == "tagged"
+        assert result.exif_make == "GoPro"
+        assert result.exif_model == "HERO12"
+
+    def test_already_correct_action(self):
+        """Second run with same values returns action='already_correct'.
+
+        Actual: TagResult.action is 'already_correct' on idempotent re-run
+        Expected: no changes reported
+        """
+        tm.tag_media_file(
+            self.test_video, [], "GoPro", "HERO12", dry_run=False
+        )
+        result = tm.tag_media_file(
+            self.test_video, [], "GoPro", "HERO12", dry_run=False
+        )
+        assert result is not None
+        assert result.action == "already_correct"
+        assert result.exif_make == ""
+        assert result.exif_model == ""
+
+    def test_missing_file_returns_none(self):
+        """Missing file returns None.
+
+        Actual: tag_media_file returns None for nonexistent path
+        Expected: None (failure sentinel)
+        """
+        result = tm.tag_media_file(
+            "/nonexistent/file.mp4", [], None, None, dry_run=True
+        )
+        assert result is None
+
+
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__, "-v"])
