@@ -6,22 +6,12 @@ on:
 permissions:
   pull-requests: read
 
-jobs:
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      scripts: ${{ steps.filter.outputs.scripts }}
-    steps:
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            scripts:
-              - 'scripts/**'
+concurrency:
+  group: ci-${{ github.head_ref }}
+  cancel-in-progress: true
 
-  scripts-test:
-    needs: changes
-    if: needs.changes.outputs.scripts == 'true'
+jobs:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -69,12 +59,3 @@ jobs:
       - name: Performance summary
         if: always()
         run: python3 .github/scripts/perf_summary.py
-
-  gate:
-    needs: [scripts-test]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          [[ "${{ needs.scripts-test.result }}" == "failure" ]] && exit 1
-          exit 0
