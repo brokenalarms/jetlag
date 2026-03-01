@@ -158,7 +158,7 @@ def process_file(file_path: str, target_dir: str, template: str,
     file_date = get_file_date_for_organization(file_path)
     if not file_date:
         print(f"ERROR: Cannot determine date for {base}", file=sys.stderr)
-        sys.exit(1)
+        return OrganizeResult(dest="", action="error")
 
     if verbose:
         print(f"  Date: {file_date}", file=sys.stderr)
@@ -243,6 +243,9 @@ def main():
     )
 
     emit_result(result)
+
+    if result.action == "error":
+        sys.exit(1)
 
 
 if __name__ == "__main__":

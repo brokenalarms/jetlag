@@ -13,12 +13,12 @@ all processing happens there, then output moves files to the target.
 """
 
 import argparse
+import dataclasses
 import json
 import os
 import re
 import shutil
 import signal
-import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
@@ -31,6 +31,11 @@ from lib.timestamp_source import build_filename, parse_datetime_original
 
 import importlib
 _ingest_mod = importlib.import_module("ingest-media")
+_tag_mod = importlib.import_module("tag-media")
+_fix_ts_mod = importlib.import_module("fix-media-timestamp")
+_organize_mod = importlib.import_module("organize-by-date")
+_gyroflow_mod = importlib.import_module("generate-gyroflow")
+_archive_mod = importlib.import_module("archive-source")
 
 SCRIPT_DIR = Path(__file__).parent
 
@@ -46,6 +51,25 @@ def emit(key: str, value: str):
     """
     if _machine_output:
         print(f"@@{key}={value}", flush=True)
+
+
+def _emit_dataclass(result, skip: frozenset[str] = frozenset({"file"})) -> None:
+    """Emit dataclass fields as @@key=value via pipeline emit().
+
+    Mirrors lib/results.emit_result() but routes through the pipeline's
+    emit() function (which respects tty detection).
+    """
+    for field in dataclasses.fields(result):
+        if field.name in skip:
+            continue
+        value = getattr(result, field.name)
+        if value is None:
+            continue
+        if isinstance(value, list):
+            value = ",".join(str(v) for v in value)
+        elif isinstance(value, bool):
+            value = str(value).lower()
+        emit(field.name, str(value))
 
 
 def signal_handler(sig, frame):
@@ -84,85 +108,43 @@ def check_exiftool_tmp(source_dir: str) -> list[Path]:
     return list(source.rglob("exiftool_tmp"))
 
 
-def _parse_at_lines(stdout: str) -> dict[str, str]:
-    """Parse @@key=value lines from stdout into a dict."""
-    result = {}
-    for line in stdout.split("\n"):
-        if line.startswith("@@"):
-            key_value = line[2:]  # strip @@
-            if "=" in key_value:
-                key, value = key_value.split("=", 1)
-                result[key] = value
-    return result
-
-
 def run_tag_media(
     file_path: Path,
     tags: Optional[str],
     make: Optional[str],
     model: Optional[str],
     apply: bool
-) -> tuple[str, bool, dict[str, str]]:
-    """Run tag-media.py on a file.
+):
+    """Tag a file via direct module call.
 
     Returns:
-        tuple of (stderr_output, changed, at_lines)
-        at_lines is a dict of parsed @@key=value pairs from stdout
+        TagResult on success, None on failure.
     """
-    cmd = [sys.executable, str(SCRIPT_DIR / "tag-media.py"), str(file_path)]
-
-    if tags:
-        cmd.extend(["--tags", tags])
-    if make:
-        cmd.extend(["--make", make])
-    if model:
-        cmd.extend(["--model", model])
-    if apply:
-        cmd.append("--apply")
-
-    result = subprocess.run(cmd, capture_output=True, text=True)
-
-    # Parse @@key=value from stdout
-    at_lines = _parse_at_lines(result.stdout)
-
-    # Check if tags were changed via machine token
-    changed = at_lines.get("action") == "tagged"
-
-    # stderr contains user-visible output
-    return result.stderr.strip(), changed, at_lines
+    finder_tags = [t.strip() for t in tags.split(",")] if tags else []
+    return _tag_mod.tag_media_file(
+        str(file_path), finder_tags, make, model, dry_run=not apply
+    )
 
 
 def run_fix_timestamp(
     file_path: Path,
-    location_args: list[str],
+    timezone_offset: Optional[str],
     apply: bool,
-    verbose: bool
-) -> tuple[str, bool, int, dict[str, str]]:
-    """Run fix-media-timestamp.py on a file.
+    infer_from_filename: bool = False,
+    time_offset: Optional[int] = None,
+):
+    """Fix a file's timestamp via direct module call.
 
     Returns:
-        tuple of (stderr_output, changed, return_code, at_lines)
-        at_lines is a dict of parsed @@key=value pairs from stdout
+        TimestampFixResult dataclass.
     """
-    cmd = [sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), str(file_path)]
-    cmd.extend(location_args)
-
-    if apply:
-        cmd.append("--apply")
-    if verbose:
-        cmd.append("--verbose")
-
-    result = subprocess.run(cmd, capture_output=True, text=True)
-
-    # Parse @@key=value from stdout
-    at_lines = _parse_at_lines(result.stdout)
-
-    # Check if timestamp was changed via machine token
-    action = at_lines.get("timestamp_action", "")
-    changed = action in ("would_fix", "fixed")
-
-    # stderr contains user-visible output
-    return result.stderr.strip(), changed, result.returncode, at_lines
+    return _fix_ts_mod.fix_media_timestamps(
+        str(file_path),
+        dry_run=not apply,
+        timezone_offset=timezone_offset,
+        infer_from_filename=infer_from_filename,
+        time_offset_seconds=time_offset,
+    )
 
 
 def run_organize_by_date(
@@ -170,39 +152,18 @@ def run_organize_by_date(
     target_dir: str,
     template: str,
     apply: bool,
-    verbose: bool
-) -> tuple[str, str, str, int]:
-    """Run organize-by-date.py on a file.
+    verbose: bool,
+):
+    """Organize a file into date-based folders via direct module call.
 
     Returns:
-        tuple of (stderr_output, action, dest_path, return_code)
-        action and dest are parsed from @@key=value lines in stdout
+        OrganizeResult dataclass.
     """
-    cmd = [
-        str(SCRIPT_DIR / "organize-by-date.sh"),
-        str(file_path),
-        "--target", target_dir,
-        "--template", template
-    ]
-
-    if apply:
-        cmd.append("--apply")
-    if verbose:
-        cmd.append("--verbose")
-
-    result = subprocess.run(cmd, capture_output=True, text=True)
-
-    # Parse @@key=value from stdout
-    action = ""
-    dest = ""
-    for line in result.stdout.split("\n"):
-        if line.startswith("@@action="):
-            action = line.split("=", 1)[1]
-        elif line.startswith("@@dest="):
-            dest = line.split("=", 1)[1]
-
-    # stderr contains user-visible output
-    return result.stderr.strip(), action, dest, result.returncode
+    return _organize_mod.process_file(
+        str(file_path), target_dir, template,
+        copy_mode=False, overwrite=False,
+        apply=apply, verbose=verbose,
+    )
 
 
 def run_ingest_media(
@@ -231,28 +192,17 @@ def run_ingest_media(
 def run_generate_gyroflow(
     file_path: Path,
     preset_json: str,
-    apply: bool
-) -> tuple[str, int, dict[str, str]]:
-    """Run generate-gyroflow.py on a file.
+    apply: bool,
+    binary: Optional[str] = None,
+):
+    """Generate a gyroflow project via direct module call.
 
     Returns:
-        tuple of (stderr_output, return_code, at_lines)
-        at_lines is a dict of parsed @@key=value pairs from stdout
+        GyroflowResult dataclass.
     """
-    cmd = [
-        sys.executable, str(SCRIPT_DIR / "generate-gyroflow.py"),
-        str(file_path),
-        "--preset", preset_json,
-    ]
-
-    if apply:
-        cmd.append("--apply")
-
-    result = subprocess.run(cmd, capture_output=True, text=True)
-
-    at_lines = _parse_at_lines(result.stdout)
-
-    return result.stderr.strip(), result.returncode, at_lines
+    return _gyroflow_mod.generate_gyroflow_project(
+        file_path, apply, binary=binary, preset_json=preset_json,
+    )
 
 
 def run_archive_source(
@@ -260,28 +210,15 @@ def run_archive_source(
     action: str,
     files: list[str],
     apply: bool,
-    verbose: bool,
-) -> int:
-    """Run archive-source.py on the source directory after all files processed.
+):
+    """Archive or delete source files via direct module call.
 
-    Returns the subprocess return code.
+    Returns:
+        ArchiveResult dataclass.
     """
-    cmd = [
-        sys.executable, str(SCRIPT_DIR / "archive-source.py"),
-        "--source", source_dir,
-        "--action", action,
-    ]
-
-    if files:
-        cmd.append("--files")
-        cmd.extend(files)
-    if apply:
-        cmd.append("--apply")
-    if verbose:
-        cmd.append("--verbose")
-
-    result = subprocess.run(cmd)
-    return result.returncode
+    if action == "delete":
+        return _archive_mod.delete_files(source_dir, files, apply)
+    return _archive_mod.archive_source(source_dir, apply)
 
 
 def process_file(
@@ -290,7 +227,7 @@ def process_file(
     target_dir: str,
     working_dir: str,
     group: Optional[str],
-    location_args: list[str],
+    timezone_offset: Optional[str],
     apply: bool,
     verbose: bool,
     gyroflow_config: Optional[dict] = None,
@@ -298,6 +235,8 @@ def process_file(
     companion_extensions: list[str] | None = None,
     copy_companion_files: bool = False,
     update_filename_dates: bool = False,
+    infer_from_filename: bool = False,
+    time_offset: Optional[int] = None,
 ) -> dict:
     """Process a single file through the pipeline.
 
@@ -351,42 +290,37 @@ def process_file(
 
         if tags or make or model:
             print("🏷️  Tagging...", file=sys.stderr)
-            output, changed, at_lines = run_tag_media(active_file, tags or None, make or None, model or None, apply)
-            for line in output.split("\n"):
-                if line.strip():
-                    print(f"  {line}", file=sys.stderr)
-            for key, value in at_lines.items():
-                if key != "file":
-                    emit(key, value)
-            if changed:
-                file_changed = True
+            tag_result = run_tag_media(active_file, tags or None, make or None, model or None, apply)
+            if tag_result is not None:
+                _emit_dataclass(tag_result)
+                if tag_result.action == "tagged":
+                    file_changed = True
             emit("stage_complete", "tag")
 
     # Fix video timestamp (if in tasks)
     if tasks and "fix-timestamp" in tasks:
         print("🔧 Fixing timestamp...", file=sys.stderr)
-        output, changed, rc, at_lines = run_fix_timestamp(active_file, location_args, apply, verbose)
-        for line in output.split("\n"):
-            if line.strip():
-                print(f"  {line}", file=sys.stderr)
-        for key, value in at_lines.items():
-            if key != "file":
-                emit(key, value)
+        ts_result = run_fix_timestamp(
+            active_file, timezone_offset, apply,
+            infer_from_filename=infer_from_filename,
+            time_offset=time_offset,
+        )
+        _emit_dataclass(ts_result)
 
-        if rc != 0:
+        if ts_result.timestamp_action == "error":
             print(f"   ❌ Timestamp fix failed for {file_path.name}", file=sys.stderr)
             result["failed"] = True
             result["error"] = "Timestamp fix failed"
             emit("pipeline_result", "failed")
             return result
 
-        if changed:
+        if ts_result.timestamp_action in ("would_fix", "fixed"):
             file_changed = True
         emit("stage_complete", "fix-timestamp")
 
         # Inline rename when --update-filename-dates is set
-        if update_filename_dates and at_lines.get("corrected_time"):
-            corrected_dt = parse_datetime_original(at_lines["corrected_time"])
+        if update_filename_dates and ts_result.corrected_time:
+            corrected_dt = parse_datetime_original(ts_result.corrected_time)
             if corrected_dt:
                 new_name = build_filename(active_file.name, corrected_dt)
                 if new_name and new_name != active_file.name:
@@ -418,26 +352,20 @@ def process_file(
         template = f"{{{{YYYY}}}}/{group}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
     else:
         template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
-    output, action, dest, rc = run_organize_by_date(active_file, target_dir, template, apply, verbose)
-    if action:
-        emit("action", action)
-    if dest:
-        emit("dest", dest)
+    org_result = run_organize_by_date(active_file, target_dir, template, apply, verbose)
+    _emit_dataclass(org_result, skip=frozenset())
 
-    if output:
-        for line in output.split("\n"):
-            if line.strip():
-                print(line, file=sys.stderr)
-
-    if rc != 0:
+    if org_result.action == "error":
         print(f"   ❌ Organization failed for {file_path.name}", file=sys.stderr)
         result["failed"] = True
         result["error"] = "Organization failed"
         emit("pipeline_result", "failed")
         return result
 
-    if action in ("copied", "moved", "overwrote", "would_copy", "would_move", "would_overwrite"):
+    if org_result.action in ("copied", "moved", "overwrote", "would_copy", "would_move", "would_overwrite"):
         file_changed = True
+
+    dest = org_result.dest
 
     # Move companions to the same output directory as the main file
     if copy_companion_files and companion_dests and dest:
@@ -460,17 +388,13 @@ def process_file(
 
         preset = gyroflow_config.get("preset", {})
         preset_json = json.dumps(preset)
+        binary = gyroflow_config.get("binary")
 
         gyroflow_file = Path(dest) if dest and apply else active_file
-        gf_output, _, gf_at_lines = run_generate_gyroflow(gyroflow_file, preset_json, apply)
-        for line in gf_output.split("\n"):
-            if line.strip():
-                print(f"  {line}", file=sys.stderr)
-        for key, value in gf_at_lines.items():
-            if key != "file":
-                emit(key, value)
+        gf_result = run_generate_gyroflow(gyroflow_file, preset_json, apply, binary=binary)
+        _emit_dataclass(gf_result, skip=frozenset())
 
-        if gf_at_lines.get("action") == "generated":
+        if gf_result.action == "generated":
             file_changed = True
         emit("stage_complete", "gyroflow")
 
@@ -637,16 +561,13 @@ def main():
         print("ERROR: --time-offset requires --timezone", file=sys.stderr)
         sys.exit(1)
 
-    # Build location args for child scripts
-    location_args = []
-    if args.location:
-        location_args = ["--location", args.location]
-    elif args.timezone:
-        location_args = ["--timezone", args.timezone]
-    if args.infer_from_filename:
-        location_args.append("--infer-from-filename")
-    if args.time_offset is not None:
-        location_args.extend(["--time-offset", str(args.time_offset)])
+    # Resolve timezone upfront (direct module calls need the offset, not CLI args)
+    timezone_offset = args.timezone
+    if args.location and not timezone_offset:
+        timezone_offset = _fix_ts_mod.get_timezone_for_country(args.location)
+        if not timezone_offset:
+            print(f"ERROR: Could not determine timezone for location '{args.location}'", file=sys.stderr)
+            sys.exit(1)
 
     # Check for stale exiftool_tmp directories
     tmp_dirs = check_exiftool_tmp(source_dir)
@@ -679,8 +600,8 @@ def main():
     print(f"→ Working: {working_dir}", file=sys.stderr)
     print(f"→ Target:  {target_dir}", file=sys.stderr)
     print(f"→ Mode:    {'APPLY (files will be processed)' if args.apply else 'DRY RUN (no changes)'}", file=sys.stderr)
-    if location_args:
-        print(f"→ Timezone: {location_args[0]} {location_args[1]}", file=sys.stderr)
+    if timezone_offset:
+        print(f"→ Timezone: {timezone_offset}", file=sys.stderr)
     else:
         print("→ Timezone: From video metadata (or will prompt if needed)", file=sys.stderr)
     if "archive-source" in args.tasks:
@@ -737,7 +658,7 @@ def main():
             target_dir,
             working_dir,
             group,
-            location_args,
+            timezone_offset,
             args.apply,
             args.verbose,
             gyroflow_config=gyroflow_config,
@@ -745,6 +666,8 @@ def main():
             companion_extensions=companion_extensions,
             copy_companion_files=args.copy_companion_files,
             update_filename_dates=args.update_filename_dates,
+            infer_from_filename=args.infer_from_filename,
+            time_offset=args.time_offset,
         )
 
         if result["failed"]:
@@ -762,11 +685,11 @@ def main():
     # Archive source (if in tasks)
     if "archive-source" in tasks:
         print("📦 Archive source...", file=sys.stderr)
-        arc_rc = run_archive_source(
-            source_dir, args.source_action, all_source_files, args.apply, args.verbose,
+        arc_result = run_archive_source(
+            source_dir, args.source_action, all_source_files, args.apply,
         )
-        if arc_rc != 0:
-            print(f"   ⚠️  Archive-source failed (exit {arc_rc})", file=sys.stderr)
+        if arc_result.failed:
+            print("   ⚠️  Archive-source failed", file=sys.stderr)
 
     # Clean up working dir
     if args.apply:

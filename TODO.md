@@ -13,10 +13,10 @@
 
 ## `scripts/` + `macos/`
 
-- (2026-03-01) **Pipeline internal migration** — four ordered specs, each enabling the next. Steps 1-2 done. Step 3 is scripts-only; step 4 touches both scripts and macOS app:
+- (2026-03-01) **Pipeline internal migration** — four ordered specs, each enabling the next. Steps 1-3 done. Step 4 touches both scripts and macOS app:
   1. Pyrefly type checking — static type enforcement across Python scripts (done, shipped)
   2. Typed return contracts — functions return dataclasses; `main()` serialises to `@@` temporarily (done, shipped)
-  3. Subprocess → module calls (`specs/subprocess-to-module-calls.md`) — pipeline imports and calls directly, receives typed objects; `@@` serialisation in scripts' `main()` deleted (dead code); pipeline's `emit()` still prints `@@` for the app
+  3. Subprocess → module calls (done, shipped) — pipeline imports and calls directly, receives typed objects; scripts' `main()` retains `emit_result()` for standalone CLI usage; pipeline's `emit()` still prints `@@` for the app
   4. JSONL + schema for app IPC (`specs/jsonl-app-ipc.md`) — atomic switchover: pipeline emits JSON, app parser switches to JSONDecoder, `@@` in `emit()` deleted. Dual-format flag during transition if needed
 
 
