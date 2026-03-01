@@ -27,6 +27,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.filesystem import find_media_files
+from lib.timestamp_source import build_filename, parse_datetime_original
 
 import importlib
 _ingest_mod = importlib.import_module("ingest-media")
@@ -296,6 +297,7 @@ def process_file(
     tasks: set | None = None,
     companion_extensions: list[str] | None = None,
     copy_companion_files: bool = False,
+    update_filename_dates: bool = False,
 ) -> dict:
     """Process a single file through the pipeline.
 
@@ -381,6 +383,30 @@ def process_file(
         if changed:
             file_changed = True
         emit("stage_complete", "fix-timestamp")
+
+        # Inline rename when --update-filename-dates is set
+        if update_filename_dates and at_lines.get("corrected_time"):
+            corrected_dt = parse_datetime_original(at_lines["corrected_time"])
+            if corrected_dt:
+                new_name = build_filename(active_file.name, corrected_dt)
+                if new_name and new_name != active_file.name:
+                    new_path = active_file.parent / new_name
+                    if apply:
+                        os.rename(str(active_file), str(new_path))
+                        # Rename companions in working dir and update companion_dests
+                        updated_companion_dests = []
+                        for ext in companion_extensions or []:
+                            old_companion = active_file.parent / (active_file.stem + ext)
+                            if old_companion.is_file():
+                                new_companion = active_file.parent / (new_path.stem + ext)
+                                os.rename(str(old_companion), str(new_companion))
+                                updated_companion_dests.append(str(new_companion))
+                        if updated_companion_dests:
+                            companion_dests = updated_companion_dests
+                    else:
+                        print(f"  [DRY RUN] Would rename: {active_file.name} → {new_name}", file=sys.stderr)
+                    emit("renamed_to", new_name)
+                    active_file = new_path
 
     # OUTPUT (always): organize active_file to target_dir
     print("📁 Organizing by date...", file=sys.stderr)
@@ -513,6 +539,18 @@ def build_parser():
         "--copy-companion-files", action="store_true",
         help="Also copy companion files (matching profile companion_extensions) to target."
     )
+    parser.add_argument(
+        "--infer-from-filename", action="store_true",
+        help="Use filename timestamp as source of truth instead of EXIF metadata. Requires --timezone."
+    )
+    parser.add_argument(
+        "--time-offset", type=int, default=None,
+        help="Seconds to add/subtract from source timestamp (for clock correction). Requires --timezone."
+    )
+    parser.add_argument(
+        "--update-filename-dates", action="store_true",
+        help="Rename files to reflect corrected timestamps after fix-timestamp."
+    )
     parser.add_argument("--tags", help="Comma-separated Finder tags (overrides profile tags)")
     parser.add_argument("--make", help="EXIF camera make (overrides profile exif.make)")
     parser.add_argument("--model", help="EXIF camera model (overrides profile exif.model)")
@@ -591,12 +629,24 @@ def main():
     if group and args.append_timezone_to_group:
         group = f"{group} ({args.timezone})"
 
+    # Validate --infer-from-filename and --time-offset requirements
+    if args.infer_from_filename and not args.timezone:
+        print("ERROR: --infer-from-filename requires --timezone", file=sys.stderr)
+        sys.exit(1)
+    if args.time_offset is not None and not args.timezone:
+        print("ERROR: --time-offset requires --timezone", file=sys.stderr)
+        sys.exit(1)
+
     # Build location args for child scripts
     location_args = []
     if args.location:
         location_args = ["--location", args.location]
     elif args.timezone:
         location_args = ["--timezone", args.timezone]
+    if args.infer_from_filename:
+        location_args.append("--infer-from-filename")
+    if args.time_offset is not None:
+        location_args.extend(["--time-offset", str(args.time_offset)])
 
     # Check for stale exiftool_tmp directories
     tmp_dirs = check_exiftool_tmp(source_dir)
@@ -694,6 +744,7 @@ def main():
             tasks=tasks,
             companion_extensions=companion_extensions,
             copy_companion_files=args.copy_companion_files,
+            update_filename_dates=args.update_filename_dates,
         )
 
         if result["failed"]:

@@ -29,7 +29,7 @@ enum SourceAction: String, CaseIterable {
 enum PipelineStep: String, CaseIterable, Identifiable {
     case ingest = "Ingest"
     case tag = "Tag"
-    case fixTimezone = "Fix Timezone"
+    case fixTimestamps = "Fix Timestamps"
     case organize = "Organize"
     case gyroflow = "Gyroflow"
     case archiveSource = "Archive Source"
@@ -44,7 +44,7 @@ enum PipelineStep: String, CaseIterable, Identifiable {
         switch self {
         case .ingest: "sdcard"
         case .tag: "tag"
-        case .fixTimezone: "clock.arrow.2.circlepath"
+        case .fixTimestamps: "clock.arrow.2.circlepath"
         case .organize: "folder.badge.gearshape"
         case .gyroflow: "gyroscope"
         case .archiveSource: "archivebox"
@@ -55,7 +55,7 @@ enum PipelineStep: String, CaseIterable, Identifiable {
         switch self {
         case .ingest:        Color("NeonCyan")
         case .tag:           Color("NeonPink")
-        case .fixTimezone:   Color("NeonYellow")
+        case .fixTimestamps:   Color("NeonYellow")
         case .organize:      Color.accentColor
         case .gyroflow:      Color("NeonPurple")
         case .archiveSource: Color("NeonCyan")
@@ -66,7 +66,7 @@ enum PipelineStep: String, CaseIterable, Identifiable {
         switch self {
         case .ingest: Strings.Pipeline.ingestLabel
         case .tag: Strings.Pipeline.tagLabel
-        case .fixTimezone: Strings.Pipeline.fixTimezoneLabel
+        case .fixTimestamps: Strings.Pipeline.fixTimestampsLabel
         case .organize: Strings.Pipeline.organizeLabel
         case .gyroflow: Strings.Pipeline.gyroflowLabel
         case .archiveSource: Strings.Pipeline.archiveSourceLabel
@@ -77,7 +77,7 @@ enum PipelineStep: String, CaseIterable, Identifiable {
         switch self {
         case .ingest: Strings.Pipeline.ingestHelp
         case .tag: Strings.Pipeline.tagHelp
-        case .fixTimezone: Strings.Pipeline.fixTimezoneHelp
+        case .fixTimestamps: Strings.Pipeline.fixTimestampsHelp
         case .organize: Strings.Pipeline.organizeHelp
         case .gyroflow: Strings.Pipeline.gyroflowHelp
         case .archiveSource: Strings.Pipeline.archiveSourceHelp
@@ -115,6 +115,9 @@ final class WorkflowSession {
     var sourceAction: SourceAction = .archive
     var appendTimezoneToGroup: Bool = false
     var applyMode: Bool = false
+    var inferFromFilenames: Bool = false
+    var timeOffsetSeconds: Int?
+    var updateFilenameDates: Bool = false
 
     var enabledSteps: Set<PipelineStep> = [] {
         didSet {
@@ -140,7 +143,7 @@ final class WorkflowSession {
 
     private static func computeAvailableSteps(profile: MediaProfile?) -> [PipelineStep] {
         guard let profile else { return [] }
-        var steps: [PipelineStep] = [.ingest, .tag, .fixTimezone, .organize]
+        var steps: [PipelineStep] = [.ingest, .tag, .fixTimestamps, .organize]
         if profile.gyroflowEnabled == true {
             steps.append(.gyroflow)
         }
@@ -154,7 +157,7 @@ final class WorkflowSession {
             return !sourceDir.current.isEmpty
         case .organize:
             return !readyDir.current.isEmpty
-        case .fixTimezone:
+        case .fixTimestamps:
             return !timezone.current.isEmpty
         case .tag, .gyroflow, .archiveSource:
             return true
@@ -163,7 +166,7 @@ final class WorkflowSession {
 
     func validateTimezone() -> String? {
         if useTimezonePicker { return nil }
-        if !enabledSteps.contains(.fixTimezone) { return nil }
+        if !enabledSteps.contains(.fixTimestamps) { return nil }
         if timezone.current.isEmpty { return Strings.Workflow.timezoneRequired }
         if !timezone.current.contains(/^[+-]\d{4}$/) { return Strings.Workflow.timezoneFormatHelp }
         return nil
@@ -245,7 +248,7 @@ final class WorkflowSession {
         let optionalSteps = enabledSteps.filter { !$0.isAlwaysOn }
         let taskNames: [PipelineStep: String] = [
             .tag: "tag",
-            .fixTimezone: "fix-timestamp",
+            .fixTimestamps: "fix-timestamp",
             .gyroflow: "gyroflow",
             .archiveSource: "archive-source",
         ]
@@ -263,8 +266,17 @@ final class WorkflowSession {
         if copyCompanionFiles {
             args.append("--copy-companion-files")
         }
-        if enabledSteps.contains(.fixTimezone) && !timezone.current.isEmpty {
+        if enabledSteps.contains(.fixTimestamps) && !timezone.current.isEmpty {
             args += ["--timezone", timezone.current]
+        }
+        if enabledSteps.contains(.fixTimestamps) && inferFromFilenames {
+            args.append("--infer-from-filename")
+        }
+        if enabledSteps.contains(.fixTimestamps), let offset = timeOffsetSeconds, offset != 0 {
+            args += ["--time-offset", String(offset)]
+        }
+        if updateFilenameDates {
+            args.append("--update-filename-dates")
         }
         if applyMode {
             args.append("--apply")
@@ -383,6 +395,12 @@ final class AppState {
             currentDiffRow?.timestampAction = value
         case "timezone":
             currentDiffRow?.timezone = value
+        case "correction_mode":
+            currentDiffRow?.correctionMode = value
+        case "time_offset_display":
+            currentDiffRow?.timeOffsetDisplay = value
+        case "renamed_to":
+            currentDiffRow?.renamedTo = value
         case "dest":
             currentDiffRow?.dest = value
         case "action":

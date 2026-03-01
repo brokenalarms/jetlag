@@ -146,16 +146,16 @@ final class PipelineArgsTests: XCTestCase {
 
     // MARK: - Step readiness
 
-    func testIsStepReadyFixTimezoneRequiresTimezone() {
+    func testIsStepReadyFixTimestampsRequiresTimezone() {
         let session = makeSession()
         session.timezone.value = ""
-        XCTAssertFalse(session.isStepReady(.fixTimezone))
+        XCTAssertFalse(session.isStepReady(.fixTimestamps))
     }
 
-    func testIsStepReadyFixTimezoneWithTimezone() {
+    func testIsStepReadyFixTimestampsWithTimezone() {
         let session = makeSession()
         session.timezone.value = "+0900"
-        XCTAssertTrue(session.isStepReady(.fixTimezone))
+        XCTAssertTrue(session.isStepReady(.fixTimestamps))
     }
 
     func testIsStepReadyIngestRequiresSourceDir() {
@@ -164,22 +164,92 @@ final class PipelineArgsTests: XCTestCase {
         XCTAssertFalse(session.isStepReady(.ingest))
     }
 
-    func testAllStepsReadyWhenFixTimezoneDisabledAndTimezoneEmpty() {
+    func testAllStepsReadyWhenFixTimestampsDisabledAndTimezoneEmpty() {
         let session = makeSession()
         session.sourceDir.value = makeTempDir()
         session.readyDir.value = makeTempDir()
         session.timezone.value = ""
-        session.enabledSteps.remove(.fixTimezone)
+        session.enabledSteps.remove(.fixTimestamps)
         XCTAssertTrue(session.allStepsReady)
     }
 
-    func testAllStepsNotReadyWhenFixTimezoneEnabledAndTimezoneEmpty() {
+    func testAllStepsNotReadyWhenFixTimestampsEnabledAndTimezoneEmpty() {
         let session = makeSession()
         session.sourceDir.value = makeTempDir()
         session.readyDir.value = makeTempDir()
         session.timezone.value = ""
-        session.enabledSteps.insert(.fixTimezone)
+        session.enabledSteps.insert(.fixTimestamps)
         XCTAssertFalse(session.allStepsReady)
+    }
+
+    func testInferFromFilenames() {
+        let session = makeSession()
+        session.timezone.value = "+0900"
+        session.inferFromFilenames = true
+        let (_, args) = session.buildPipelineArgs()
+
+        XCTAssertTrue(args.contains("--infer-from-filename"))
+    }
+
+    func testInferFromFilenamesNotIncludedByDefault() {
+        let session = makeSession()
+        session.timezone.value = "+0900"
+        let (_, args) = session.buildPipelineArgs()
+
+        XCTAssertFalse(args.contains("--infer-from-filename"))
+    }
+
+    func testInferFromFilenamesNotIncludedWhenStepDisabled() {
+        let session = makeSession()
+        session.timezone.value = "+0900"
+        session.inferFromFilenames = true
+        session.enabledSteps.remove(.fixTimestamps)
+        let (_, args) = session.buildPipelineArgs()
+
+        XCTAssertFalse(args.contains("--infer-from-filename"))
+    }
+
+    func testTimeOffset() {
+        let session = makeSession()
+        session.timezone.value = "+0900"
+        session.timeOffsetSeconds = 3600
+        let (_, args) = session.buildPipelineArgs()
+
+        let idx = args.firstIndex(of: "--time-offset")!
+        XCTAssertEqual(args[idx + 1], "3600")
+    }
+
+    func testTimeOffsetNotIncludedWhenNil() {
+        let session = makeSession()
+        session.timezone.value = "+0900"
+        session.timeOffsetSeconds = nil
+        let (_, args) = session.buildPipelineArgs()
+
+        XCTAssertFalse(args.contains("--time-offset"))
+    }
+
+    func testTimeOffsetNotIncludedWhenZero() {
+        let session = makeSession()
+        session.timezone.value = "+0900"
+        session.timeOffsetSeconds = 0
+        let (_, args) = session.buildPipelineArgs()
+
+        XCTAssertFalse(args.contains("--time-offset"))
+    }
+
+    func testUpdateFilenameDates() {
+        let session = makeSession()
+        session.updateFilenameDates = true
+        let (_, args) = session.buildPipelineArgs()
+
+        XCTAssertTrue(args.contains("--update-filename-dates"))
+    }
+
+    func testUpdateFilenameDatesNotIncludedByDefault() {
+        let session = makeSession()
+        let (_, args) = session.buildPipelineArgs()
+
+        XCTAssertFalse(args.contains("--update-filename-dates"))
     }
 
     func testAlwaysOnStepsNeverInTasks() {

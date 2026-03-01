@@ -42,13 +42,13 @@ class TestFilenameSourceOfTruth:
         shutil.rmtree(self.temp_dir)
         fmt._exif_cache.clear()
 
-    def test_insta360_filename_is_source_of_truth_with_overwrite(self):
+    def test_insta360_filename_is_source_of_truth_with_infer(self):
         """
         Insta360 file VID_20250619_063809_00_002.mp4 has:
         - Filename: 06:38:09 (CORRECT - source of truth)
         - DateTimeOriginal: 09:38:09+08:00 (WRONG - corrupted)
 
-        With --overwrite-datetimeoriginal --timezone +0800:
+        With --infer-from-filename --timezone +0800:
         - Should use filename (06:38:09) as source of truth
         - Should write DateTimeOriginal as 06:38:09+08:00
         - Should ignore the corrupted DateTimeOriginal value
@@ -56,11 +56,10 @@ class TestFilenameSourceOfTruth:
         video_path = os.path.join(self.temp_dir, "VID_20250619_063809_00_002.mp4")
         create_test_video(video_path, DateTimeOriginal="2025:06:19 09:38:09+08:00")
 
-        # Run with --overwrite-datetimeoriginal to use filename as source of truth
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
-            "--overwrite-datetimeoriginal",
+            "--infer-from-filename",
             "--timezone", "+0800",
             "--apply"
         ], capture_output=True, text=True)
@@ -98,10 +97,7 @@ class TestFilenameSourceOfTruth:
 
 
 class TestDateTimeOriginalPreservation:
-    """
-    CLAUDE.md: "DateTimeOriginal is next source of truth and should never be modified
-    unless --overwrite-datetimeoriginal is specified"
-    """
+    """DateTimeOriginal is preserved by default unless --infer-from-filename."""
 
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
@@ -111,14 +107,12 @@ class TestDateTimeOriginalPreservation:
         fmt._exif_cache.clear()
 
     def test_datetimeoriginal_preserved_by_default(self):
-        """
-        Without --overwrite-datetimeoriginal, DateTimeOriginal should never change
-        """
+        """Without --infer-from-filename, DateTimeOriginal should never change."""
         video_path = os.path.join(self.temp_dir, "test_video.mp4")
         original_datetime = "2025:06:19 06:38:09+08:00"
         create_test_video(video_path, DateTimeOriginal=original_datetime)
 
-        # Run fix without --overwrite-datetimeoriginal
+        # Run fix without --infer-from-filename
         subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
@@ -131,10 +125,8 @@ class TestDateTimeOriginalPreservation:
         assert exif.get("DateTimeOriginal") == original_datetime
 
 
-class TestOverwriteDateTimeOriginalRequiresTimezone:
-    """
-    CLAUDE.md: "if --overwrite-datetimeoriginal is specified, --timezone must be provided"
-    """
+class TestInferFromFilenameRequiresTimezone:
+    """--infer-from-filename requires --timezone."""
 
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
@@ -143,31 +135,24 @@ class TestOverwriteDateTimeOriginalRequiresTimezone:
         shutil.rmtree(self.temp_dir)
         fmt._exif_cache.clear()
 
-    def test_overwrite_without_timezone_fails(self):
-        """
-        --overwrite-datetimeoriginal without --timezone should fail with clear error
-        """
+    def test_infer_without_timezone_fails(self):
+        """--infer-from-filename without --timezone should fail."""
         video_path = os.path.join(self.temp_dir, "VID_20250619_063809.mp4")
         create_test_video(video_path)
 
-        # Try to run with --overwrite-datetimeoriginal but no --timezone
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
-            "--overwrite-datetimeoriginal",
+            "--infer-from-filename",
             "--apply"
         ], capture_output=True, text=True)
 
-        # Should fail
         assert result.returncode != 0
-        assert "requires --timezone" in result.stderr or "requires --timezone" in result.stdout
+        assert "requires --timezone" in result.stderr
 
 
 class TestTimezoneMismatchDetection:
-    """
-    CLAUDE.md: "if a different --timezone is specified that doesn't match DateTimeOriginal,
-    then we should exit with a warning unless --overwrite-datetime-original is specified"
-    """
+    """Timezone mismatch is now informational — succeeds with @@timestamp_action=tz_mismatch."""
 
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
@@ -176,49 +161,32 @@ class TestTimezoneMismatchDetection:
         shutil.rmtree(self.temp_dir)
         fmt._exif_cache.clear()
 
-    def test_timezone_mismatch_without_overwrite_fails(self):
-        """
-        Providing different --timezone than DateTimeOriginal should fail without --overwrite
-        """
+    def _parse_at_lines(self, stdout: str) -> dict:
+        result = {}
+        for line in stdout.strip().split("\n"):
+            if line.startswith("@@"):
+                key_value = line[2:]
+                if "=" in key_value:
+                    key, value = key_value.split("=", 1)
+                    result[key] = value
+        return result
+
+    def test_timezone_mismatch_is_informational(self):
+        """Providing different --timezone than DateTimeOriginal succeeds with tz_mismatch action."""
         video_path = os.path.join(self.temp_dir, "test_video.mp4")
         create_test_video(video_path, DateTimeOriginal="2025:06:19 06:38:09+08:00")
 
-        # Try to run with DIFFERENT timezone +09:00
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
             "--timezone", "+0900",
-            "--apply"
         ], capture_output=True, text=True)
 
-        # Should fail with timezone mismatch error
-        assert result.returncode != 0
-        output = result.stdout + result.stderr
-        assert "mismatch" in output.lower() or "different" in output.lower()
-
-    def test_timezone_mismatch_with_overwrite_succeeds(self):
-        """
-        With --overwrite-datetimeoriginal, timezone mismatch should be allowed
-        """
-        video_path = os.path.join(self.temp_dir, "test_video.mp4")
-        create_test_video(video_path, DateTimeOriginal="2025:06:19 06:38:09+08:00")
-
-        # Run with DIFFERENT timezone but with --overwrite-datetimeoriginal
-        result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            video_path,
-            "--overwrite-datetimeoriginal",
-            "--timezone", "+0900",
-            "--apply"
-        ], capture_output=True, text=True)
-
-        # Should succeed
+        # Should succeed (informational, not blocking)
         assert result.returncode == 0
-
-        # DateTimeOriginal should be updated to new timezone
-        fmt._exif_cache.clear()
-        exif = fmt.read_exif_data(video_path)
-        assert "+09:00" in exif.get("DateTimeOriginal", "")
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("timestamp_action") == "tz_mismatch"
+        assert "mismatch" in result.stderr.lower()
 
 
 class TestTimezoneConversion:

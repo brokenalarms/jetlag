@@ -57,23 +57,26 @@ class TestTimestampParsing:
     def test_parse_filename_insta360_pattern(self):
         """Test parsing Insta360 filename pattern"""
         filename = "/path/to/VID_20250618_072521.mp4"
-        result = fmt.parse_filename_timestamp(filename)
+        result, pattern = fmt.parse_filename_timestamp(filename)
 
         assert result == "2025:06:18 07:25:21"
+        assert pattern == "YYYYMMDD_HHMMSS"
 
     def test_parse_filename_dji_pattern(self):
         """Test parsing DJI filename pattern"""
         filename = "/path/to/DJI_20250618072521_0001.mp4"
-        result = fmt.parse_filename_timestamp(filename)
+        result, pattern = fmt.parse_filename_timestamp(filename)
 
         assert result == "2025:06:18 07:25:21"
+        assert pattern == "YYYYMMDDHHMMSS"
 
     def test_parse_filename_no_match(self):
         """Test that random filenames return None"""
         filename = "/path/to/random_file.mp4"
-        result = fmt.parse_filename_timestamp(filename)
+        result, pattern = fmt.parse_filename_timestamp(filename)
 
         assert result is None
+        assert pattern is None
 
 
 class TestExifDataReading:
@@ -350,8 +353,8 @@ class TestGetAllTimestampData:
         assert data["datetime_original"].minute == 25
         assert data["datetime_original"].second == 21
 
-    def test_overwrite_mode_uses_filename(self):
-        """--overwrite-datetimeoriginal uses filename even when EXIF exists"""
+    def test_infer_from_filename_uses_filename(self):
+        """--infer-from-filename uses filename even when EXIF exists"""
         # Filename says 06:38:09, but EXIF says 09:38:09 (corrupted)
         video = self._create_video(
             "VID_20250619_063809.mp4",
@@ -361,22 +364,31 @@ class TestGetAllTimestampData:
         data = fmt.get_all_timestamp_data(
             video,
             timezone_offset="+08:00",
-            overwrite_datetimeoriginal=True
+            infer_from_filename=True
         )
 
-        assert data["timestamp_source"] == "filename (overwrite mode)"
+        assert data["timestamp_source"] == "filename (infer mode)"
         assert data["datetime_original"].hour == 6  # From filename, not 9 from EXIF
         assert data["datetime_original"].minute == 38
         assert data["datetime_original"].second == 9
 
-    def test_overwrite_requires_timezone(self):
-        """--overwrite-datetimeoriginal requires --timezone"""
+    def test_infer_from_filename_requires_timezone(self):
+        """--infer-from-filename requires --timezone"""
+        video = self._create_video("VID_20250618_072521.mp4")
+
+        with pytest.raises(ValueError) as exc_info:
+            fmt.get_all_timestamp_data(video, infer_from_filename=True)
+
+        assert "requires --timezone" in str(exc_info.value)
+
+    def test_infer_from_filename_requires_parseable_name(self):
+        """--infer-from-filename with unparseable filename raises error"""
         video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
 
         with pytest.raises(ValueError) as exc_info:
-            fmt.get_all_timestamp_data(video, overwrite_datetimeoriginal=True)
+            fmt.get_all_timestamp_data(video, timezone_offset="+08:00", infer_from_filename=True)
 
-        assert "requires --timezone" in str(exc_info.value)
+        assert "no parseable date" in str(exc_info.value)
 
     def test_datetimeoriginal_without_timezone_adds_flag_timezone(self):
         """DateTimeOriginal without timezone uses --timezone flag"""
@@ -388,6 +400,130 @@ class TestGetAllTimestampData:
         assert data["datetime_original"] is not None
         assert data["datetime_original"].utcoffset() == timedelta(hours=8)
         assert "--timezone flag" in data["timezone_source"]
+
+
+class TestTimeOffset:
+    """Test --time-offset functionality"""
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    def _create_video(self, name, exif_args=None):
+        path = os.path.join(self.temp_dir, name)
+        create_test_video(path, **({"DateTimeOriginal": exif_args[0].split("=")[1]} if exif_args else {}))
+        return path
+
+    def _parse_at_lines(self, stdout: str) -> dict:
+        result = {}
+        for line in stdout.strip().split("\n"):
+            if line.startswith("@@"):
+                key_value = line[2:]
+                if "=" in key_value:
+                    key, value = key_value.split("=", 1)
+                    result[key] = value
+        return result
+
+    def test_positive_offset_applied(self):
+        """Positive offset shifts timestamp forward"""
+        video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
+
+        result = subprocess.run([
+            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            video,
+            "--timezone", "+0800",
+            "--time-offset", "3600",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        at_lines = self._parse_at_lines(result.stdout)
+        assert "08:25:21" in at_lines.get("corrected_time", "")
+        assert at_lines.get("correction_mode") == "time"
+        assert at_lines.get("time_offset_seconds") == "3600"
+
+    def test_negative_offset_applied(self):
+        """Negative offset shifts timestamp backward"""
+        video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
+
+        result = subprocess.run([
+            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            video,
+            "--timezone", "+0800",
+            "--time-offset", "-3600",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        at_lines = self._parse_at_lines(result.stdout)
+        assert "06:25:21" in at_lines.get("corrected_time", "")
+        assert at_lines.get("correction_mode") == "time"
+
+    def test_offset_combined_with_infer(self):
+        """--time-offset works with --infer-from-filename"""
+        video = self._create_video("VID_20250618_072521.mp4")
+
+        result = subprocess.run([
+            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            video,
+            "--timezone", "+0800",
+            "--infer-from-filename",
+            "--time-offset", "7200",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        at_lines = self._parse_at_lines(result.stdout)
+        # 07:25:21 + 2h = 09:25:21
+        assert "09:25:21" in at_lines.get("corrected_time", "")
+
+    def test_offset_without_timezone_fails(self):
+        """--time-offset without --timezone should fail"""
+        video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
+
+        result = subprocess.run([
+            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            video,
+            "--time-offset", "3600",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode != 0
+        assert "requires --timezone" in result.stderr
+
+    def test_offset_display_emitted(self):
+        """@@time_offset_display is emitted when offset is non-zero"""
+        video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
+
+        result = subprocess.run([
+            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            video,
+            "--timezone", "+0800",
+            "--time-offset", "93784",
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("time_offset_display") == "+1d 2h 3m 4s"
+
+
+class TestFormatOffsetDisplay:
+    """Test format_offset_display helper"""
+
+    def test_positive_offset(self):
+        assert fmt.format_offset_display(93784) == "+1d 2h 3m 4s"
+
+    def test_negative_offset(self):
+        assert fmt.format_offset_display(-5400) == "-0d 1h 30m 0s"
+
+    def test_zero(self):
+        assert fmt.format_offset_display(0) == "+0d 0h 0m 0s"
+
+    def test_small_offset(self):
+        assert fmt.format_offset_display(300) == "+0d 0h 5m 0s"
 
 
 class TestFormattingFunctions:

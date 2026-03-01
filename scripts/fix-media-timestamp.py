@@ -27,6 +27,21 @@ except ImportError:
     sys.exit(1)
 
 from lib.exiftool import exiftool
+from lib.timestamp_source import (
+    read_exif_data,
+    _exif_cache,
+    is_valid_timestamp,
+    parse_datetime_original,
+    ensure_colon_tz,
+    normalize_timezone_input,
+    normalize_timezone_format,
+    normalize_exif_value,
+    parse_filename_timestamp,
+    get_best_timestamp,
+    extract_metadata_timezone,
+    read_timestamp_sources,
+    clear_exif_cache,
+)
 
 if sys.platform == "darwin":
     from lib.file_timestamps import (
@@ -44,9 +59,6 @@ else:
         return False
     def get_expected_file_system_time(datetime_original: datetime, preserve_wallclock: bool = False) -> str:
         return ""
-
-# Global cache for exiftool data to avoid reading same file multiple times
-_exif_cache: Dict[str, Dict[str, str]] = {}
 
 def same_as_original(dt_with_tz: datetime) -> str:
     """Keep same as DateTimeOriginal with timezone"""
@@ -151,153 +163,6 @@ def get_country_name(input_country: str) -> str:
 
     return input_country
 
-# FileModifyDate and FileAccessDate are file system timestamps, not EXIF metadata
-# They are not modified by this script - video applications use Keys:CreationDate for timeline ordering
-
-def read_exif_data(file_path: str) -> Dict[str, str]:
-    """Read all relevant EXIF data with single exiftool call (cached)"""
-    if file_path in _exif_cache:
-        return _exif_cache[file_path]
-
-    fields = [
-        "DateTimeOriginal", "CreateDate", "ModifyDate", "CreationDate",
-        "QuickTime:MediaCreateDate", "QuickTime:MediaModifyDate", "Keys:CreationDate"
-    ]
-
-    try:
-        raw = exiftool.read_tags(file_path, fields)
-
-        data = {}
-        for key, value in raw.items():
-            if key == "MediaCreateDate":
-                data["MediaCreateDate"] = value
-            elif key == "MediaModifyDate":
-                data["MediaModifyDate"] = value
-            else:
-                data[key] = value
-
-        _exif_cache[file_path] = data
-        return data
-    except FileNotFoundError as e:
-        print(f"❌ {e}", file=sys.stderr)
-        return {}
-    except Exception as e:
-        print(f"❌ EXIF read failed for {Path(file_path).name}: {e}", file=sys.stderr)
-        return {}
-
-def is_valid_timestamp(timestamp_str: str) -> bool:
-    """Check if timestamp is valid (not null/zero date)"""
-    if not timestamp_str:
-        return False
-    # Reject null timestamps like 0000:00:00 00:00:00
-    if timestamp_str.startswith("0000:00:00"):
-        return False
-    return True
-
-def parse_datetime_original(datetime_str: str) -> Optional[datetime]:
-    """Parse DateTimeOriginal string to datetime object with timezone"""
-    if not datetime_str:
-        return None
-        
-    # Handle format: "2025:05:14 16:38:07+02:00"
-    pattern = r'^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})([\+\-]\d{2}):?(\d{2})$'
-    match = re.match(pattern, datetime_str)
-    
-    if match:
-        year, month, day, hour, minute, second, tz_hour, tz_min = match.groups()
-        
-        # Create timezone-aware datetime
-        dt_str = f"{year}-{month}-{day} {hour}:{minute}:{second}"
-        tz_str = f"{tz_hour}:{tz_min}" if ':' not in f"{tz_hour}{tz_min}" else f"{tz_hour}{tz_min}"
-        
-        try:
-            dt = datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S')
-            # Parse timezone offset
-            tz_sign = 1 if tz_hour.startswith('+') else -1
-            tz_hours = int(tz_hour[1:])
-            tz_minutes = int(tz_min)
-            tz_offset = tz_sign * (tz_hours * 60 + tz_minutes)
-
-            # Create timezone-aware datetime
-            tz = timezone(timedelta(minutes=tz_offset))
-            return dt.replace(tzinfo=tz)
-        except ValueError:
-            return None
-    
-    return None
-
-def ensure_colon_tz(tz_str: str) -> str:
-    """Ensure timezone has colon format (+0200 -> +02:00, +02:00 stays +02:00)"""
-    return re.sub(r'([+-][0-9]{2}):?([0-9]{2})$', r'\1:\2', tz_str)
-
-def normalize_timezone_input(tz_str: str) -> str:
-    """Normalize timezone input - ensure it has +/- sign and colon format"""
-    if not tz_str:
-        return tz_str
-
-    # If no +/- sign, add + (assume positive offset)
-    if not tz_str.startswith(('+', '-')):
-        tz_str = '+' + tz_str
-
-    # Ensure colon format
-    return ensure_colon_tz(tz_str)
-
-def normalize_timezone_format(value: str) -> str:
-    """Normalize timezone format for consistent comparison"""
-    if not value:
-        return ""
-
-    # Normalize timezone format: +02:00 <-> +0200 (remove colon for comparison)
-    return re.sub(r'([+-]\d{2}):(\d{2})$', r'\1\2', value)
-
-def normalize_exif_value(value: str) -> str:
-    """Normalize EXIF value for comparison (handle timezone format differences)"""
-    if not value:
-        return ""
-
-    # Normalize timezone format for comparison
-    return normalize_timezone_format(value)
-
-def parse_filename_timestamp(file_path: str) -> Optional[str]:
-    """Parse timestamp from filename patterns (comprehensive set from bash lib-timestamp.sh)"""
-    base = os.path.basename(file_path)
-
-    # VID_YYYYMMDD_HHMMSS, IMG_YYYYMMDD_HHMMSS, LRV_YYYYMMDD_HHMMSS (Insta360)
-    match = re.match(r'^(VID|LRV|IMG)_([0-9]{8})_([0-9]{6})', base)
-    if match:
-        d, t = match.groups()[1], match.groups()[2]
-        return f"{d[:4]}:{d[4:6]}:{d[6:8]} {t[:2]}:{t[2:4]}:{t[4:6]}"
-
-    # DJI_YYYYMMDDHHMMSS_* (DJI Mavic 3 and newer)
-    match = re.match(r'DJI_([0-9]{4})([0-9]{2})([0-9]{2})([0-9]{6})_', base)
-    if match:
-        year, month, day, time = match.groups()
-        d = f"{year}{month}{day}"
-        t = time
-        return f"{d[:4]}:{d[4:6]}:{d[6:8]} {t[:2]}:{t[2:4]}:{t[4:6]}"
-
-    # DSC_YYYYMMDD_HHMMSS (Sony cameras)
-    match = re.match(r'DSC_([0-9]{4})([0-9]{2})([0-9]{2})_', base)
-    if match:
-        year, month, day = match.groups()
-        d = f"{year}{month}{day}"
-        return f"{d[:4]}:{d[4:6]}:{d[6:8]} 00:00:00"  # No time in pattern, use 00:00:00
-
-    # Screenshot YYYY-MM-DD at HH.MM.SS (macOS screenshots)
-    match = re.match(r'Screenshot\s+([0-9]{4})-([0-9]{2})-([0-9]{2})\s+at\s+([0-9]{1,2})\.([0-9]{2})\.([0-9]{2})', base)
-    if match:
-        year, month, day, hour, minute, second = match.groups()
-        return f"{year}:{month}:{day} {hour.zfill(2)}:{minute}:{second}"
-
-    # Generic YYYYMMDD anywhere in filename
-    match = re.search(r'([0-9]{4})([0-9]{2})([0-9]{2})', base)
-    if match:
-        year, month, day = match.groups()
-        # Validation: year 2000-2099, month 01-12, day 01-31
-        if (2000 <= int(year) <= 2099 and 1 <= int(month) <= 12 and 1 <= int(day) <= 31):
-            return f"{year}:{month}:{day} 00:00:00"
-
-    return None
 
 def write_exif_fields(file_path: str, field_args: list) -> bool:
     """Write multiple EXIF fields in a single exiftool call."""
@@ -377,184 +242,92 @@ def write_quicktime_createdate(file_path: str, datetime_original: datetime) -> b
         return False
 
 
-def get_best_timestamp(file_path: str, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False) -> tuple[Optional[str], str]:
-    """Get the best timestamp using 5-tier priority system from bash lib-timestamp.sh
-    Returns: (timestamp_string, source_description)
+def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None, infer_from_filename: bool = False) -> dict:
+    """Get all current timestamp data from file.
 
-    When overwrite_datetimeoriginal=True:
-    - Filename is Priority 1 for Insta360/DJI files (source of truth at capture time)
-    - Ignores existing DateTimeOriginal (which may be corrupted)
-    """
-    exif_data = read_exif_data(file_path)
-    base = os.path.basename(file_path)
-
-    # When overwriting, filename is first source of truth for Insta360/DJI files
-    if overwrite_datetimeoriginal:
-        filename_timestamp = parse_filename_timestamp(file_path)
-        # Check for Insta360/DJI filename patterns
-        if filename_timestamp and (re.match(r'^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6}', base) or re.match(r'^DJI_[0-9]{14}_', base)):
-            return filename_timestamp, "filename (overwrite mode)"
-
-    # Priority 1: DateTimeOriginal with timezone (authoritative source)
-    datetime_original = exif_data.get("DateTimeOriginal", "")
-    if datetime_original and re.search(r'[+-]\d{2}:?\d{2}$', datetime_original):
-        # Has timezone, extract just the datetime part
-        timestamp = re.sub(r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1', datetime_original)
-        return timestamp, "DateTimeOriginal with timezone"
-
-    # Priority 2: CreationDate with timezone (iPhone videos)
-    creation_date = exif_data.get("CreationDate", "")
-    if creation_date and re.search(r'[+-]\d{2}:?\d{2}$', creation_date):
-        # Has timezone, extract just the datetime part
-        timestamp = re.sub(r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1', creation_date)
-        return timestamp, "CreationDate with timezone"
-
-    # Priority 2.5: Keys:CreationDate with Z marker (iPhone UTC that needs timezone)
-    # This is for iPhone files where QuickTime CreateDate is corrupted but Keys:CreationDate has correct UTC
-    if creation_date and creation_date.endswith('Z') and timezone_offset:
-        # Parse UTC time (remove Z suffix)
-        timestamp = creation_date[:-1].strip()
-        if re.match(r'[0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}', timestamp):
-            return timestamp, "CreationDate with Z (UTC)"
-
-    # Priority 3: Filename for VID/IMG/LRV/DJI files with parseable names (Insta360, DJI, etc.)
-    filename_timestamp = parse_filename_timestamp(file_path)
-    if filename_timestamp and (re.match(r'^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6}', base) or re.match(r'^DJI_[0-9]{14}_', base)):
-        return filename_timestamp, "filename"
-
-    # Priority 4: DateTimeOriginal without timezone
-    if datetime_original and re.search(r'[0-9]', datetime_original):
-        timestamp = re.sub(r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1', datetime_original)
-        return timestamp, "DateTimeOriginal"
-
-    # Priority 5: MediaCreateDate (usually UTC)
-    media_create_date = exif_data.get("MediaCreateDate", "")
-    if media_create_date and re.search(r'[0-9]', media_create_date):
-        timestamp = re.sub(r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1', media_create_date)
-        if is_valid_timestamp(timestamp):
-            return timestamp, "MediaCreateDate"
-
-    # Priority 6: File timestamps (cross-platform via os.stat)
-    try:
-        st = os.stat(file_path)
-        try:
-            birth = datetime.fromtimestamp(st.st_birthtime).strftime('%Y:%m:%d %H:%M:%S')  # pyrefly: ignore[missing-attribute]
-            return birth, "file birthtime"
-        except AttributeError:
-            pass
-        mtime = datetime.fromtimestamp(st.st_mtime).strftime('%Y:%m:%d %H:%M:%S')
-        return mtime, "file mtime"
-    except OSError:
-        pass
-
-    return None, "no timestamps found"
-
-def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False) -> dict:
-    """Get all current timestamp data from file
-
-    When overwrite_datetimeoriginal=True:
+    When infer_from_filename=True:
     - Requires timezone_offset to be provided
-    - Uses filename timestamp with provided timezone (for Insta360/DJI files)
-    - Ignores existing DateTimeOriginal
+    - Uses filename timestamp with provided timezone as source of truth
+    - Ignores existing EXIF timestamps
     """
     data = {
-        "file_path": file_path,  # Store file path for filename parsing
+        "file_path": file_path,
         "exif": read_exif_data(file_path),
         "file_system": get_file_system_timestamps(file_path) if sys.platform == "darwin" else {"birth": "", "modify": ""},
         "datetime_original_str": "",
         "datetime_original": None,
         "timestamp_source": "",
-        "timezone_source": ""  # Track where timezone came from
+        "timezone_source": ""
     }
 
-    # Validate: --overwrite-datetimeoriginal requires --timezone
-    if overwrite_datetimeoriginal and not timezone_offset:
-        raise ValueError("--overwrite-datetimeoriginal requires --timezone to be specified")
+    if infer_from_filename:
+        if not timezone_offset:
+            raise ValueError("--infer-from-filename requires --timezone to be specified")
+        report = read_timestamp_sources(file_path, timezone_offset)
+        if not report.filename_parseable:
+            raise ValueError(f"--infer-from-filename specified but filename has no parseable date")
+        fn_ts, _ = parse_filename_timestamp(file_path)
+        datetime_with_tz = f"{fn_ts}{timezone_offset}"
+        data["datetime_original_str"] = datetime_with_tz
+        data["datetime_original"] = parse_datetime_original(datetime_with_tz)
+        data["timestamp_source"] = "filename (infer mode)"
+        data["timezone_source"] = f"--timezone flag ({timezone_offset})"
+        return data
 
-    # Use 5-tier priority system to find best timestamp
-    best_timestamp, source = get_best_timestamp(file_path, timezone_offset, overwrite_datetimeoriginal)
+    # Use 6-tier priority system to find best timestamp
+    best_timestamp, source = get_best_timestamp(file_path, timezone_offset)
     data["timestamp_source"] = source
 
     if best_timestamp:
-        # When overwriting with filename, use filename + provided timezone
-        if source == "filename (overwrite mode)":
-            if timezone_offset:
-                datetime_with_tz = f"{best_timestamp}{timezone_offset}"
+        if source == "CreationDate with timezone":
+            data["datetime_original_str"] = data["exif"].get("CreationDate", "")
+            data["timezone_source"] = "Keys:CreationDate metadata"
+            if data["datetime_original_str"]:
+                data["datetime_original"] = parse_datetime_original(data["datetime_original_str"])
+        elif source == "DateTimeOriginal with timezone":
+            data["datetime_original_str"] = data["exif"].get("DateTimeOriginal", "")
+            data["timezone_source"] = "DateTimeOriginal metadata"
+            if data["datetime_original_str"]:
+                data["datetime_original"] = parse_datetime_original(data["datetime_original_str"])
+        elif source == "DateTimeOriginal" and timezone_offset:
+            datetime_with_tz = f"{best_timestamp}{timezone_offset}"
+            data["datetime_original_str"] = datetime_with_tz
+            data["datetime_original"] = parse_datetime_original(datetime_with_tz)
+            data["timezone_source"] = f"--timezone flag ({timezone_offset})"
+        elif source == "DateTimeOriginal":
+            data["datetime_original_str"] = data["exif"].get("DateTimeOriginal", "")
+            data["timezone_source"] = "DateTimeOriginal metadata"
+            if data["datetime_original_str"]:
+                data["datetime_original"] = parse_datetime_original(data["datetime_original_str"])
+        elif source == "CreationDate with Z (UTC)" and timezone_offset:
+            utc_dt = datetime.strptime(best_timestamp, "%Y:%m:%d %H:%M:%S").replace(tzinfo=timezone.utc)
+            tz_match = re.match(r'([+-])(\d{2}):?(\d{2})', timezone_offset)
+            if tz_match:
+                sign, hours, minutes = tz_match.groups()
+                offset_seconds = int(hours) * 3600 + int(minutes) * 60
+                if sign == '-':
+                    offset_seconds = -offset_seconds
+                local_tz = timezone(timedelta(seconds=offset_seconds))
+                local_dt = utc_dt.astimezone(local_tz)
+                datetime_with_tz = local_dt.strftime("%Y:%m:%d %H:%M:%S") + timezone_offset
                 data["datetime_original_str"] = datetime_with_tz
                 data["datetime_original"] = parse_datetime_original(datetime_with_tz)
                 data["timezone_source"] = f"--timezone flag ({timezone_offset})"
-        elif source == "CreationDate with timezone":
-            # Check if we should override timezone (only with --overwrite-datetimeoriginal)
-            if overwrite_datetimeoriginal and timezone_offset:
-                # Override existing timezone with provided one
-                datetime_with_tz = f"{best_timestamp}{timezone_offset}"
+        elif source == "MediaCreateDate" and timezone_offset:
+            utc_dt = datetime.strptime(best_timestamp, "%Y:%m:%d %H:%M:%S").replace(tzinfo=timezone.utc)
+            tz_match = re.match(r'([+-])(\d{2}):?(\d{2})', timezone_offset)
+            if tz_match:
+                sign, hours, minutes = tz_match.groups()
+                offset_seconds = int(hours) * 3600 + int(minutes) * 60
+                if sign == '-':
+                    offset_seconds = -offset_seconds
+                local_tz = timezone(timedelta(seconds=offset_seconds))
+                local_dt = utc_dt.astimezone(local_tz)
+                datetime_with_tz = local_dt.strftime("%Y:%m:%d %H:%M:%S") + timezone_offset
                 data["datetime_original_str"] = datetime_with_tz
                 data["datetime_original"] = parse_datetime_original(datetime_with_tz)
                 data["timezone_source"] = f"--timezone flag ({timezone_offset})"
-            else:
-                # Use existing CreationDate with timezone (source of truth)
-                data["datetime_original_str"] = data["exif"].get("CreationDate", "")
-                data["timezone_source"] = "Keys:CreationDate metadata"
-                if data["datetime_original_str"]:
-                    data["datetime_original"] = parse_datetime_original(data["datetime_original_str"])
-        elif source in ["DateTimeOriginal with timezone", "DateTimeOriginal"]:
-            # Check if we should override timezone (only with --overwrite-datetimeoriginal)
-            if overwrite_datetimeoriginal and timezone_offset:
-                # Override existing timezone with provided one
-                datetime_with_tz = f"{best_timestamp}{timezone_offset}"
-                data["datetime_original_str"] = datetime_with_tz
-                data["datetime_original"] = parse_datetime_original(datetime_with_tz)
-                data["timezone_source"] = f"--timezone flag ({timezone_offset})"
-            elif source == "DateTimeOriginal" and timezone_offset:
-                # DateTimeOriginal exists but has no timezone - add provided timezone
-                datetime_with_tz = f"{best_timestamp}{timezone_offset}"
-                data["datetime_original_str"] = datetime_with_tz
-                data["datetime_original"] = parse_datetime_original(datetime_with_tz)
-                data["timezone_source"] = f"--timezone flag ({timezone_offset})"
-            else:
-                # Use existing DateTimeOriginal with timezone (source of truth)
-                data["datetime_original_str"] = data["exif"].get("DateTimeOriginal", "")
-                data["timezone_source"] = "DateTimeOriginal metadata"
-                if data["datetime_original_str"]:
-                    data["datetime_original"] = parse_datetime_original(data["datetime_original_str"])
-        elif source == "CreationDate with Z (UTC)":
-            # Keys:CreationDate has UTC with Z marker, convert to local time using timezone_offset
-            # This handles iPhone files where QuickTime CreateDate is corrupted
-            if timezone_offset:
-                utc_dt = datetime.strptime(best_timestamp, "%Y:%m:%d %H:%M:%S").replace(tzinfo=timezone.utc)
-                # Parse timezone offset
-                tz_match = re.match(r'([+-])(\d{2}):?(\d{2})', timezone_offset)
-                if tz_match:
-                    sign, hours, minutes = tz_match.groups()
-                    offset_seconds = int(hours) * 3600 + int(minutes) * 60
-                    if sign == '-':
-                        offset_seconds = -offset_seconds
-                    local_tz = timezone(timedelta(seconds=offset_seconds))
-                    local_dt = utc_dt.astimezone(local_tz)
-                    datetime_with_tz = local_dt.strftime("%Y:%m:%d %H:%M:%S") + timezone_offset
-                    data["datetime_original_str"] = datetime_with_tz
-                    data["datetime_original"] = parse_datetime_original(datetime_with_tz)
-                    data["timezone_source"] = f"--timezone flag ({timezone_offset})"
-        elif source == "MediaCreateDate":
-            # MediaCreateDate is in UTC, need timezone to convert to local time
-            if timezone_offset:
-                # Convert UTC timestamp to local time with timezone
-                utc_dt = datetime.strptime(best_timestamp, "%Y:%m:%d %H:%M:%S").replace(tzinfo=timezone.utc)
-                # Parse timezone offset
-                tz_match = re.match(r'([+-])(\d{2}):?(\d{2})', timezone_offset)
-                if tz_match:
-                    sign, hours, minutes = tz_match.groups()
-                    offset_seconds = int(hours) * 3600 + int(minutes) * 60
-                    if sign == '-':
-                        offset_seconds = -offset_seconds
-                    local_tz = timezone(timedelta(seconds=offset_seconds))
-                    local_dt = utc_dt.astimezone(local_tz)
-                    datetime_with_tz = local_dt.strftime("%Y:%m:%d %H:%M:%S") + timezone_offset
-                    data["datetime_original_str"] = datetime_with_tz
-                    data["datetime_original"] = parse_datetime_original(datetime_with_tz)
-                    data["timezone_source"] = f"--timezone flag ({timezone_offset})"
         else:
-            # For filename or file timestamps, need timezone to create proper timestamp
             if timezone_offset:
                 datetime_with_tz = f"{best_timestamp}{timezone_offset}"
                 data["datetime_original_str"] = datetime_with_tz
@@ -708,9 +481,9 @@ def format_original_timestamps(current_data: dict) -> str:
             parts.append(f"{format_exif_timestamp_display(media_create)} UTC (MediaCreateDate)")
         if birth_ts:
             parts.append(f"{format_exif_timestamp_display(birth_ts)} local (file)")
-    elif source == "filename":
+    elif "filename" in source:
         # Show the parsed filename timestamp
-        filename_ts = parse_filename_timestamp(current_data.get("file_path", ""))
+        filename_ts, _ = parse_filename_timestamp(current_data.get("file_path", ""))
         if filename_ts:
             parts.append(f"{format_exif_timestamp_display(filename_ts)} (from filename)")
         else:
@@ -868,16 +641,18 @@ def format_change_description(changes: dict, timestamp_data: Optional[dict] = No
 
     return ", ".join(parts) if parts else "No change"
 
-def extract_metadata_timezone(file_path: str) -> Optional[str]:
-    """Extract timezone offset from DateTimeOriginal or CreationDate if present."""
-    exif_data = read_exif_data(file_path)
-    for field in ["DateTimeOriginal", "CreationDate"]:
-        value = exif_data.get(field, "")
-        if value:
-            tz_match = re.search(r'([+-]\d{2}):?(\d{2})$', value)
-            if tz_match:
-                return f"{tz_match.group(1)}:{tz_match.group(2)}"
-    return None
+def format_offset_display(seconds: int) -> str:
+    """Format a time offset in seconds to human-readable display.
+
+    Examples: +1d 2h 3m 4s, -0d 1h 30m 0s, +0d 0h 5m 0s
+    """
+    sign = "+" if seconds >= 0 else "-"
+    total = abs(seconds)
+    days = total // 86400
+    hours = (total % 86400) // 3600
+    minutes = (total % 3600) // 60
+    secs = total % 60
+    return f"{sign}{days}d {hours}h {minutes}m {secs}s"
 
 
 def _source_to_machine_token(source: str) -> str:
@@ -898,16 +673,17 @@ def _source_to_machine_token(source: str) -> str:
     return source_lower
 
 
-def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset: Optional[str] = None, overwrite_datetimeoriginal: bool = False, preserve_wallclock: bool = False) -> bool:
+def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None) -> bool:
     """Main function to fix media (photo/video) timestamps
 
     Args:
         file_path: Path to media file
         dry_run: If True, show changes without applying them
         timezone_offset: Timezone offset (e.g. +09:00) for files missing timezone
-        overwrite_datetimeoriginal: If True, overwrite DateTimeOriginal even if it exists (for genuinely wrong timestamps)
+        infer_from_filename: If True, use filename timestamp as source of truth
         preserve_wallclock: If True, preserve literal wall-clock shooting time (10:30 stays 10:30)
                           If False (default), convert to current timezone for correct equivalent display
+        time_offset_seconds: Integer seconds to add/subtract from the resolved timestamp
     """
 
     filename = os.path.basename(file_path)
@@ -916,34 +692,26 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
     if detected_tz:
         print(f"@@timezone={detected_tz}")
 
-    # Check for timezone mismatch before processing
-    if timezone_offset and not overwrite_datetimeoriginal:
+    # Timezone mismatch detection (informational only)
+    tz_mismatch = False
+    if timezone_offset and not infer_from_filename:
         exif_data = read_exif_data(file_path)
-        datetime_original = exif_data.get("DateTimeOriginal", "")
+        dto_value = exif_data.get("DateTimeOriginal", "")
 
-        # Check if DateTimeOriginal has a timezone
-        tz_match = re.search(r'([+-]\d{2}):?(\d{2})$', datetime_original)
+        tz_match = re.search(r'([+-]\d{2}):?(\d{2})$', dto_value)
         if tz_match:
             existing_tz = f"{tz_match.group(1)}:{tz_match.group(2)}"
             provided_tz = normalize_timezone_input(timezone_offset)
 
-            # Normalize both for comparison (remove colon)
             existing_tz_normalized = existing_tz.replace(':', '')
             provided_tz_normalized = provided_tz.replace(':', '')
 
             if existing_tz_normalized != provided_tz_normalized:
-                print(f"\033[36m🔍 {filename}\033[0m", file=sys.stderr)
-                print(f"❌ Timezone mismatch:", file=sys.stderr)
-                print(f"   DateTimeOriginal has timezone: {existing_tz}", file=sys.stderr)
-                print(f"   You provided timezone: {provided_tz}", file=sys.stderr)
-                print(f"   Use --overwrite-datetimeoriginal to force overwrite with new timezone", file=sys.stderr)
-                print(f"@@file={filename}")
-                print(f"@@original_time={exif_data.get('DateTimeOriginal', '')}")
-                print(f"@@timestamp_action=tz_mismatch")
-                return False
+                tz_mismatch = True
+                print(f"⚠️  Timezone mismatch: DateTimeOriginal has {existing_tz}, you provided {provided_tz}", file=sys.stderr)
 
     # Get all data
-    current_data = get_all_timestamp_data(file_path, timezone_offset, overwrite_datetimeoriginal)
+    current_data = get_all_timestamp_data(file_path, timezone_offset, infer_from_filename)
 
     # Display header
     print(f"\033[36m🔍 {filename}\033[0m", file=sys.stderr)
@@ -966,6 +734,14 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
 
     datetime_original = current_data["datetime_original"]
     datetime_original_str = current_data["datetime_original_str"]
+
+    # Apply time offset if specified
+    if time_offset_seconds is not None and time_offset_seconds != 0:
+        datetime_original = datetime_original + timedelta(seconds=time_offset_seconds)
+        datetime_original_str = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
+        datetime_original_str = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', datetime_original_str)
+        current_data["datetime_original"] = datetime_original
+        current_data["datetime_original_str"] = datetime_original_str
 
     # Determine needed changes
     changes = determine_needed_changes(file_path, datetime_original, preserve_wallclock=preserve_wallclock)
@@ -1009,25 +785,30 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
     change_desc = format_change_description(changes, timestamp_data, current_data, preserve_wallclock, datetime_original)
     has_changes = changes.get("keys_creationdate", False) or changes["file_timestamps"] or changes.get("quicktime_createdate", False)
 
-    if dry_run and has_changes:
-        print(f"📊 Change   : {change_desc} (DRY RUN)", file=sys.stderr)
-        # Emit machine-readable @@ lines
+    # Determine machine output fields
+    action = "tz_mismatch" if tz_mismatch else None
+    correction_mode = "time" if (time_offset_seconds is not None and time_offset_seconds != 0) else "timezone"
+
+    def _emit_machine_lines(timestamp_action: str):
         print(f"@@file={filename}")
         print(f"@@original_time={_get_raw_original_time(current_data)}")
         print(f"@@corrected_time={datetime_original_str}")
         print(f"@@timestamp_source={_source_to_machine_token(timestamp_source)}")
-        print(f"@@timestamp_action=would_fix")
+        print(f"@@correction_mode={correction_mode}")
+        if time_offset_seconds is not None and time_offset_seconds != 0:
+            print(f"@@time_offset_seconds={time_offset_seconds}")
+            print(f"@@time_offset_display={format_offset_display(time_offset_seconds)}")
+        print(f"@@timestamp_action={timestamp_action}")
+
+    if dry_run and has_changes:
+        print(f"📊 Change   : {change_desc} (DRY RUN)", file=sys.stderr)
+        _emit_machine_lines(action or "would_fix")
         return True
     else:
         print(f"📊 Change   : {change_desc}", file=sys.stderr)
 
     if not has_changes:
-        # Emit machine-readable @@ lines for no-change case
-        print(f"@@file={filename}")
-        print(f"@@original_time={_get_raw_original_time(current_data)}")
-        print(f"@@corrected_time={datetime_original_str}")
-        print(f"@@timestamp_source={_source_to_machine_token(timestamp_source)}")
-        print(f"@@timestamp_action=no_change")
+        _emit_machine_lines(action or "no_change")
         return True
 
     if dry_run:
@@ -1038,14 +819,14 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
 
     # Write DateTimeOriginal if:
     # 1. It's missing and we have timezone info, OR
-    # 2. overwrite_datetimeoriginal flag is set (for genuinely wrong timestamps)
+    # 2. infer_from_filename is set (filename is the source of truth, DTO may be wrong/missing)
     should_write_datetime_original = (
         (not current_data["exif"].get("DateTimeOriginal") and current_data["datetime_original_str"]) or
-        (overwrite_datetimeoriginal and current_data["datetime_original_str"])
+        (infer_from_filename and current_data["datetime_original_str"])
     )
 
-    if should_write_datetime_original and overwrite_datetimeoriginal and current_data["exif"].get("DateTimeOriginal"):
-        print("   ⚠️  Overwriting existing DateTimeOriginal (--overwrite-datetimeoriginal flag)", file=sys.stderr)
+    if should_write_datetime_original and infer_from_filename and current_data["exif"].get("DateTimeOriginal"):
+        print("   ⚠️  Overwriting existing DateTimeOriginal (--infer-from-filename flag)", file=sys.stderr)
 
     # Build all EXIF writes and apply in one exiftool call
     field_args = []
@@ -1076,12 +857,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
             print("   ❌ Failed to apply file timestamps", file=sys.stderr)
             success = False
 
-    # Emit machine-readable @@ lines
-    print(f"@@file={filename}")
-    print(f"@@original_time={_get_raw_original_time(current_data)}")
-    print(f"@@corrected_time={datetime_original_str}")
-    print(f"@@timestamp_source={_source_to_machine_token(timestamp_source)}")
-    print(f"@@timestamp_action={'fixed' if success else 'error'}")
+    _emit_machine_lines("fixed" if success else "error")
 
     return success
 
@@ -1093,7 +869,8 @@ def main():
     parser.add_argument('--timezone', help='Timezone offset (e.g. +09:00) - required when DateTimeOriginal lacks timezone info')
     parser.add_argument('--country', help='Country code or name for automatic timezone lookup (e.g. JP, Taiwan)')
     parser.add_argument('--apply', action='store_true', help='Apply changes (default: dry run)')
-    parser.add_argument('--overwrite-datetimeoriginal', action='store_true', help='Overwrite DateTimeOriginal even if it exists (for genuinely wrong timestamps)')
+    parser.add_argument('--infer-from-filename', action='store_true', help='Use filename timestamp as source of truth (requires --timezone)')
+    parser.add_argument('--time-offset', type=int, default=None, help='Seconds to add/subtract from resolved timestamp (requires --timezone)')
     parser.add_argument('--preserve-wallclock-time', action='store_true', help='Preserve literal wall-clock shooting time (10:30 stays 10:30) instead of converting to current timezone for display')
 
     args = parser.parse_args()
@@ -1115,12 +892,21 @@ def main():
             print(f"Error: Could not determine timezone for country '{args.country}'", file=sys.stderr)
             return 1
 
+    if args.infer_from_filename and not timezone_offset:
+        print("Error: --infer-from-filename requires --timezone", file=sys.stderr)
+        return 1
+
+    if args.time_offset is not None and not timezone_offset:
+        print("Error: --time-offset requires --timezone", file=sys.stderr)
+        return 1
+
     success = fix_media_timestamps(
         file_path,
         dry_run=not args.apply,
         timezone_offset=timezone_offset,
-        overwrite_datetimeoriginal=args.overwrite_datetimeoriginal,
-        preserve_wallclock=args.preserve_wallclock_time
+        infer_from_filename=args.infer_from_filename,
+        preserve_wallclock=args.preserve_wallclock_time,
+        time_offset_seconds=args.time_offset
     )
 
     return 0 if success else 1
