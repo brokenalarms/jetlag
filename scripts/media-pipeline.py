@@ -13,7 +13,6 @@ all processing happens there, then output moves files to the target.
 """
 
 import argparse
-import dataclasses
 import json
 import os
 import re
@@ -42,34 +41,22 @@ SCRIPT_DIR = Path(__file__).parent
 _machine_output = not sys.stdout.isatty()
 
 
-def emit(key: str, value: str):
-    """Emit a @@key=value machine-readable line to stdout.
+def emit_event(event_type: str, **fields) -> None:
+    """Emit a JSONL event to stdout.
 
     Only emits when stdout is a pipe (macOS app), not a terminal (CLI).
-    Flushes immediately so the app receives each line without waiting
-    for Python's block-buffer to fill or the process to exit.
+    Flushes immediately so the app receives each line without buffering.
+
+    None values are omitted. Lists, bools, and numbers stay as native JSON types.
     """
-    if _machine_output:
-        print(f"@@{key}={value}", flush=True)
-
-
-def _emit_dataclass(result, skip: frozenset[str] = frozenset({"file"})) -> None:
-    """Emit dataclass fields as @@key=value via pipeline emit().
-
-    Mirrors lib/results.emit_result() but routes through the pipeline's
-    emit() function (which respects tty detection).
-    """
-    for field in dataclasses.fields(result):
-        if field.name in skip:
-            continue
-        value = getattr(result, field.name)
+    if not _machine_output:
+        return
+    payload: dict = {"event": event_type}
+    for key, value in fields.items():
         if value is None:
             continue
-        if isinstance(value, list):
-            value = ",".join(str(v) for v in value)
-        elif isinstance(value, bool):
-            value = str(value).lower()
-        emit(field.name, str(value))
+        payload[key] = value
+    print(json.dumps(payload), flush=True)
 
 
 def signal_handler(sig, frame):
@@ -248,7 +235,7 @@ def process_file(
     result = {"changed": False, "failed": False, "error": None, "source_files": [str(file_path)]}
     file_changed = False
 
-    emit("pipeline_file", file_path.name)
+    emit_event("pipeline_file", file=file_path.name)
 
     # INGEST (always): copy source file to working dir
     print("📥 Ingesting...", file=sys.stderr)
@@ -265,13 +252,13 @@ def process_file(
         print(f"   ❌ Ingest failed for {file_path.name}", file=sys.stderr)
         result["failed"] = True
         result["error"] = "Ingest failed"
-        emit("pipeline_result", "failed")
+        emit_event("pipeline_result", file=file_path.name, result="failed")
         return result
 
     active_file = Path(dest) if action == "copied" else file_path
     if action == "copied":
         file_changed = True
-    emit("stage_complete", "ingest")
+    emit_event("stage_complete", stage="ingest")
 
     if copy_companion_files and companion_dests:
         source_dir = file_path.parent
@@ -292,10 +279,16 @@ def process_file(
             print("🏷️  Tagging...", file=sys.stderr)
             tag_result = run_tag_media(active_file, tags or None, make or None, model or None, apply)
             if tag_result is not None:
-                _emit_dataclass(tag_result)
+                emit_event("tag_result",
+                    file=active_file.name,
+                    action=tag_result.action,
+                    tags_added=tag_result.tags_added,
+                    exif_make=tag_result.exif_make,
+                    exif_model=tag_result.exif_model,
+                )
                 if tag_result.action == "tagged":
                     file_changed = True
-            emit("stage_complete", "tag")
+            emit_event("stage_complete", stage="tag")
 
     # Fix video timestamp (if in tasks)
     if tasks and "fix-timestamp" in tasks:
@@ -305,18 +298,28 @@ def process_file(
             infer_from_filename=infer_from_filename,
             time_offset=time_offset,
         )
-        _emit_dataclass(ts_result)
+        emit_event("timestamp_result",
+            file=active_file.name,
+            action=ts_result.timestamp_action,
+            original_time=ts_result.original_time,
+            corrected_time=ts_result.corrected_time,
+            source=ts_result.timestamp_source,
+            timezone=ts_result.timezone,
+            correction_mode=ts_result.correction_mode,
+            time_offset_seconds=ts_result.time_offset_seconds,
+            time_offset_display=ts_result.time_offset_display,
+        )
 
         if ts_result.timestamp_action == "error":
             print(f"   ❌ Timestamp fix failed for {file_path.name}", file=sys.stderr)
             result["failed"] = True
             result["error"] = "Timestamp fix failed"
-            emit("pipeline_result", "failed")
+            emit_event("pipeline_result", file=file_path.name, result="failed")
             return result
 
         if ts_result.timestamp_action in ("would_fix", "fixed"):
             file_changed = True
-        emit("stage_complete", "fix-timestamp")
+        emit_event("stage_complete", stage="fix-timestamp")
 
         # Inline rename when --update-filename-dates is set
         if update_filename_dates and ts_result.corrected_time:
@@ -339,7 +342,10 @@ def process_file(
                             companion_dests = updated_companion_dests
                     else:
                         print(f"  [DRY RUN] Would rename: {active_file.name} → {new_name}", file=sys.stderr)
-                    emit("renamed_to", new_name)
+                    emit_event("rename_result",
+                        file=active_file.name,
+                        renamed_to=new_name,
+                    )
                     active_file = new_path
 
     # OUTPUT (always): organize active_file to target_dir
@@ -353,13 +359,17 @@ def process_file(
     else:
         template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
     org_result = run_organize_by_date(active_file, target_dir, template, apply, verbose)
-    _emit_dataclass(org_result, skip=frozenset())
+    emit_event("organize_result",
+        file=active_file.name,
+        action=org_result.action,
+        dest=org_result.dest,
+    )
 
     if org_result.action == "error":
         print(f"   ❌ Organization failed for {file_path.name}", file=sys.stderr)
         result["failed"] = True
         result["error"] = "Organization failed"
-        emit("pipeline_result", "failed")
+        emit_event("pipeline_result", file=file_path.name, result="failed")
         return result
 
     if org_result.action in ("copied", "moved", "overwrote", "would_copy", "would_move", "would_overwrite"):
@@ -379,7 +389,7 @@ def process_file(
                 print(f"  Companion: {companion_file.name} → {companion_target}", file=sys.stderr)
             elif not apply:
                 print(f"  [DRY RUN] Would move companion: {companion_file.name} → {companion_target}", file=sys.stderr)
-    emit("stage_complete", "output")
+    emit_event("stage_complete", stage="output")
 
     # Generate gyroflow project (if in tasks, enabled, and applying)
     gyroflow_enabled = profile.get("gyroflow_enabled", False) if profile else False
@@ -392,19 +402,24 @@ def process_file(
 
         gyroflow_file = Path(dest) if dest and apply else active_file
         gf_result = run_generate_gyroflow(gyroflow_file, preset_json, apply, binary=binary)
-        _emit_dataclass(gf_result, skip=frozenset())
+        emit_event("gyroflow_result",
+            file=active_file.name,
+            action=gf_result.action,
+            gyroflow_path=gf_result.gyroflow_path,
+            error=gf_result.error,
+        )
 
         if gf_result.action == "generated":
             file_changed = True
-        emit("stage_complete", "gyroflow")
+        emit_event("stage_complete", stage="gyroflow")
 
     result["changed"] = file_changed
     if result["failed"]:
-        emit("pipeline_result", "failed")
+        emit_event("pipeline_result", file=file_path.name, result="failed")
     elif file_changed:
-        emit("pipeline_result", "changed" if apply else "would_change")
+        emit_event("pipeline_result", file=file_path.name, result="changed" if apply else "would_change")
     else:
-        emit("pipeline_result", "unchanged")
+        emit_event("pipeline_result", file=file_path.name, result="unchanged")
     return result
 
 
