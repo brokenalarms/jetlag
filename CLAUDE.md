@@ -13,6 +13,7 @@
   - docs/ — documentation. CLAUDE.md, README.md, TODO.md live at repo root.
 - don't reference Claude or Claude.md
 - TESTING
+- "at the time of writing tests, it's crucial to write out the meaning and the importance of the test explaining what it's trying to do in the form of a comment preceding it" — use moduledoc for test classes and individual test preambles where necessary.
 - tests should not be updated to cater to broken behavior, unless we are specifically using TDD in advance to make a broken test then write the feature to fix itthe change.
 -  Otherwise tests at this stage should not break from a change unless there is a regression, and the test should be used to identify this regression.
   - testing that returncode is 0 is not testing the actual behavior or effect of the code, just that it ran without error, so would make for a useless test
