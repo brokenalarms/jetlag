@@ -12,16 +12,18 @@
   - web/ — Vite + Tailwind marketing site. Sections live in web/src/sections/.
   - docs/ — documentation. CLAUDE.md, README.md, TODO.md live at repo root.
 - don't reference Claude or Claude.md
+- ENVIRONMENT
+ - You may be in a MacOS or Linux environment. If commands don't work when you first run them, record which one works for which environment and update/check in docs/environment.md first.
 - TESTING
-- "at the time of writing tests, it's crucial to write out the meaning and the importance of the test explaining what it's trying to do in the form of a comment preceding it" — use moduledoc for test classes and individual test preambles where necessary.
-- tests should not be updated to cater to broken behavior, unless we are specifically using TDD in advance to make a broken test then write the feature to fix itthe change.
--  Otherwise tests at this stage should not break from a change unless there is a regression, and the test should be used to identify this regression.
+ - at the time of writing tests, it's crucial to write out the meaning and the importance of the test explaining what it's trying to do in the form of a comment preceding the module or test. Use moduledoc for test classes, and individual test preamble comments where necessary.
+ - tests should not be updated to cater to broken behavior, unless we are specifically using TDD in advance to make a broken test then write the feature to fix itthe change.
+ -  Otherwise tests at this stage should not break from a change unless there is a regression, and the test should be used to identify this regression.
   - testing that returncode is 0 is not testing the actual behavior or effect of the code, just that it ran without error, so would make for a useless test
   - similarly testing result.stdout reveals nothing but what the logs said, which could lie. the changes to the fake test file need to be recorded before and after with actual/expected human readable messages. Strings for users are brittle and should not be tested directly - that's why we have the scripts passing @@key=value for machines.
-  - Don't run the entire suite to validate every change. Try to run local relevant tests for that script or module first to avoid time wasted on redundant testing. Only perform a full test suite run if the work is complex or interrelated, or before the final push.
-  - Never re-run /scripts/tests if you have not made any changes inside /scripts, but if in the right environment (local MacOS only), always run /macos/tests if you made any changes inside of either /macos or /scripts.
-  - visually verify any web changes yourself in playwright if you can
-  - if you cannot visually build and verify (eg XCode projects), include on the PR a test plan checklist that the reviewer may follow to visually verify the changes in the live app.
+ - Don't run the entire suite to validate every change. Try to run local relevant tests for that script or module first to avoid time wasted on redundant testing. Only perform a full test suite run if the work is complex or interrelated, or before the final push.
+ - Never re-run /scripts/tests if you have not made any changes inside /scripts, but if in the right environment (local MacOS only), always run /macos/tests if you made any changes inside of either /macos or /scripts.
+ - visually verify any web changes yourself in playwright if you can
+ - if you cannot visually build and verify (eg XCode projects), include on the PR a test plan checklist that the reviewer may follow to visually verify the changes in the live app.
 - COMMITS & PULL REQUESTS — see docs/committing.md for all rules on commits, branches, and PRs
   - you don't need to ask for permission to pull new content in from main and run local git commands, besides final pushes.
   - for new features, ALWAYS create a worktree. You may have already been invoked in one, but ALWAYS check first and ALWAYS create a worktree for a new session.
@@ -31,4 +33,5 @@
   - each task is prefixed with its date added in YYYY-MM-DD format
   - at the start of each session, read TODO.md; if not instructed to work on a specific task, determine the single highest-leverage or most badly needed task, and work only on that. Use dates created to help inform where we are up to in terms of the backlog and broken-down tasks that may only be partially implemented.
   - if a task is large enough, it can become a spec that requires its own MD. These can be placed in /spces/. These can then similarly be worked through as part of a task or series of PRs, and then the file deleted as the final PR in seriesis shipped.
-  - at the end of a session, remove completed tasks from TODO.md and add any newly discovered ones. If a linked spec file is now complete, move that markdown file into specs/implemented. Never add a "Done" section to TODO.md or tick off items versus just removing them. The commit record is the 'Done' record, and the final commit in the PR should generally be the removal of te TODO from the main file and movin of the spec file that shipping the PR would mean must have happened.
+  - at the end of a session, remove completed tasks from TODO.md and add any newly discovered ones. If a linked spec file is now complete, move that markdown file into specs/implemented.
+  - Never add a "Done" section or status reports to TODO.md or tick off items versus just removing them. The commit record is the 'Done' record, and the final commit in the PR should generally be the removal of te TODO from the main file and moving of the spec file that shipping the PR would mean must have happened.
