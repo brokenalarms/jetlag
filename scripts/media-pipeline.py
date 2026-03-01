@@ -483,11 +483,8 @@ def print_summary(stats: dict, apply: bool):
         print("   Use --apply to execute timestamp fixes and file organization.", file=sys.stderr)
 
 
-def main():
-    """Main entry point."""
-    # Set up signal handler for Ctrl-C
-    signal.signal(signal.SIGINT, signal_handler)
-
+def build_parser():
+    """Build the argument parser for media-pipeline."""
     parser = argparse.ArgumentParser(
         description="Orchestrates video timestamp fixing and organization into date-based folders."
     )
@@ -524,7 +521,15 @@ def main():
         default=os.path.expanduser("~/Library/Application Support/Jetlag/working"),
         help="Working directory for intermediate files (default: ~/Library/Application Support/Jetlag/working)"
     )
+    return parser
 
+
+def main():
+    """Main entry point."""
+    # Set up signal handler for Ctrl-C
+    signal.signal(signal.SIGINT, signal_handler)
+
+    parser = build_parser()
     args = parser.parse_args()
 
     # Load profile if specified
