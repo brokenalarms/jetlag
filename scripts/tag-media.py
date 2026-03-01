@@ -19,8 +19,6 @@ def signal_handler(sig, frame):  # noqa: ARG001
     print("\n\nInterrupted by user", file=sys.stderr)
     sys.exit(130)
 
-signal.signal(signal.SIGINT, signal_handler)
-
 def get_existing_finder_tags(file_path: str) -> List[str]:
     """Get existing Finder tags from a file"""
     try:
@@ -168,6 +166,7 @@ def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], 
 
 
 def main():
+    signal.signal(signal.SIGINT, signal_handler)
     parser = argparse.ArgumentParser(description='Tag media files with Finder tags and camera EXIF')
     parser.add_argument('files', nargs='+', help='Media files to tag')
     parser.add_argument('--make', help='Camera make/manufacturer to add to EXIF')

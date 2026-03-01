@@ -20,8 +20,6 @@ def signal_handler(sig, frame):
     print("\n\nInterrupted by user", file=sys.stderr)
     sys.exit(130)
 
-signal.signal(signal.SIGINT, signal_handler)
-
 try:
     import humanize
 except ImportError:
@@ -1089,6 +1087,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
 
 def main():
     """Command line interface"""
+    signal.signal(signal.SIGINT, signal_handler)
     parser = argparse.ArgumentParser(description='Fix media timestamps - ensures file system timestamps match EXIF data')
     parser.add_argument('file', help='Media file (photo or video) to process')
     parser.add_argument('--timezone', help='Timezone offset (e.g. +09:00) - required when DateTimeOriginal lacks timezone info')
