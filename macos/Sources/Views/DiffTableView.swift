@@ -67,7 +67,7 @@ struct DiffTableView: View {
                 TableColumn(Strings.DiffTable.statusColumn) { row in
                     statusBadge(row)
                 }
-                .width(min: 60, ideal: 80)
+                .width(min: 80, ideal: 100)
             }
         }
         .frame(maxHeight: .infinity)
