@@ -50,7 +50,7 @@ events:
     exif_model: string
   timestamp_result:
     file: string
-    action: string  # fixed | would_fix | no_change | error | tz_mismatch
+    action: string  # fixed | would_fix | no_change | error
     original_time: string
     corrected_time: string
     source: string
