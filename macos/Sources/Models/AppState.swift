@@ -280,7 +280,6 @@ final class WorkflowSession {
     }
 
     func validateTimezone() -> String? {
-        if useTimezonePicker { return nil }
         if !enabledSteps.contains(.fixTimestamps) { return nil }
         if timezone.current.isEmpty { return Strings.Workflow.timezoneRequired }
         if !timezone.current.contains(/^[+-]\d{4}$/) { return Strings.Workflow.timezoneFormatHelp }

@@ -249,9 +249,6 @@ struct WorkflowView: View {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
-            } else if isActive && !state.workflowSession.isStepReady(step) {
-                Image(systemName: "exclamationmark.circle.fill")
-                    .foregroundStyle(.yellow)
             } else {
                 Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(isActive ? step.iconColor : .secondary)
