@@ -15,6 +15,7 @@
 - ENVIRONMENT
  - You may be in a MacOS or Linux environment. If commands don't work when you first run them, record which one works for which environment and update/check in docs/environment.md first.
 - TESTING
+ - A commit can never be made with a known failing test, even if unrelated. It is the agent's responsibility to fix a failing test (by identifying regression that caused the failure, not just rewriting the test to pass) as soon as it is discovered. 
  - at the time of writing tests, it's crucial to write out the meaning and the importance of the test explaining what it's trying to do in the form of a comment preceding the module or test. Use moduledoc for test classes, and individual test preamble comments where necessary.
  - tests should not be updated to cater to broken behavior, unless we are specifically using TDD in advance to make a broken test then write the feature to fix itthe change.
  -  Otherwise tests at this stage should not break from a change unless there is a regression, and the test should be used to identify this regression.
