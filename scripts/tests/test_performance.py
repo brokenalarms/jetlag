@@ -111,11 +111,11 @@ class TestPerformance:
         )
 
     def test_media_pipeline(self, request):
-        """media-pipeline: fix-timestamp + organize on 17 files."""
+        """media-pipeline: fix-timestamp + organize on multiple files."""
         profiles_path = SCRIPT_DIR / "media-profiles.yaml"
         original_yaml = profiles_path.read_text()
 
-        file_count = 17
+        file_count = 100
         timestamps = [
             f"2025:10:{5 + i:02d} {i:02d}:00:00"
             for i in range(file_count)
