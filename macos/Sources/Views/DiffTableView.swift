@@ -38,6 +38,10 @@ struct DiffTableView: View {
         strings.max(by: { $0.count < $1.count })
     }
 
+    private var columnWidths: [CGFloat] {
+        [fileIdeal, originalIdeal, correctedIdeal, timestampIdeal, destinationIdeal, statusIdeal]
+    }
+
     private var fileIdeal: CGFloat {
         let headerWidth = Self.textWidth(Strings.DiffTable.fileColumn, font: Self.systemFont)
         guard let widest = Self.longestByCharCount(rows.map(\.file)) else {
@@ -157,6 +161,10 @@ struct DiffTableView: View {
                 }
                 .width(min: 80, ideal: statusIdeal)
             }
+            .background {
+                ColumnAutoSizer(columnWidths: columnWidths)
+                    .frame(width: 0, height: 0)
+            }
         }
         .frame(maxHeight: .infinity)
     }
@@ -261,5 +269,111 @@ struct DiffTableView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+// MARK: - NSTableView introspection
+
+private struct ColumnAutoSizer: NSViewRepresentable {
+    let columnWidths: [CGFloat]
+
+    final class Coordinator: NSObject {
+        weak var tableView: NSTableView?
+        var columnWidths: [CGFloat] = []
+        weak var gesture: NSClickGestureRecognizer?
+
+        @objc func headerDoubleClicked(_ gesture: NSClickGestureRecognizer) {
+            guard let headerView = gesture.view as? NSTableHeaderView,
+                  let tableView else { return }
+
+            let location = gesture.location(in: headerView)
+            var x: CGFloat = 0
+            for i in 0..<tableView.numberOfColumns {
+                x += tableView.tableColumns[i].width + tableView.intercellSpacing.width
+                if abs(location.x - x) < 5, i < columnWidths.count {
+                    tableView.tableColumns[i].width = columnWidths[i]
+                    return
+                }
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> TableFinderView {
+        let view = TableFinderView()
+        view.onTableFound = { tableView in
+            context.coordinator.tableView = tableView
+            applyWidths(context.coordinator)
+            installDoubleClick(context.coordinator)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: TableFinderView, context: Context) {
+        context.coordinator.columnWidths = columnWidths
+        if context.coordinator.tableView == nil {
+            nsView.retryFindTable()
+        }
+        applyWidths(context.coordinator)
+    }
+
+    private func applyWidths(_ coordinator: Coordinator) {
+        guard let tableView = coordinator.tableView else { return }
+        for (i, width) in columnWidths.enumerated()
+            where i < tableView.tableColumns.count {
+            tableView.tableColumns[i].width = width
+        }
+    }
+
+    private func installDoubleClick(_ coordinator: Coordinator) {
+        guard let headerView = coordinator.tableView?.headerView,
+              coordinator.gesture == nil else { return }
+
+        let gesture = NSClickGestureRecognizer(
+            target: coordinator,
+            action: #selector(Coordinator.headerDoubleClicked(_:)))
+        gesture.numberOfClicksRequired = 2
+        headerView.addGestureRecognizer(gesture)
+        coordinator.gesture = gesture
+    }
+}
+
+private final class TableFinderView: NSView {
+    var onTableFound: ((NSTableView) -> Void)?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil else { return }
+        retryFindTable()
+    }
+
+    func retryFindTable() {
+        guard let tableView = findTableView() else { return }
+        onTableFound?(tableView)
+    }
+
+    private func findTableView() -> NSTableView? {
+        var current: NSView? = superview
+        while let view = current {
+            if let found = searchSubviews(of: view) {
+                return found
+            }
+            current = view.superview
+        }
+        return nil
+    }
+
+    private func searchSubviews(of view: NSView) -> NSTableView? {
+        if let scrollView = view as? NSScrollView,
+           let tableView = scrollView.documentView as? NSTableView {
+            return tableView
+        }
+        for subview in view.subviews {
+            if let found = searchSubviews(of: subview) {
+                return found
+            }
+        }
+        return nil
     }
 }
