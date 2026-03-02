@@ -1109,11 +1109,12 @@ class TestPipelineMachineOutput:
                 if event["event"] not in ("stage_complete",):
                     assert "file" in event, f"Event {event['event']} should include file field"
 
-    def test_tz_mismatch_emits_distinct_token(self, temp_workspace, test_profile):
-        """Timezone mismatch emits action=tz_mismatch in timestamp_result event.
+    def test_tz_mismatch_stops_with_conflict_event(self, temp_workspace, test_profile):
+        """Timezone mismatch stops the pipeline and emits timezone_conflict event.
 
-        Actual: timestamp_result action=tz_mismatch when file timezone differs from provided
-        Expected: distinct token so the UI can show a specific "TZ Mismatch" badge, pipeline continues
+        When a file's DateTimeOriginal has a timezone that differs from --timezone,
+        the pipeline should stop before processing and emit a timezone_conflict event.
+        The user must re-run with --force-timezone to proceed.
         """
         source = temp_workspace["source"]
         video = source / "test.mp4"
@@ -1131,17 +1132,43 @@ class TestPipelineMachineOutput:
             "--tasks", "fix-timestamp",
         ])
 
+        assert result.returncode != 0, "Pipeline should exit non-zero on timezone conflict"
+
+        events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
+        conflict_events = [e for e in events if e.get("event") == "timezone_conflict"]
+        assert len(conflict_events) == 1, f"Expected 1 timezone_conflict event, got {len(conflict_events)}"
+        conflict = conflict_events[0]
+        assert conflict["conflict_type"] == "provided_mismatch"
+        assert conflict["provided_tz"] == "+0200"
+        assert "+0900" in conflict["file_timezones"]
+
+    def test_tz_mismatch_proceeds_with_force_timezone(self, temp_workspace, test_profile):
+        """With --force-timezone, timezone mismatch overrides DTO timezone and proceeds.
+
+        The wall-clock time is preserved but the timezone is changed to the user-provided one.
+        """
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        _create_video_raw(
+            video,
+            MediaCreateDate="2025:10:05 01:00:00",
+            CreateDate="2025:10:05 01:00:00",
+            DateTimeOriginal="2025:10:05 01:00:00+09:00",
+        )
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0200",
+            "--force-timezone",
+            "--tasks", "fix-timestamp",
+        ])
+
         files = self._parse_events(result.stdout)
         assert len(files) == 1
         f = files[0]
-        assert f.get("timestamp_action") == "tz_mismatch", \
-            f"Expected timestamp_action=tz_mismatch, got: {f.get('timestamp_action')}"
-        assert "original_time" in f, \
-            f"TZ mismatch should include original_time, got keys: {list(f.keys())}"
-        assert f["original_time"], \
-            f"original_time should be non-empty, got: {f.get('original_time')}"
-        assert f.get("pipeline_result") == "would_change", \
-            f"Expected pipeline_result=would_change (tz_mismatch is informational), got: {f.get('pipeline_result')}"
+        assert f.get("timestamp_action") == "would_fix", \
+            f"Expected would_fix with --force-timezone, got: {f.get('timestamp_action')}"
 
     def test_error_path_emits_original_time(self, temp_workspace, test_profile):
         """Error path emits original_time when the file has a known timestamp.

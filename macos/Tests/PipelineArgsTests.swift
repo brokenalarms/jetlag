@@ -34,7 +34,14 @@ final class PipelineArgsTests: XCTestCase {
     }
 
     func testDefaultState() {
-        let session = makeSession()
+        let profile = MediaProfile(
+            type: .video,
+            sourceDir: "/Volumes/TestCard/DCIM",
+            readyDir: "/tmp/ready",
+            gyroflowEnabled: true,
+            fileExtensions: [".mp4"]
+        )
+        let session = WorkflowSession(profile: profile, profileName: "test-profile")
         let (script, args) = session.buildPipelineArgs()
 
         XCTAssertEqual(script, "media-pipeline.sh")
@@ -49,7 +56,7 @@ final class PipelineArgsTests: XCTestCase {
         XCTAssertTrue(tasks.contains("tag"))
         XCTAssertTrue(tasks.contains("fix-timestamp"))
         XCTAssertTrue(tasks.contains("gyroflow"))
-        XCTAssertTrue(tasks.contains("archive-source"))
+        XCTAssertFalse(tasks.contains("archive-source"))
         XCTAssertFalse(tasks.contains("ingest"))
         XCTAssertFalse(tasks.contains("organize"))
     }
@@ -64,13 +71,15 @@ final class PipelineArgsTests: XCTestCase {
         XCTAssertTrue(args.contains("--source"))
     }
 
-    func testArchiveSourceWithDelete() {
-        let session = makeSession()
-        session.sourceAction = .delete
-        let (_, args) = session.buildPipelineArgs()
-
-        XCTAssertTrue(args.contains("archive-source"))
-        XCTAssertTrue(args.contains("delete"))
+    func testArchiveSourceNotEnabledByDefault() {
+        let profile = MediaProfile(
+            type: .video,
+            sourceDir: "/Volumes/TestCard/DCIM",
+            readyDir: "/tmp/ready",
+            fileExtensions: [".mp4"]
+        )
+        let session = WorkflowSession(profile: profile, profileName: "test-profile")
+        XCTAssertFalse(session.enabledSteps.contains(.archiveSource))
     }
 
     func testCopyCompanionFiles() {
@@ -250,6 +259,21 @@ final class PipelineArgsTests: XCTestCase {
         let (_, args) = session.buildPipelineArgs()
 
         XCTAssertFalse(args.contains("--update-filename-dates"))
+    }
+
+    func testForceTimezone() {
+        let session = makeSession()
+        session.forceTimezone = true
+        let (_, args) = session.buildPipelineArgs()
+
+        XCTAssertTrue(args.contains("--force-timezone"))
+    }
+
+    func testForceTimezoneNotIncludedByDefault() {
+        let session = makeSession()
+        let (_, args) = session.buildPipelineArgs()
+
+        XCTAssertFalse(args.contains("--force-timezone"))
     }
 
     func testAlwaysOnStepsNeverInTasks() {

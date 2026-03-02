@@ -660,7 +660,7 @@ class TestTimestampFixResult:
         )
         assert isinstance(result, fmt.TimestampFixResult)
         assert result.file == "VID_20250618_072521.mp4"
-        assert result.timestamp_action in ("would_fix", "no_change", "tz_mismatch")
+        assert result.timestamp_action in ("would_fix", "no_change")
         assert result.original_time is not None
         assert result.corrected_time is not None
         assert result.timestamp_source is not None

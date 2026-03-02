@@ -152,7 +152,7 @@ class TestInferFromFilenameRequiresTimezone:
 
 
 class TestTimezoneMismatchDetection:
-    """Timezone mismatch is now informational — succeeds with @@timestamp_action=tz_mismatch."""
+    """Timezone mismatch handling: DTO timezone wins unless --force-timezone is used."""
 
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
@@ -171,8 +171,13 @@ class TestTimezoneMismatchDetection:
                     result[key] = value
         return result
 
-    def test_timezone_mismatch_is_informational(self):
-        """Providing different --timezone than DateTimeOriginal succeeds with tz_mismatch action."""
+    def test_timezone_mismatch_uses_dto_timezone(self):
+        """When DTO has timezone and user provides a different one, DTO timezone wins.
+
+        The script proceeds using DTO's timezone (+08:00), not the user's (+09:00).
+        The result may be would_fix (if derived fields need syncing) or no_change.
+        The pre-flight check in media-pipeline.py handles the mismatch warning.
+        """
         video_path = os.path.join(self.temp_dir, "test_video.mp4")
         create_test_video(video_path, DateTimeOriginal="2025:06:19 06:38:09+08:00")
 
@@ -182,11 +187,31 @@ class TestTimezoneMismatchDetection:
             "--timezone", "+0900",
         ], capture_output=True, text=True)
 
-        # Should succeed (informational, not blocking)
         assert result.returncode == 0
         at_lines = self._parse_at_lines(result.stdout)
-        assert at_lines.get("timestamp_action") == "tz_mismatch"
-        assert "mismatch" in result.stderr.lower()
+        assert at_lines.get("timestamp_action") in ("would_fix", "no_change")
+        assert "+08:00" in at_lines.get("corrected_time", ""), \
+            "DTO timezone should win — corrected time should use +08:00, not +09:00"
+
+    def test_force_timezone_overrides_dto(self):
+        """With --force-timezone, the user-provided timezone overrides DTO's embedded timezone.
+
+        The wall-clock time is preserved, only the timezone label changes.
+        """
+        video_path = os.path.join(self.temp_dir, "test_video.mp4")
+        create_test_video(video_path, DateTimeOriginal="2025:06:19 06:38:09+08:00")
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path,
+            "--timezone", "+0900",
+            "--force-timezone",
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("timestamp_action") == "would_fix"
+        assert "+09:00" in at_lines.get("corrected_time", "")
 
 
 class TestTimezoneConversion:

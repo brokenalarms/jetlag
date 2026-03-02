@@ -41,8 +41,13 @@ def signal_handler(sig, frame):
     sys.exit(130)
 
 
-def has_motion_data(file_path: Path) -> bool:
-    """Check if video file contains motion/gyro data streams using ffprobe."""
+def has_motion_data(file_path: Path) -> Optional[bool]:
+    """Check if video file contains motion/gyro data streams using ffprobe.
+
+    Returns:
+        True if motion data found, False if checked and none found,
+        None if ffprobe is unavailable (cannot determine).
+    """
     try:
         result = subprocess.run(
             [
@@ -52,8 +57,7 @@ def has_motion_data(file_path: Path) -> bool:
             capture_output=True, text=True
         )
     except OSError:
-        print("Warning: ffprobe not available — cannot check for motion data", file=sys.stderr)
-        return False
+        return None
     if result.returncode != 0:
         return False
 
@@ -117,7 +121,12 @@ def generate_gyroflow_project(
         print(f"Already exists: {gyroflow_path}", file=sys.stderr)
         return GyroflowResult(gyroflow_path=gyroflow_path, action="skipped")
 
-    if not has_motion_data(file_path):
+    motion_check = has_motion_data(file_path)
+    if motion_check is None:
+        print(f"Skipped: {gyroflow_path} (ffprobe not available)", file=sys.stderr)
+        return GyroflowResult(gyroflow_path=gyroflow_path, action="skipped",
+                              error="ffprobe not available — cannot check for motion data")
+    if not motion_check:
         print(f"Skipped: {gyroflow_path} (no motion data)", file=sys.stderr)
         return GyroflowResult(gyroflow_path=gyroflow_path, action="skipped")
 

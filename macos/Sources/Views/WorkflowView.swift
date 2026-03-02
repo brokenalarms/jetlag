@@ -78,6 +78,38 @@ struct WorkflowView: View {
                 }
             )
         }
+        .alert(
+            Strings.Workflow.timezoneConflictTitle,
+            isPresented: $state.workflowSession.showTimezoneConflict
+        ) {
+            Button(Strings.Workflow.forceTimezoneButton, role: .destructive) {
+                state.workflowSession.forceTimezone = true
+                state.workflowSession.showTimezoneConflict = false
+                runWorkflow()
+            }
+            Button(Strings.Common.cancel, role: .cancel) {
+                state.workflowSession.showTimezoneConflict = false
+            }
+        } message: {
+            Text(timezoneConflictMessage)
+        }
+    }
+
+    private var timezoneConflictMessage: String {
+        let session = state.workflowSession
+        guard let fileTimezones = session.timezoneConflictFileTimezones else {
+            return ""
+        }
+        if session.timezoneConflictType == "mixed_timezones" {
+            let groups = fileTimezones.map { tz, files in
+                "\(tz): \(files.count) file\(files.count == 1 ? "" : "s")"
+            }.sorted().joined(separator: "\n")
+            return Strings.Workflow.mixedTimezonesMessage(groups: groups)
+        } else {
+            let provided = session.timezoneConflictProvidedTz ?? ""
+            let existing = fileTimezones.keys.sorted().joined(separator: ", ")
+            return Strings.Workflow.providedMismatchMessage(provided: provided, existing: existing)
+        }
     }
 
     // MARK: - Profile selection
@@ -399,8 +431,35 @@ struct WorkflowView: View {
                 Toggle(Strings.Workflow.updateFilenameDatesToggle, isOn: $session.updateFilenameDates)
                 HelpButton(Strings.Workflow.updateFilenameDatesHelp)
             }
+
+            if let preview = fixTimestampPreview {
+                Text(preview)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(10)
+    }
+
+    private var fixTimestampPreview: String? {
+        let session = state.workflowSession
+        guard session.enabledSteps.contains(.fixTimestamps) else { return nil }
+
+        var parts: [String] = []
+        if session.inferFromFilenames {
+            parts.append("Use filename dates as timestamp source")
+        }
+        if let offset = session.timeOffsetSeconds, offset != 0 {
+            let sign = offset > 0 ? "+" : ""
+            parts.append("Shift timestamps by \(sign)\(offset)s")
+        }
+        if !session.timezone.current.isEmpty && !session.inferFromFilenames {
+            parts.append("Apply timezone \(session.timezone.current)")
+        }
+        if session.updateFilenameDates {
+            parts.append("Rename files to match corrected dates")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     private var archiveSourceOptions: some View {

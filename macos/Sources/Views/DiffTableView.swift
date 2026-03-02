@@ -162,38 +162,55 @@ struct DiffTableView: View {
     }
 
     private func wouldChangeLabel(_ row: DiffTableRow) -> String {
+        if row.timestampAction == "would_fix" && row.dest != nil {
+            return Strings.DiffTable.wouldFixAndMoveStatus
+        }
         if row.timestampAction == "would_fix" { return Strings.DiffTable.wouldFixStatus }
         if row.dest != nil { return Strings.DiffTable.wouldMoveStatus }
         return Strings.DiffTable.wouldChangeStatus
     }
 
     private func changedLabel(_ row: DiffTableRow) -> String {
+        if row.timestampAction == "fixed" && row.dest != nil {
+            return Strings.DiffTable.fixedAndMovedStatus
+        }
         if row.timestampAction == "fixed" { return Strings.DiffTable.fixedStatus }
         if row.dest != nil { return Strings.DiffTable.movedStatus }
         return Strings.DiffTable.changedStatus
     }
 
+    private func changeBadgeText(_ row: DiffTableRow) -> String {
+        switch row.timestampAction {
+        case "would_fix", "fixed":
+            if row.correctionMode == "time", let offset = row.timeOffsetDisplay {
+                return offset
+            }
+            return row.timestampAction == "would_fix"
+                ? Strings.DiffTable.wouldFixChange : Strings.DiffTable.fixedChange
+        case "no_change": return Strings.DiffTable.noChangeChange
+        case "error": return Strings.DiffTable.errorChange
+        default: return "—"
+        }
+    }
+
     @ViewBuilder
     private func changeBadge(_ row: DiffTableRow) -> some View {
+        let text = changeBadgeText(row)
         switch row.timestampAction {
         case "would_fix":
-            Text(Strings.DiffTable.wouldFixChange)
+            Text(text)
                 .font(.system(size: 11))
                 .foregroundStyle(Color("NeonCyan").opacity(0.7))
         case "fixed":
-            Text(Strings.DiffTable.fixedChange)
+            Text(text)
                 .font(.system(size: 11))
                 .foregroundStyle(Color("NeonCyan"))
         case "no_change":
-            Text(Strings.DiffTable.noChangeChange)
+            Text(text)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-        case "tz_mismatch":
-            Text(Strings.DiffTable.tzMismatchStatus)
-                .font(.system(size: 11))
-                .foregroundStyle(Color("NeonYellow"))
         case "error":
-            Text(Strings.DiffTable.errorChange)
+            Text(text)
                 .font(.system(size: 11))
                 .foregroundStyle(.red)
         default:
