@@ -40,7 +40,7 @@ class TimestampFixResult:
     original_time: str
     corrected_time: str
     timestamp_source: str
-    timestamp_action: str  # "fixed" | "would_fix" | "no_change" | "error" | "tz_mismatch"
+    timestamp_action: str  # "fixed" | "would_fix" | "no_change" | "error"
     timezone: str          # detected timezone, empty if none
 ```
 

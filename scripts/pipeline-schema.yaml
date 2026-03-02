@@ -37,7 +37,7 @@ events:
       file: { type: string }
       action:
         type: string
-        enum: [fixed, would_fix, no_change, error, tz_mismatch]
+        enum: [fixed, would_fix, no_change, error]
       original_time: { type: string, optional: true }
       corrected_time: { type: string, optional: true }
       source: { type: string, optional: true }

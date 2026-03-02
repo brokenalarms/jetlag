@@ -270,7 +270,7 @@ What happens to source files after processing:
         static let wouldMoveStatus = String(localized: "diffTable.wouldMove.status", defaultValue: "Would move")
         static let fixedStatus = String(localized: "diffTable.fixed.status", defaultValue: "Fixed")
         static let movedStatus = String(localized: "diffTable.moved.status", defaultValue: "Moved")
-        static let tzMismatchStatus = String(localized: "diffTable.tzMismatch.status", defaultValue: "TZ mismatch")
+
         static let wouldFixChange = String(localized: "diffTable.wouldFix.change", defaultValue: "Would fix")
         static let fixedChange = String(localized: "diffTable.fixed.change", defaultValue: "Fixed")
         static let noChangeChange = String(localized: "diffTable.noChange.change", defaultValue: "No change")

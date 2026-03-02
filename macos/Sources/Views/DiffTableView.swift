@@ -54,9 +54,7 @@ struct DiffTableView: View {
         case "changed": return changedLabel(row)
         case "unchanged": return Strings.DiffTable.noChangeStatus
         case "failed":
-            return row.timestampAction == "tz_mismatch"
-                ? Strings.DiffTable.tzMismatchStatus
-                : Strings.DiffTable.failedStatus
+            return Strings.DiffTable.failedStatus
         case "would_change": return wouldChangeLabel(row)
         case nil: return row.lastCompletedStageLabel ?? ""
         default: return row.pipelineResult ?? ""
@@ -270,15 +268,9 @@ struct DiffTableView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         case "failed":
-            if row.timestampAction == "tz_mismatch" {
-                Label(Strings.DiffTable.tzMismatchStatus, systemImage: "exclamationmark.triangle.fill")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color("NeonYellow"))
-            } else {
-                Label(Strings.DiffTable.failedStatus, systemImage: "xmark.circle.fill")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.red)
-            }
+            Label(Strings.DiffTable.failedStatus, systemImage: "xmark.circle.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(.red)
         case "would_change":
             Label(wouldChangeLabel(row), systemImage: "arrow.triangle.2.circlepath.circle.fill")
                 .font(.system(size: 11))

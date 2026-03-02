@@ -27,6 +27,7 @@ struct TimezonePickerView: View {
                 if selectedTimezone.isEmpty {
                     Text(Strings.Workflow.selectTimezone)
                         .foregroundStyle(.secondary)
+
                 } else {
                     let match = Self.timezones.first { $0.offset == selectedTimezone }
                     if let match {
@@ -115,6 +116,8 @@ private struct TimezonePickerSheet: View {
                                         .font(.system(.caption, design: .monospaced))
                                         .foregroundStyle(.secondary)
                                 }
+                                .contentShape(Rectangle())
+
                             }
                             .buttonStyle(.plain)
                         }
@@ -123,6 +126,6 @@ private struct TimezonePickerSheet: View {
             }
             .listStyle(.plain)
         }
-        .frame(width: 320, height: 380)
+        .frame(width: 250, height: 380)
     }
 }
