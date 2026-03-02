@@ -5,6 +5,7 @@ Test suite for generate-gyroflow.py
 Run with: pytest tests/test_generate_gyroflow.py -v
 """
 
+import importlib.util
 import json
 import os
 import shlex
@@ -19,6 +20,16 @@ import yaml
 SCRIPT_DIR = Path(__file__).parent.parent
 GENERATE_GYROFLOW = SCRIPT_DIR / "generate-gyroflow.sh"
 PROFILES_FILE = SCRIPT_DIR / "media-profiles.yaml"
+
+
+def _load_generate_gyroflow():
+    """Load generate-gyroflow.py as a module (filename has a hyphen)."""
+    spec = importlib.util.spec_from_file_location(
+        "generate_gyroflow", SCRIPT_DIR / "generate-gyroflow.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def run_generate_gyroflow(args: list[str]) -> subprocess.CompletedProcess:
@@ -209,6 +220,83 @@ class TestMissingBinary:
 
         assert result.returncode != 0
         assert "@@error=" in result.stdout
+
+
+class TestBinaryResolution:
+    """Tests for resolve_gyroflow_binary — bundled binary takes priority over
+    configured path and system PATH, so the app can ship self-contained."""
+
+    def test_bundled_binary_preferred_over_configured(self):
+        """A bundled gyroflow in scripts/tools/ should be used even when a
+        configured path also exists — bundled tools are the preferred source
+        for the macOS app bundle."""
+        mod = _load_generate_gyroflow()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_scripts = Path(tmpdir) / "scripts"
+            fake_tools = fake_scripts / "tools"
+            fake_tools.mkdir(parents=True)
+            bundled = fake_tools / "gyroflow"
+            bundled.write_text("#!/bin/bash\necho bundled")
+            bundled.chmod(0o755)
+
+            configured = Path(tmpdir) / "configured" / "gyroflow"
+            configured.parent.mkdir()
+            configured.write_text("#!/bin/bash\necho configured")
+            configured.chmod(0o755)
+
+            original_dir = mod.SCRIPT_DIR
+            try:
+                mod.SCRIPT_DIR = fake_scripts
+                result = mod.resolve_gyroflow_binary(str(configured))
+                assert result == str(bundled), (
+                    f"Bundled binary should be preferred, got {result}"
+                )
+            finally:
+                mod.SCRIPT_DIR = original_dir
+
+    def test_configured_path_used_when_no_bundled(self):
+        """When no bundled binary exists, the configured path from
+        media-profiles.yaml should be used."""
+        mod = _load_generate_gyroflow()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_scripts = Path(tmpdir) / "scripts"
+            fake_tools = fake_scripts / "tools"
+            fake_tools.mkdir(parents=True)
+
+            configured = Path(tmpdir) / "configured" / "gyroflow"
+            configured.parent.mkdir()
+            configured.write_text("#!/bin/bash\necho configured")
+            configured.chmod(0o755)
+
+            original_dir = mod.SCRIPT_DIR
+            try:
+                mod.SCRIPT_DIR = fake_scripts
+                result = mod.resolve_gyroflow_binary(str(configured))
+                assert result == str(configured), (
+                    f"Configured path should be used when no bundle, got {result}"
+                )
+            finally:
+                mod.SCRIPT_DIR = original_dir
+
+    def test_returns_none_when_nothing_found(self):
+        """When no bundled, configured, or PATH binary exists, returns None
+        so the caller can skip gracefully."""
+        mod = _load_generate_gyroflow()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_scripts = Path(tmpdir) / "scripts"
+            fake_tools = fake_scripts / "tools"
+            fake_tools.mkdir(parents=True)
+
+            original_dir = mod.SCRIPT_DIR
+            original_path = os.environ.get("PATH", "")
+            try:
+                mod.SCRIPT_DIR = fake_scripts
+                os.environ["PATH"] = "/nonexistent"
+                result = mod.resolve_gyroflow_binary("/no/such/binary")
+                assert result is None, "Should return None when nothing found"
+            finally:
+                mod.SCRIPT_DIR = original_dir
+                os.environ["PATH"] = original_path
 
 
 class TestPreset:

@@ -41,9 +41,9 @@ targets:
           python3 -m pip install --quiet --target "$DEST/site-packages" -r "$DEST/requirements.txt"
 
           # Verify vendored tools are present (copied by cp -r above)
-          for tool in exiftool tag; do
+          for tool in exiftool tag ffprobe gyroflow; do
             if [ ! -f "$DEST/tools/$tool" ]; then
-              echo "error: scripts/tools/$tool missing — see scripts/tools/README" >&2
+              echo "error: scripts/tools/$tool missing — run scripts/tools/download-${tool}.sh or see scripts/tools/README" >&2
               exit 1
             fi
           done

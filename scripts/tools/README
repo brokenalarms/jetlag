@@ -10,3 +10,19 @@ tag        macOS Finder tag CLI (github.com/jdberry/tag), MIT licensed.
            Or copy from Homebrew:
              cp $(brew --prefix)/bin/tag scripts/tools/tag
            The built binary is gitignored — each developer builds locally.
+
+ffprobe    Stream inspection tool from the FFmpeg project (ffmpeg.org).
+           Used by generate-gyroflow.py to detect gyro/motion data streams.
+           Download a static build:
+             scripts/tools/download-ffprobe.sh
+           Or copy from Homebrew:
+             cp $(brew --prefix)/bin/ffprobe scripts/tools/ffprobe
+           The binary is gitignored — each developer downloads locally.
+
+gyroflow   Gyroflow CLI (gyroflow.xyz), used for .gyroflow project generation.
+           The Gyroflow app binary doubles as a CLI (accepts --export-project).
+           Download or extract from an existing install:
+             scripts/tools/download-gyroflow.sh
+           The script checks /Applications/Gyroflow.app, Homebrew, then
+           downloads from GitHub releases.
+           The binary is gitignored — each developer downloads locally.

@@ -15,6 +15,10 @@ scripts/tests/perf_baseline.json
 .env.local
 .env
 
+# Vendored tool binaries (downloaded locally per developer — see scripts/tools/README)
+scripts/tools/ffprobe
+scripts/tools/gyroflow
+
 # Xcode generated
 *.xcodeproj
 xcuserdata/
