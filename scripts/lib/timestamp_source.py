@@ -288,10 +288,9 @@ def get_best_timestamp(
         if re.match(r'[0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}', timestamp):
             return timestamp, "CreationDate with Z (UTC)"
 
-    # Priority 3: Filename for VID/IMG/LRV/DJI
-    ts, _ = parse_filename_timestamp(file_path)
-    if ts and (re.match(r'^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6}', base) or
-               re.match(r'^DJI_[0-9]{14}_', base)):
+    # Priority 3: Filename with camera date+time pattern (prefix-agnostic)
+    ts, pattern = parse_filename_timestamp(file_path)
+    if ts and pattern in ('YYYYMMDD_HHMMSS', 'YYYYMMDDHHMMSS'):
         return ts, "filename"
 
     # Priority 4: DateTimeOriginal without timezone

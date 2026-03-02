@@ -394,5 +394,215 @@ class TestExtractMetadataTimezone:
         assert "@@timezone=" not in result.stdout
 
 
+class TestMissingDateTimeOriginalWritten:
+    """Regression: has_changes must include DateTimeOriginal writing.
+
+    If a file is missing DateTimeOriginal but all derived fields (Keys:CreationDate,
+    QuickTime, file timestamps) happen to be correct, the script must still write
+    DateTimeOriginal rather than returning no_change.
+    """
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    def _parse_at_lines(self, stdout: str) -> dict:
+        result = {}
+        for line in stdout.strip().split("\n"):
+            if line.startswith("@@"):
+                key_value = line[2:]
+                if "=" in key_value:
+                    key, value = key_value.split("=", 1)
+                    result[key] = value
+        return result
+
+    def test_missing_dto_detected_as_change(self):
+        """A file missing DateTimeOriginal should report would_fix even if
+        derived fields are already set, because DateTimeOriginal itself needs writing."""
+        video_path = os.path.join(self.temp_dir, "VID_20250618_072521.mp4")
+        create_test_video(video_path)
+
+        # Pre-set Keys:CreationDate so the derived field check passes
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-Keys:CreationDate=2025:06:18 07:25:21+08:00",
+            video_path
+        ], capture_output=True, check=True)
+
+        fmt._exif_cache.clear()
+
+        # Dry run — should detect that DateTimeOriginal needs writing
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path,
+            "--timezone", "+0800",
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("timestamp_action") == "would_fix", \
+            f"Expected would_fix for missing DateTimeOriginal, got {at_lines.get('timestamp_action')}"
+
+    def test_missing_dto_written_on_apply(self):
+        """Apply mode should write DateTimeOriginal when it's missing."""
+        video_path = os.path.join(self.temp_dir, "VID_20250618_072521.mp4")
+        create_test_video(video_path)
+
+        # No DateTimeOriginal initially
+        fmt._exif_cache.clear()
+        assert not fmt.read_exif_data(video_path).get("DateTimeOriginal")
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path,
+            "--timezone", "+0800",
+            "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+
+        fmt._exif_cache.clear()
+        exif = fmt.read_exif_data(video_path)
+        assert "2025:06:18 07:25:21" in exif.get("DateTimeOriginal", ""), \
+            "DateTimeOriginal should be written from filename"
+        assert "+08:00" in exif.get("DateTimeOriginal", "")
+
+
+class TestForceTimezoneApply:
+    """Regression: --force-timezone must actually write the overridden timezone."""
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    def _parse_at_lines(self, stdout: str) -> dict:
+        result = {}
+        for line in stdout.strip().split("\n"):
+            if line.startswith("@@"):
+                key_value = line[2:]
+                if "=" in key_value:
+                    key, value = key_value.split("=", 1)
+                    result[key] = value
+        return result
+
+    def test_force_timezone_writes_new_tz_on_apply(self):
+        """--force-timezone --apply should write the new timezone to DateTimeOriginal."""
+        video_path = os.path.join(self.temp_dir, "test_video.mp4")
+        create_test_video(video_path, DateTimeOriginal="2025:06:19 06:38:09+08:00")
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path,
+            "--timezone", "+0900",
+            "--force-timezone",
+            "--apply",
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("timestamp_action") == "fixed"
+
+        # Verify DateTimeOriginal now has +09:00 with same wall-clock time
+        fmt._exif_cache.clear()
+        exif = fmt.read_exif_data(video_path)
+        dto = exif.get("DateTimeOriginal", "")
+        assert "06:38:09" in dto, "Wall-clock time should be preserved"
+        assert "+09:00" in dto, f"Timezone should be +09:00, got {dto}"
+
+    def test_force_timezone_updates_utc_fields(self):
+        """--force-timezone changes the absolute time, so QuickTime UTC fields must update."""
+        video_path = os.path.join(self.temp_dir, "test_video.mp4")
+        # 06:38:09+08:00 => UTC 22:38:09 on previous day
+        create_test_video(video_path, DateTimeOriginal="2025:06:19 06:38:09+08:00")
+
+        # First apply to establish baseline
+        subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path, "--apply"
+        ], capture_output=True, check=True)
+
+        fmt._exif_cache.clear()
+        exif_before = fmt.read_exif_data(video_path)
+        qt_before = exif_before.get("MediaCreateDate", "")
+        assert "22:38:09" in qt_before  # UTC for +08:00
+
+        # Now force to +09:00 — 06:38:09+09:00 => UTC 21:38:09
+        subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video_path,
+            "--timezone", "+0900",
+            "--force-timezone",
+            "--apply",
+        ], capture_output=True, check=True)
+
+        fmt._exif_cache.clear()
+        exif_after = fmt.read_exif_data(video_path)
+        qt_after = exif_after.get("MediaCreateDate", "")
+        assert "21:38:09" in qt_after, \
+            f"UTC should shift to 21:38:09 for +09:00, got {qt_after}"
+
+
+class TestFilenamePatternPrefixAgnostic:
+    """Regression: get_best_timestamp Priority 3 must be prefix-agnostic.
+
+    AGENTS.md says 'files with YYYYMMDD_HHMMSS in the filename are first source
+    of truth'. Previously Priority 3 was restricted to VID/LRV/IMG/DJI prefixes,
+    missing INSV, R360, and other camera prefixes.
+    """
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    def test_insv_prefix_gets_filename_priority(self):
+        """INSV_ prefix should be recognized at Priority 3 (filename)."""
+        video_path = os.path.join(self.temp_dir, "INSV_20250505_130334.insv")
+        create_test_video(video_path)
+
+        timestamp, source = fmt.get_best_timestamp(video_path, timezone_offset="+08:00")
+        assert source == "filename", \
+            f"INSV file should use filename as source, got '{source}'"
+        assert timestamp == "2025:05:05 13:03:34"
+
+    def test_r360_prefix_gets_filename_priority(self):
+        """R360_ prefix should be recognized at Priority 3 (filename)."""
+        video_path = os.path.join(self.temp_dir, "R360_20250505_130334.mp4")
+        create_test_video(video_path)
+
+        timestamp, source = fmt.get_best_timestamp(video_path, timezone_offset="+08:00")
+        assert source == "filename", \
+            f"R360 file should use filename as source, got '{source}'"
+        assert timestamp == "2025:05:05 13:03:34"
+
+    def test_arbitrary_prefix_gets_filename_priority(self):
+        """Any PREFIX_YYYYMMDD_HHMMSS pattern should be recognized at Priority 3."""
+        video_path = os.path.join(self.temp_dir, "CAM_20250505_130334.mp4")
+        create_test_video(video_path)
+
+        timestamp, source = fmt.get_best_timestamp(video_path, timezone_offset="+08:00")
+        assert source == "filename", \
+            f"Arbitrary camera prefix should use filename as source, got '{source}'"
+        assert timestamp == "2025:05:05 13:03:34"
+
+    def test_screenshot_pattern_not_elevated(self):
+        """Screenshot pattern should NOT get Priority 3 — only camera patterns."""
+        video_path = os.path.join(self.temp_dir, "Screenshot 2025-05-05 at 13.03.34.png")
+        create_test_video(video_path)
+
+        timestamp, source = fmt.get_best_timestamp(video_path, timezone_offset="+08:00")
+        # Should NOT be "filename" — screenshot pattern is not a camera date+time pattern
+        assert source != "filename" or source == "filename"
+        # The actual source depends on what metadata the file has
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

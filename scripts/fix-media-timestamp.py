@@ -535,7 +535,7 @@ def format_corrected_timestamp(datetime_original: datetime, timestamp_source: st
 
     # Use the actual timezone source
     tz_source_display = timezone_source if timezone_source else f"{source_display} metadata ({tz_formatted})"
-    if not timezone_source.startswith("--timezone"):
+    if not timezone_source.startswith(("--timezone", "--force-timezone")):
         tz_source_display = f"{timezone_source} ({tz_formatted})"
 
     return f"{corrected_str} (from {source_display} with timezone, tz: {tz_source_display})"
@@ -787,9 +787,24 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
         except:
             pass
 
+    # Determine if DateTimeOriginal itself needs writing:
+    # 1. It's missing and we have timezone info, OR
+    # 2. infer_from_filename is set (filename is the source of truth, DTO may be wrong/missing), OR
+    # 3. force_timezone is set (override embedded timezone)
+    should_write_datetime_original = (
+        (not current_data["exif"].get("DateTimeOriginal") and current_data["datetime_original_str"]) or
+        (infer_from_filename and current_data["datetime_original_str"]) or
+        (force_timezone and current_data["datetime_original_str"])
+    )
+
     # Display changes
     change_desc = format_change_description(changes, timestamp_data, current_data, preserve_wallclock, datetime_original)
-    has_changes = changes.get("keys_creationdate", False) or changes["file_timestamps"] or changes.get("quicktime_createdate", False)
+    has_changes = (
+        should_write_datetime_original or
+        changes.get("keys_creationdate", False) or
+        changes["file_timestamps"] or
+        changes.get("quicktime_createdate", False)
+    )
 
     # Build common result fields
     correction_mode = "time" if (time_offset_seconds is not None and time_offset_seconds != 0) else "timezone"
@@ -818,15 +833,6 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
 
     # Apply changes
     success = True
-
-    # Write DateTimeOriginal if:
-    # 1. It's missing and we have timezone info, OR
-    # 2. infer_from_filename is set (filename is the source of truth, DTO may be wrong/missing)
-    should_write_datetime_original = (
-        (not current_data["exif"].get("DateTimeOriginal") and current_data["datetime_original_str"]) or
-        (infer_from_filename and current_data["datetime_original_str"]) or
-        (force_timezone and current_data["datetime_original_str"])
-    )
 
     if should_write_datetime_original and infer_from_filename and current_data["exif"].get("DateTimeOriginal"):
         print("   ⚠️  Overwriting existing DateTimeOriginal (--infer-from-filename flag)", file=sys.stderr)
