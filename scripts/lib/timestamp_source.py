@@ -9,10 +9,12 @@ Public API:
     build_filename(original_name, corrected_date) -> Optional[str]
 """
 
+import json
 import os
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from typing import Dict, Optional
 
 from lib.exiftool import exiftool
@@ -142,21 +144,10 @@ def normalize_exif_value(value: str) -> str:
 # Filename timestamp parsing — generic date patterns
 # ---------------------------------------------------------------------------
 
-# Each pattern: (compiled regex for the date portion, pattern name, has_time)
-# Order matters — most specific first.
+_PATTERNS_FILE = Path(__file__).parent / "filename-patterns.json"
 _FILENAME_PATTERNS = [
-    # YYYYMMDD_HHMMSS — e.g. VID_20250505_130334_00_001.mp4
-    (re.compile(r'(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])_((?:[01]\d|2[0-3])(?:[0-5]\d){2})'),
-     'YYYYMMDD_HHMMSS', True),
-    # YYYYMMDDHHMMSS — e.g. DJI_20250505130334_0001.mp4
-    (re.compile(r'(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])((?:[01]\d|2[0-3])(?:[0-5]\d){2})'),
-     'YYYYMMDDHHMMSS', True),
-    # YYYY-MM-DD + time with separators — e.g. Screenshot 2025-05-05 at 13.03.34.png
-    (re.compile(r'(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\s+at\s+(\d{1,2})\.(\d{2})\.(\d{2})'),
-     'YYYY-MM-DD_at_HH.MM.SS', True),
-    # YYYYMMDD (no time) — e.g. DSC_20250505_001.jpg
-    (re.compile(r'(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])'),
-     'YYYYMMDD', False),
+    (re.compile(p["regex"]), p["name"], p["has_time"])
+    for p in json.loads(_PATTERNS_FILE.read_text())
 ]
 
 

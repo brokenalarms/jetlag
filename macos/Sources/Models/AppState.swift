@@ -110,12 +110,16 @@ enum PipelineEvent: Decodable {
                          source: String?, timezone: String?,
                          correctionMode: String?,
                          timeOffsetSeconds: Int?,
-                         timeOffsetDisplay: String?)
+                         timeOffsetDisplay: String?,
+                         error: String?)
     case renameResult(file: String, renamedTo: String)
     case organizeResult(file: String, action: String, dest: String)
     case gyroflowResult(file: String, action: String, gyroflowPath: String,
                         error: String?)
     case pipelineResult(file: String, result: String)
+    case timezoneConflict(conflictType: String, providedTz: String?,
+                          fileTimezones: [String: [String]])
+    case pipelineError(message: String)
 
     private enum CodingKeys: String, CodingKey {
         case event, file, stage, action
@@ -131,7 +135,10 @@ enum PipelineEvent: Decodable {
         case renamedTo = "renamed_to"
         case dest
         case gyroflowPath = "gyroflow_path"
-        case error, result
+        case error, result, message
+        case conflictType = "conflict_type"
+        case providedTz = "provided_tz"
+        case fileTimezones = "file_timezones"
     }
 
     init(from decoder: Decoder) throws {
@@ -162,7 +169,8 @@ enum PipelineEvent: Decodable {
                 timezone: try container.decodeIfPresent(String.self, forKey: .timezone),
                 correctionMode: try container.decodeIfPresent(String.self, forKey: .correctionMode),
                 timeOffsetSeconds: try container.decodeIfPresent(Int.self, forKey: .timeOffsetSeconds),
-                timeOffsetDisplay: try container.decodeIfPresent(String.self, forKey: .timeOffsetDisplay))
+                timeOffsetDisplay: try container.decodeIfPresent(String.self, forKey: .timeOffsetDisplay),
+                error: try container.decodeIfPresent(String.self, forKey: .error))
         case "rename_result":
             self = .renameResult(
                 file: try container.decode(String.self, forKey: .file),
@@ -182,6 +190,14 @@ enum PipelineEvent: Decodable {
             self = .pipelineResult(
                 file: try container.decode(String.self, forKey: .file),
                 result: try container.decode(String.self, forKey: .result))
+        case "timezone_conflict":
+            self = .timezoneConflict(
+                conflictType: try container.decode(String.self, forKey: .conflictType),
+                providedTz: try container.decodeIfPresent(String.self, forKey: .providedTz),
+                fileTimezones: try container.decode([String: [String]].self, forKey: .fileTimezones))
+        case "pipeline_error":
+            self = .pipelineError(
+                message: try container.decode(String.self, forKey: .message))
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .event, in: container,
@@ -209,6 +225,13 @@ final class WorkflowSession {
     var inferFromFilenames: Bool = false
     var timeOffsetSeconds: Int?
     var updateFilenameDates: Bool = false
+    var forceTimezone: Bool = false
+    var allowMixedTimezones: Bool = false
+
+    var timezoneConflictType: String?
+    var timezoneConflictProvidedTz: String?
+    var timezoneConflictFileTimezones: [String: [String]]?
+    var showTimezoneConflict: Bool = false
 
     var enabledSteps: Set<PipelineStep> = [] {
         didSet {
@@ -238,7 +261,7 @@ final class WorkflowSession {
         if profile.gyroflowEnabled == true {
             steps.append(.gyroflow)
         }
-        steps.append(.archiveSource)
+        // steps.append(.archiveSource)
         return steps
     }
 
@@ -369,6 +392,12 @@ final class WorkflowSession {
         if updateFilenameDates {
             args.append("--update-filename-dates")
         }
+        if forceTimezone {
+            args.append("--force-timezone")
+        }
+        if allowMixedTimezones {
+            args.append("--allow-mixed-timezones")
+        }
         if applyMode {
             args.append("--apply")
         }
@@ -480,7 +509,7 @@ final class AppState {
 
         case .timestampResult(_, let action, let originalTime, let correctedTime,
                               let source, let timezone, let correctionMode,
-                              _, let timeOffsetDisplay):
+                              _, let timeOffsetDisplay, let error):
             currentDiffRow?.timestampAction = action
             currentDiffRow?.originalTime = originalTime
             currentDiffRow?.correctedTime = correctedTime
@@ -488,6 +517,7 @@ final class AppState {
             currentDiffRow?.timezone = timezone
             currentDiffRow?.correctionMode = correctionMode
             currentDiffRow?.timeOffsetDisplay = timeOffsetDisplay
+            currentDiffRow?.timestampError = error
             liveRow = currentDiffRow
 
         case .renameResult(_, let renamedTo):
@@ -505,6 +535,15 @@ final class AppState {
         case .stageComplete(let stage):
             currentDiffRow?.markStageComplete(stage)
             liveRow = currentDiffRow
+
+        case .timezoneConflict(let conflictType, let providedTz, let fileTimezones):
+            workflowSession.timezoneConflictType = conflictType
+            workflowSession.timezoneConflictProvidedTz = providedTz
+            workflowSession.timezoneConflictFileTimezones = fileTimezones
+            workflowSession.showTimezoneConflict = true
+
+        case .pipelineError(let message):
+            logOutput.append(LogLine(text: "ERROR: \(message)", stream: .stderr))
         }
     }
 

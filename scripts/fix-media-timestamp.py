@@ -688,7 +688,7 @@ def _source_to_machine_token(source: str) -> str:
     return source_lower
 
 
-def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None) -> TimestampFixResult:
+def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None, force_timezone: bool = False) -> TimestampFixResult:
     """Fix media (photo/video) timestamps.
 
     Returns:
@@ -700,26 +700,20 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
 
     detected_tz = extract_metadata_timezone(file_path) or None
 
-    # Timezone mismatch detection (informational only)
-    tz_mismatch = False
-    if timezone_offset and not infer_from_filename:
-        exif_data = read_exif_data(file_path)
-        dto_value = exif_data.get("DateTimeOriginal", "")
-
-        tz_match = re.search(r'([+-]\d{2}):?(\d{2})$', dto_value)
-        if tz_match:
-            existing_tz = f"{tz_match.group(1)}:{tz_match.group(2)}"
-            provided_tz = normalize_timezone_input(timezone_offset)
-
-            existing_tz_normalized = existing_tz.replace(':', '')
-            provided_tz_normalized = provided_tz.replace(':', '')
-
-            if existing_tz_normalized != provided_tz_normalized:
-                tz_mismatch = True
-                print(f"⚠️  Timezone mismatch: DateTimeOriginal has {existing_tz}, you provided {provided_tz}", file=sys.stderr)
-
     # Get all data
     current_data = get_all_timestamp_data(file_path, timezone_offset, infer_from_filename)
+
+    # When --force-timezone is set: override DTO's embedded timezone with the
+    # user-provided timezone, keeping the wall-clock time intact.
+    if force_timezone and timezone_offset and not infer_from_filename:
+        source = current_data.get("timestamp_source", "")
+        if "with timezone" in source and current_data["datetime_original_str"]:
+            wall_clock = re.sub(r'[+-]\d{2}:?\d{2}$', '', current_data["datetime_original_str"]).strip()
+            forced_tz = normalize_timezone_input(timezone_offset)
+            datetime_with_tz = f"{wall_clock}{forced_tz}"
+            current_data["datetime_original_str"] = datetime_with_tz
+            current_data["datetime_original"] = parse_datetime_original(datetime_with_tz)
+            current_data["timezone_source"] = f"--force-timezone ({forced_tz})"
 
     # Display header
     print(f"\033[36m🔍 {filename}\033[0m", file=sys.stderr)
@@ -810,19 +804,17 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
         time_offset_display=format_offset_display(time_offset_seconds) if (time_offset_seconds is not None and time_offset_seconds != 0) else None,
     )
 
-    tz_action = "tz_mismatch" if tz_mismatch else None
-
     if dry_run and has_changes:
         print(f"📊 Change   : {change_desc} (DRY RUN)", file=sys.stderr)
-        return TimestampFixResult(**result_base, timestamp_action=tz_action or "would_fix")
+        return TimestampFixResult(**result_base, timestamp_action="would_fix")
     else:
         print(f"📊 Change   : {change_desc}", file=sys.stderr)
 
     if not has_changes:
-        return TimestampFixResult(**result_base, timestamp_action=tz_action or "no_change")
+        return TimestampFixResult(**result_base, timestamp_action="no_change")
 
     if dry_run:
-        return TimestampFixResult(**result_base, timestamp_action=tz_action or "no_change")
+        return TimestampFixResult(**result_base, timestamp_action="no_change")
 
     # Apply changes
     success = True
@@ -832,11 +824,14 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
     # 2. infer_from_filename is set (filename is the source of truth, DTO may be wrong/missing)
     should_write_datetime_original = (
         (not current_data["exif"].get("DateTimeOriginal") and current_data["datetime_original_str"]) or
-        (infer_from_filename and current_data["datetime_original_str"])
+        (infer_from_filename and current_data["datetime_original_str"]) or
+        (force_timezone and current_data["datetime_original_str"])
     )
 
     if should_write_datetime_original and infer_from_filename and current_data["exif"].get("DateTimeOriginal"):
         print("   ⚠️  Overwriting existing DateTimeOriginal (--infer-from-filename flag)", file=sys.stderr)
+    elif should_write_datetime_original and force_timezone and current_data["exif"].get("DateTimeOriginal"):
+        print("   ⚠️  Overwriting existing DateTimeOriginal timezone (--force-timezone flag)", file=sys.stderr)
 
     # Build all EXIF writes and apply in one exiftool call
     field_args = []
@@ -880,6 +875,7 @@ def main():
     parser.add_argument('--infer-from-filename', action='store_true', help='Use filename timestamp as source of truth (requires --timezone)')
     parser.add_argument('--time-offset', type=int, default=None, help='Seconds to add/subtract from resolved timestamp (requires --timezone)')
     parser.add_argument('--preserve-wallclock-time', action='store_true', help='Preserve literal wall-clock shooting time (10:30 stays 10:30) instead of converting to current timezone for display')
+    parser.add_argument('--force-timezone', action='store_true', help='Override existing timezone in DateTimeOriginal with --timezone')
 
     args = parser.parse_args()
 
@@ -914,7 +910,8 @@ def main():
         timezone_offset=timezone_offset,
         infer_from_filename=args.infer_from_filename,
         preserve_wallclock=args.preserve_wallclock_time,
-        time_offset_seconds=args.time_offset
+        time_offset_seconds=args.time_offset,
+        force_timezone=args.force_timezone,
     )
 
     emit_result(result)

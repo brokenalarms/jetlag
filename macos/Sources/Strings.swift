@@ -135,6 +135,22 @@ What happens to source files after processing:
         static let gyroflowDepsGyroflow = "brew install gyroflow"
         static let gyroflowDepsCopy = String(localized: "workflow.gyroflowDeps.copy",
             defaultValue: "Copy Commands")
+
+        // Timezone conflict dialog
+        static let timezoneConflictTitle = String(localized: "workflow.timezoneConflict.title",
+            defaultValue: "Timezone Conflict")
+        static let forceTimezoneButton = String(localized: "workflow.forceTimezone.button",
+            defaultValue: "Override Timezone")
+
+        static func mixedTimezonesMessage(groups: String) -> String {
+            String(localized: "workflow.mixedTimezones.message",
+                   defaultValue: "Files have different embedded timezones. Consider processing each group separately.\n\n\(groups)")
+        }
+
+        static func providedMismatchMessage(provided: String, existing: String) -> String {
+            String(localized: "workflow.providedMismatch.message",
+                   defaultValue: "You specified \(provided) but files have embedded timezone \(existing). The embedded timezone is usually correct (set by the camera). Override to use your timezone instead.")
+        }
     }
 
     // MARK: - Profiles
@@ -258,6 +274,8 @@ What happens to source files after processing:
         static let fixedChange = String(localized: "diffTable.fixed.change", defaultValue: "Fixed")
         static let noChangeChange = String(localized: "diffTable.noChange.change", defaultValue: "No change")
         static let errorChange = String(localized: "diffTable.error.change", defaultValue: "Error")
+        static let wouldFixAndMoveStatus = String(localized: "diffTable.wouldFixAndMove.status", defaultValue: "Would fix + move")
+        static let fixedAndMovedStatus = String(localized: "diffTable.fixedAndMoved.status", defaultValue: "Fixed + moved")
 
         static func fileCount(_ count: Int) -> String {
             String(localized: "diffTable.fileCount",
