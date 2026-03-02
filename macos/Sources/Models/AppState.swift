@@ -280,7 +280,6 @@ final class WorkflowSession {
     }
 
     func validateTimezone() -> String? {
-        if useTimezonePicker { return nil }
         if !enabledSteps.contains(.fixTimestamps) { return nil }
         if timezone.current.isEmpty { return Strings.Workflow.timezoneRequired }
         if !timezone.current.contains(/^[+-]\d{4}$/) { return Strings.Workflow.timezoneFormatHelp }
@@ -405,7 +404,15 @@ final class WorkflowSession {
 
 @Observable
 final class AppState {
-    var selectedTab: SidebarTab = .workflow
+    var selectedTab: SidebarTab = .workflow {
+        didSet {
+            if selectedTab != .workflow {
+                clearLog()
+                showLogOutput = false
+                showInspector = false
+            }
+        }
+    }
 
     let scriptsDirectory: String
     var profilesFilePath: String {
@@ -466,7 +473,6 @@ final class AppState {
         diffTableRows = []
         currentDiffRow = nil
         liveRow = nil
-        showLogOutput = false
     }
 
     func appendLog(_ line: LogLine) {

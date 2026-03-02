@@ -1,6 +1,9 @@
 #!/bin/bash
 # Library - Timezone lookup functions
 # Not executable directly - source this file from other scripts
+#
+# Only caller: batch-fix-media-timestamp.sh (display-only timezone info).
+# All timestamp fixing logic now lives in the Python pipeline.
 
 # ============================================================================
 # Timezone and utility functions
@@ -70,7 +73,7 @@ get_timezone_for_country() {
     local abs_seconds=$((offset_seconds < 0 ? -offset_seconds : offset_seconds))
     local hours=$((abs_seconds / 3600))
     local minutes=$(((abs_seconds % 3600) / 60))
-    local sign=$([[ offset_seconds -lt 0 ]] && echo "-" || echo "+")
+    local sign=$([[ $offset_seconds -lt 0 ]] && echo "-" || echo "+")
     offset_str="$(printf "%s%02d%02d" "$sign" "$hours" "$minutes")"
   fi
 
@@ -78,23 +81,6 @@ get_timezone_for_country() {
   echo "${offset_str}|${tz_abbrev}"
 }
 
-# Get country name for templating (full name only)
-get_country_name() {
-  local input="$1"
-  local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  local TIMEZONE_DIR="$SCRIPT_DIR/timezones"
-  local country_csv="$TIMEZONE_DIR/country.csv"
-
-  # If it's a 2-letter code, return full name
-  if [[ ${#input} -eq 2 ]]; then
-    local country_code="$(echo "$input" | tr '[:lower:]' '[:upper:]')"
-    grep "^$country_code," "$country_csv" 2>/dev/null | sed "s/^$country_code,//" | sed 's/^"//;s/"$//' || echo "$input"
-  else
-    echo "$input"
-  fi
-}
-
-# Get display string for location (includes country name if it's a code)
 get_location_display() {
   local input="$1"
   local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

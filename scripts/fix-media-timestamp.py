@@ -14,18 +14,12 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Dict, Optional, Callable
+from typing import Dict, Optional
 
 # Handle Ctrl-C gracefully
 def signal_handler(sig, frame):
     print("\n\nInterrupted by user", file=sys.stderr)
     sys.exit(130)
-
-try:
-    import humanize
-except ImportError:
-    print("Error: humanize library not found. Install with: pip install humanize", file=sys.stderr)
-    sys.exit(1)
 
 from lib.exiftool import exiftool
 from lib.results import emit_result
