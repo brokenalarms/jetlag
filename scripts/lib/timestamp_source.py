@@ -51,11 +51,9 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
         _exif_cache[file_path] = data
         return data
     except FileNotFoundError as e:
-        from pathlib import Path
         print(f"❌ {e}", file=__import__('sys').stderr)
         return {}
     except Exception as e:
-        from pathlib import Path
         print(f"❌ EXIF read failed for {os.path.basename(file_path)}: {e}",
               file=__import__('sys').stderr)
         return {}
