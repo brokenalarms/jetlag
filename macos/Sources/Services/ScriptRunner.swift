@@ -30,9 +30,8 @@ struct ScriptRunner {
             func readLines(from pipe: Pipe, stream: LogLine.Stream) {
                 group.enter()
                 // Buffer for partial lines that span pipe chunk boundaries.
-                // Without this, a chunk ending mid-line (e.g. "@@original_ti")
-                // would be yielded as an incomplete line and the remainder
-                // ("me=2024:01:15 08:30:00") lost as a separate non-@@ fragment.
+                // Without this, a chunk ending mid-line (e.g. '{"event":"timestamp_res')
+                // would be yielded as an incomplete line and the remainder lost.
                 var partialLine = ""
                 pipe.fileHandleForReading.readabilityHandler = { handle in
                     let data = handle.availableData

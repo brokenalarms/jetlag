@@ -1,0 +1,80 @@
+# Pipeline JSONL event schema
+#
+# Each stdout line from media-pipeline.py is a single JSON object (JSONL).
+# The "event" field discriminates event types. All other fields depend on event type.
+# Optional fields are omitted when absent (not null).
+#
+# The macOS app parses these events via JSONDecoder into PipelineEvent structs.
+# Standalone scripts still use @@key=value via lib/results.emit_result() for CLI output.
+
+events:
+  pipeline_file:
+    description: "Emitted at the start of processing each file"
+    fields:
+      file: { type: string, description: "Basename of the file being processed" }
+
+  stage_complete:
+    description: "Emitted after each pipeline stage completes for a file"
+    fields:
+      stage:
+        type: string
+        enum: [ingest, tag, fix-timestamp, output, gyroflow, archive-source]
+
+  tag_result:
+    description: "Result of the tag-media stage"
+    fields:
+      file: { type: string }
+      action:
+        type: string
+        enum: [tagged, already_correct]
+      tags_added: { type: "list[string]" }
+      exif_make: { type: string }
+      exif_model: { type: string }
+
+  timestamp_result:
+    description: "Result of the fix-media-timestamp stage"
+    fields:
+      file: { type: string }
+      action:
+        type: string
+        enum: [fixed, would_fix, no_change, error, tz_mismatch]
+      original_time: { type: string, optional: true }
+      corrected_time: { type: string, optional: true }
+      source: { type: string, optional: true }
+      timezone: { type: string, optional: true }
+      correction_mode: { type: string, optional: true }
+      time_offset_seconds: { type: integer, optional: true }
+      time_offset_display: { type: string, optional: true }
+
+  rename_result:
+    description: "Emitted when --update-filename-dates renames a file"
+    fields:
+      file: { type: string, description: "Original filename" }
+      renamed_to: { type: string }
+
+  organize_result:
+    description: "Result of the organize-by-date (output) stage"
+    fields:
+      file: { type: string }
+      action:
+        type: string
+        enum: [copied, moved, skipped, overwrote, would_copy, would_move, would_overwrite, error]
+      dest: { type: string }
+
+  gyroflow_result:
+    description: "Result of the generate-gyroflow stage"
+    fields:
+      file: { type: string }
+      action:
+        type: string
+        enum: [generated, skipped, would_generate]
+      gyroflow_path: { type: string }
+      error: { type: string, optional: true }
+
+  pipeline_result:
+    description: "Final result for each file, always the last event per file"
+    fields:
+      file: { type: string }
+      result:
+        type: string
+        enum: [changed, would_change, unchanged, failed]

@@ -8,6 +8,7 @@ identically when run against a Python rewrite.
 Run with: pytest tests/test_media_pipeline.py -v
 """
 
+import json
 import os
 import shlex
 import shutil
@@ -559,7 +560,9 @@ class TestTagging:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
-        assert "@@action=" in result.stdout, "Pipeline should emit @@action from tag-media"
+        event_types = [json.loads(l)["event"] for l in result.stdout.strip().split("\n") if l.strip()]
+        assert "tag_result" in event_types, \
+            f"Actual: event types {event_types}, Expected: tag_result present"
 
     def test_applies_exif_make_model_from_profile(self, temp_workspace, test_profile):
         """EXIF Make/Model from profile are applied."""
@@ -878,30 +881,58 @@ class TestArchiveSourceIntegration:
 
 
 class TestPipelineMachineOutput:
-    """Test @@ machine-readable output from media-pipeline."""
+    """Test JSONL machine-readable output from media-pipeline."""
 
-    def _parse_at_lines(self, stdout: str) -> list[dict]:
-        """Parse @@ lines from pipeline stdout, grouping by @@pipeline_file."""
-        files = []
-        current = {}
+    def _parse_events(self, stdout: str) -> list[dict]:
+        """Parse JSONL events from pipeline stdout, grouping by pipeline_file."""
+        files: list[dict] = []
+        current: dict = {}
         for line in stdout.strip().split("\n"):
-            if line.startswith("@@pipeline_file="):
+            if not line.strip():
+                continue
+            event = json.loads(line)
+            etype = event["event"]
+            if etype == "pipeline_file":
                 if current:
                     files.append(current)
-                current = {"pipeline_file": line.split("=", 1)[1]}
-            elif line.startswith("@@") and "=" in line:
-                key = line[2:].split("=", 1)[0]
-                value = line[2:].split("=", 1)[1]
-                current[key] = value
+                current = {"pipeline_file": event["file"]}
+            elif etype == "pipeline_result":
+                current["pipeline_result"] = event["result"]
+            elif etype == "tag_result":
+                current["tag_action"] = event["action"]
+                current["tags_added"] = event.get("tags_added")
+                current["exif_make"] = event.get("exif_make")
+                current["exif_model"] = event.get("exif_model")
+            elif etype == "timestamp_result":
+                current["timestamp_action"] = event["action"]
+                current["original_time"] = event.get("original_time")
+                current["corrected_time"] = event.get("corrected_time")
+                current["timestamp_source"] = event.get("source")
+                current["timezone"] = event.get("timezone")
+                current["correction_mode"] = event.get("correction_mode")
+                current["time_offset_seconds"] = event.get("time_offset_seconds")
+                current["time_offset_display"] = event.get("time_offset_display")
+            elif etype == "rename_result":
+                current["renamed_to"] = event["renamed_to"]
+            elif etype == "organize_result":
+                current["organize_action"] = event["action"]
+                current["dest"] = event["dest"]
+            elif etype == "gyroflow_result":
+                current["gyroflow_action"] = event["action"]
+                current["gyroflow_path"] = event.get("gyroflow_path")
+                if event.get("error"):
+                    current["error"] = event["error"]
+            elif etype == "stage_complete":
+                current.setdefault("stages", []).append(event["stage"])
         if current:
             files.append(current)
         return files
 
-    def test_pipeline_emits_at_lines_per_file(self, temp_workspace, test_profile):
-        """Pipeline emits @@pipeline_file and @@pipeline_result for each file.
+    def test_pipeline_emits_events_per_file(self, temp_workspace, test_profile):
+        """Pipeline emits pipeline_file and pipeline_result JSONL events per file.
 
-        Actual: stdout contains @@pipeline_file=<basename> and @@pipeline_result=<token>
-        Expected: one set of @@ lines per file processed
+        Actual: two file groups from two input videos, each with a pipeline_result
+        Expected: {test1.mp4, test2.mp4} each with result in {changed, unchanged, would_change}
         """
         source = temp_workspace["source"]
         create_test_video(source / "test1.mp4", media_create_date="2025:10:05 01:00:00")
@@ -914,20 +945,23 @@ class TestPipelineMachineOutput:
             "--group", "Test",
         ])
 
-        files = self._parse_at_lines(result.stdout)
-        assert len(files) == 2, f"Actual: {len(files)} file groups, Expected: 2"
-        names = {f["pipeline_file"] for f in files}
-        assert "test1.mp4" in names
-        assert "test2.mp4" in names
+        files = self._parse_events(result.stdout)
+        actual_names = {f["pipeline_file"] for f in files}
+        expected_names = {"test1.mp4", "test2.mp4"}
+        assert actual_names == expected_names, \
+            f"Actual: file groups {actual_names}, Expected: {expected_names}"
+        valid_results = {"changed", "unchanged", "would_change"}
         for f in files:
-            assert "pipeline_result" in f, f"Missing @@pipeline_result for {f.get('pipeline_file')}"
-            assert f["pipeline_result"] in ("changed", "unchanged", "would_change"), f"Unexpected pipeline_result: {f['pipeline_result']}"
+            actual_result = f.get("pipeline_result")
+            assert actual_result in valid_results, \
+                f"Actual: pipeline_result={actual_result} for {f['pipeline_file']}, " \
+                f"Expected: one of {valid_results}"
 
-    def test_pipeline_re_emits_child_at_lines(self, temp_workspace, test_profile):
-        """Pipeline re-emits @@ lines from child scripts (fix-timestamp, organize).
+    def test_pipeline_emits_stage_events(self, temp_workspace, test_profile):
+        """Pipeline emits structured JSONL events for each stage result.
 
-        Actual: stdout contains child @@ lines (timestamp_action, original_time, corrected_time, dest)
-        Expected: child script @@ data flows through pipeline to stdout
+        Actual: raw JSONL events include timestamp_result and organize_result with typed fields
+        Expected: timestamp_result has action + time fields, organize_result has dest
         """
         source = temp_workspace["source"]
         create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
@@ -939,22 +973,31 @@ class TestPipelineMachineOutput:
             "--group", "Test",
         ])
 
-        files = self._parse_at_lines(result.stdout)
-        assert len(files) == 1
-        f = files[0]
-        if sys.platform == "darwin" and _has_tag_cmd():
-            assert "action" in f, "Missing @@action from tag-media child"
-        assert "timestamp_action" in f, "Missing @@timestamp_action from fix-timestamp child"
-        assert "original_time" in f, f"Missing @@original_time from fix-timestamp child, got keys: {list(f.keys())}"
-        assert f["original_time"], f"@@original_time is empty, expected a timestamp value"
-        assert "corrected_time" in f, f"Missing @@corrected_time from fix-timestamp child, got keys: {list(f.keys())}"
-        assert f["corrected_time"], f"@@corrected_time is empty, expected a timestamp value"
-        assert "dest" in f, "Missing @@dest from organize child"
+        raw_events = [json.loads(l) for l in result.stdout.strip().split("\n") if l.strip()]
+        event_types = [e["event"] for e in raw_events]
+        assert "timestamp_result" in event_types, \
+            f"Actual: event types {event_types}, Expected: timestamp_result present"
+        assert "organize_result" in event_types, \
+            f"Actual: event types {event_types}, Expected: organize_result present"
 
-    def test_pipeline_stdout_only_has_at_lines(self, temp_workspace, test_profile):
-        """Pipeline stdout contains only @@key=value lines.
+        ts_event = next(e for e in raw_events if e["event"] == "timestamp_result")
+        assert ts_event.get("original_time"), \
+            f"Actual: timestamp_result.original_time={ts_event.get('original_time')}, Expected: non-empty timestamp"
+        assert ts_event.get("corrected_time"), \
+            f"Actual: timestamp_result.corrected_time={ts_event.get('corrected_time')}, Expected: non-empty timestamp"
+        assert ts_event.get("action"), \
+            f"Actual: timestamp_result.action={ts_event.get('action')}, Expected: non-empty action"
 
-        Actual: every non-empty stdout line starts with @@
+        org_event = next(e for e in raw_events if e["event"] == "organize_result")
+        assert org_event.get("dest"), \
+            f"Actual: organize_result.dest={org_event.get('dest')}, Expected: non-empty path"
+        assert org_event.get("action"), \
+            f"Actual: organize_result.action={org_event.get('action')}, Expected: non-empty action"
+
+    def test_pipeline_stdout_only_has_jsonl(self, temp_workspace, test_profile):
+        """Pipeline stdout contains only JSONL event lines.
+
+        Actual: every non-empty stdout line is valid JSON with an event key
         Expected: clean machine-readable output on stdout, human text on stderr
         """
         source = temp_workspace["source"]
@@ -969,12 +1012,13 @@ class TestPipelineMachineOutput:
 
         for line in result.stdout.strip().split("\n"):
             if line.strip():
-                assert line.startswith("@@"), f"Actual: stdout line '{line}' is not @@-prefixed, Expected: all stdout lines are @@key=value"
+                event = json.loads(line)
+                assert "event" in event, f"Actual: stdout line missing 'event' key: {line}"
 
     def test_gyroflow_runs_in_dry_run(self, temp_workspace, test_profile):
         """Gyroflow step runs in dry run — base script is --apply-aware.
 
-        Actual: no @@error in stdout when gyroflow is enabled but --apply is not passed
+        Actual: no error in stdout when gyroflow is enabled but --apply is not passed
         Expected: gyroflow step runs without error in dry run
         """
         profiles_path = SCRIPT_DIR / "media-profiles.yaml"
@@ -995,15 +1039,15 @@ class TestPipelineMachineOutput:
             "--tasks", "tag", "fix-timestamp", "gyroflow",
         ])
 
-        files = self._parse_at_lines(result.stdout)
+        files = self._parse_events(result.stdout)
         assert len(files) == 1
-        assert "error" not in files[0], f"Gyroflow should be skipped in dry run, got @@error={files[0].get('error')}"
+        assert "error" not in files[0], f"Gyroflow should be skipped in dry run, got error={files[0].get('error')}"
         assert files[0]["pipeline_result"] in ("changed", "unchanged", "would_change")
 
     def test_dry_run_emits_would_change(self, temp_workspace, test_profile):
-        """Dry run emits @@pipeline_result=would_change, not changed.
+        """Dry run emits pipeline_result=would_change, not changed.
 
-        Actual: @@pipeline_result=would_change in stdout for files with pending changes
+        Actual: pipeline_result=would_change in stdout for files with pending changes
         Expected: dry run distinguishes from apply mode's 'changed' token
         """
         source = temp_workspace["source"]
@@ -1016,15 +1060,15 @@ class TestPipelineMachineOutput:
             "--group", "Test",
         ])
 
-        files = self._parse_at_lines(result.stdout)
+        files = self._parse_events(result.stdout)
         assert len(files) == 1
         assert files[0]["pipeline_result"] == "would_change", \
             f"Dry run should emit would_change, got: {files[0]['pipeline_result']}"
 
     def test_apply_emits_changed(self, temp_workspace, test_profile):
-        """Apply mode emits @@pipeline_result=changed, not would_change.
+        """Apply mode emits pipeline_result=changed, not would_change.
 
-        Actual: @@pipeline_result=changed in stdout for files with applied changes
+        Actual: pipeline_result=changed in stdout for files with applied changes
         Expected: apply mode uses 'changed' token
         """
         source = temp_workspace["source"]
@@ -1038,16 +1082,16 @@ class TestPipelineMachineOutput:
             "--apply",
         ])
 
-        files = self._parse_at_lines(result.stdout)
+        files = self._parse_events(result.stdout)
         assert len(files) == 1
         assert files[0]["pipeline_result"] == "changed", \
             f"Apply mode should emit changed, got: {files[0]['pipeline_result']}"
 
-    def test_no_redundant_file_key(self, temp_workspace, test_profile):
-        """Pipeline filters @@file= from child re-emission since @@pipeline_file= covers it.
+    def test_every_event_has_file_field(self, temp_workspace, test_profile):
+        """Each non-control event includes a file field for scoping.
 
-        Actual: no @@file= lines in stdout
-        Expected: only @@pipeline_file= identifies the file
+        Actual: all result events include a file field
+        Expected: JSONL events are self-contained with file context
         """
         source = temp_workspace["source"]
         create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
@@ -1061,13 +1105,14 @@ class TestPipelineMachineOutput:
 
         for line in result.stdout.strip().split("\n"):
             if line.strip():
-                assert not line.startswith("@@file="), \
-                    f"@@file= should be filtered, found: {line}"
+                event = json.loads(line)
+                if event["event"] not in ("stage_complete",):
+                    assert "file" in event, f"Event {event['event']} should include file field"
 
     def test_tz_mismatch_emits_distinct_token(self, temp_workspace, test_profile):
-        """Timezone mismatch emits @@timestamp_action=tz_mismatch (informational, not blocking).
+        """Timezone mismatch emits action=tz_mismatch in timestamp_result event.
 
-        Actual: @@timestamp_action=tz_mismatch when file timezone differs from provided
+        Actual: timestamp_result action=tz_mismatch when file timezone differs from provided
         Expected: distinct token so the UI can show a specific "TZ Mismatch" badge, pipeline continues
         """
         source = temp_workspace["source"]
@@ -1086,22 +1131,22 @@ class TestPipelineMachineOutput:
             "--tasks", "fix-timestamp",
         ])
 
-        files = self._parse_at_lines(result.stdout)
+        files = self._parse_events(result.stdout)
         assert len(files) == 1
         f = files[0]
         assert f.get("timestamp_action") == "tz_mismatch", \
             f"Expected timestamp_action=tz_mismatch, got: {f.get('timestamp_action')}"
         assert "original_time" in f, \
-            f"TZ mismatch should emit @@original_time, got keys: {list(f.keys())}"
+            f"TZ mismatch should include original_time, got keys: {list(f.keys())}"
         assert f["original_time"], \
-            f"@@original_time should be non-empty, got: {f.get('original_time')}"
+            f"original_time should be non-empty, got: {f.get('original_time')}"
         assert f.get("pipeline_result") == "would_change", \
             f"Expected pipeline_result=would_change (tz_mismatch is informational), got: {f.get('pipeline_result')}"
 
     def test_error_path_emits_original_time(self, temp_workspace, test_profile):
-        """Error path emits @@original_time when the file has a known timestamp.
+        """Error path emits original_time when the file has a known timestamp.
 
-        Actual: @@original_time present alongside @@timestamp_action=error
+        Actual: original_time present alongside action=error in timestamp_result
         Expected: error paths include available timestamp data for display
         """
         source = temp_workspace["source"]
@@ -1113,21 +1158,21 @@ class TestPipelineMachineOutput:
             "--tasks", "fix-timestamp",
         ])
 
-        files = self._parse_at_lines(result.stdout)
+        files = self._parse_events(result.stdout)
         assert len(files) == 1
         f = files[0]
         assert f.get("timestamp_action") == "error", \
             f"Expected timestamp_action=error, got: {f.get('timestamp_action')}"
         assert "original_time" in f, \
-            f"Error path should emit @@original_time, got keys: {list(f.keys())}"
+            f"Error path should include original_time, got keys: {list(f.keys())}"
         assert f["original_time"], \
-            f"@@original_time should be non-empty, got: {f.get('original_time')}"
+            f"original_time should be non-empty, got: {f.get('original_time')}"
 
     def test_pipeline_emits_stage_complete(self, temp_workspace, test_profile):
-        """Pipeline emits @@stage_complete for each step that runs.
+        """Pipeline emits stage_complete events for each step that runs.
 
-        Actual: stdout contains @@stage_complete=ingest, fix-timestamp, output
-        Expected: one stage_complete per pipeline step, in order
+        Actual: stdout contains stage_complete events for ingest, fix-timestamp, output
+        Expected: one stage_complete per pipeline step
         """
         source = temp_workspace["source"]
         create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
@@ -1140,9 +1185,9 @@ class TestPipelineMachineOutput:
         ])
 
         stages = [
-            line.split("=", 1)[1]
+            json.loads(line)["stage"]
             for line in result.stdout.strip().split("\n")
-            if line.startswith("@@stage_complete=")
+            if line.strip() and json.loads(line)["event"] == "stage_complete"
         ]
         assert "ingest" in stages, f"Missing ingest stage, got: {stages}"
         assert "fix-timestamp" in stages, f"Missing fix-timestamp stage, got: {stages}"
@@ -1165,9 +1210,9 @@ class TestPipelineMachineOutput:
         ])
 
         stages = [
-            line.split("=", 1)[1]
+            json.loads(line)["stage"]
             for line in result.stdout.strip().split("\n")
-            if line.startswith("@@stage_complete=")
+            if line.strip() and json.loads(line)["event"] == "stage_complete"
         ]
         # Tag may or may not be present (depends on platform), but order must be preserved
         ordered = [s for s in stages if s in ("ingest", "tag", "fix-timestamp", "output")]
@@ -1352,10 +1397,10 @@ class TestUpdateFilenameDates:
             f"Expected corrected timestamp in filename, got: {moved[0].name}"
 
     def test_rename_emits_renamed_to(self, temp_workspace, test_profile):
-        """--update-filename-dates emits @@renamed_to when filename changes.
+        """--update-filename-dates emits rename_result with the corrected filename.
 
-        Actual: @@renamed_to in stdout with new filename
-        Expected: machine-readable rename notification
+        Actual: rename_result event contains renamed_to with shifted timestamp
+        Expected: VID_20250505_130334 → VID_20250505_140334 after +3600s offset
         """
         source = temp_workspace["source"]
         video = source / "VID_20250505_130334_00_001.mp4"
@@ -1374,14 +1419,21 @@ class TestUpdateFilenameDates:
             "--update-filename-dates",
         ])
 
-        assert "@@renamed_to=" in result.stdout, \
-            f"Expected @@renamed_to in stdout, got: {result.stdout}"
+        events = [json.loads(l) for l in result.stdout.strip().split("\n") if l.strip()]
+        rename_events = [e for e in events if e["event"] == "rename_result"]
+        assert rename_events, \
+            f"Actual: no rename_result events in {[e['event'] for e in events]}, " \
+            "Expected: one rename_result with corrected filename"
+        actual_new_name = rename_events[0]["renamed_to"]
+        assert "20250505_140334" in actual_new_name, \
+            f"Actual: renamed_to={actual_new_name}, " \
+            "Expected: filename containing 20250505_140334 (shifted by +3600s)"
 
     def test_no_rename_when_no_parseable_date(self, temp_workspace, test_profile):
-        """Files without parseable date in filename are not renamed.
+        """Files without parseable date in filename produce no rename_result event.
 
-        Actual: no @@renamed_to in stdout for unparseable filename
-        Expected: rename is a no-op for files like 'test.mp4'
+        Actual: event types emitted for test.mp4 (no date pattern in name)
+        Expected: no rename_result event since filename has no parseable date
         """
         source = temp_workspace["source"]
         video = source / "test.mp4"
@@ -1396,14 +1448,16 @@ class TestUpdateFilenameDates:
             "--update-filename-dates",
         ])
 
-        assert "@@renamed_to=" not in result.stdout, \
-            f"Should not rename unparseable filename, got: {result.stdout}"
+        event_types = [json.loads(l)["event"] for l in result.stdout.strip().split("\n") if l.strip()]
+        assert "rename_result" not in event_types, \
+            f"Actual: rename_result found in {event_types}, " \
+            "Expected: no rename_result for unparseable filename 'test.mp4'"
 
     def test_no_rename_when_time_unchanged(self, temp_workspace, test_profile):
-        """No rename when corrected time matches filename time.
+        """No rename when corrected time matches the filename timestamp.
 
-        Actual: no @@renamed_to when filename already matches corrected timestamp
-        Expected: rename is a no-op when no shift occurs
+        Actual: event types emitted for VID_20250505_130334 with no time offset
+        Expected: no rename_result since filename already matches corrected time
         """
         source = temp_workspace["source"]
         video = source / "VID_20250505_130334_00_001.mp4"
@@ -1421,8 +1475,10 @@ class TestUpdateFilenameDates:
             "--update-filename-dates",
         ])
 
-        assert "@@renamed_to=" not in result.stdout, \
-            f"Should not rename when time unchanged, got: {result.stdout}"
+        event_types = [json.loads(l)["event"] for l in result.stdout.strip().split("\n") if l.strip()]
+        assert "rename_result" not in event_types, \
+            f"Actual: rename_result found in {event_types}, " \
+            "Expected: no rename_result when filename time is already correct"
 
     def test_rename_with_companion_files(self, temp_workspace, test_profile):
         """Companion files are renamed alongside the main file.

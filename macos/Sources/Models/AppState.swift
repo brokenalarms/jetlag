@@ -95,7 +95,98 @@ struct LogLine: Identifiable {
     }
 
     var isMachineReadable: Bool {
-        text.hasPrefix("@@")
+        text.hasPrefix("{")
+    }
+}
+
+/// JSONL event types emitted by media-pipeline.py on stdout.
+enum PipelineEvent: Decodable {
+    case pipelineFile(file: String)
+    case stageComplete(stage: String)
+    case tagResult(file: String, action: String, tagsAdded: [String],
+                   exifMake: String, exifModel: String)
+    case timestampResult(file: String, action: String,
+                         originalTime: String?, correctedTime: String?,
+                         source: String?, timezone: String?,
+                         correctionMode: String?,
+                         timeOffsetSeconds: Int?,
+                         timeOffsetDisplay: String?)
+    case renameResult(file: String, renamedTo: String)
+    case organizeResult(file: String, action: String, dest: String)
+    case gyroflowResult(file: String, action: String, gyroflowPath: String,
+                        error: String?)
+    case pipelineResult(file: String, result: String)
+
+    private enum CodingKeys: String, CodingKey {
+        case event, file, stage, action
+        case tagsAdded = "tags_added"
+        case exifMake = "exif_make"
+        case exifModel = "exif_model"
+        case originalTime = "original_time"
+        case correctedTime = "corrected_time"
+        case source, timezone
+        case correctionMode = "correction_mode"
+        case timeOffsetSeconds = "time_offset_seconds"
+        case timeOffsetDisplay = "time_offset_display"
+        case renamedTo = "renamed_to"
+        case dest
+        case gyroflowPath = "gyroflow_path"
+        case error, result
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let event = try container.decode(String.self, forKey: .event)
+
+        switch event {
+        case "pipeline_file":
+            self = .pipelineFile(
+                file: try container.decode(String.self, forKey: .file))
+        case "stage_complete":
+            self = .stageComplete(
+                stage: try container.decode(String.self, forKey: .stage))
+        case "tag_result":
+            self = .tagResult(
+                file: try container.decode(String.self, forKey: .file),
+                action: try container.decode(String.self, forKey: .action),
+                tagsAdded: try container.decode([String].self, forKey: .tagsAdded),
+                exifMake: try container.decode(String.self, forKey: .exifMake),
+                exifModel: try container.decode(String.self, forKey: .exifModel))
+        case "timestamp_result":
+            self = .timestampResult(
+                file: try container.decode(String.self, forKey: .file),
+                action: try container.decode(String.self, forKey: .action),
+                originalTime: try container.decodeIfPresent(String.self, forKey: .originalTime),
+                correctedTime: try container.decodeIfPresent(String.self, forKey: .correctedTime),
+                source: try container.decodeIfPresent(String.self, forKey: .source),
+                timezone: try container.decodeIfPresent(String.self, forKey: .timezone),
+                correctionMode: try container.decodeIfPresent(String.self, forKey: .correctionMode),
+                timeOffsetSeconds: try container.decodeIfPresent(Int.self, forKey: .timeOffsetSeconds),
+                timeOffsetDisplay: try container.decodeIfPresent(String.self, forKey: .timeOffsetDisplay))
+        case "rename_result":
+            self = .renameResult(
+                file: try container.decode(String.self, forKey: .file),
+                renamedTo: try container.decode(String.self, forKey: .renamedTo))
+        case "organize_result":
+            self = .organizeResult(
+                file: try container.decode(String.self, forKey: .file),
+                action: try container.decode(String.self, forKey: .action),
+                dest: try container.decode(String.self, forKey: .dest))
+        case "gyroflow_result":
+            self = .gyroflowResult(
+                file: try container.decode(String.self, forKey: .file),
+                action: try container.decode(String.self, forKey: .action),
+                gyroflowPath: try container.decode(String.self, forKey: .gyroflowPath),
+                error: try container.decodeIfPresent(String.self, forKey: .error))
+        case "pipeline_result":
+            self = .pipelineResult(
+                file: try container.decode(String.self, forKey: .file),
+                result: try container.decode(String.self, forKey: .result))
+        default:
+            throw DecodingError.dataCorruptedError(
+                forKey: .event, in: container,
+                debugDescription: "Unknown event type: \(event)")
+        }
     }
 }
 
@@ -361,58 +452,58 @@ final class AppState {
     }
 
     private func parseMachineReadableLine(_ text: String) {
-        let stripped = String(text.dropFirst(2))
-        guard let eqIndex = stripped.firstIndex(of: "=") else { return }
-        let key = String(stripped[stripped.startIndex..<eqIndex])
-        let value = String(stripped[stripped.index(after: eqIndex)...])
+        guard let data = text.data(using: .utf8),
+              let event = try? JSONDecoder().decode(PipelineEvent.self, from: data)
+        else { return }
 
-        switch key {
-        case "pipeline_file":
+        switch event {
+        case .pipelineFile(let file):
             if var row = currentDiffRow {
                 row.pipelineResult = row.pipelineResult ?? "in_progress"
                 diffTableRows.append(row)
             }
-            currentDiffRow = DiffTableRow(file: value)
+            currentDiffRow = DiffTableRow(file: file)
             liveRow = currentDiffRow
-        case "pipeline_result":
+
+        case .pipelineResult(_, let result):
             if var row = currentDiffRow {
-                row.pipelineResult = value
+                row.pipelineResult = result
                 diffTableRows.append(row)
                 currentDiffRow = nil
                 liveRow = nil
             }
-        case "tag_action":
-            currentDiffRow?.tagAction = value
-        case "tags_added":
-            currentDiffRow?.tagsAdded = value
-        case "original_time":
-            currentDiffRow?.originalTime = value
-        case "corrected_time":
-            currentDiffRow?.correctedTime = value
-        case "timestamp_source":
-            currentDiffRow?.timestampSource = value
-        case "timestamp_action":
-            currentDiffRow?.timestampAction = value
-        case "timezone":
-            currentDiffRow?.timezone = value
-        case "correction_mode":
-            currentDiffRow?.correctionMode = value
-        case "time_offset_display":
-            currentDiffRow?.timeOffsetDisplay = value
-        case "renamed_to":
-            currentDiffRow?.renamedTo = value
-        case "dest":
-            currentDiffRow?.dest = value
-        case "action":
-            currentDiffRow?.organizeAction = value
-        case "stage_complete":
-            currentDiffRow?.markStageComplete(value)
-        default:
-            break
-        }
 
-        // Push snapshot for live table display (skip events already handled above)
-        if key != "pipeline_file" && key != "pipeline_result" {
+        case .tagResult(_, let action, let tagsAdded, _, _):
+            currentDiffRow?.tagAction = action
+            currentDiffRow?.tagsAdded = tagsAdded.joined(separator: ", ")
+            liveRow = currentDiffRow
+
+        case .timestampResult(_, let action, let originalTime, let correctedTime,
+                              let source, let timezone, let correctionMode,
+                              _, let timeOffsetDisplay):
+            currentDiffRow?.timestampAction = action
+            currentDiffRow?.originalTime = originalTime
+            currentDiffRow?.correctedTime = correctedTime
+            currentDiffRow?.timestampSource = source
+            currentDiffRow?.timezone = timezone
+            currentDiffRow?.correctionMode = correctionMode
+            currentDiffRow?.timeOffsetDisplay = timeOffsetDisplay
+            liveRow = currentDiffRow
+
+        case .renameResult(_, let renamedTo):
+            currentDiffRow?.renamedTo = renamedTo
+            liveRow = currentDiffRow
+
+        case .organizeResult(_, let action, let dest):
+            currentDiffRow?.organizeAction = action
+            currentDiffRow?.dest = dest
+            liveRow = currentDiffRow
+
+        case .gyroflowResult:
+            liveRow = currentDiffRow
+
+        case .stageComplete(let stage):
+            currentDiffRow?.markStageComplete(stage)
             liveRow = currentDiffRow
         }
     }
