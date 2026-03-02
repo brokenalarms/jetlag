@@ -248,7 +248,8 @@ final class WorkflowSession {
         self.readyDir = Dirtyable(profile?.readyDir ?? "")
         self.tags = Dirtyable(profile?.tags)
         self.timezone = Dirtyable("")
-        self.enabledSteps = Set(Self.computeAvailableSteps(profile: profile))
+        let availableSteps = Self.computeAvailableSteps(profile: profile)
+        self.enabledSteps = Set(availableSteps.filter { $0 != .archiveSource })
     }
 
     var availableSteps: [PipelineStep] {
@@ -261,18 +262,18 @@ final class WorkflowSession {
         if profile.gyroflowEnabled == true {
             steps.append(.gyroflow)
         }
-        // steps.append(.archiveSource)
+        steps.append(.archiveSource)
         return steps
     }
 
     func isStepReady(_ step: PipelineStep) -> Bool {
         switch step {
         case .ingest:
-            return !sourceDir.current.isEmpty
+            return validateDirectory(sourceDir.current) == nil
         case .organize:
-            return !readyDir.current.isEmpty
+            return validateDirectory(readyDir.current) == nil
         case .fixTimestamps:
-            return !timezone.current.isEmpty
+            return validateTimezone() == nil
         case .tag, .gyroflow, .archiveSource:
             return true
         }
@@ -288,11 +289,7 @@ final class WorkflowSession {
 
     var allStepsReady: Bool {
         let active = availableSteps.filter { $0.isAlwaysOn || enabledSteps.contains($0) }
-        let stepsReady = active.allSatisfy { isStepReady($0) }
-        let fieldsValid = validateDirectory(sourceDir.current) == nil
-            && validateDirectory(readyDir.current) == nil
-            && validateTimezone() == nil
-        return stepsReady && fieldsValid
+        return active.allSatisfy { isStepReady($0) }
     }
 
     // MARK: - Gyroflow tool availability (UI hint only)
