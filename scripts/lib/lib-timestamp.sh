@@ -99,8 +99,8 @@ get_file_timestamps() {
 }
 
 # Get the best timestamp to use based on priority
-# Priority: 1. Keys:CreationDate (with tz), 2. DateTimeOriginal (with tz), 3. Filename (VID/IMG/LRV), 
-#           4. DateTimeOriginal, 5. MediaCreateDate, 6. File timestamps
+# Priority: 1. DateTimeOriginal (with tz), 2. Filename (VID/IMG/LRV),
+#           3. DateTimeOriginal (no tz), 4. MediaCreateDate, 5. File timestamps
 # Returns: timestamp and sets global TIMESTAMP_SOURCE
 get_best_timestamp() {
   local file="$1"
@@ -595,7 +595,7 @@ get_timezone_for_country() {
     local abs_seconds=$((offset_seconds < 0 ? -offset_seconds : offset_seconds))
     local hours=$((abs_seconds / 3600))
     local minutes=$(((abs_seconds % 3600) / 60))
-    local sign=$([[ offset_seconds -lt 0 ]] && echo "-" || echo "+")
+    local sign=$([[ $offset_seconds -lt 0 ]] && echo "-" || echo "+")
     offset_str="$(printf "%s%02d%02d" "$sign" "$hours" "$minutes")"
   fi
   
