@@ -11,7 +11,7 @@ from pathlib import Path
 def main():
     """Run all tests"""
     script_dir = Path(__file__).parent
-    tests_dir = script_dir / "scripts" / "tests"
+    tests_dir = script_dir / "tests"
 
     # Check if pytest is available
     try:
