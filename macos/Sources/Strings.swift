@@ -123,19 +123,6 @@ What happens to source files after processing:
         static let dryRunHelp = String(localized: "workflow.dryRun.help",
             defaultValue: "Dry Run previews changes without modifying files. Apply performs the actual processing.")
 
-        // Gyroflow dependency popup
-        static let gyroflowDepsTitle = String(localized: "workflow.gyroflowDeps.title",
-            defaultValue: "Gyroflow requires additional tools")
-        static let gyroflowDepsMessage = String(localized: "workflow.gyroflowDeps.message",
-            defaultValue: "Gyroflow stabilization is more advanced and requires separate installation of two local tools. Open Terminal.app and run these commands:")
-        static let gyroflowDepsBrewPreamble = String(localized: "workflow.gyroflowDeps.brewPreamble",
-            defaultValue: "If you don't have Homebrew installed, run this first (see brew.sh):")
-        static let gyroflowDepsBrewInstall = #"/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)""#
-        static let gyroflowDepsFfprobe = "brew install ffmpeg"
-        static let gyroflowDepsGyroflow = "brew install gyroflow"
-        static let gyroflowDepsCopy = String(localized: "workflow.gyroflowDeps.copy",
-            defaultValue: "Copy Commands")
-
         // Timezone conflict dialog
         static let timezoneConflictTitle = String(localized: "workflow.timezoneConflict.title",
             defaultValue: "Timezone Conflict")
