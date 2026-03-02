@@ -59,7 +59,7 @@ else:
 @dataclass
 class TimestampFixResult:
     file: str
-    timestamp_action: str  # "fixed" | "would_fix" | "no_change" | "error" | "tz_mismatch"
+    timestamp_action: str  # "fixed" | "would_fix" | "no_change" | "error"
     original_time: Optional[str] = None
     corrected_time: Optional[str] = None
     timestamp_source: Optional[str] = None
@@ -707,7 +707,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
             datetime_with_tz = f"{wall_clock}{forced_tz}"
             current_data["datetime_original_str"] = datetime_with_tz
             current_data["datetime_original"] = parse_datetime_original(datetime_with_tz)
-            current_data["timezone_source"] = f"--force-timezone ({forced_tz})"
+            current_data["timezone_source"] = f"--timezone flag ({forced_tz})"
 
     # Display header
     print(f"\033[36m🔍 {filename}\033[0m", file=sys.stderr)
@@ -816,6 +816,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
     # Write DateTimeOriginal if:
     # 1. It's missing and we have timezone info, OR
     # 2. infer_from_filename is set (filename is the source of truth, DTO may be wrong/missing)
+    # 3. force_timezone is set (override embedded timezone)
     should_write_datetime_original = (
         (not current_data["exif"].get("DateTimeOriginal") and current_data["datetime_original_str"]) or
         (infer_from_filename and current_data["datetime_original_str"]) or
