@@ -39,7 +39,11 @@ struct WorkflowView: View {
         .inspector(isPresented: $state.showInspector) {
             VStack(spacing: 0) {
                 if !state.visibleRows.isEmpty || state.isRunning {
-                    DiffTableView(rows: state.visibleRows)
+                    if state.showTimeline {
+                        TimelinePreviewView(rows: state.visibleRows)
+                    } else {
+                        DiffTableView(rows: state.visibleRows)
+                    }
                 } else if !state.showLogOutput {
                     Spacer()
                     Text(Strings.Workflow.inspectorEmptyLabel)
@@ -608,6 +612,16 @@ struct WorkflowView: View {
 
     private var inspectorBottomBar: some View {
         HStack {
+            Button {
+                withAnimation { state.showTimeline.toggle() }
+            } label: {
+                Image(systemName: "timeline.selection")
+                    .foregroundStyle(state.showTimeline ? .primary : .secondary)
+            }
+            .buttonStyle(.borderless)
+            .help(state.showTimeline ? Strings.Timeline.hideTimelineHelp : Strings.Timeline.showTimelineHelp)
+            .disabled(state.visibleRows.isEmpty && !state.isRunning)
+
             Button {
                 withAnimation { state.showLogOutput.toggle() }
             } label: {

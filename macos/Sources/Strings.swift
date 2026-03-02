@@ -283,6 +283,27 @@ What happens to source files after processing:
         }
     }
 
+    // MARK: - Timeline
+
+    enum Timeline {
+        static let title = String(localized: "timeline.title", defaultValue: "Timeline")
+        static let beforeLabel = String(localized: "timeline.before.label", defaultValue: "Before")
+        static let afterLabel = String(localized: "timeline.after.label", defaultValue: "After")
+        static let emptyLabel = String(localized: "timeline.empty.label", defaultValue: "Run a workflow to see the timeline")
+        static let showTimelineHelp = String(localized: "timeline.show.help", defaultValue: "Show timeline")
+        static let hideTimelineHelp = String(localized: "timeline.hide.help", defaultValue: "Hide timeline")
+
+        static func fileCount(_ count: Int) -> String {
+            String(localized: "timeline.fileCount",
+                   defaultValue: "\(count) files")
+        }
+
+        static func moreFiles(_ count: Int) -> String {
+            String(localized: "timeline.moreFiles",
+                   defaultValue: "+\(count) more")
+        }
+    }
+
     // MARK: - Log output
 
     enum LogOutput {

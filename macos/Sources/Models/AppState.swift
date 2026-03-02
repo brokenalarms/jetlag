@@ -423,6 +423,7 @@ final class AppState {
 
     var showInspector: Bool = false
     var showLogOutput: Bool = false
+    var showTimeline: Bool = false
 
     // Execution state
     var isRunning: Bool = false
