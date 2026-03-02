@@ -258,6 +258,7 @@ What happens to source files after processing:
         static let fileColumn = String(localized: "diffTable.file.column", defaultValue: "File")
         static let originalColumn = String(localized: "diffTable.original.column", defaultValue: "Original")
         static let correctedColumn = String(localized: "diffTable.corrected.column", defaultValue: "Corrected")
+        static let timelineColumn = String(localized: "diffTable.timeline.column", defaultValue: "Timeline")
         static let timestampColumn = String(localized: "diffTable.timestamp.column", defaultValue: "Timestamp")
         static let destinationColumn = String(localized: "diffTable.destination.column", defaultValue: "Destination")
         static let statusColumn = String(localized: "diffTable.status.column", defaultValue: "Status")

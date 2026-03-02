@@ -21,6 +21,34 @@ struct DiffTableView: View {
         return textWidth + extraWidth + cellPadding
     }
 
+    private struct TimelineScale {
+        let rangeStart: Double
+        let rangeEnd: Double
+        let duration: Double
+
+        init(rows: [DiffTableRow]) {
+            var epochs: [Double] = []
+            for row in rows {
+                if let e = row.originalEpoch { epochs.append(e) }
+                if let e = row.correctedEpoch { epochs.append(e) }
+            }
+            guard let lo = epochs.min(), let hi = epochs.max(), hi > lo else {
+                rangeStart = 0; rangeEnd = 1; duration = 1; return
+            }
+            let pad = max((hi - lo) * 0.05, 60)
+            rangeStart = lo - pad; rangeEnd = hi + pad
+            duration = rangeEnd - rangeStart
+        }
+
+        func fraction(for epoch: Double) -> Double {
+            (epoch - rangeStart) / duration
+        }
+    }
+
+    private var timelineScale: TimelineScale {
+        TimelineScale(rows: rows)
+    }
+
     private func statusText(_ row: DiffTableRow) -> String {
         switch row.pipelineResult {
         case "changed": return changedLabel(row)
@@ -40,6 +68,7 @@ struct DiffTableView: View {
             Self.idealWidth(for: rows.map(\.file), font: Self.monoFont),
             Self.idealWidth(for: rows.compactMap(\.originalTime), font: Self.monoFont),
             Self.idealWidth(for: rows.compactMap(\.correctedTime), font: Self.monoFont),
+            120,
             Self.idealWidth(for: rows.map { changeBadgeText($0) }, font: Self.systemFont),
             Self.idealWidth(
                 for: rows.compactMap(\.dest).map { ($0 as NSString).lastPathComponent },
@@ -92,6 +121,11 @@ struct DiffTableView: View {
                 }
                 .width(min: 130)
 
+                TableColumn(Strings.DiffTable.timelineColumn) { row in
+                    timelineCell(row, scale: timelineScale)
+                }
+                .width(min: 60, ideal: 120)
+
                 TableColumn(Strings.DiffTable.timestampColumn) { row in
                     changeBadge(row)
                 }
@@ -123,6 +157,45 @@ struct DiffTableView: View {
             }
         }
         .frame(maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private func timelineCell(_ row: DiffTableRow, scale: TimelineScale) -> some View {
+        GeometryReader { geo in
+            let markSize: CGFloat = 6
+            let usable = geo.size.width - markSize
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.primary.opacity(0.06))
+                    .frame(height: 1)
+                    .frame(maxWidth: .infinity)
+
+                if let oEpoch = row.originalEpoch, let cEpoch = row.correctedEpoch,
+                   oEpoch != cEpoch {
+                    let oX = CGFloat(scale.fraction(for: oEpoch)) * usable
+                    let cX = CGFloat(scale.fraction(for: cEpoch)) * usable
+                    Rectangle()
+                        .fill(Color("NeonCyan").opacity(0.15))
+                        .frame(width: abs(cX - oX), height: 2)
+                        .offset(x: min(oX, cX) + markSize / 2)
+                }
+
+                if let epoch = row.originalEpoch {
+                    RoundedRectangle(cornerRadius: 0.5)
+                        .fill(Color.primary.opacity(0.25))
+                        .frame(width: 2, height: 10)
+                        .offset(x: CGFloat(scale.fraction(for: epoch)) * usable + (markSize - 2) / 2)
+                }
+
+                if let epoch = row.correctedEpoch {
+                    Circle()
+                        .fill(Color("NeonCyan"))
+                        .frame(width: markSize, height: markSize)
+                        .offset(x: CGFloat(scale.fraction(for: epoch)) * usable)
+                }
+            }
+            .frame(maxHeight: .infinity)
+        }
     }
 
     private func wouldChangeLabel(_ row: DiffTableRow) -> String {

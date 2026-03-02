@@ -73,6 +73,8 @@ class TimestampFixResult:
     timezone: Optional[str] = None
     time_offset_seconds: Optional[int] = None
     time_offset_display: Optional[str] = None
+    original_epoch: Optional[float] = None
+    corrected_epoch: Optional[float] = None
 
 
 def same_as_original(dt_with_tz: datetime) -> str:
@@ -740,6 +742,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
 
     datetime_original = current_data["datetime_original"]
     datetime_original_str = current_data["datetime_original_str"]
+    datetime_before_offset = datetime_original
 
     # Apply time offset if specified
     if time_offset_seconds is not None and time_offset_seconds != 0:
@@ -802,6 +805,8 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
         timezone=detected_tz,
         time_offset_seconds=time_offset_seconds if (time_offset_seconds is not None and time_offset_seconds != 0) else None,
         time_offset_display=format_offset_display(time_offset_seconds) if (time_offset_seconds is not None and time_offset_seconds != 0) else None,
+        original_epoch=datetime_before_offset.timestamp() if datetime_before_offset else None,
+        corrected_epoch=datetime_original.timestamp() if datetime_original else None,
     )
 
     if dry_run and has_changes:
