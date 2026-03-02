@@ -111,7 +111,9 @@ enum PipelineEvent: Decodable {
                          correctionMode: String?,
                          timeOffsetSeconds: Int?,
                          timeOffsetDisplay: String?,
-                         error: String?)
+                         error: String?,
+                         originalEpoch: Double?,
+                         correctedEpoch: Double?)
     case renameResult(file: String, renamedTo: String)
     case organizeResult(file: String, action: String, dest: String)
     case gyroflowResult(file: String, action: String, gyroflowPath: String,
@@ -132,6 +134,8 @@ enum PipelineEvent: Decodable {
         case correctionMode = "correction_mode"
         case timeOffsetSeconds = "time_offset_seconds"
         case timeOffsetDisplay = "time_offset_display"
+        case originalEpoch = "original_epoch"
+        case correctedEpoch = "corrected_epoch"
         case renamedTo = "renamed_to"
         case dest
         case gyroflowPath = "gyroflow_path"
@@ -170,7 +174,9 @@ enum PipelineEvent: Decodable {
                 correctionMode: try container.decodeIfPresent(String.self, forKey: .correctionMode),
                 timeOffsetSeconds: try container.decodeIfPresent(Int.self, forKey: .timeOffsetSeconds),
                 timeOffsetDisplay: try container.decodeIfPresent(String.self, forKey: .timeOffsetDisplay),
-                error: try container.decodeIfPresent(String.self, forKey: .error))
+                error: try container.decodeIfPresent(String.self, forKey: .error),
+                originalEpoch: try container.decodeIfPresent(Double.self, forKey: .originalEpoch),
+                correctedEpoch: try container.decodeIfPresent(Double.self, forKey: .correctedEpoch))
         case "rename_result":
             self = .renameResult(
                 file: try container.decode(String.self, forKey: .file),
@@ -512,7 +518,8 @@ final class AppState {
 
         case .timestampResult(_, let action, let originalTime, let correctedTime,
                               let source, let timezone, let correctionMode,
-                              _, let timeOffsetDisplay, let error):
+                              _, let timeOffsetDisplay, let error,
+                              let originalEpoch, let correctedEpoch):
             currentDiffRow?.timestampAction = action
             currentDiffRow?.originalTime = originalTime
             currentDiffRow?.correctedTime = correctedTime
@@ -521,6 +528,8 @@ final class AppState {
             currentDiffRow?.correctionMode = correctionMode
             currentDiffRow?.timeOffsetDisplay = timeOffsetDisplay
             currentDiffRow?.timestampError = error
+            currentDiffRow?.originalEpoch = originalEpoch
+            currentDiffRow?.correctedEpoch = correctedEpoch
             liveRow = currentDiffRow
 
         case .renameResult(_, let renamedTo):

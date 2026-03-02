@@ -45,6 +45,8 @@ events:
       correction_mode: { type: string, optional: true }
       time_offset_seconds: { type: integer, optional: true }
       time_offset_display: { type: string, optional: true }
+      original_epoch: { type: number, optional: true }
+      corrected_epoch: { type: number, optional: true }
 
   rename_result:
     description: "Emitted when --update-filename-dates renames a file"

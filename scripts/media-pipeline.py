@@ -329,6 +329,8 @@ def process_file(
             correction_mode=ts_result.correction_mode,
             time_offset_seconds=ts_result.time_offset_seconds,
             time_offset_display=ts_result.time_offset_display,
+            original_epoch=ts_result.original_epoch,
+            corrected_epoch=ts_result.corrected_epoch,
         )
 
         if ts_result.timestamp_action == "error":

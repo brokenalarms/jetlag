@@ -17,6 +17,8 @@ struct DiffTableRow: Identifiable {
     var dest: String?
     var organizeAction: String?
     var pipelineResult: String?
+    var originalEpoch: Double?
+    var correctedEpoch: Double?
 
     var completedStages: Set<String> = []
 
