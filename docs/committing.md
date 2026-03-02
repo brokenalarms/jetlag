@@ -4,10 +4,12 @@
 
 Before any commit or push action, every session:
 
-1. `git fetch origin main` then `git log origin/main --oneline | head -10`
-2. If a recent main commit title matches the session-assigned branch name or task (squash-merged indicator), the old branch is dead — **immediately** `git checkout -b claude/<new-descriptive-name>-<session-token> origin/main` before touching any files
-3. Never do any work on a branch that was squash-merged; GitHub closes that branch's PR and new commits become inaccessible through it
-4. **`git branch -r --merged` does NOT detect squash merges** — always use the commit title comparison method above
+1. for new features, ALWAYS create a worktree. You may have already been invoked in one, but ALWAYS check first and ALWAYS create a worktree for a new session.
+2. `git fetch origin main` then `git log origin/main --oneline | head -10`
+3. If a recent main commit title matches the session-assigned branch name or task (squash-merged indicator), the old branch is dead — **immediately** `git checkout -b claude/<new-descriptive-name>-<session-token> origin/main` before touching any files
+4. Never do any work on a branch that was squash-merged; GitHub closes that branch's PR and new commits become inaccessible through it
+5. **`git branch -r --merged` does NOT detect squash merges** — always use the commit title comparison method above
+6. you don't need to ask for permission to pull new content in from main and run local git commands, besides final pushes.
 
 ## Commits
 
@@ -27,3 +29,4 @@ Before any commit or push action, every session:
 - Otherwise, provide a fully URL-encoded link for user to click on to create PR
 - PR title and body follow the same format as commit messages: imperative title (lowercase, no period), concise bullet-list body covering **why**, **how**, and test coverage. The PR description should encapsulate the sum of all commits in the PR, not repeat each one individually.
 - If subsequent commits are added to a PR, update the PR title/body with `gh pr edit` to reflect the full scope of changes. If `gh` is unavailable, give the user new description text to paste in.
+  

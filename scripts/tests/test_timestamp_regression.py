@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Regression tests for fix-media-timestamp.py
-Tests critical behaviors documented in CLAUDE.md
+Tests critical behaviors documented in AGENTS.md
 """
 
 import os
@@ -31,7 +31,7 @@ SCRIPT_DIR = Path(__file__).parent.parent
 
 class TestFilenameSourceOfTruth:
     """
-    CLAUDE.md: "files with YYYYMMDD_HHMMSS in the filename are first source of truth
+    AGENTS.md: "files with YYYYMMDD_HHMMSS in the filename are first source of truth
     and filename should never be modified"
     """
 
@@ -191,7 +191,7 @@ class TestTimezoneMismatchDetection:
 
 class TestTimezoneConversion:
     """
-    CLAUDE.md: "if a file was shot in timezone +0800, with the script run in +0900,
+    AGENTS.md: "if a file was shot in timezone +0800, with the script run in +0900,
     then we would expect Keys:Creation date to end up with the +0800 timezone,
     and the birthdate to end up as one hour later"
     """
@@ -230,7 +230,7 @@ class TestTimezoneConversion:
 
 class TestMissingDateTimeOriginalWithTimezoneChange:
     """
-    CLAUDE.md: "if DateTimeOriginal is missing and we change timezones,
+    AGENTS.md: "if DateTimeOriginal is missing and we change timezones,
     we would expect the Quicktime UTC fields MediaCreateDate, file birth date,
     Keys:CreationDate to all be updated"
     """

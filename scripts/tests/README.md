@@ -133,7 +133,7 @@ Functions should:
 - Enable composition and reuse
 ```
 
-## Design Principles from CLAUDE.md
+## Design Principles from AGENTS.md
 
 These tests validate adherence to:
 
@@ -171,7 +171,7 @@ When adding features:
 
 ## Test Philosophy
 
-Following CLAUDE.md principles:
+Following AGENTS.md principles:
 
 - **Test behavior, not implementation** - Validate data structures and file effects
 - **Test real scenarios** - Use actual timezone combinations users face

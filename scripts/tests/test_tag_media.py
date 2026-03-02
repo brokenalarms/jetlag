@@ -484,7 +484,7 @@ class TestTagMediaDataPresentation:
 
     def test_returns_what_changed(self, test_video):
         """Test that functions return data about what changed"""
-        # This tests the principle from CLAUDE.md:
+        # This tests the principle from AGENTS.md:
         # "separation of data and presentation"
         # Functions should return what changed, presentation formats it
 

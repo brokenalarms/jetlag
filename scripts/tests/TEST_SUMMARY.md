@@ -90,7 +90,7 @@ python3 run-tests.py test_timezone_scenarios.py::TestTimezoneScenarios::test_sce
 
 ## Key Principles Validated
 
-### 1. Data/Presentation Separation (CLAUDE.md)
+### 1. Data/Presentation Separation (AGENTS.md)
 ```python
 # ✅ Good: Functions return data
 success, tags_added = apply_finder_tags(file, ["tag1", "tag2"])
