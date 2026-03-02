@@ -3,6 +3,94 @@ import SwiftUI
 struct DiffTableView: View {
     let rows: [DiffTableRow]
 
+    private static let cellPadding: CGFloat = 20
+    private static let iconWidth: CGFloat = 18
+
+    private static let monoFont = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+    private static let systemFont = NSFont.systemFont(ofSize: 11)
+
+    private static let allBadgeStrings = [
+        Strings.DiffTable.wouldFixChange,
+        Strings.DiffTable.fixedChange,
+        Strings.DiffTable.noChangeChange,
+        Strings.DiffTable.tzMismatchStatus,
+        Strings.DiffTable.errorChange,
+    ]
+
+    private static let allStatusStrings = [
+        Strings.DiffTable.wouldChangeStatus,
+        Strings.DiffTable.wouldFixStatus,
+        Strings.DiffTable.wouldMoveStatus,
+        Strings.DiffTable.changedStatus,
+        Strings.DiffTable.noChangeStatus,
+        Strings.DiffTable.fixedStatus,
+        Strings.DiffTable.movedStatus,
+        Strings.DiffTable.tzMismatchStatus,
+        Strings.DiffTable.failedStatus,
+    ]
+
+    private static func textWidth(_ string: String, font: NSFont) -> CGFloat {
+        let attributes: [NSAttributedString.Key: Any] = [.font: font]
+        return (string as NSString).size(withAttributes: attributes).width
+    }
+
+    private static func longestByCharCount(_ strings: [String]) -> String? {
+        strings.max(by: { $0.count < $1.count })
+    }
+
+    private var fileIdeal: CGFloat {
+        let headerWidth = Self.textWidth(Strings.DiffTable.fileColumn, font: Self.systemFont)
+        guard let widest = Self.longestByCharCount(rows.map(\.file)) else {
+            return headerWidth + Self.cellPadding
+        }
+        let contentWidth = Self.textWidth(widest, font: Self.monoFont)
+        return max(headerWidth, contentWidth) + Self.cellPadding
+    }
+
+    private var originalIdeal: CGFloat {
+        let headerWidth = Self.textWidth(Strings.DiffTable.originalColumn, font: Self.systemFont)
+        guard let widest = Self.longestByCharCount(rows.compactMap(\.originalTime)) else {
+            return headerWidth + Self.cellPadding
+        }
+        let contentWidth = Self.textWidth(widest, font: Self.monoFont)
+        return max(headerWidth, contentWidth) + Self.cellPadding
+    }
+
+    private var correctedIdeal: CGFloat {
+        let headerWidth = Self.textWidth(Strings.DiffTable.correctedColumn, font: Self.systemFont)
+        guard let widest = Self.longestByCharCount(rows.compactMap(\.correctedTime)) else {
+            return headerWidth + Self.cellPadding
+        }
+        let contentWidth = Self.textWidth(widest, font: Self.monoFont)
+        return max(headerWidth, contentWidth) + Self.cellPadding
+    }
+
+    private var timestampIdeal: CGFloat {
+        let headerWidth = Self.textWidth(Strings.DiffTable.timestampColumn, font: Self.systemFont)
+        let contentWidth = Self.allBadgeStrings.map {
+            Self.textWidth($0, font: Self.systemFont)
+        }.max() ?? 0
+        return max(headerWidth, contentWidth) + Self.cellPadding
+    }
+
+    private var destinationIdeal: CGFloat {
+        let headerWidth = Self.textWidth(Strings.DiffTable.destinationColumn, font: Self.systemFont)
+        let components = rows.compactMap(\.dest).map { ($0 as NSString).lastPathComponent }
+        guard let widest = Self.longestByCharCount(components) else {
+            return headerWidth + Self.cellPadding
+        }
+        let contentWidth = Self.textWidth(widest, font: Self.monoFont)
+        return max(headerWidth, contentWidth) + Self.cellPadding
+    }
+
+    private var statusIdeal: CGFloat {
+        let headerWidth = Self.textWidth(Strings.DiffTable.statusColumn, font: Self.systemFont)
+        let contentWidth = Self.allStatusStrings.map {
+            Self.textWidth($0, font: Self.systemFont)
+        }.max() ?? 0
+        return max(headerWidth, contentWidth) + Self.iconWidth + Self.cellPadding
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
@@ -28,26 +116,26 @@ struct DiffTableView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
-                .width(min: 80, ideal: 140)
+                .width(min: 80, ideal: fileIdeal)
 
                 TableColumn(Strings.DiffTable.originalColumn) { row in
                     Text(row.originalTime ?? "—")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(row.originalTime != nil ? .primary : .tertiary)
                 }
-                .width(min: 130, ideal: 175)
+                .width(min: 130, ideal: originalIdeal)
 
                 TableColumn(Strings.DiffTable.correctedColumn) { row in
                     Text(row.correctedTime ?? "—")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(row.correctedTime != nil ? .primary : .tertiary)
                 }
-                .width(min: 130, ideal: 175)
+                .width(min: 130, ideal: correctedIdeal)
 
                 TableColumn(Strings.DiffTable.timestampColumn) { row in
                     changeBadge(row)
                 }
-                .width(min: 70, ideal: 90)
+                .width(min: 70, ideal: timestampIdeal)
 
                 TableColumn(Strings.DiffTable.destinationColumn) { row in
                     if let dest = row.dest {
@@ -62,12 +150,12 @@ struct DiffTableView: View {
                             .foregroundStyle(.tertiary)
                     }
                 }
-                .width(min: 80, ideal: 120)
+                .width(min: 80, ideal: destinationIdeal)
 
                 TableColumn(Strings.DiffTable.statusColumn) { row in
                     statusBadge(row)
                 }
-                .width(min: 80, ideal: 100)
+                .width(min: 80, ideal: statusIdeal)
             }
         }
         .frame(maxHeight: .infinity)
