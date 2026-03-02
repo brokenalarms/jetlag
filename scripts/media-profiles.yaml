@@ -9,6 +9,26 @@ backup_config:
   local_base_path: /Volumes/
   remote_base_path: /volume1/Backup/ChronoSync/
 profiles:
+  TEST-sony-a7v-video:
+    type: video
+    source_dir: /Users/daniellawrence/Movies/2025-08-16
+    backup_enabled: true
+    gyroflow_enabled: true
+    ready_dir: /Users/daniellawrence/Movies/2025-08-16/processed
+    backup_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7V/Ready
+    backup_exclude_subdirs: []
+    tags:
+    - sony-a7v
+    exif:
+      make: Sony
+      model: ILCE-7M5
+    file_extensions:
+    - .mp4
+    - .mov
+    companion_extensions:
+    - .xml
+    - .bin
+    - .jpg
   insta360:
     type: video
     source_dir: /Volumes/Untitled/DCIM

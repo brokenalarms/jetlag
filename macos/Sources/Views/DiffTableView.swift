@@ -211,7 +211,7 @@ struct DiffTableView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(Color("NeonCyan").opacity(0.7))
         case nil:
-            HStack(spacing: 4) {
+            HStack(spacing: 2) {
                 ProgressView()
                     .controlSize(.small)
                 if let stage = row.lastCompletedStageLabel {
