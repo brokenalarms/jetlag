@@ -11,13 +11,14 @@ dependency on Python, Perl (ExifTool), and Gyroflow.
 |---|---|---|
 | Python scripts (`scripts/`) | System `python3` via venv | humanize, PyYAML |
 | ExifTool (`scripts/tools/exiftool`) | System `/usr/bin/perl` | Vendored v13.50, persistent `-stay_open` subprocess |
-| Gyroflow | External app at configured path | Launched as subprocess, user must install separately |
+| Gyroflow | Vendored binary (`scripts/tools/gyroflow`) | Bundled in app, downloaded via `download-gyroflow.sh` |
 | `tag` CLI | Native binary | Vendored, already self-contained |
-| `ffprobe` | System install (Homebrew/Xcode) | Used only to detect gyro data streams |
+| `ffprobe` | Vendored binary (`scripts/tools/ffprobe`) | Bundled in app, downloaded via `download-ffprobe.sh` |
 | `SetFile` / `stat` / `date` | macOS system tools | File birth-time operations |
 
-**Problem**: The app currently has no sandbox, uses system interpreters, and
-requires external app installation — all blockers for Mac App Store.
+**Problem**: The app currently has no sandbox and uses system interpreters —
+blockers for Mac App Store. External tool installation has been resolved
+(ffprobe and gyroflow are now vendored).
 
 ---
 
@@ -75,16 +76,20 @@ requires external app installation — all blockers for Mac App Store.
 
 ### Gyroflow
 
-**Cannot require external installation. Options exist.**
-
-- Guideline 4.2(i): "Your app should work on its own without requiring installation of another app to function."
-- [Gyroflow](https://apps.apple.com/us/app/gyroflow/id6447994244) is itself on the Mac App Store (free).
-- [Gyroflow Core](https://docs.gyroflow.xyz/app/technical-details/gyroflow-core) is a standalone Rust library that does all stabilization.
-- [Gyroflow Toolbox](https://apps.apple.com/us/app/gyroflow-toolbox/id1667462993?mt=12) ($9.99) embeds Gyroflow Core into FCP — proves the library can ship on the App Store.
+**Resolved for direct distribution.** Gyroflow CLI is now vendored in
+`scripts/tools/gyroflow` and bundled inside the app. For App Store, the CLI
+binary would need code-signing with Team ID, or could be replaced by embedding
+[Gyroflow Core](https://docs.gyroflow.xyz/app/technical-details/gyroflow-core)
+(Rust library, C API) — proven by
+[Gyroflow Toolbox](https://apps.apple.com/us/app/gyroflow-toolbox/id1667462993?mt=12)
+on the App Store.
 
 ### ffprobe
 
-**Only used for gyro-stream detection** — a narrow use case. Could be replaced with AVAsset stream inspection or bundled as a signed binary.
+**Resolved for direct distribution.** ffprobe is now vendored in
+`scripts/tools/ffprobe` and bundled inside the app. For App Store, the binary
+would need code-signing, or could be replaced with `AVAsset.tracks` to detect
+gyro data streams natively.
 
 ### SetFile / stat / date
 
