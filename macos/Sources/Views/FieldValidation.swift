@@ -48,7 +48,6 @@ extension Dirtyable where T: Equatable {
 }
 
 func validateDirectory(_ path: String) -> String? {
-    guard !path.isEmpty else { return nil }
     var isDir: ObjCBool = false
     if !FileManager.default.fileExists(atPath: path, isDirectory: &isDir) {
         return Strings.Errors.directoryNotFound
