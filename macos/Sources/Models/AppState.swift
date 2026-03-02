@@ -110,7 +110,8 @@ enum PipelineEvent: Decodable {
                          source: String?, timezone: String?,
                          correctionMode: String?,
                          timeOffsetSeconds: Int?,
-                         timeOffsetDisplay: String?)
+                         timeOffsetDisplay: String?,
+                         error: String?)
     case renameResult(file: String, renamedTo: String)
     case organizeResult(file: String, action: String, dest: String)
     case gyroflowResult(file: String, action: String, gyroflowPath: String,
@@ -168,7 +169,8 @@ enum PipelineEvent: Decodable {
                 timezone: try container.decodeIfPresent(String.self, forKey: .timezone),
                 correctionMode: try container.decodeIfPresent(String.self, forKey: .correctionMode),
                 timeOffsetSeconds: try container.decodeIfPresent(Int.self, forKey: .timeOffsetSeconds),
-                timeOffsetDisplay: try container.decodeIfPresent(String.self, forKey: .timeOffsetDisplay))
+                timeOffsetDisplay: try container.decodeIfPresent(String.self, forKey: .timeOffsetDisplay),
+                error: try container.decodeIfPresent(String.self, forKey: .error))
         case "rename_result":
             self = .renameResult(
                 file: try container.decode(String.self, forKey: .file),
@@ -224,6 +226,7 @@ final class WorkflowSession {
     var timeOffsetSeconds: Int?
     var updateFilenameDates: Bool = false
     var forceTimezone: Bool = false
+    var allowMixedTimezones: Bool = false
 
     var timezoneConflictType: String?
     var timezoneConflictProvidedTz: String?
@@ -258,7 +261,7 @@ final class WorkflowSession {
         if profile.gyroflowEnabled == true {
             steps.append(.gyroflow)
         }
-        steps.append(.archiveSource)
+        // steps.append(.archiveSource)
         return steps
     }
 
@@ -392,6 +395,9 @@ final class WorkflowSession {
         if forceTimezone {
             args.append("--force-timezone")
         }
+        if allowMixedTimezones {
+            args.append("--allow-mixed-timezones")
+        }
         if applyMode {
             args.append("--apply")
         }
@@ -503,7 +509,7 @@ final class AppState {
 
         case .timestampResult(_, let action, let originalTime, let correctedTime,
                               let source, let timezone, let correctionMode,
-                              _, let timeOffsetDisplay):
+                              _, let timeOffsetDisplay, let error):
             currentDiffRow?.timestampAction = action
             currentDiffRow?.originalTime = originalTime
             currentDiffRow?.correctedTime = correctedTime
@@ -511,6 +517,7 @@ final class AppState {
             currentDiffRow?.timezone = timezone
             currentDiffRow?.correctionMode = correctionMode
             currentDiffRow?.timeOffsetDisplay = timeOffsetDisplay
+            currentDiffRow?.timestampError = error
             liveRow = currentDiffRow
 
         case .renameResult(_, let renamedTo):

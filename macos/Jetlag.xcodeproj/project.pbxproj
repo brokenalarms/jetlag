@@ -1,0 +1,596 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		03E263B765C4C53CE8B6FF7E /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 823EAC4F97C91F6A789E0415 /* MapKit.framework */; };
+		0D5AC61704A72A9FEF4D4DF3 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F559FB82EF7FBD0FD4101BE5 /* AppState.swift */; };
+		1D23F4385E3C9080D63F95C1 /* DiffTableRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A67A68A82CC97A0B42F497 /* DiffTableRow.swift */; };
+		B2F4A3E8C7D91A5F3E8B01D2 /* FilenamePatterns.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3D7B2E1F4C85A9D6E2F0B73 /* FilenamePatterns.swift */; };
+		4FDCE64D99169FBCD837CF2B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C503D6DF395CB0F0EE8674D /* SettingsView.swift */; };
+		53E52584D7A0F04EBD764B7D /* LogOutputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93163EBEB8CD8B13330BAB7C /* LogOutputView.swift */; };
+		5C37852483245BC294545B2B /* WorkflowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC02EFEC0D85CEB6F137381 /* WorkflowView.swift */; };
+		6565530211ECEF491334BDD9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DCC75F647AA2A41BF2B17B9 /* ContentView.swift */; };
+		67B98190D68F596BAC4EF2AE /* PipelineArgsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D08074CC6CCFCC6AFEC75C39 /* PipelineArgsTests.swift */; };
+		6A589A5C59B6E0ACF8DC960F /* ProfilePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 824A528222BFA2E5BFFCDF48 /* ProfilePicker.swift */; };
+		7C0A6314355CC7D586AFA208 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 155795936E0AF78F19DDB808 /* Assets.xcassets */; };
+		7EB40F1EE336843C386D4474 /* SandboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6989D9C650B0383E7ABA46E2 /* SandboxView.swift */; };
+		8989E8C851EEE8A1CA2F436E /* UpgradeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEA322FB3423ED25C28C0860 /* UpgradeView.swift */; };
+		8D5AEC4A3D748ADF6853E7C1 /* JetlagApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1EA0220A8EF5122DF196162 /* JetlagApp.swift */; };
+		932EB3F57E4BF42DBFA0EBF9 /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */; };
+		A782F8A1159D170B5CEB4C7E /* LicenseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D2EC9D00CD4EE5A754D59E /* LicenseStore.swift */; };
+		A87A9F7C3870DC8D634B2510 /* MediaProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC0210C9EE3BEF29E07C9DE6 /* MediaProfile.swift */; };
+		AAC3E4FC571BCF92D2EBA219 /* ScriptRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5FD29C41D642C67671FBAF /* ScriptRunner.swift */; };
+		AF4D4132C54C04CF1A1ADDB7 /* DirtyableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DB6E838E4C1827858BB004E /* DirtyableTests.swift */; };
+		C0578D87EB55FAED6B59A9C0 /* ProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AFFC7653CEF9432BABAFE94 /* ProfileTests.swift */; };
+		C0FF2D225A09C82E454CF5E2 /* ProfilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4AF4B0A35CD716A34E2A275 /* ProfilesView.swift */; };
+		C5C6CFCF2DF5DBBAF6E4683D /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = 8C4D7F8D5FD775F5F3711F05 /* Yams */; };
+		C61A796CA3B728982C946AD4 /* TimezoneMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A54A1E7104B0356A474B3968 /* TimezoneMapView.swift */; };
+		CF708EB9D2E1C9376806BA71 /* Strings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 886F8C8992B2C0546F301A05 /* Strings.swift */; };
+		D4148DE34CA1305FAAEB74E7 /* DiffTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A142786B3A2C61DF018E00D1 /* DiffTableView.swift */; };
+		D6A581C2985C5F5655494088 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C1D644A22201A7866455A04 /* CoreLocation.framework */; };
+		E6DEE560FAFDCFE9F48B205B /* FieldValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7884EFEE29BD136A760320 /* FieldValidation.swift */; };
+		ED7D0C891E4F99927C96CD9D /* PillField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689D9A69FF07CCA892429C0A /* PillField.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		46586EE6A4E5EE37F96FB1CF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C31C292ECE5C319B6CA91B3A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A6CA54EF1C9DE69D611781FA;
+			remoteInfo = Jetlag;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		155795936E0AF78F19DDB808 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		1C1D644A22201A7866455A04 /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
+		2DB6E838E4C1827858BB004E /* DirtyableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirtyableTests.swift; sourceTree = "<group>"; };
+		3B7884EFEE29BD136A760320 /* FieldValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldValidation.swift; sourceTree = "<group>"; };
+		A3D7B2E1F4C85A9D6E2F0B73 /* FilenamePatterns.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenamePatterns.swift; sourceTree = "<group>"; };
+		3CF7D354B21B95B1EB3A8984 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		5AFFC7653CEF9432BABAFE94 /* ProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileTests.swift; sourceTree = "<group>"; };
+		5DCC75F647AA2A41BF2B17B9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		689D9A69FF07CCA892429C0A /* PillField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PillField.swift; sourceTree = "<group>"; };
+		6989D9C650B0383E7ABA46E2 /* SandboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SandboxView.swift; sourceTree = "<group>"; };
+		6AC02EFEC0D85CEB6F137381 /* WorkflowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowView.swift; sourceTree = "<group>"; };
+		6C503D6DF395CB0F0EE8674D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileService.swift; sourceTree = "<group>"; };
+		73A67A68A82CC97A0B42F497 /* DiffTableRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffTableRow.swift; sourceTree = "<group>"; };
+		823EAC4F97C91F6A789E0415 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
+		824A528222BFA2E5BFFCDF48 /* ProfilePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilePicker.swift; sourceTree = "<group>"; };
+		886F8C8992B2C0546F301A05 /* Strings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings.swift; sourceTree = "<group>"; };
+		88D2EC9D00CD4EE5A754D59E /* LicenseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseStore.swift; sourceTree = "<group>"; };
+		93163EBEB8CD8B13330BAB7C /* LogOutputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogOutputView.swift; sourceTree = "<group>"; };
+		9C5FD29C41D642C67671FBAF /* ScriptRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptRunner.swift; sourceTree = "<group>"; };
+		A142786B3A2C61DF018E00D1 /* DiffTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffTableView.swift; sourceTree = "<group>"; };
+		A1EA0220A8EF5122DF196162 /* JetlagApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JetlagApp.swift; sourceTree = "<group>"; };
+		A54A1E7104B0356A474B3968 /* TimezoneMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimezoneMapView.swift; sourceTree = "<group>"; };
+		B68CD5F46C4AF7FAFE297AAE /* Jetlag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jetlag.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C4AF4B0A35CD716A34E2A275 /* ProfilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesView.swift; sourceTree = "<group>"; };
+		CDF31C93574205EBA3F42FEC /* JetlagTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JetlagTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D08074CC6CCFCC6AFEC75C39 /* PipelineArgsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineArgsTests.swift; sourceTree = "<group>"; };
+		DC0210C9EE3BEF29E07C9DE6 /* MediaProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaProfile.swift; sourceTree = "<group>"; };
+		F559FB82EF7FBD0FD4101BE5 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		FEA322FB3423ED25C28C0860 /* UpgradeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpgradeView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		BCB11FBB772D43DDB3F9EE6A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C5C6CFCF2DF5DBBAF6E4683D /* Yams in Frameworks */,
+				03E263B765C4C53CE8B6FF7E /* MapKit.framework in Frameworks */,
+				D6A581C2985C5F5655494088 /* CoreLocation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0530905D99590674005A7361 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				88D2EC9D00CD4EE5A754D59E /* LicenseStore.swift */,
+				6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */,
+				9C5FD29C41D642C67671FBAF /* ScriptRunner.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		1E97872BD8B9B2FFA6421628 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				1C1D644A22201A7866455A04 /* CoreLocation.framework */,
+				823EAC4F97C91F6A789E0415 /* MapKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		64E008420DD19CC786D2E74C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B68CD5F46C4AF7FAFE297AAE /* Jetlag.app */,
+				CDF31C93574205EBA3F42FEC /* JetlagTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		686A9308AC148729D9CECC5C = {
+			isa = PBXGroup;
+			children = (
+				A018EBD796746F6DB21C935A /* Sources */,
+				9F3926E784BB0FFDD702034D /* Tests */,
+				1E97872BD8B9B2FFA6421628 /* Frameworks */,
+				64E008420DD19CC786D2E74C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		9F3926E784BB0FFDD702034D /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				2DB6E838E4C1827858BB004E /* DirtyableTests.swift */,
+				D08074CC6CCFCC6AFEC75C39 /* PipelineArgsTests.swift */,
+				5AFFC7653CEF9432BABAFE94 /* ProfileTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		A018EBD796746F6DB21C935A /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				3CF7D354B21B95B1EB3A8984 /* App.entitlements */,
+				155795936E0AF78F19DDB808 /* Assets.xcassets */,
+				A1EA0220A8EF5122DF196162 /* JetlagApp.swift */,
+				886F8C8992B2C0546F301A05 /* Strings.swift */,
+				FD274DA66633AB6A3C7629C3 /* Models */,
+				0530905D99590674005A7361 /* Services */,
+				BB23ED1DA037A603FA2375F0 /* Views */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		BB23ED1DA037A603FA2375F0 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				5DCC75F647AA2A41BF2B17B9 /* ContentView.swift */,
+				A142786B3A2C61DF018E00D1 /* DiffTableView.swift */,
+				3B7884EFEE29BD136A760320 /* FieldValidation.swift */,
+				93163EBEB8CD8B13330BAB7C /* LogOutputView.swift */,
+				689D9A69FF07CCA892429C0A /* PillField.swift */,
+				824A528222BFA2E5BFFCDF48 /* ProfilePicker.swift */,
+				C4AF4B0A35CD716A34E2A275 /* ProfilesView.swift */,
+				6989D9C650B0383E7ABA46E2 /* SandboxView.swift */,
+				6C503D6DF395CB0F0EE8674D /* SettingsView.swift */,
+				A54A1E7104B0356A474B3968 /* TimezoneMapView.swift */,
+				FEA322FB3423ED25C28C0860 /* UpgradeView.swift */,
+				6AC02EFEC0D85CEB6F137381 /* WorkflowView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		FD274DA66633AB6A3C7629C3 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				F559FB82EF7FBD0FD4101BE5 /* AppState.swift */,
+				73A67A68A82CC97A0B42F497 /* DiffTableRow.swift */,
+				A3D7B2E1F4C85A9D6E2F0B73 /* FilenamePatterns.swift */,
+				DC0210C9EE3BEF29E07C9DE6 /* MediaProfile.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		99EB6117371AF187C8017527 /* JetlagTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 523D8DF99C007F3E278B1BE6 /* Build configuration list for PBXNativeTarget "JetlagTests" */;
+			buildPhases = (
+				D85A73A38EB836B91AEDCAD6 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FF0C8C61898B2EA4E30459A6 /* PBXTargetDependency */,
+			);
+			name = JetlagTests;
+			packageProductDependencies = (
+			);
+			productName = JetlagTests;
+			productReference = CDF31C93574205EBA3F42FEC /* JetlagTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		A6CA54EF1C9DE69D611781FA /* Jetlag */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3B345131B7328B247808BE97 /* Build configuration list for PBXNativeTarget "Jetlag" */;
+			buildPhases = (
+				65D7687FE2D484BF6F6E0E91 /* Sources */,
+				71A31D1B074F078951F2D4CD /* Resources */,
+				BCB11FBB772D43DDB3F9EE6A /* Frameworks */,
+				FD4A93DF9A898EAE722BC868 /* Bundle scripts */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Jetlag;
+			packageProductDependencies = (
+				8C4D7F8D5FD775F5F3711F05 /* Yams */,
+			);
+			productName = Jetlag;
+			productReference = B68CD5F46C4AF7FAFE297AAE /* Jetlag.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C31C292ECE5C319B6CA91B3A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+			};
+			buildConfigurationList = 685744F4C7E747627694E7D4 /* Build configuration list for PBXProject "Jetlag" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 686A9308AC148729D9CECC5C;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B84EF0D968CA901D0E38764C /* XCRemoteSwiftPackageReference "Yams" */,
+			);
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A6CA54EF1C9DE69D611781FA /* Jetlag */,
+				99EB6117371AF187C8017527 /* JetlagTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		71A31D1B074F078951F2D4CD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7C0A6314355CC7D586AFA208 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		FD4A93DF9A898EAE722BC868 /* Bundle scripts */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Bundle scripts";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nDEST=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/scripts\"\nrm -rf \"$DEST\"\ncp -r \"${SRCROOT}/../scripts/\" \"$DEST\"\nrm -rf \"$DEST/site-packages\"\npython3 -m pip install --quiet --target \"$DEST/site-packages\" -r \"$DEST/requirements.txt\"\n\n# Verify vendored tools are present (copied by cp -r above)\nfor tool in exiftool tag; do\n  if [ ! -f \"$DEST/tools/$tool\" ]; then\n    echo \"error: scripts/tools/$tool missing — see scripts/tools/README\" >&2\n    exit 1\n  fi\ndone\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		65D7687FE2D484BF6F6E0E91 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0D5AC61704A72A9FEF4D4DF3 /* AppState.swift in Sources */,
+				6565530211ECEF491334BDD9 /* ContentView.swift in Sources */,
+				1D23F4385E3C9080D63F95C1 /* DiffTableRow.swift in Sources */,
+				D4148DE34CA1305FAAEB74E7 /* DiffTableView.swift in Sources */,
+				E6DEE560FAFDCFE9F48B205B /* FieldValidation.swift in Sources */,
+				B2F4A3E8C7D91A5F3E8B01D2 /* FilenamePatterns.swift in Sources */,
+				8D5AEC4A3D748ADF6853E7C1 /* JetlagApp.swift in Sources */,
+				A782F8A1159D170B5CEB4C7E /* LicenseStore.swift in Sources */,
+				53E52584D7A0F04EBD764B7D /* LogOutputView.swift in Sources */,
+				A87A9F7C3870DC8D634B2510 /* MediaProfile.swift in Sources */,
+				ED7D0C891E4F99927C96CD9D /* PillField.swift in Sources */,
+				6A589A5C59B6E0ACF8DC960F /* ProfilePicker.swift in Sources */,
+				932EB3F57E4BF42DBFA0EBF9 /* ProfileService.swift in Sources */,
+				C0FF2D225A09C82E454CF5E2 /* ProfilesView.swift in Sources */,
+				7EB40F1EE336843C386D4474 /* SandboxView.swift in Sources */,
+				AAC3E4FC571BCF92D2EBA219 /* ScriptRunner.swift in Sources */,
+				4FDCE64D99169FBCD837CF2B /* SettingsView.swift in Sources */,
+				CF708EB9D2E1C9376806BA71 /* Strings.swift in Sources */,
+				C61A796CA3B728982C946AD4 /* TimezoneMapView.swift in Sources */,
+				8989E8C851EEE8A1CA2F436E /* UpgradeView.swift in Sources */,
+				5C37852483245BC294545B2B /* WorkflowView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D85A73A38EB836B91AEDCAD6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AF4D4132C54C04CF1A1ADDB7 /* DirtyableTests.swift in Sources */,
+				67B98190D68F596BAC4EF2AE /* PipelineArgsTests.swift in Sources */,
+				C0578D87EB55FAED6B59A9C0 /* ProfileTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		FF0C8C61898B2EA4E30459A6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A6CA54EF1C9DE69D611781FA /* Jetlag */;
+			targetProxy = 46586EE6A4E5EE37F96FB1CF /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		63C0F8C6457415CCCE625B1B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		7593C9A726246A9F45C81F91 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Sources/App.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Daniel Lawrence";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.daniellawrence.Jetlag;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		994F73EE9416C94F239927D3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.daniellawrence.JetlagTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Jetlag.app/Contents/MacOS/Jetlag";
+			};
+			name = Debug;
+		};
+		9F2B35644A3B03B0F38116A7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		C3FE8E2BA39602E919F8F029 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.daniellawrence.JetlagTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Jetlag.app/Contents/MacOS/Jetlag";
+			};
+			name = Release;
+		};
+		DE4E6FE7B86FA642DB24D38E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Sources/App.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Daniel Lawrence";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.daniellawrence.Jetlag;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3B345131B7328B247808BE97 /* Build configuration list for PBXNativeTarget "Jetlag" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7593C9A726246A9F45C81F91 /* Debug */,
+				DE4E6FE7B86FA642DB24D38E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		523D8DF99C007F3E278B1BE6 /* Build configuration list for PBXNativeTarget "JetlagTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				994F73EE9416C94F239927D3 /* Debug */,
+				C3FE8E2BA39602E919F8F029 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		685744F4C7E747627694E7D4 /* Build configuration list for PBXProject "Jetlag" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				63C0F8C6457415CCCE625B1B /* Debug */,
+				9F2B35644A3B03B0F38116A7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B84EF0D968CA901D0E38764C /* XCRemoteSwiftPackageReference "Yams" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/jpsim/Yams";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		8C4D7F8D5FD775F5F3711F05 /* Yams */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B84EF0D968CA901D0E38764C /* XCRemoteSwiftPackageReference "Yams" */;
+			productName = Yams;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = C31C292ECE5C319B6CA91B3A /* Project object */;
+}

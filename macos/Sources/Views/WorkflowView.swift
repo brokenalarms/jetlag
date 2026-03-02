@@ -83,7 +83,11 @@ struct WorkflowView: View {
             isPresented: $state.workflowSession.showTimezoneConflict
         ) {
             Button(Strings.Workflow.forceTimezoneButton, role: .destructive) {
-                state.workflowSession.forceTimezone = true
+                if state.workflowSession.timezoneConflictType == "mixed_timezones" {
+                    state.workflowSession.allowMixedTimezones = true
+                } else {
+                    state.workflowSession.forceTimezone = true
+                }
                 state.workflowSession.showTimezoneConflict = false
                 runWorkflow()
             }
@@ -411,6 +415,7 @@ struct WorkflowView: View {
                 Text(Strings.Workflow.timestampSourceLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                let parseable = hasParseableFilenames()
                 Picker("", selection: $session.inferFromFilenames) {
                     Text(Strings.Workflow.timestampSourceMetadata).tag(false)
                     Text(Strings.Workflow.timestampSourceFilenames).tag(true)
@@ -418,6 +423,12 @@ struct WorkflowView: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .frame(width: 220)
+                .disabled(!parseable)
+                .onChange(of: parseable) { _, newValue in
+                    if !newValue && session.inferFromFilenames {
+                        session.inferFromFilenames = false
+                    }
+                }
             }
 
             HStack(spacing: 4) {
@@ -628,6 +639,30 @@ struct WorkflowView: View {
     }
 
     // MARK: - Actions
+
+    private func hasParseableFilenames() -> Bool {
+        let session = state.workflowSession
+        let extensions = (session.workingProfile.fileExtensions ?? []).map {
+            $0.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        }
+        guard !extensions.isEmpty else { return false }
+        let dir = session.sourceDir.current
+        guard !dir.isEmpty else { return false }
+        guard let enumerator = FileManager.default.enumerator(
+            at: URL(fileURLWithPath: dir),
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return false }
+        for item in enumerator {
+            guard let url = item as? URL,
+                  extensions.contains(url.pathExtension.lowercased())
+            else { continue }
+            if FilenamePatterns.hasParseableTimestamp(url.lastPathComponent, scriptsDirectory: state.scriptsDirectory) {
+                return true
+            }
+        }
+        return false
+    }
 
     private func countMediaFiles() -> Int {
         let session = state.workflowSession

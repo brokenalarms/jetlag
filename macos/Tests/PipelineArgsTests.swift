@@ -276,6 +276,21 @@ final class PipelineArgsTests: XCTestCase {
         XCTAssertFalse(args.contains("--force-timezone"))
     }
 
+    func testAllowMixedTimezones() {
+        let session = makeSession()
+        session.allowMixedTimezones = true
+        let (_, args) = session.buildPipelineArgs()
+
+        XCTAssertTrue(args.contains("--allow-mixed-timezones"))
+    }
+
+    func testAllowMixedTimezonesNotIncludedByDefault() {
+        let session = makeSession()
+        let (_, args) = session.buildPipelineArgs()
+
+        XCTAssertFalse(args.contains("--allow-mixed-timezones"))
+    }
+
     func testAlwaysOnStepsNeverInTasks() {
         let session = makeSession()
         let (_, args) = session.buildPipelineArgs()

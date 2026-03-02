@@ -188,7 +188,7 @@ struct DiffTableView: View {
             return row.timestampAction == "would_fix"
                 ? Strings.DiffTable.wouldFixChange : Strings.DiffTable.fixedChange
         case "no_change": return Strings.DiffTable.noChangeChange
-        case "error": return Strings.DiffTable.errorChange
+        case "error": return row.timestampError ?? Strings.DiffTable.errorChange
         default: return "—"
         }
     }
@@ -213,6 +213,7 @@ struct DiffTableView: View {
             Text(text)
                 .font(.system(size: 11))
                 .foregroundStyle(.red)
+                .help(row.timestampError ?? "")
         default:
             Text("—")
                 .font(.system(size: 11))

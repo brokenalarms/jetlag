@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from lib.filesystem import find_media_files
 from lib.timestamp_source import (
     build_filename, extract_metadata_timezone, normalize_timezone_input,
-    parse_datetime_original,
+    parse_datetime_original, parse_filename_timestamp,
 )
 
 import importlib
@@ -312,6 +312,7 @@ def process_file(
             emit_event("timestamp_result",
                 file=active_file.name,
                 action="error",
+                error=error_msg,
             )
             result["failed"] = True
             result["error"] = error_msg
@@ -512,7 +513,11 @@ def build_parser():
     )
     parser.add_argument(
         "--force-timezone", action="store_true",
-        help="Override existing timezone in DateTimeOriginal with --timezone. Without this flag, the pipeline stops when a conflict is detected."
+        help="Override existing timezone in DateTimeOriginal with --timezone. Without this flag, the pipeline stops when a provided-vs-embedded conflict is detected."
+    )
+    parser.add_argument(
+        "--allow-mixed-timezones", action="store_true",
+        help="Allow processing files with different embedded timezones in a single batch. Without this flag, the pipeline stops when mixed timezones are detected."
     )
     parser.add_argument("--tags", help="Comma-separated Finder tags (overrides profile tags)")
     parser.add_argument("--make", help="EXIF camera make (overrides profile exif.make)")
@@ -679,7 +684,7 @@ def main():
         provided_tz_normalized = normalize_timezone_input(timezone_offset).replace(":", "") if timezone_offset else None
 
         # Check 1: mixed timezones within the batch
-        if len(file_timezones) > 1 and not args.force_timezone:
+        if len(file_timezones) > 1 and not args.allow_mixed_timezones:
             print("⚠️  Files have mixed timezones:", file=sys.stderr)
             for tz, fnames in sorted(file_timezones.items()):
                 print(f"   {tz}: {', '.join(fnames)}", file=sys.stderr)
@@ -708,6 +713,16 @@ def main():
                     file_timezones={tz: fnames for tz, fnames in file_timezones.items()},
                 )
                 sys.exit(1)
+
+    # Pre-flight filename parseability check (defense-in-depth for CLI users)
+    if args.infer_from_filename:
+        unparseable = [fp.name for fp in files if parse_filename_timestamp(str(fp))[0] is None]
+        if unparseable:
+            print("⚠️  --infer-from-filename specified but these files have no parseable timestamp in their filename:", file=sys.stderr)
+            for name in unparseable:
+                print(f"   {name}", file=sys.stderr)
+            emit_event("filename_parse_error", unparseable_files=unparseable)
+            sys.exit(1)
 
     # Process each file
     stats = {

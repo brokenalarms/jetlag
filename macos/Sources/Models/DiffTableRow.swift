@@ -12,6 +12,7 @@ struct DiffTableRow: Identifiable {
     var timezone: String?
     var correctionMode: String?
     var timeOffsetDisplay: String?
+    var timestampError: String?
     var renamedTo: String?
     var dest: String?
     var organizeAction: String?
