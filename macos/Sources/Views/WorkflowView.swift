@@ -151,6 +151,7 @@ struct WorkflowView: View {
                 Text(Strings.Workflow.profileLabel).gridColumnAlignment(.trailing)
                 ProfilePicker(selection: $session.profileName, state: state)
                     .onChange(of: session.profileName) { _, newValue in
+                        state.clearLog()
                         state.workflowSession = WorkflowSession(
                             profile: state.profilesConfig?.profiles[newValue],
                             profileName: newValue
@@ -585,9 +586,6 @@ struct WorkflowView: View {
                     .labelsHidden()
                     .pickerStyle(.segmented)
                     .frame(width: 160)
-                    .onChange(of: session.applyMode) { _, _ in
-                        state.clearLog()
-                    }
 
                     Button(state.isRunning ? Strings.Workflow.runningButton : Strings.Workflow.runButton) { runWorkflow() }
                         .disabled(state.isRunning || !session.allStepsReady)
