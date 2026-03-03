@@ -40,10 +40,17 @@ targets:
           rm -rf "$DEST/site-packages"
           python3 -m pip install --quiet --target "$DEST/site-packages" -r "$DEST/requirements.txt"
 
+          # Build jetlag-metadata Swift CLI and install into bundle
+          METADATA_PKG="${SRCROOT}/Sources/Tools/jetlag-metadata"
+          if [ -d "$METADATA_PKG" ]; then
+            swift build -c release --package-path "$METADATA_PKG" 2>&1
+            cp "$METADATA_PKG/.build/release/jetlag-metadata" "$DEST/tools/jetlag-metadata"
+          fi
+
           # Verify vendored tools are present (copied by cp -r above)
-          for tool in exiftool tag ffprobe gyroflow; do
+          for tool in exiftool tag ffprobe gyroflow jetlag-metadata; do
             if [ ! -f "$DEST/tools/$tool" ]; then
-              echo "error: scripts/tools/$tool missing — run scripts/tools/download-${tool}.sh or see scripts/tools/README" >&2
+              echo "error: scripts/tools/$tool missing — run scripts/tools/download-${tool}.sh or scripts/tools/build-jetlag-metadata.sh or see scripts/tools/README" >&2
               exit 1
             fi
           done
