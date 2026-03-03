@@ -24,7 +24,8 @@
  - this is required reading if dealing with any git or Github-based commands like commiting, branches, and creating pull requests.
 
 - TODOs
-  - a list of TODOs maintained at /docs/TODO.md, with larger tasks broken down into their own specifications in /docs/specs/.
+  - a list of smaller TODOs are maintained at @docs/TODO.md, with larger tasks broken down into their own specifications in @docs/specs/, with previously completed ones in @docs/specs/completed.
+  -  Large tasks in specs folder may not have their own entries in TODO.md, so part of looking for todos is checking through specs files as well. 
   - TODO.md is a sliding context window for fresh agents — open tasks only; completed work belongs in commit messages, not here
   - tasks are grouped by subrepo (`scripts/`, `macos/`, `web/`); cross-repo tasks appear under combined headings (e.g. `scripts/` + `macos/`)
   - each task is prefixed with its date added in YYYY-MM-DD format
