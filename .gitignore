@@ -4,6 +4,7 @@ __pycache__
 .vscode
 .coverage
 .vite
+.ralph
 
 # Python venv (recreated locally by ensure-venv.sh; app bundle installs deps fresh at build time)
 scripts/.venv/
