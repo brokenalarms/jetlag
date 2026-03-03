@@ -1,10 +1,11 @@
 /**
- * Shared timeline component used by all problem-section scenarios.
+ * Interactive timeline component for problem-section scenarios.
  *
  * Clips supply { time: 'HH:MM', day: 0|1|2, tz, file, color, correct }.
  * Bar positions are derived automatically — no manual offset/width needed.
- * A time-axis with hour ticks is rendered below the clips so each card
- * shows the true relative spacing of the footage.
+ * A draggable slider interpolates each clip between its "before" (broken)
+ * and "after" (corrected) position. The time axis uses hour ticks to show
+ * the true relative spacing of the footage.
  */
 
 const colorMap = {
@@ -13,19 +14,15 @@ const colorMap = {
   purple: { bar: 'bg-purple-500/30 border-purple-400/20', text: 'text-purple-300/70' },
 }
 
-// Width of each clip bar (px). The bar area is PAD…(BAR_AREA - CLIP_WIDTH + PAD)
-// so both the first and last clip fit fully within the card.
 const CLIP_WIDTH    = 100
-const BAR_AREA      = 290   // px available from label-column edge to card edge
-const PAD_MINUTES   = 70    // breathing room on each side of the time scale
+const BAR_AREA      = 290
+const PAD_MINUTES   = 70
 
 function toMinutes({ time, day = 0 }) {
   const [h, m] = time.split(':').map(Number)
   return day * 1440 + h * 60 + m
 }
 
-// Build a scale object from a set of clips.
-// pxPerMin maps the inner bar area [0 … BAR_AREA - CLIP_WIDTH] to the time range.
 function buildScale(clips) {
   const times      = clips.map(toMinutes)
   const minTime    = Math.min(...times)
@@ -40,7 +37,6 @@ function clipOffset(clip, scale) {
   return Math.round((toMinutes(clip) - scale.scaleStart) * scale.pxPerMin)
 }
 
-// Generate hour-tick marks visible within the scale.
 function buildTicks(scale) {
   const { scaleStart, scaleEnd, pxPerMin } = scale
   const durationMin = scaleEnd - scaleStart
@@ -57,26 +53,6 @@ function buildTicks(scale) {
     ticks.push({ px, label: `${String(dispH).padStart(2, '0')}:00`, isNewDay })
   }
   return ticks
-}
-
-function renderClip(clip, scale, multiDay) {
-  const c       = colorMap[clip.color]
-  const tzClass = clip.correct ? 'text-white/25' : 'text-red-400/70'
-  const offset  = clipOffset(clip, scale)
-  const dayTag  = multiDay
-    ? `<div class="text-[9px] text-white/20 mb-0.5">Day ${(clip.day ?? 0) + 1}</div>`
-    : ''
-  return /* html */`
-    <div class="flex items-center gap-3">
-      <div class="w-28 text-right font-mono leading-tight flex-shrink-0">
-        ${dayTag}
-        <div class="text-xs text-white/35">${clip.time}</div>
-        <div class="text-[10px] ${tzClass}">${clip.tz}</div>
-      </div>
-      <div class="h-7 rounded ${c.bar} ${c.text} border flex items-center px-2.5 text-[11px] overflow-hidden flex-shrink-0"
-           style="width:${CLIP_WIDTH}px; margin-left:${offset}px">${clip.file}</div>
-    </div>
-  `
 }
 
 // 124px = w-28 (112px) + gap-3 (12px) — aligns axis with the bar area.
@@ -98,39 +74,130 @@ function renderAxis(scale) {
   `
 }
 
-function renderCard(card, isAfter, scale) {
-  const dot        = isAfter ? 'bg-neon-pink'              : 'bg-red-400'
-  const labelClass = isAfter ? 'text-neon-pink/80'         : 'text-red-400/80'
-  const label      = isAfter ? 'After Jetlag'              : 'Before Jetlag'
-  const cardClass  = isAfter ? 'card border-neon-pink/20 bg-neon-pink/5' : 'card'
-  const capClass   = isAfter ? 'text-neon-pink/60'         : 'text-white/30'
+// --- Interactive timeline slider ---
 
-  // Show "Day N" labels when this card's clips span multiple days.
-  const days     = new Set(card.clips.map(c => c.day ?? 0))
+const scenarioStore = []
+
+function formatMinutes(totalMin) {
+  const rounded = Math.round(totalMin)
+  const day     = Math.floor(rounded / 1440)
+  const rem     = rounded - day * 1440
+  const h       = Math.floor(rem / 60)
+  const m       = rem % 60
+  return {
+    day,
+    time: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+  }
+}
+
+export function renderInteractiveTimeline(before, after) {
+  const sharedScale = buildScale([...before.clips, ...after.clips])
+  const idx = scenarioStore.length
+
+  const allClips = [...before.clips, ...after.clips]
+  const days     = new Set(allClips.map(c => c.day ?? 0))
   const multiDay = days.size > 1
 
+  const clipEntries = before.clips.map((bClip, i) => ({
+    before:       bClip,
+    after:        after.clips[i],
+    beforeOffset: clipOffset(bClip, sharedScale),
+    afterOffset:  clipOffset(after.clips[i], sharedScale),
+    beforeMin:    toMinutes(bClip),
+    afterMin:     toMinutes(after.clips[i]),
+  }))
+
+  scenarioStore.push({
+    clips:         clipEntries,
+    beforeCaption: before.caption,
+    afterCaption:  after.caption,
+  })
+
   return /* html */`
-    <div class="${cardClass}">
-      <div class="mb-3 flex items-center gap-2">
-        <div class="h-2 w-2 rounded-full ${dot}"></div>
-        <span class="text-xs font-semibold uppercase tracking-widest ${labelClass}">${label}</span>
+    <div class="timeline-interactive card" data-scenario="${idx}">
+      <div class="mb-3 flex items-center gap-3">
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="h-2 w-2 rounded-full bg-red-400 tl-dot"></div>
+          <span class="text-xs font-semibold uppercase tracking-widest text-red-400/80 tl-before-label">Before</span>
+        </div>
+        <input type="range" min="0" max="100" value="0" class="timeline-range flex-1">
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <span class="text-xs font-semibold uppercase tracking-widest text-white/20 tl-after-label">After</span>
+          <div class="h-2 w-2 rounded-full bg-neon-pink/30 tl-dot-after"></div>
+        </div>
       </div>
       <div class="space-y-2">
-        ${card.clips.map(clip => renderClip(clip, scale, multiDay)).join('')}
+        ${clipEntries.map(({ before: b, beforeOffset }) => {
+          const c       = colorMap[b.color]
+          const tzClass = b.correct ? 'text-white/25' : 'text-red-400/70'
+          const dayTag  = multiDay
+            ? `<div class="text-[9px] text-white/20 mb-0.5 tl-day">Day ${(b.day ?? 0) + 1}</div>`
+            : ''
+          return /* html */`
+            <div class="flex items-center gap-3">
+              <div class="w-28 text-right font-mono leading-tight flex-shrink-0">
+                ${dayTag}
+                <div class="text-xs text-white/35 tl-time">${b.time}</div>
+                <div class="text-[10px] tl-tz ${tzClass}">${b.tz}</div>
+              </div>
+              <div class="h-7 rounded ${c.bar} ${c.text} border flex items-center px-2.5 text-[11px] overflow-hidden flex-shrink-0 tl-bar"
+                   style="width:${CLIP_WIDTH}px; margin-left:${beforeOffset}px">${b.file}</div>
+            </div>
+          `
+        }).join('')}
       </div>
-      ${renderAxis(scale)}
-      <p class="mt-3 text-xs ${capClass}">${card.caption}</p>
+      ${renderAxis(sharedScale)}
+      <p class="mt-3 text-xs tl-caption text-white/30">${before.caption}</p>
     </div>
   `
 }
 
-// Render both cards for a scenario sharing one scale derived from all clips
-// combined. This ensures clip positions are comparable across before/after:
-// Amsterdam lands at the same x in both cards; only Seoul's bar moves.
-export function renderScenarioCards(before, after) {
-  const sharedScale = buildScale([...before.clips, ...after.clips])
-  return `
-    ${renderCard(before, false, sharedScale)}
-    ${renderCard(after,  true,  sharedScale)}
-  `
+export function initTimelineSliders() {
+  document.querySelectorAll('.timeline-interactive').forEach(card => {
+    const idx  = parseInt(card.dataset.scenario, 10)
+    const data = scenarioStore[idx]
+    if (!data) return
+
+    const range       = card.querySelector('.timeline-range')
+    const bars        = card.querySelectorAll('.tl-bar')
+    const times       = card.querySelectorAll('.tl-time')
+    const tzs         = card.querySelectorAll('.tl-tz')
+    const dayLabels   = card.querySelectorAll('.tl-day')
+    const caption     = card.querySelector('.tl-caption')
+    const beforeLabel = card.querySelector('.tl-before-label')
+    const afterLabel  = card.querySelector('.tl-after-label')
+    const dotBefore   = card.querySelector('.tl-dot')
+    const dotAfter    = card.querySelector('.tl-dot-after')
+
+    range.addEventListener('input', () => {
+      const t = range.value / 100
+
+      data.clips.forEach((clip, i) => {
+        const offset = Math.round(clip.beforeOffset + (clip.afterOffset - clip.beforeOffset) * t)
+        bars[i].style.marginLeft = `${offset}px`
+
+        const currentMin    = clip.beforeMin + (clip.afterMin - clip.beforeMin) * t
+        const { day, time } = formatMinutes(currentMin)
+        times[i].textContent = time
+        if (dayLabels[i]) dayLabels[i].textContent = `Day ${day + 1}`
+
+        const isAfter = t >= 0.5
+        const src     = isAfter ? clip.after : clip.before
+        tzs[i].textContent = src.tz
+        tzs[i].className   = `text-[10px] tl-tz ${src.correct ? 'text-white/25' : 'text-red-400/70'}`
+      })
+
+      const isAfter = t >= 0.5
+      caption.textContent = isAfter ? data.afterCaption : data.beforeCaption
+      caption.className   = `mt-3 text-xs tl-caption ${isAfter ? 'text-neon-pink/60' : 'text-white/30'}`
+
+      beforeLabel.className = `text-xs font-semibold uppercase tracking-widest tl-before-label ${t < 0.5 ? 'text-red-400/80' : 'text-red-400/30'}`
+      afterLabel.className  = `text-xs font-semibold uppercase tracking-widest tl-after-label ${t >= 0.5 ? 'text-neon-pink/80' : 'text-white/20'}`
+
+      dotBefore.className = `h-2 w-2 rounded-full tl-dot ${t < 0.5 ? 'bg-red-400' : 'bg-red-400/30'}`
+      dotAfter.className  = `h-2 w-2 rounded-full tl-dot-after ${t >= 0.5 ? 'bg-neon-pink' : 'bg-neon-pink/30'}`
+
+      card.classList.toggle('timeline-active', t >= 0.5)
+    })
+  })
 }

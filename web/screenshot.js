@@ -45,9 +45,7 @@ await new Promise((resolve, reject) => {
   server.on('error', reject)
 })
 
-// Use a pre-installed Chromium if the bundled headless shell is absent
-const chromiumPath = '/root/.cache/ms-playwright/chromium-1194/chrome-linux/chrome'
-const browser = await chromium.launch({ executablePath: chromiumPath })
+const browser = await chromium.launch()
 const page = await browser.newPage()
 await page.setViewportSize({ width: 1440, height: 900 })
 await page.goto('http://localhost:4173')
