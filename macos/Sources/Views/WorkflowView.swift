@@ -29,7 +29,8 @@ struct WorkflowView: View {
             if !name.isEmpty {
                 state.workflowSession = WorkflowSession(
                     profile: state.profilesConfig?.profiles[name],
-                    profileName: name
+                    profileName: name,
+                    globalGyroflow: state.profilesConfig?.gyroflow
                 )
             }
         }
@@ -152,7 +153,8 @@ struct WorkflowView: View {
                         state.clearLog()
                         state.workflowSession = WorkflowSession(
                             profile: state.profilesConfig?.profiles[newValue],
-                            profileName: newValue
+                            profileName: newValue,
+                            globalGyroflow: state.profilesConfig?.gyroflow
                         )
                     }
             }
@@ -268,11 +270,12 @@ struct WorkflowView: View {
         case .fixTimestamps:
             Divider()
             fixTimestampsOptions
+        case .gyroflow:
+            Divider()
+            gyroflowOptions
         case .archiveSource:
             Divider()
             archiveSourceOptions
-        default:
-            EmptyView()
         }
     }
 
@@ -475,6 +478,48 @@ struct WorkflowView: View {
                 Label(Strings.Workflow.deleteSourceWarning, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.yellow)
+            }
+        }
+        .padding(10)
+    }
+
+    private var gyroflowOptions: some View {
+        @Bindable var session = state.workflowSession
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Text(Strings.Profiles.maxZoomLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 80, alignment: .trailing)
+                TextField("", value: $session.gyroflowMaxZoom, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
+                HelpButton(Strings.Profiles.maxZoomHelp)
+            }
+            HStack(spacing: 4) {
+                Text(Strings.Profiles.adaptiveZoomWindowLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 80, alignment: .trailing)
+                TextField("", value: $session.gyroflowAdaptiveZoomWindow, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
+                HelpButton(Strings.Profiles.adaptiveZoomWindowHelp)
+            }
+            HStack(spacing: 4) {
+                Text(Strings.Profiles.adaptiveZoomMethodLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 80, alignment: .trailing)
+                Picker("", selection: $session.gyroflowAdaptiveZoomMethod) {
+                    ForEach(AdaptiveZoomMethod.allCases) { method in
+                        Text(method.label).tag(method)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 200)
+                HelpButton(Strings.Profiles.adaptiveZoomMethodHelp)
             }
         }
         .padding(10)

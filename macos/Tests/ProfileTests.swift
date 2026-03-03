@@ -249,6 +249,47 @@ final class ProfileTests: XCTestCase {
         XCTAssertEqual(renamed.type, .video)
     }
 
+    func testPerProfileGyroflowSettingsRoundTrip() throws {
+        let path = NSTemporaryDirectory() + UUID().uuidString + ".yaml"
+        tempFiles.append(path)
+
+        let original = ProfilesConfig(
+            gyroflow: nil,
+            backupConfig: nil,
+            profiles: [
+                "gopro": MediaProfile(
+                    type: .video,
+                    gyroflowEnabled: true,
+                    gyroflowSettings: StabilizationSettings(
+                        maxZoom: 120.0,
+                        adaptiveZoomWindow: 25.0,
+                        adaptiveZoomMethod: 2
+                    ),
+                    fileExtensions: [".mp4"]
+                )
+            ]
+        )
+
+        try ProfileService.write(original, to: path)
+        let loaded = try ProfileService.load(from: path)
+
+        let gopro = try XCTUnwrap(loaded.profiles["gopro"])
+        XCTAssertEqual(gopro.gyroflowEnabled, true)
+        XCTAssertEqual(gopro.gyroflowSettings?.maxZoom, 120.0)
+        XCTAssertEqual(gopro.gyroflowSettings?.adaptiveZoomWindow, 25.0)
+        XCTAssertEqual(gopro.gyroflowSettings?.adaptiveZoomMethod, 2)
+    }
+
+    func testPhotoProfileHasNoGyroflowSettings() throws {
+        let path = writeTempYAML(fixtureYAML)
+        let config = try ProfileService.load(from: path)
+
+        let sony = try XCTUnwrap(config.profiles["sony"])
+        XCTAssertEqual(sony.type, .photo)
+        XCTAssertNil(sony.gyroflowEnabled)
+        XCTAssertNil(sony.gyroflowSettings)
+    }
+
     // MARK: - Selection independence
 
     func testProfileSelectionIndependence() {

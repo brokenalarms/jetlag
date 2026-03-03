@@ -310,4 +310,102 @@ final class PipelineArgsTests: XCTestCase {
             XCTAssertFalse(tasks.contains("organize"))
         }
     }
+
+    // MARK: - Gyroflow preset
+
+    func testGyroflowPresetIncludedWhenStepEnabled() {
+        let session = makeSession()
+        session.gyroflowMaxZoom = 110.0
+        session.gyroflowAdaptiveZoomWindow = 20.0
+        session.gyroflowAdaptiveZoomMethod = .dynamic
+        let (_, args) = session.buildPipelineArgs()
+
+        let idx = args.firstIndex(of: "--gyroflow-preset")
+        XCTAssertNotNil(idx)
+        let json = args[idx! + 1]
+        XCTAssertTrue(json.contains("max_zoom"))
+        XCTAssertTrue(json.contains("adaptive_zoom_window"))
+        XCTAssertTrue(json.contains("adaptive_zoom_method"))
+    }
+
+    func testGyroflowPresetNotIncludedWhenStepDisabled() {
+        let session = makeSession()
+        session.enabledSteps.remove(.gyroflow)
+        session.gyroflowMaxZoom = 110.0
+        let (_, args) = session.buildPipelineArgs()
+
+        XCTAssertFalse(args.contains("--gyroflow-preset"))
+    }
+
+    func testGyroflowPresetOmitsNilValues() {
+        let session = makeSession()
+        session.gyroflowMaxZoom = nil
+        session.gyroflowAdaptiveZoomWindow = nil
+        session.gyroflowAdaptiveZoomMethod = .static
+        let (_, args) = session.buildPipelineArgs()
+
+        let idx = args.firstIndex(of: "--gyroflow-preset")!
+        let json = args[idx + 1]
+        XCTAssertFalse(json.contains("max_zoom"))
+        XCTAssertFalse(json.contains("adaptive_zoom_window"))
+        XCTAssertTrue(json.contains("adaptive_zoom_method"))
+    }
+
+    // MARK: - Gyroflow session initialization
+
+    func testGyroflowSettingsFromGlobalDefaults() {
+        let globalGyroflow = GyroflowConfig(
+            binary: "/usr/local/bin/gyroflow",
+            preset: GyroflowPreset(
+                stabilization: StabilizationSettings(
+                    maxZoom: 105.0,
+                    adaptiveZoomWindow: 15.0,
+                    adaptiveZoomMethod: 1
+                )
+            )
+        )
+        let profile = MediaProfile(type: .video, gyroflowEnabled: true, fileExtensions: [".mp4"])
+        let session = WorkflowSession(profile: profile, profileName: "test", globalGyroflow: globalGyroflow)
+
+        XCTAssertEqual(session.gyroflowMaxZoom, 105.0)
+        XCTAssertEqual(session.gyroflowAdaptiveZoomWindow, 15.0)
+        XCTAssertEqual(session.gyroflowAdaptiveZoomMethod, .dynamic)
+    }
+
+    func testGyroflowSettingsProfileOverridesGlobal() {
+        let globalGyroflow = GyroflowConfig(
+            binary: nil,
+            preset: GyroflowPreset(
+                stabilization: StabilizationSettings(
+                    maxZoom: 105.0,
+                    adaptiveZoomWindow: 15.0,
+                    adaptiveZoomMethod: 1
+                )
+            )
+        )
+        let profile = MediaProfile(
+            type: .video,
+            gyroflowEnabled: true,
+            gyroflowSettings: StabilizationSettings(
+                maxZoom: 120.0,
+                adaptiveZoomWindow: 25.0,
+                adaptiveZoomMethod: 2
+            ),
+            fileExtensions: [".mp4"]
+        )
+        let session = WorkflowSession(profile: profile, profileName: "test", globalGyroflow: globalGyroflow)
+
+        XCTAssertEqual(session.gyroflowMaxZoom, 120.0)
+        XCTAssertEqual(session.gyroflowAdaptiveZoomWindow, 25.0)
+        XCTAssertEqual(session.gyroflowAdaptiveZoomMethod, .static)
+    }
+
+    func testGyroflowSettingsDefaultWhenNoConfig() {
+        let profile = MediaProfile(type: .video, gyroflowEnabled: true, fileExtensions: [".mp4"])
+        let session = WorkflowSession(profile: profile, profileName: "test")
+
+        XCTAssertNil(session.gyroflowMaxZoom)
+        XCTAssertNil(session.gyroflowAdaptiveZoomWindow)
+        XCTAssertEqual(session.gyroflowAdaptiveZoomMethod, .dynamic)
+    }
 }

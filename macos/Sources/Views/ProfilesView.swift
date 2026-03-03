@@ -380,16 +380,22 @@ struct ProfileEditorView: View {
                     )
                 }
 
-                Divider().gridCellUnsizedAxes(.horizontal)
+                if session.profile.type != .photo {
+                    Divider().gridCellUnsizedAxes(.horizontal)
 
-                GridRow {
-                    Text("")
-                    HStack(spacing: 4) {
-                        Toggle(
-                            Strings.Profiles.gyroflowToggle,
-                            isOn: gyroflowToggle
-                        )
-                        HelpButton(Strings.Profiles.gyroflowHelp)
+                    GridRow {
+                        Text("")
+                        HStack(spacing: 4) {
+                            Toggle(
+                                Strings.Profiles.gyroflowToggle,
+                                isOn: gyroflowToggle
+                            )
+                            HelpButton(Strings.Profiles.gyroflowHelp)
+                        }
+                    }
+
+                    if session.profile.gyroflowEnabled == true {
+                        gyroflowSettingsRows
                     }
                 }
             }
@@ -452,14 +458,98 @@ struct ProfileEditorView: View {
     private var typeBinding: Binding<MediaType> {
         Binding(
             get: { session.profile.type ?? .video },
-            set: { session.profile.type = $0 }
+            set: { newValue in
+                session.profile.type = newValue
+                if newValue == .photo {
+                    session.profile.gyroflowEnabled = nil
+                    session.profile.gyroflowSettings = nil
+                }
+            }
         )
     }
 
     private var gyroflowToggle: Binding<Bool> {
         Binding(
             get: { session.profile.gyroflowEnabled ?? false },
-            set: { session.profile.gyroflowEnabled = $0 }
+            set: { newValue in
+                session.profile.gyroflowEnabled = newValue
+                if !newValue {
+                    session.profile.gyroflowSettings = nil
+                }
+            }
+        )
+    }
+
+    private var gyroflowSettingsRows: some View {
+        Group {
+            GridRow {
+                HelpLabel(
+                    Strings.Profiles.maxZoomLabel,
+                    help: Strings.Profiles.maxZoomHelp
+                )
+                TextField(
+                    "",
+                    value: stabilizationBinding(\.maxZoom),
+                    format: .number
+                )
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 80)
+            }
+
+            GridRow {
+                HelpLabel(
+                    Strings.Profiles.adaptiveZoomWindowLabel,
+                    help: Strings.Profiles.adaptiveZoomWindowHelp
+                )
+                TextField(
+                    "",
+                    value: stabilizationBinding(\.adaptiveZoomWindow),
+                    format: .number
+                )
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 80)
+            }
+
+            GridRow {
+                HelpLabel(
+                    Strings.Profiles.adaptiveZoomMethodLabel,
+                    help: Strings.Profiles.adaptiveZoomMethodHelp
+                )
+                Picker("", selection: zoomMethodBinding) {
+                    ForEach(AdaptiveZoomMethod.allCases) { method in
+                        Text(method.label).tag(method)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 200)
+            }
+        }
+    }
+
+    private func stabilizationBinding(_ keyPath: WritableKeyPath<StabilizationSettings, Double?>) -> Binding<Double?> {
+        Binding(
+            get: { session.profile.gyroflowSettings?[keyPath: keyPath] },
+            set: { newValue in
+                if session.profile.gyroflowSettings == nil {
+                    session.profile.gyroflowSettings = StabilizationSettings()
+                }
+                session.profile.gyroflowSettings?[keyPath: keyPath] = newValue
+            }
+        )
+    }
+
+    private var zoomMethodBinding: Binding<AdaptiveZoomMethod> {
+        Binding(
+            get: {
+                AdaptiveZoomMethod(rawValue: session.profile.gyroflowSettings?.adaptiveZoomMethod ?? 1) ?? .dynamic
+            },
+            set: { newValue in
+                if session.profile.gyroflowSettings == nil {
+                    session.profile.gyroflowSettings = StabilizationSettings()
+                }
+                session.profile.gyroflowSettings?.adaptiveZoomMethod = newValue.rawValue
+            }
         )
     }
 }
