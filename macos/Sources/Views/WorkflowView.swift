@@ -268,11 +268,12 @@ struct WorkflowView: View {
         case .fixTimestamps:
             Divider()
             fixTimestampsOptions
+        case .gyroflow:
+            Divider()
+            gyroflowOptions
         case .archiveSource:
             Divider()
             archiveSourceOptions
-        default:
-            EmptyView()
         }
     }
 
@@ -478,6 +479,73 @@ struct WorkflowView: View {
             }
         }
         .padding(10)
+    }
+
+    private var gyroflowOptions: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Text(Strings.Profiles.maxZoomLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 100, alignment: .trailing)
+                TextField("", value: gyroflowBinding(\.maxZoom), format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
+                HelpButton(Strings.Profiles.maxZoomHelp)
+            }
+            HStack(spacing: 4) {
+                Text(Strings.Profiles.adaptiveZoomWindowLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 100, alignment: .trailing)
+                TextField("", value: gyroflowBinding(\.adaptiveZoomWindow), format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
+                HelpButton(Strings.Profiles.adaptiveZoomWindowHelp)
+            }
+            HStack(spacing: 4) {
+                Text(Strings.Profiles.adaptiveZoomMethodLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 100, alignment: .trailing)
+                Picker("", selection: gyroflowZoomMethodBinding) {
+                    ForEach(AdaptiveZoomMethod.allCases) { method in
+                        Text(method.label).tag(method)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 200)
+                HelpButton(Strings.Profiles.adaptiveZoomMethodHelp)
+            }
+        }
+        .padding(10)
+    }
+
+    private func gyroflowBinding(_ keyPath: WritableKeyPath<StabilizationSettings, Double?>) -> Binding<Double?> {
+        Binding(
+            get: { state.workflowSession.workingProfile.gyroflowSettings?[keyPath: keyPath] },
+            set: { newValue in
+                if state.workflowSession.workingProfile.gyroflowSettings == nil {
+                    state.workflowSession.workingProfile.gyroflowSettings = StabilizationSettings()
+                }
+                state.workflowSession.workingProfile.gyroflowSettings?[keyPath: keyPath] = newValue
+            }
+        )
+    }
+
+    private var gyroflowZoomMethodBinding: Binding<AdaptiveZoomMethod> {
+        Binding(
+            get: {
+                AdaptiveZoomMethod(rawValue: state.workflowSession.workingProfile.gyroflowSettings?.adaptiveZoomMethod ?? 1) ?? .dynamic
+            },
+            set: { newValue in
+                if state.workflowSession.workingProfile.gyroflowSettings == nil {
+                    state.workflowSession.workingProfile.gyroflowSettings = StabilizationSettings()
+                }
+                state.workflowSession.workingProfile.gyroflowSettings?.adaptiveZoomMethod = newValue.rawValue
+            }
+        )
     }
 
     // MARK: - Execution

@@ -525,6 +525,10 @@ def build_parser():
     parser.add_argument("--make", help="EXIF camera make (overrides profile exif.make)")
     parser.add_argument("--model", help="EXIF camera model (overrides profile exif.model)")
     parser.add_argument(
+        "--gyroflow-preset",
+        help='JSON string overriding gyroflow stabilization preset from config (e.g. \'{"stabilization": {"max_zoom": 110.0}}\')'
+    )
+    parser.add_argument(
         "--working-dir",
         default=os.path.expanduser("~/Library/Application Support/Jetlag/working"),
         help="Working directory for intermediate files (default: ~/Library/Application Support/Jetlag/working)"
@@ -736,6 +740,10 @@ def main():
     }
 
     gyroflow_config = full_config.get("gyroflow")
+    if args.gyroflow_preset:
+        if gyroflow_config is None:
+            gyroflow_config = {}
+        gyroflow_config["preset"] = json.loads(args.gyroflow_preset)
     tasks = set(args.tasks)
 
     companion_extensions = None

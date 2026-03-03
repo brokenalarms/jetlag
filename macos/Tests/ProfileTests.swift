@@ -249,6 +249,174 @@ final class ProfileTests: XCTestCase {
         XCTAssertEqual(renamed.type, .video)
     }
 
+    func testPerProfileGyroflowSettingsRoundTrip() throws {
+        let path = NSTemporaryDirectory() + UUID().uuidString + ".yaml"
+        tempFiles.append(path)
+
+        let original = ProfilesConfig(
+            gyroflow: nil,
+            backupConfig: nil,
+            profiles: [
+                "gopro": MediaProfile(
+                    type: .video,
+                    gyroflowEnabled: true,
+                    gyroflowSettings: StabilizationSettings(
+                        maxZoom: 120.0,
+                        adaptiveZoomWindow: 25.0,
+                        adaptiveZoomMethod: 2
+                    ),
+                    fileExtensions: [".mp4"]
+                )
+            ]
+        )
+
+        try ProfileService.write(original, to: path)
+        let loaded = try ProfileService.load(from: path)
+
+        let gopro = try XCTUnwrap(loaded.profiles["gopro"])
+        XCTAssertEqual(gopro.gyroflowEnabled, true)
+        XCTAssertEqual(gopro.gyroflowSettings?.maxZoom, 120.0)
+        XCTAssertEqual(gopro.gyroflowSettings?.adaptiveZoomWindow, 25.0)
+        XCTAssertEqual(gopro.gyroflowSettings?.adaptiveZoomMethod, 2)
+    }
+
+    func testPhotoProfileHasNoGyroflowSettings() throws {
+        let path = writeTempYAML(fixtureYAML)
+        let config = try ProfileService.load(from: path)
+
+        let sony = try XCTUnwrap(config.profiles["sony"])
+        XCTAssertEqual(sony.type, .photo)
+        XCTAssertNil(sony.gyroflowEnabled)
+        XCTAssertNil(sony.gyroflowSettings)
+    }
+
+    // MARK: - Normalization
+
+    func testNormalizedPopulatesNilSettingsFromGlobal() {
+        let config = ProfilesConfig(
+            gyroflow: GyroflowConfig(
+                binary: nil,
+                preset: GyroflowPreset(
+                    stabilization: StabilizationSettings(
+                        maxZoom: 105.0,
+                        adaptiveZoomWindow: 15.0,
+                        adaptiveZoomMethod: 1
+                    )
+                )
+            ),
+            backupConfig: nil,
+            profiles: [
+                "gopro": MediaProfile(type: .video, gyroflowEnabled: true, fileExtensions: [".mp4"])
+            ]
+        )
+
+        let normalized = config.normalized()
+        let gopro = normalized.profiles["gopro"]!
+        XCTAssertEqual(gopro.gyroflowSettings?.maxZoom, 105.0)
+        XCTAssertEqual(gopro.gyroflowSettings?.adaptiveZoomWindow, 15.0)
+        XCTAssertEqual(gopro.gyroflowSettings?.adaptiveZoomMethod, 1)
+    }
+
+    func testNormalizedFillsPartialSettingsFromGlobal() {
+        let config = ProfilesConfig(
+            gyroflow: GyroflowConfig(
+                binary: nil,
+                preset: GyroflowPreset(
+                    stabilization: StabilizationSettings(
+                        maxZoom: 105.0,
+                        adaptiveZoomWindow: 15.0,
+                        adaptiveZoomMethod: 1
+                    )
+                )
+            ),
+            backupConfig: nil,
+            profiles: [
+                "gopro": MediaProfile(
+                    type: .video,
+                    gyroflowEnabled: true,
+                    gyroflowSettings: StabilizationSettings(maxZoom: 120.0),
+                    fileExtensions: [".mp4"]
+                )
+            ]
+        )
+
+        let normalized = config.normalized()
+        let gopro = normalized.profiles["gopro"]!
+        XCTAssertEqual(gopro.gyroflowSettings?.maxZoom, 120.0)
+        XCTAssertEqual(gopro.gyroflowSettings?.adaptiveZoomWindow, 15.0)
+        XCTAssertEqual(gopro.gyroflowSettings?.adaptiveZoomMethod, 1)
+    }
+
+    func testNormalizedPreservesExplicitSettings() {
+        let config = ProfilesConfig(
+            gyroflow: GyroflowConfig(
+                binary: nil,
+                preset: GyroflowPreset(
+                    stabilization: StabilizationSettings(
+                        maxZoom: 105.0,
+                        adaptiveZoomWindow: 15.0,
+                        adaptiveZoomMethod: 1
+                    )
+                )
+            ),
+            backupConfig: nil,
+            profiles: [
+                "gopro": MediaProfile(
+                    type: .video,
+                    gyroflowEnabled: true,
+                    gyroflowSettings: StabilizationSettings(
+                        maxZoom: 120.0,
+                        adaptiveZoomWindow: 25.0,
+                        adaptiveZoomMethod: 2
+                    ),
+                    fileExtensions: [".mp4"]
+                )
+            ]
+        )
+
+        let normalized = config.normalized()
+        let gopro = normalized.profiles["gopro"]!
+        XCTAssertEqual(gopro.gyroflowSettings?.maxZoom, 120.0)
+        XCTAssertEqual(gopro.gyroflowSettings?.adaptiveZoomWindow, 25.0)
+        XCTAssertEqual(gopro.gyroflowSettings?.adaptiveZoomMethod, 2)
+    }
+
+    func testNormalizedSkipsNonGyroflowProfiles() {
+        let config = ProfilesConfig(
+            gyroflow: GyroflowConfig(
+                binary: nil,
+                preset: GyroflowPreset(
+                    stabilization: StabilizationSettings(maxZoom: 105.0)
+                )
+            ),
+            backupConfig: nil,
+            profiles: [
+                "sony": MediaProfile(type: .photo, fileExtensions: [".arw"])
+            ]
+        )
+
+        let normalized = config.normalized()
+        let sony = normalized.profiles["sony"]!
+        XCTAssertNil(sony.gyroflowSettings)
+    }
+
+    func testNormalizedWithNoGlobalConfig() {
+        let config = ProfilesConfig(
+            gyroflow: nil,
+            backupConfig: nil,
+            profiles: [
+                "gopro": MediaProfile(type: .video, gyroflowEnabled: true, fileExtensions: [".mp4"])
+            ]
+        )
+
+        let normalized = config.normalized()
+        let gopro = normalized.profiles["gopro"]!
+        XCTAssertNotNil(gopro.gyroflowSettings)
+        XCTAssertNil(gopro.gyroflowSettings?.maxZoom)
+        XCTAssertNil(gopro.gyroflowSettings?.adaptiveZoomWindow)
+        XCTAssertNil(gopro.gyroflowSettings?.adaptiveZoomMethod)
+    }
+
     // MARK: - Selection independence
 
     func testProfileSelectionIndependence() {

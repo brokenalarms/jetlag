@@ -364,6 +364,27 @@ final class WorkflowSession {
             args.append("--apply")
         }
 
+        if enabledSteps.contains(.gyroflow), let settings = workingProfile.gyroflowSettings {
+            var stabilization: [String: Any] = [:]
+            if let maxZoom = settings.maxZoom {
+                stabilization["max_zoom"] = maxZoom
+            }
+            if let window = settings.adaptiveZoomWindow {
+                stabilization["adaptive_zoom_window"] = window
+            }
+            if let method = settings.adaptiveZoomMethod {
+                stabilization["adaptive_zoom_method"] = method
+            }
+
+            if !stabilization.isEmpty {
+                let preset: [String: Any] = ["stabilization": stabilization]
+                if let data = try? JSONSerialization.data(withJSONObject: preset),
+                   let json = String(data: data, encoding: .utf8) {
+                    args += ["--gyroflow-preset", json]
+                }
+            }
+        }
+
         return (script: "media-pipeline.sh", args: args)
     }
 }
