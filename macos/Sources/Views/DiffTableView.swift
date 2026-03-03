@@ -105,6 +105,11 @@ struct DiffTableView: View {
                 }
                 .width(min: 80)
 
+                TableColumn(Strings.DiffTable.timelineColumn) { row in
+                    timelineCell(row, scale: timelineScale)
+                }
+                .width(min: 50, ideal: 80)
+
                 TableColumn(Strings.DiffTable.originalColumn) { row in
                     Text(row.originalTime ?? "—")
                         .font(.system(size: 11, design: .monospaced))
@@ -118,11 +123,6 @@ struct DiffTableView: View {
                         .foregroundStyle(row.correctedTime != nil ? .primary : .tertiary)
                 }
                 .width(min: 130)
-
-                TableColumn(Strings.DiffTable.timelineColumn) { row in
-                    timelineCell(row, scale: timelineScale)
-                }
-                .width(min: 60, ideal: 120)
 
                 TableColumn(Strings.DiffTable.timestampColumn) { row in
                     changeBadge(row)
