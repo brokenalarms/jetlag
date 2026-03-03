@@ -234,10 +234,6 @@ final class WorkflowSession {
     var forceTimezone: Bool = false
     var allowMixedTimezones: Bool = false
 
-    var gyroflowMaxZoom: Double?
-    var gyroflowAdaptiveZoomWindow: Double?
-    var gyroflowAdaptiveZoomMethod: AdaptiveZoomMethod = .dynamic
-
     var timezoneConflictType: String?
     var timezoneConflictProvidedTz: String?
     var timezoneConflictFileTimezones: [String: [String]]?
@@ -251,7 +247,7 @@ final class WorkflowSession {
         }
     }
 
-    init(profile: MediaProfile? = nil, profileName: String = "", globalGyroflow: GyroflowConfig? = nil) {
+    init(profile: MediaProfile? = nil, profileName: String = "") {
         self.profileName = profileName
         self.workingProfile = profile ?? MediaProfile()
         self.sourceDir = Dirtyable(profile?.sourceDir ?? "")
@@ -260,14 +256,6 @@ final class WorkflowSession {
         self.timezone = Dirtyable("")
         let availableSteps = Self.computeAvailableSteps(profile: profile)
         self.enabledSteps = Set(availableSteps.filter { $0 != .archiveSource })
-
-        let globalStab = globalGyroflow?.preset?.stabilization
-        let profileStab = profile?.gyroflowSettings
-        self.gyroflowMaxZoom = profileStab?.maxZoom ?? globalStab?.maxZoom
-        self.gyroflowAdaptiveZoomWindow = profileStab?.adaptiveZoomWindow ?? globalStab?.adaptiveZoomWindow
-        self.gyroflowAdaptiveZoomMethod = AdaptiveZoomMethod(
-            rawValue: profileStab?.adaptiveZoomMethod ?? globalStab?.adaptiveZoomMethod ?? 1
-        ) ?? .dynamic
     }
 
     var availableSteps: [PipelineStep] {
@@ -376,15 +364,17 @@ final class WorkflowSession {
             args.append("--apply")
         }
 
-        if enabledSteps.contains(.gyroflow) {
+        if enabledSteps.contains(.gyroflow), let settings = workingProfile.gyroflowSettings {
             var stabilization: [String: Any] = [:]
-            if let maxZoom = gyroflowMaxZoom {
+            if let maxZoom = settings.maxZoom {
                 stabilization["max_zoom"] = maxZoom
             }
-            if let window = gyroflowAdaptiveZoomWindow {
+            if let window = settings.adaptiveZoomWindow {
                 stabilization["adaptive_zoom_window"] = window
             }
-            stabilization["adaptive_zoom_method"] = gyroflowAdaptiveZoomMethod.rawValue
+            if let method = settings.adaptiveZoomMethod {
+                stabilization["adaptive_zoom_method"] = method
+            }
 
             if !stabilization.isEmpty {
                 let preset: [String: Any] = ["stabilization": stabilization]

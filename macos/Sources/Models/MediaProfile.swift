@@ -9,6 +9,26 @@ struct ProfilesConfig: Codable {
         case gyroflow, profiles
         case backupConfig = "backup_config"
     }
+
+    func normalized() -> ProfilesConfig {
+        let globalStab = gyroflow?.preset?.stabilization
+        var result = self
+        for (name, profile) in profiles {
+            guard profile.gyroflowEnabled == true else { continue }
+            var p = profile
+            if p.gyroflowSettings == nil {
+                p.gyroflowSettings = globalStab ?? StabilizationSettings()
+            } else if let globalStab {
+                var settings = p.gyroflowSettings!
+                settings.maxZoom = settings.maxZoom ?? globalStab.maxZoom
+                settings.adaptiveZoomWindow = settings.adaptiveZoomWindow ?? globalStab.adaptiveZoomWindow
+                settings.adaptiveZoomMethod = settings.adaptiveZoomMethod ?? globalStab.adaptiveZoomMethod
+                p.gyroflowSettings = settings
+            }
+            result.profiles[name] = p
+        }
+        return result
+    }
 }
 
 struct BackupConfig: Codable {

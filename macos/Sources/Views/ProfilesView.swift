@@ -3,6 +3,7 @@ import SwiftUI
 struct ProfileEditingSession: Equatable {
     var name: String
     var profile: MediaProfile
+    var globalStabilization: StabilizationSettings?
 }
 
 struct ProfilesView: View {
@@ -204,6 +205,7 @@ struct ProfilesView: View {
     private func applyProfileLoad(_ target: ProfileEditingSession) {
         var session = target
         if session.profile.type == nil { session.profile.type = .video }
+        session.globalStabilization = state.profilesConfig?.gyroflow?.preset?.stabilization
         editor = session
         snapshot = session
         selectedProfile = session.name
@@ -297,9 +299,9 @@ struct ProfileEditorView: View {
                 verticalSpacing: 10
             ) {
                 GridRow {
-                    Text(Strings.Profiles.nameLabel).gridColumnAlignment(
-                        .trailing
-                    )
+                    Text(Strings.Profiles.nameLabel)
+                        .gridColumnAlignment(.trailing)
+                        .frame(minWidth: 110, alignment: .trailing)
                     TextField(
                         Strings.Profiles.namePlaceholder,
                         text: $session.name
@@ -473,7 +475,11 @@ struct ProfileEditorView: View {
             get: { session.profile.gyroflowEnabled ?? false },
             set: { newValue in
                 session.profile.gyroflowEnabled = newValue
-                if !newValue {
+                if newValue {
+                    if session.profile.gyroflowSettings == nil {
+                        session.profile.gyroflowSettings = session.globalStabilization ?? StabilizationSettings()
+                    }
+                } else {
                     session.profile.gyroflowSettings = nil
                 }
             }

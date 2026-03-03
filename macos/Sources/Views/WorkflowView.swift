@@ -29,8 +29,7 @@ struct WorkflowView: View {
             if !name.isEmpty {
                 state.workflowSession = WorkflowSession(
                     profile: state.profilesConfig?.profiles[name],
-                    profileName: name,
-                    globalGyroflow: state.profilesConfig?.gyroflow
+                    profileName: name
                 )
             }
         }
@@ -153,8 +152,7 @@ struct WorkflowView: View {
                         state.clearLog()
                         state.workflowSession = WorkflowSession(
                             profile: state.profilesConfig?.profiles[newValue],
-                            profileName: newValue,
-                            globalGyroflow: state.profilesConfig?.gyroflow
+                            profileName: newValue
                         )
                     }
             }
@@ -484,14 +482,13 @@ struct WorkflowView: View {
     }
 
     private var gyroflowOptions: some View {
-        @Bindable var session = state.workflowSession
-        return VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
                 Text(Strings.Profiles.maxZoomLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(width: 80, alignment: .trailing)
-                TextField("", value: $session.gyroflowMaxZoom, format: .number)
+                    .frame(width: 100, alignment: .trailing)
+                TextField("", value: gyroflowBinding(\.maxZoom), format: .number)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 70)
                 HelpButton(Strings.Profiles.maxZoomHelp)
@@ -500,8 +497,8 @@ struct WorkflowView: View {
                 Text(Strings.Profiles.adaptiveZoomWindowLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(width: 80, alignment: .trailing)
-                TextField("", value: $session.gyroflowAdaptiveZoomWindow, format: .number)
+                    .frame(width: 100, alignment: .trailing)
+                TextField("", value: gyroflowBinding(\.adaptiveZoomWindow), format: .number)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 70)
                 HelpButton(Strings.Profiles.adaptiveZoomWindowHelp)
@@ -510,8 +507,8 @@ struct WorkflowView: View {
                 Text(Strings.Profiles.adaptiveZoomMethodLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(width: 80, alignment: .trailing)
-                Picker("", selection: $session.gyroflowAdaptiveZoomMethod) {
+                    .frame(width: 100, alignment: .trailing)
+                Picker("", selection: gyroflowZoomMethodBinding) {
                     ForEach(AdaptiveZoomMethod.allCases) { method in
                         Text(method.label).tag(method)
                     }
@@ -523,6 +520,32 @@ struct WorkflowView: View {
             }
         }
         .padding(10)
+    }
+
+    private func gyroflowBinding(_ keyPath: WritableKeyPath<StabilizationSettings, Double?>) -> Binding<Double?> {
+        Binding(
+            get: { state.workflowSession.workingProfile.gyroflowSettings?[keyPath: keyPath] },
+            set: { newValue in
+                if state.workflowSession.workingProfile.gyroflowSettings == nil {
+                    state.workflowSession.workingProfile.gyroflowSettings = StabilizationSettings()
+                }
+                state.workflowSession.workingProfile.gyroflowSettings?[keyPath: keyPath] = newValue
+            }
+        )
+    }
+
+    private var gyroflowZoomMethodBinding: Binding<AdaptiveZoomMethod> {
+        Binding(
+            get: {
+                AdaptiveZoomMethod(rawValue: state.workflowSession.workingProfile.gyroflowSettings?.adaptiveZoomMethod ?? 1) ?? .dynamic
+            },
+            set: { newValue in
+                if state.workflowSession.workingProfile.gyroflowSettings == nil {
+                    state.workflowSession.workingProfile.gyroflowSettings = StabilizationSettings()
+                }
+                state.workflowSession.workingProfile.gyroflowSettings?.adaptiveZoomMethod = newValue.rawValue
+            }
+        )
     }
 
     // MARK: - Execution

@@ -82,7 +82,7 @@ struct SettingsView: View {
 
     private func loadProfiles() {
         do {
-            state.profilesConfig = try ProfileService.load(from: state.resolvedProfilesPath)
+            state.profilesConfig = try ProfileService.load(from: state.resolvedProfilesPath).normalized()
             state.profileLoadError = nil
         } catch {
             state.profilesConfig = nil
