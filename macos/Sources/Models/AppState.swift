@@ -239,6 +239,10 @@ final class WorkflowSession {
     var timezoneConflictFileTimezones: [String: [String]]?
     var showTimezoneConflict: Bool = false
 
+    var gyroflowMaxZoom: Double?
+    var gyroflowAdaptiveZoomWindow: Double?
+    var gyroflowAdaptiveZoomMethod: Int?
+
     var enabledSteps: Set<PipelineStep> = [] {
         didSet {
             if !enabledSteps.contains(.archiveSource) {
@@ -247,7 +251,8 @@ final class WorkflowSession {
         }
     }
 
-    init(profile: MediaProfile? = nil, profileName: String = "") {
+    init(profile: MediaProfile? = nil, profileName: String = "",
+         globalGyroflowConfig: GyroflowConfig? = nil) {
         self.profileName = profileName
         self.workingProfile = profile ?? MediaProfile()
         self.sourceDir = Dirtyable(profile?.sourceDir ?? "")
@@ -256,6 +261,13 @@ final class WorkflowSession {
         self.timezone = Dirtyable("")
         let availableSteps = Self.computeAvailableSteps(profile: profile)
         self.enabledSteps = Set(availableSteps.filter { $0 != .archiveSource })
+
+        // Initialize gyroflow settings: profile overrides > global defaults
+        let profileStab = profile?.gyroflowStabilization
+        let globalStab = globalGyroflowConfig?.preset?.stabilization
+        self.gyroflowMaxZoom = profileStab?.maxZoom ?? globalStab?.maxZoom
+        self.gyroflowAdaptiveZoomWindow = profileStab?.adaptiveZoomWindow ?? globalStab?.adaptiveZoomWindow
+        self.gyroflowAdaptiveZoomMethod = profileStab?.adaptiveZoomMethod ?? globalStab?.adaptiveZoomMethod
     }
 
     var availableSteps: [PipelineStep] {
@@ -362,6 +374,21 @@ final class WorkflowSession {
         }
         if applyMode {
             args.append("--apply")
+        }
+
+        if enabledSteps.contains(.gyroflow) {
+            var preset: [String: Any] = [:]
+            var stab: [String: Any] = [:]
+            if let maxZoom = gyroflowMaxZoom { stab["max_zoom"] = maxZoom }
+            if let window = gyroflowAdaptiveZoomWindow { stab["adaptive_zoom_window"] = window }
+            if let method = gyroflowAdaptiveZoomMethod { stab["adaptive_zoom_method"] = method }
+            if !stab.isEmpty {
+                preset["stabilization"] = stab
+                if let data = try? JSONSerialization.data(withJSONObject: preset),
+                   let json = String(data: data, encoding: .utf8) {
+                    args += ["--gyroflow-preset", json]
+                }
+            }
         }
 
         return (script: "media-pipeline.sh", args: args)

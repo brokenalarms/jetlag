@@ -21,16 +21,16 @@ struct BackupConfig: Codable {
     }
 }
 
-struct GyroflowConfig: Codable {
+struct GyroflowConfig: Codable, Equatable {
     var binary: String?
     var preset: GyroflowPreset?
 }
 
-struct GyroflowPreset: Codable {
+struct GyroflowPreset: Codable, Equatable {
     var stabilization: StabilizationSettings?
 }
 
-struct StabilizationSettings: Codable {
+struct StabilizationSettings: Codable, Equatable {
     var maxZoom: Double?
     var adaptiveZoomWindow: Double?
     var adaptiveZoomMethod: Int?
@@ -39,6 +39,22 @@ struct StabilizationSettings: Codable {
         case maxZoom = "max_zoom"
         case adaptiveZoomWindow = "adaptive_zoom_window"
         case adaptiveZoomMethod = "adaptive_zoom_method"
+    }
+}
+
+enum AdaptiveZoomMethod: Int, CaseIterable, Identifiable {
+    case disabled = 0
+    case dynamic = 1
+    case staticZoom = 2
+
+    var id: Int { rawValue }
+
+    var label: String {
+        switch self {
+        case .disabled: "Disabled"
+        case .dynamic: "Dynamic"
+        case .staticZoom: "Static"
+        }
     }
 }
 
@@ -71,6 +87,7 @@ struct MediaProfile: Codable, Equatable {
     var backupDir: String?
     var backupExcludeSubdirs: [String]?
     var gyroflowEnabled: Bool?
+    var gyroflowStabilization: StabilizationSettings?
     var tags: [String]?
     var exif: ExifConfig?
     var fileExtensions: [String]?
@@ -84,6 +101,7 @@ struct MediaProfile: Codable, Equatable {
         case backupDir = "backup_dir"
         case backupExcludeSubdirs = "backup_exclude_subdirs"
         case gyroflowEnabled = "gyroflow_enabled"
+        case gyroflowStabilization = "gyroflow_stabilization"
         case tags, exif
         case fileExtensions = "file_extensions"
         case companionExtensions = "companion_extensions"

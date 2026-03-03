@@ -29,7 +29,8 @@ struct WorkflowView: View {
             if !name.isEmpty {
                 state.workflowSession = WorkflowSession(
                     profile: state.profilesConfig?.profiles[name],
-                    profileName: name
+                    profileName: name,
+                    globalGyroflowConfig: state.profilesConfig?.gyroflow
                 )
             }
         }
@@ -152,7 +153,8 @@ struct WorkflowView: View {
                         state.clearLog()
                         state.workflowSession = WorkflowSession(
                             profile: state.profilesConfig?.profiles[newValue],
-                            profileName: newValue
+                            profileName: newValue,
+                            globalGyroflowConfig: state.profilesConfig?.gyroflow
                         )
                     }
             }
@@ -271,8 +273,9 @@ struct WorkflowView: View {
         case .archiveSource:
             Divider()
             archiveSourceOptions
-        default:
-            EmptyView()
+        case .gyroflow:
+            Divider()
+            gyroflowOptions
         }
     }
 
@@ -478,6 +481,58 @@ struct WorkflowView: View {
             }
         }
         .padding(10)
+    }
+
+    private var gyroflowOptions: some View {
+        @Bindable var session = state.workflowSession
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Text(Strings.Workflow.maxZoomLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 110, alignment: .trailing)
+                TextField("", value: $session.gyroflowMaxZoom, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
+                Text("%")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 4) {
+                Text(Strings.Workflow.adaptiveZoomWindowLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 110, alignment: .trailing)
+                TextField("", value: $session.gyroflowAdaptiveZoomWindow, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
+                Text("s")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 4) {
+                Text(Strings.Workflow.adaptiveZoomMethodLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 110, alignment: .trailing)
+                Picker("", selection: adaptiveZoomMethodBinding(for: session)) {
+                    ForEach(AdaptiveZoomMethod.allCases) { method in
+                        Text(method.label).tag(method)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 200)
+            }
+        }
+        .padding(10)
+    }
+
+    private func adaptiveZoomMethodBinding(for session: WorkflowSession) -> Binding<AdaptiveZoomMethod> {
+        Binding(
+            get: { AdaptiveZoomMethod(rawValue: session.gyroflowAdaptiveZoomMethod ?? 1) ?? .dynamic },
+            set: { session.gyroflowAdaptiveZoomMethod = $0.rawValue }
+        )
     }
 
     // MARK: - Execution

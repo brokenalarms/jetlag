@@ -521,6 +521,10 @@ def build_parser():
         "--allow-mixed-timezones", action="store_true",
         help="Allow processing files with different embedded timezones in a single batch. Without this flag, the pipeline stops when mixed timezones are detected."
     )
+    parser.add_argument(
+        "--gyroflow-preset",
+        help="JSON preset string for gyroflow stabilization settings (overrides config file defaults)"
+    )
     parser.add_argument("--tags", help="Comma-separated Finder tags (overrides profile tags)")
     parser.add_argument("--make", help="EXIF camera make (overrides profile exif.make)")
     parser.add_argument("--model", help="EXIF camera model (overrides profile exif.model)")
@@ -736,6 +740,14 @@ def main():
     }
 
     gyroflow_config = full_config.get("gyroflow")
+    if args.gyroflow_preset:
+        try:
+            preset_override = json.loads(args.gyroflow_preset)
+            if gyroflow_config is None:
+                gyroflow_config = {}
+            gyroflow_config["preset"] = preset_override
+        except json.JSONDecodeError:
+            print(f"⚠️  Invalid --gyroflow-preset JSON: {args.gyroflow_preset}", file=sys.stderr)
     tasks = set(args.tasks)
 
     companion_extensions = None

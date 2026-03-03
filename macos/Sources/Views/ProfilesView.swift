@@ -382,14 +382,21 @@ struct ProfileEditorView: View {
 
                 Divider().gridCellUnsizedAxes(.horizontal)
 
-                GridRow {
-                    Text("")
-                    HStack(spacing: 4) {
-                        Toggle(
-                            Strings.Profiles.gyroflowToggle,
-                            isOn: gyroflowToggle
-                        )
-                        HelpButton(Strings.Profiles.gyroflowHelp)
+                if session.profile.type != .photo {
+                    GridRow {
+                        Text("")
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 4) {
+                                Toggle(
+                                    Strings.Profiles.gyroflowToggle,
+                                    isOn: gyroflowToggle
+                                )
+                                HelpButton(Strings.Profiles.gyroflowHelp)
+                            }
+                            if session.profile.gyroflowEnabled == true {
+                                gyroflowStabilizationFields
+                            }
+                        }
                     }
                 }
             }
@@ -449,17 +456,97 @@ struct ProfileEditorView: View {
         )
     }
 
-    private var typeBinding: Binding<MediaType> {
-        Binding(
-            get: { session.profile.type ?? .video },
-            set: { session.profile.type = $0 }
-        )
-    }
-
     private var gyroflowToggle: Binding<Bool> {
         Binding(
             get: { session.profile.gyroflowEnabled ?? false },
-            set: { session.profile.gyroflowEnabled = $0 }
+            set: { newValue in
+                session.profile.gyroflowEnabled = newValue
+                if !newValue {
+                    session.profile.gyroflowStabilization = nil
+                }
+            }
+        )
+    }
+
+    private var typeBinding: Binding<MediaType> {
+        Binding(
+            get: { session.profile.type ?? .video },
+            set: { newValue in
+                session.profile.type = newValue
+                if newValue == .photo {
+                    session.profile.gyroflowEnabled = nil
+                    session.profile.gyroflowStabilization = nil
+                }
+            }
+        )
+    }
+
+    private var gyroflowStabilizationFields: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Text(Strings.Profiles.gyroflowMaxZoomLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 90, alignment: .trailing)
+                TextField("", value: stabilizationBinding(\.maxZoom), format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
+                Text("%")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 4) {
+                Text(Strings.Profiles.gyroflowAdaptiveZoomWindowLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 90, alignment: .trailing)
+                TextField("", value: stabilizationBinding(\.adaptiveZoomWindow), format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
+                Text("s")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 4) {
+                Text(Strings.Profiles.gyroflowAdaptiveZoomMethodLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 90, alignment: .trailing)
+                Picker("", selection: profileAdaptiveZoomMethodBinding) {
+                    ForEach(AdaptiveZoomMethod.allCases) { method in
+                        Text(method.label).tag(method)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 200)
+            }
+        }
+    }
+
+    private func stabilizationBinding(_ keyPath: WritableKeyPath<StabilizationSettings, Double?>) -> Binding<Double?> {
+        Binding(
+            get: { session.profile.gyroflowStabilization?[keyPath: keyPath] },
+            set: { newValue in
+                if session.profile.gyroflowStabilization == nil {
+                    session.profile.gyroflowStabilization = StabilizationSettings()
+                }
+                session.profile.gyroflowStabilization?[keyPath: keyPath] = newValue
+            }
+        )
+    }
+
+    private var profileAdaptiveZoomMethodBinding: Binding<AdaptiveZoomMethod> {
+        Binding(
+            get: {
+                AdaptiveZoomMethod(rawValue: session.profile.gyroflowStabilization?.adaptiveZoomMethod ?? 1) ?? .dynamic
+            },
+            set: { newValue in
+                if session.profile.gyroflowStabilization == nil {
+                    session.profile.gyroflowStabilization = StabilizationSettings()
+                }
+                session.profile.gyroflowStabilization?.adaptiveZoomMethod = newValue.rawValue
+            }
         )
     }
 }

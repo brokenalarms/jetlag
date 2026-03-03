@@ -4,8 +4,6 @@
 
 ## `macos/`
 
-- (2026-03-02) **Gyroflow task settings** the 3 gyroflow stabilization settings (max_zoom, adaptive_zoom_window, and adaptive_zoom_method (translated from enum to 3 meaningful values eg 1 == dynamic) should be exposed here to modify for the run. These are taken from defaults in media-profiles.yaml, but similarly in creating profiles when ticking the supports gyroflow data obx we should also have per-profile settings for these values become visible that are populated with the defaults. Also the supports gyroflow checkbox should not be available for photo profiles.
-
 - (2026-02-24) **Timeline visualization** — Horizontal timeline view showing files as colored blocks per camera, positioned by timestamp. Two rows per camera: "before" (scattered, gaps from timezone errors) and "after" (correctly interleaved). Builds on diff table data. Use the neon color palette already defined in Assets (NeonCyan, NeonPink, NeonYellow, NeonPurple) to distinguish cameras.
 
 - (2026-02-24) **Pipeline steps visual redesign** — Render pipeline steps as a connected horizontal chain with a line behind them. Always-on steps (ingest, output) shown in green, non-toggleable. Optional steps (tag, fix-timestamp, gyroflow, archive-source) are toggleable. Enabling a task in the chain causes its configuration options to appear as grouped rows below (e.g. enabling archive-source reveals source action picker: leave/archive/delete, with yellow accent).

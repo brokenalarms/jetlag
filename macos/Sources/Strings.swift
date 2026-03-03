@@ -123,6 +123,11 @@ What happens to source files after processing:
         static let dryRunHelp = String(localized: "workflow.dryRun.help",
             defaultValue: "Dry Run previews changes without modifying files. Apply performs the actual processing.")
 
+        // Gyroflow settings
+        static let maxZoomLabel = String(localized: "workflow.maxZoom.label", defaultValue: "Max zoom:")
+        static let adaptiveZoomWindowLabel = String(localized: "workflow.adaptiveZoomWindow.label", defaultValue: "Zoom window:")
+        static let adaptiveZoomMethodLabel = String(localized: "workflow.adaptiveZoomMethod.label", defaultValue: "Zoom method:")
+
         // Timezone conflict dialog
         static let timezoneConflictTitle = String(localized: "workflow.timezoneConflict.title",
             defaultValue: "Timezone Conflict")
@@ -176,6 +181,9 @@ What happens to source files after processing:
             defaultValue: "Sidecar files generated alongside the main video — e.g. .thm (thumbnail), .lrv (low-res proxy), .srt (subtitle/telemetry). Imported together with the main file unless skipped.")
         static let gyroflowHelp = String(localized: "profiles.gyroflow.help",
             defaultValue: "Generate Gyroflow stabilization project files during pipeline processing. Requires the camera to record gyroscope data (e.g. GoPro, Insta360).")
+        static let gyroflowMaxZoomLabel = String(localized: "profiles.gyroflow.maxZoom.label", defaultValue: "Max zoom:")
+        static let gyroflowAdaptiveZoomWindowLabel = String(localized: "profiles.gyroflow.adaptiveZoomWindow.label", defaultValue: "Zoom window:")
+        static let gyroflowAdaptiveZoomMethodLabel = String(localized: "profiles.gyroflow.adaptiveZoomMethod.label", defaultValue: "Zoom method:")
         static let fileExtensionsHelp = String(localized: "profiles.fileExtensions.help",
             defaultValue: "File types this profile processes (e.g. .mp4, .mov, .insv)")
         static let tagsHelp = String(localized: "profiles.tags.help",
