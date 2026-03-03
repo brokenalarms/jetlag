@@ -21,7 +21,7 @@ def signal_handler(sig, frame):
     print("\n\nInterrupted by user", file=sys.stderr)
     sys.exit(130)
 
-from lib.exiftool import exiftool
+from lib.metadata import metadata_service as exiftool
 from lib.results import emit_result
 from lib.timestamp_source import (
     read_exif_data,

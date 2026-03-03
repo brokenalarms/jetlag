@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 import argparse
 
-from lib.exiftool import exiftool
+from lib.metadata import metadata_service as exiftool
 from lib.results import emit_result
 
 

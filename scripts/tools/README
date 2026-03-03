@@ -4,6 +4,13 @@ exiftool   Perl script + lib/ from Image-ExifTool distribution (exiftool.org).
            Currently v13.50. To update: download a new tar.gz, replace
            exiftool and lib/.
 
+jetlag-metadata
+           Swift CLI wrapping ExifTool with a JSON-in/JSON-out interface.
+           Source at macos/Sources/Tools/jetlag-metadata/. Build:
+             cd macos/Sources/Tools/jetlag-metadata && swift build -c release
+             cp .build/release/jetlag-metadata ../../../../scripts/tools/
+           The binary is gitignored — each developer builds locally.
+
 tag        macOS Finder tag CLI (github.com/jdberry/tag), MIT licensed.
            Source vendored at tag-src/. Build on macOS:
              scripts/tools/build-tag.sh
