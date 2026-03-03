@@ -74,12 +74,34 @@ def has_motion_data(file_path: Path) -> Optional[bool]:
     return False
 
 
+def resolve_gyroflow_binary(configured_path: Optional[str] = None) -> Optional[str]:
+    """Find the gyroflow binary: bundled → configured → PATH.
+
+    Returns the resolved path, or None if not found anywhere.
+    """
+    # 1. Bundled binary in scripts/tools/
+    bundled = SCRIPT_DIR / "tools" / "gyroflow"
+    if bundled.is_file() and os.access(bundled, os.X_OK):
+        return str(bundled)
+
+    # 2. Configured path from media-profiles.yaml
+    if configured_path and os.path.isfile(configured_path):
+        return configured_path
+
+    # 3. System PATH (e.g. Homebrew install, Gyroflow.app symlink)
+    path_binary = shutil.which("gyroflow")
+    if path_binary:
+        return path_binary
+
+    return None
+
+
 def load_gyroflow_config() -> dict:
     """Load gyroflow config from media-profiles.yaml."""
     profiles_file = SCRIPT_DIR / "media-profiles.yaml"
     if not profiles_file.exists():
         print(f"ERROR: Config file not found: {profiles_file}", file=sys.stderr)
-        print("Add a 'gyroflow' section to media-profiles.yaml with 'binary' path", file=sys.stderr)
+        print("Add a 'gyroflow' section to media-profiles.yaml", file=sys.stderr)
         sys.exit(1)
 
     with open(profiles_file) as f:
@@ -88,11 +110,7 @@ def load_gyroflow_config() -> dict:
     config = data.get("gyroflow")
     if not config:
         print("ERROR: No 'gyroflow' section found in media-profiles.yaml", file=sys.stderr)
-        print("Add a 'gyroflow' section with at minimum a 'binary' path", file=sys.stderr)
-        sys.exit(1)
-
-    if not config.get("binary"):
-        print("ERROR: No 'binary' path in gyroflow config in media-profiles.yaml", file=sys.stderr)
+        print("Add a 'gyroflow' section to media-profiles.yaml", file=sys.stderr)
         sys.exit(1)
 
     return config
@@ -134,20 +152,17 @@ def generate_gyroflow_project(
         print(f"Would generate: {gyroflow_path}", file=sys.stderr)
         return GyroflowResult(gyroflow_path=gyroflow_path, action="would_generate")
 
-    if not binary or not os.path.isfile(binary):
-        # Configured path missing — try PATH (e.g. Homebrew install)
-        path_binary = shutil.which("gyroflow")
-        if path_binary:
-            binary = path_binary
-        else:
-            configured = binary or "(not set)"
-            print(f"Warning: Gyroflow not found at configured path ({configured}) or in $PATH", file=sys.stderr)
-            print("Install Gyroflow or update the 'binary' path in media-profiles.yaml", file=sys.stderr)
-            return GyroflowResult(
-                gyroflow_path=gyroflow_path,
-                action="skipped",
-                error=f"Gyroflow not found at {configured} or in $PATH",
-            )
+    resolved = resolve_gyroflow_binary(binary)
+    if not resolved:
+        configured = binary or "(not set)"
+        print(f"Warning: Gyroflow not found — checked bundled tools/, configured path ({configured}), and $PATH", file=sys.stderr)
+        print("Run scripts/tools/download-gyroflow.sh or install Gyroflow", file=sys.stderr)
+        return GyroflowResult(
+            gyroflow_path=gyroflow_path,
+            action="skipped",
+            error=f"Gyroflow not found at {configured} or in $PATH",
+        )
+    binary = resolved
 
     cmd = [binary, str(file_path), "--export-project", "2"]
 
@@ -193,7 +208,7 @@ def main():
     preset_json = args.preset
     if args.apply:
         config = load_gyroflow_config()
-        binary = config["binary"]
+        binary = config.get("binary")
         if not preset_json:
             preset_json = json.dumps(config.get("preset", {}))
 

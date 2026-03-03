@@ -11,6 +11,12 @@
 _ENSURE_VENV_SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 _ENSURE_VENV_DIR="$_ENSURE_VENV_SCRIPTS_DIR/.venv"
 _ENSURE_VENV_REQS="$_ENSURE_VENV_SCRIPTS_DIR/requirements.txt"
+_ENSURE_VENV_TOOLS="$_ENSURE_VENV_SCRIPTS_DIR/tools"
+
+# Prepend vendored tools (ffprobe, gyroflow, exiftool, tag) to PATH
+if [[ -d "$_ENSURE_VENV_TOOLS" ]]; then
+    export PATH="$_ENSURE_VENV_TOOLS:$PATH"
+fi
 
 if [[ ! -d "$_ENSURE_VENV_DIR" ]]; then
     if ! command -v python3 &>/dev/null; then
@@ -27,4 +33,4 @@ if [[ -d "$_ENSURE_VENV_DIR" ]]; then
     export PATH="$_ENSURE_VENV_DIR/bin:$PATH"
 fi
 
-unset _ENSURE_VENV_SCRIPTS_DIR _ENSURE_VENV_DIR _ENSURE_VENV_REQS
+unset _ENSURE_VENV_SCRIPTS_DIR _ENSURE_VENV_DIR _ENSURE_VENV_REQS _ENSURE_VENV_TOOLS

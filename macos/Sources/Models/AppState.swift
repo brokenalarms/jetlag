@@ -297,46 +297,6 @@ final class WorkflowSession {
         return active.allSatisfy { isStepReady($0) }
     }
 
-    // MARK: - Gyroflow tool availability (UI hint only)
-
-    struct GyroflowToolStatus {
-        let ffprobeMissing: Bool
-        let gyroflowMissing: Bool
-        var anyMissing: Bool { ffprobeMissing || gyroflowMissing }
-    }
-
-    /// Pre-flight check: are the external tools needed by the gyroflow step installed?
-    /// Checks configured path first (App Store / .dmg), then $PATH (Homebrew).
-    static func checkGyroflowTools(gyroflowConfig: GyroflowConfig?) -> GyroflowToolStatus {
-        GyroflowToolStatus(
-            ffprobeMissing: !isToolInPath("ffprobe"),
-            gyroflowMissing: !isGyroflowInstalled(config: gyroflowConfig)
-        )
-    }
-
-    private static func isToolInPath(_ name: String) -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = [name]
-        process.standardOutput = Pipe()
-        process.standardError = Pipe()
-        do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
-        } catch {
-            return false
-        }
-    }
-
-    private static func isGyroflowInstalled(config: GyroflowConfig?) -> Bool {
-        if let binary = config?.binary, !binary.isEmpty,
-           FileManager.default.isExecutableFile(atPath: binary) {
-            return true
-        }
-        return isToolInPath("gyroflow")
-    }
-
     func buildPipelineArgs() -> (script: String, args: [String]) {
         var args: [String] = []
         args += ["--profile", profileName]
