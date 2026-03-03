@@ -7,5 +7,3 @@
 ## `scripts/` + `macos/`
 
 ## `web/`
-
-- (2026-02-26) **Interactive before/after timeline slider** — Replace the static side-by-side cards in the Problem section with a draggable slider. Clips animate between broken and corrected positions as the user drags. Reuse existing `timeline.js` scale/positioning math. The before state is the default; dragging right reveals the corrected positions with smooth CSS transitions.

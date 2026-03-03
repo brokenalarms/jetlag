@@ -3,6 +3,7 @@ import './style.css'
 import { renderNav } from './sections/nav.js'
 import { renderHero } from './sections/hero.js'
 import { renderProblem } from './sections/problem.js'
+import { initSliders } from './components/timeline.js'
 import { renderFeatures } from './sections/features.js'
 import { renderAudience } from './sections/audience.js'
 import { renderHowItWorks } from './sections/how-it-works.js'
@@ -25,6 +26,8 @@ function mount() {
     renderDownload(),
     renderFooter(),
   ].join('')
+
+  initSliders()
 
   // Intersection Observer for scroll-triggered fade-in
   const observer = new IntersectionObserver(

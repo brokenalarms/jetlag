@@ -41,6 +41,15 @@
   .feature-icon {
     @apply flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400;
   }
+
+  .scenario-slider {
+    transition: border-color 0.3s ease, background-color 0.3s ease;
+  }
+
+  .scenario-slider[data-state="after"] {
+    border-color: rgba(255, 45, 120, 0.2);
+    background-color: rgba(255, 45, 120, 0.05);
+  }
 }
 
 @layer utilities {
@@ -208,6 +217,50 @@
     79.3%    { background-position-y: 6px; }
     79.8%    { background-position-y: 0px; }
     100%     { background-position-y: 0px; }
+  }
+
+  .slider-range {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .slider-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    cursor: grab;
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.15);
+    transition: transform 0.15s ease;
+  }
+
+  .slider-range:active::-webkit-slider-thumb {
+    cursor: grabbing;
+    transform: scale(1.15);
+  }
+
+  .slider-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    border: none;
+    cursor: grab;
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.15);
+  }
+
+  .slider-range::-moz-range-track {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    border: none;
   }
 
   .vhs-glitch {
