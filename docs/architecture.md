@@ -92,8 +92,10 @@ All EXIF/metadata operations go through `MetadataService` (`scripts/lib/metadata
 which provides a unified `read_tags`/`write_tags` API. It delegates to one of two backends:
 
 1. **`jetlag-metadata`** (preferred) — a Swift CLI tool (`macos/Sources/Tools/jetlag-metadata/`)
-   that wraps ExifTool behind a JSON-over-stdin/stdout protocol. Runs as a persistent process
-   for low per-operation latency.
+   that uses native Apple frameworks. Photos use ImageIO (`CGImageSource`/`CGImageDestination`)
+   for EXIF read/write. Videos use binary QuickTime atom parsing for mvhd/mdhd timestamps and
+   mdta keys (creationdate, make, model). Runs as a persistent process for low per-operation
+   latency.
 2. **ExifTool directly** (fallback) — used when `jetlag-metadata` isn't available
    (e.g. Linux CI without Swift). Uses ExifTool's native `-stay_open` protocol.
 
@@ -102,10 +104,6 @@ in `scripts/tools/` first, then `$PATH`, falling back to ExifTool if neither is 
 
 All scripts import the singleton: `from lib.metadata import metadata_service as exiftool`.
 The `as exiftool` alias preserves call-site compatibility with the original ExifTool wrapper.
-
-This abstraction layer is Phase 1 of the App Store migration path
-(`docs/specs/swift-migration.md`). Phase 2 replaces the ExifTool backend inside
-`jetlag-metadata` with native Swift code, without touching any Python callers.
 
 ---
 
