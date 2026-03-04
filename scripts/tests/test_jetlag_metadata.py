@@ -122,6 +122,7 @@ class TestVideoRead:
 class TestVideoWrite:
     """Write operations on MP4/MOV files."""
 
+    @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — st_birthtime unavailable on Linux")
     def test_write_preserves_file_timestamps(self, service, tmp_path):
         """Metadata writes must not change the file's filesystem timestamps.
 
