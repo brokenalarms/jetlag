@@ -82,6 +82,10 @@ enum QuickTimeMetadata {
     static func writeTags(file: String, tags: [String: String]) -> Bool {
         guard FileManager.default.isWritableFile(atPath: file) else { return false }
 
+        let origAttrs = try? FileManager.default.attributesOfItem(atPath: file)
+        let origModDate = origAttrs?[.modificationDate] as? Date
+        let origCreateDate = origAttrs?[.creationDate] as? Date
+
         var changed = false
 
         // Pass 1: in-place timestamp patches (via FileHandle, before any full rewrite)
@@ -112,24 +116,34 @@ enum QuickTimeMetadata {
             handle.closeFile()
         }
 
-        // Pass 2: mdta key writes (full file rewrite)
+        // Pass 2: batch all mdta key writes into a single operation
+        var mdtaKeys: [String: String] = [:]
         for (tag, value) in tags {
             let normalized = normalizeTagName(tag)
             switch normalized {
             case "DateTimeOriginal", "Keys:CreationDate":
-                if writeMdtaKey(file: file, key: "com.apple.quicktime.creationdate", value: isoDate(value)) {
-                    changed = true
-                }
+                mdtaKeys["com.apple.quicktime.creationdate"] = isoDate(value)
             case "Make":
-                if writeMdtaKey(file: file, key: "com.apple.quicktime.make", value: value) {
-                    changed = true
-                }
+                mdtaKeys["com.apple.quicktime.make"] = value
             case "Model":
-                if writeMdtaKey(file: file, key: "com.apple.quicktime.model", value: value) {
-                    changed = true
-                }
+                mdtaKeys["com.apple.quicktime.model"] = value
             default:
                 break
+            }
+        }
+        if !mdtaKeys.isEmpty {
+            let keyPairs = mdtaKeys.map { (key: $0.key, value: $0.value) }
+            if writeMdtaKeys(file: file, keys: keyPairs) {
+                changed = true
+            }
+        }
+
+        if changed {
+            var restore: [FileAttributeKey: Any] = [:]
+            if let d = origModDate { restore[.modificationDate] = d }
+            if let d = origCreateDate { restore[.creationDate] = d }
+            if !restore.isEmpty {
+                try? FileManager.default.setAttributes(restore, ofItemAtPath: file)
             }
         }
 
@@ -418,7 +432,8 @@ enum QuickTimeMetadata {
 
     // MARK: - mdta key writing
 
-    private static func writeMdtaKey(file: String, key: String, value: String) -> Bool {
+    private static func writeMdtaKeys(file: String, keys: [(key: String, value: String)]) -> Bool {
+        guard !keys.isEmpty else { return false }
         guard let handle = FileHandle(forReadingAtPath: file) else { return false }
         defer { handle.closeFile() }
 
@@ -430,7 +445,7 @@ enum QuickTimeMetadata {
         }
 
         guard let meta = findAtom(in: handle, type: "meta", range: moov.contentRange) else {
-            return rewriteWithNewMdtaKey(file: file, moovAtom: moov, key: key, value: value)
+            return rewriteWithMdtaKeys(file: file, moovAtom: moov, keys: keys)
         }
 
         let childRange = metaChildRange(handle, meta: meta)
@@ -438,14 +453,19 @@ enum QuickTimeMetadata {
         guard let keysAtom = findAtom(in: handle, type: "keys", range: childRange),
               let ilstAtom = findAtom(in: handle, type: "ilst", range: childRange)
         else {
-            return rewriteWithNewMdtaKey(file: file, moovAtom: moov, key: key, value: value)
+            return rewriteWithMdtaKeys(file: file, moovAtom: moov, keys: keys)
         }
 
-        let keys = parseKeysAtom(handle, atom: keysAtom)
+        let existingKeys = parseKeysAtom(handle, atom: keysAtom)
 
-        // Check if key already exists with same-length value
-        if let existingIndex = keys.first(where: { $0.value == key })?.key {
-            // Find the ilst entry for this index and check value length
+        // Try in-place patches: only if every key exists with same-length value
+        var patches: [(offset: UInt64, data: Data)] = []
+        for (key, value) in keys {
+            guard let existingIndex = existingKeys.first(where: { $0.value == key })?.key else {
+                return rewriteWithMdtaKeys(file: file, moovAtom: moov, keys: keys)
+            }
+
+            var found = false
             var pos = ilstAtom.contentRange.lowerBound
             while pos < ilstAtom.contentRange.upperBound {
                 guard let item = readAtomHeader(handle, at: pos,
@@ -460,29 +480,37 @@ enum QuickTimeMetadata {
                         let newData = Data(value.utf8)
 
                         if newData.count == existingLen {
-                            guard let wh = try? FileHandle(forUpdating:
-                                URL(fileURLWithPath: file)) else { return false }
-                            defer { wh.closeFile() }
-                            wh.seek(toFileOffset: valueOffset)
-                            wh.write(newData)
-                            return true
+                            patches.append((valueOffset, newData))
+                            found = true
+                        } else {
+                            return rewriteWithMdtaKeys(file: file, moovAtom: moov, keys: keys)
                         }
                     }
                 }
                 pos = item.offset + item.size
             }
+            if !found {
+                return rewriteWithMdtaKeys(file: file, moovAtom: moov, keys: keys)
+            }
         }
 
-        return rewriteWithNewMdtaKey(file: file, moovAtom: moov, key: key, value: value)
+        guard let wh = try? FileHandle(forUpdating: URL(fileURLWithPath: file)) else {
+            return false
+        }
+        defer { wh.closeFile() }
+        for (offset, data) in patches {
+            wh.seek(toFileOffset: offset)
+            wh.write(data)
+        }
+        return true
     }
 
     // MARK: - Full moov rewrite
 
-    private static func rewriteWithNewMdtaKey(
+    private static func rewriteWithMdtaKeys(
         file: String,
         moovAtom: Atom,
-        key: String,
-        value: String
+        keys: [(key: String, value: String)]
     ) -> Bool {
         let url = URL(fileURLWithPath: file)
         guard let readHandle = FileHandle(forReadingAtPath: file) else { return false }
@@ -491,18 +519,15 @@ enum QuickTimeMetadata {
         let fileSize = readHandle.seekToEndOfFile()
         readHandle.seek(toFileOffset: 0)
 
-        // Read original moov data
         readHandle.seek(toFileOffset: moovAtom.offset + UInt64(moovAtom.headerSize))
         let moovData = readHandle.readData(
             ofLength: Int(moovAtom.size) - moovAtom.headerSize
         )
 
-        // Build new moov with updated/added mdta key
         guard var newMoovContent = buildUpdatedMoov(
             originalContent: moovData,
             moovAtom: moovAtom,
-            key: key,
-            value: value,
+            keys: keys,
             readHandle: readHandle
         ) else { return false }
 
@@ -513,15 +538,11 @@ enum QuickTimeMetadata {
 
         let sizeDelta = Int64(newMoovSize) - Int64(moovAtom.size)
 
-        // Adjust stco/co64 chunk offsets. These are absolute file offsets.
-        // Only offsets pointing past moov need adjustment — data before moov
-        // (e.g. mdat in standard camera layout) stays at the same position.
         let moovEnd = moovAtom.offset + moovAtom.size
         if sizeDelta != 0 {
             adjustChunkOffsets(in: &newMoovContent, delta: sizeDelta, threshold: moovEnd)
         }
 
-        // Write new file
         let tempURL = url.deletingLastPathComponent()
             .appendingPathComponent(".\(UUID().uuidString).\(url.pathExtension)")
 
@@ -535,15 +556,11 @@ enum QuickTimeMetadata {
         defer { writeHandle.closeFile() }
 
         readHandle.seek(toFileOffset: 0)
-
-        // Copy atoms before moov
         copyBytes(from: readHandle, to: writeHandle, count: Int(moovAtom.offset))
 
-        // Write new moov
         writeHandle.write(moovHeader)
         writeHandle.write(newMoovContent)
 
-        // Copy atoms after moov using buffered IO
         let afterMoov = moovAtom.offset + moovAtom.size
         if afterMoov < fileSize {
             readHandle.seek(toFileOffset: afterMoov)
@@ -551,21 +568,9 @@ enum QuickTimeMetadata {
         }
 
         do {
-            let attrs = try FileManager.default.attributesOfItem(atPath: file)
-            let modDate = attrs[.modificationDate] as? Date
-            let createDate = attrs[.creationDate] as? Date
-
             writeHandle.closeFile()
             readHandle.closeFile()
-
             _ = try FileManager.default.replaceItemAt(url, withItemAt: tempURL)
-
-            var restore: [FileAttributeKey: Any] = [:]
-            if let d = modDate { restore[.modificationDate] = d }
-            if let d = createDate { restore[.creationDate] = d }
-            if !restore.isEmpty {
-                try FileManager.default.setAttributes(restore, ofItemAtPath: file)
-            }
             return true
         } catch {
             try? FileManager.default.removeItem(at: tempURL)
@@ -576,11 +581,9 @@ enum QuickTimeMetadata {
     private static func buildUpdatedMoov(
         originalContent: Data,
         moovAtom: Atom,
-        key: String,
-        value: String,
+        keys: [(key: String, value: String)],
         readHandle: FileHandle
     ) -> Data? {
-        // Parse children of moov to find/rebuild meta atom
         var result = Data()
         var pos = 0
         var foundMeta = false
@@ -604,7 +607,7 @@ enum QuickTimeMetadata {
             if type == "meta" {
                 foundMeta = true
                 let metaContent = Data(originalContent[pos..<(pos + atomSize)])
-                let newMeta = rebuildMetaAtom(metaContent, key: key, value: value)
+                let newMeta = rebuildMetaAtom(metaContent, keys: keys)
                 result.append(newMeta)
             } else {
                 result.append(originalContent[pos..<(pos + atomSize)])
@@ -614,18 +617,17 @@ enum QuickTimeMetadata {
         }
 
         if !foundMeta {
-            result.append(buildNewMetaAtom(key: key, value: value))
+            result.append(buildNewMetaAtom(keys: keys))
         }
 
         return result
     }
 
-    private static func rebuildMetaAtom(_ metaData: Data, key: String, value: String) -> Data {
+    private static func rebuildMetaAtom(_ metaData: Data, keys keysToWrite: [(key: String, value: String)]) -> Data {
         guard metaData.count >= 16 else {
-            return buildNewMetaAtom(key: key, value: value)
+            return buildNewMetaAtom(keys: keysToWrite)
         }
 
-        // Detect QuickTime (no version+flags) vs ISO (with version+flags)
         let headerSize = 8
         let probeSize = metaData.uint32BE(at: headerSize)
         let probeType = metaData.fourCC(at: headerSize + 4)
@@ -635,7 +637,7 @@ enum QuickTimeMetadata {
         let hasVersionFlags = !(probeSize >= 8 && isPrintable)
         let childStart = hasVersionFlags ? headerSize + 4 : headerSize
 
-        var existingKeys: [(String)] = []
+        var existingKeys: [String] = []
         var existingItems: [(Int, Data)] = []
         var otherChildren = Data()
 
@@ -657,23 +659,25 @@ enum QuickTimeMetadata {
             pos += atomSize
         }
 
-        var keyIndex = existingKeys.firstIndex(of: key)
-        if keyIndex == nil {
-            existingKeys.append(key)
-            keyIndex = existingKeys.count - 1
+        var newItems = existingItems
+        for (key, value) in keysToWrite {
+            var keyIndex = existingKeys.firstIndex(of: key)
+            if keyIndex == nil {
+                existingKeys.append(key)
+                keyIndex = existingKeys.count - 1
+            }
+            let oneBasedIndex = keyIndex! + 1
+
+            let valueBytes = Data(value.utf8)
+            let dataAtomContent = buildDataAtom(typeIndicator: 1, value: valueBytes)
+
+            newItems = newItems.filter { $0.0 != oneBasedIndex }
+            newItems.append((oneBasedIndex, dataAtomContent))
         }
-        let oneBasedIndex = keyIndex! + 1
-
-        let valueBytes = Data(value.utf8)
-        let dataAtomContent = buildDataAtom(typeIndicator: 1, value: valueBytes)
-
-        var newItems = existingItems.filter { $0.0 != oneBasedIndex }
-        newItems.append((oneBasedIndex, dataAtomContent))
 
         let keysAtom = buildKeysAtom(existingKeys)
         let ilstAtom = buildIlstAtom(newItems)
 
-        // Rebuild meta — always write QuickTime-style (no version+flags)
         var metaContent = Data()
         metaContent.append(otherChildren)
         metaContent.append(keysAtom)
@@ -687,12 +691,16 @@ enum QuickTimeMetadata {
         return metaResult
     }
 
-    private static func buildNewMetaAtom(key: String, value: String) -> Data {
+    private static func buildNewMetaAtom(keys: [(key: String, value: String)]) -> Data {
         let hdlr = buildHdlrAtom()
-        let keysAtom = buildKeysAtom([key])
-        let valueData = Data(value.utf8)
-        let dataAtom = buildDataAtom(typeIndicator: 1, value: valueData)
-        let ilstAtom = buildIlstAtom([(1, dataAtom)])
+        let keysAtom = buildKeysAtom(keys.map { $0.key })
+
+        var items: [(Int, Data)] = []
+        for (i, kv) in keys.enumerated() {
+            let dataAtom = buildDataAtom(typeIndicator: 1, value: Data(kv.value.utf8))
+            items.append((i + 1, dataAtom))
+        }
+        let ilstAtom = buildIlstAtom(items)
 
         var metaContent = Data()
         metaContent.append(hdlr)

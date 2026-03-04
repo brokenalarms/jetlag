@@ -122,6 +122,39 @@ class TestVideoRead:
 class TestVideoWrite:
     """Write operations on MP4/MOV files."""
 
+    def test_write_preserves_file_timestamps(self, service, tmp_path):
+        """Metadata writes must not change the file's filesystem timestamps.
+
+        This covers the in-place timestamp patch path (Pass 1 only, no mdta
+        key writes) which previously skipped timestamp restoration.
+        """
+        import os
+        import time
+
+        video = tmp_path / "ts_preserve.mp4"
+        create_test_video(str(video))
+
+        old_mtime = os.path.getmtime(str(video))
+        old_ctime = os.stat(str(video)).st_birthtime
+
+        time.sleep(0.1)
+
+        service.write_tags(
+            str(video),
+            ["-QuickTime:CreateDate=2025:01:01 00:00:00",
+             "-QuickTime:MediaCreateDate=2025:01:01 00:00:00"],
+        )
+
+        new_mtime = os.path.getmtime(str(video))
+        new_ctime = os.stat(str(video)).st_birthtime
+
+        assert abs(new_mtime - old_mtime) < 1, (
+            f"mtime changed: {old_mtime} -> {new_mtime}"
+        )
+        assert abs(new_ctime - old_ctime) < 1, (
+            f"birthtime changed: {old_ctime} -> {new_ctime}"
+        )
+
     def test_write_returns_true(self, service, sample_video):
         ok = service.write_tags(str(sample_video), ["-Make=NewCam"])
         assert ok is True
