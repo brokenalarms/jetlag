@@ -28,7 +28,11 @@ def service():
 @pytest.fixture
 def sample_video(tmp_path):
     video = tmp_path / "test.mp4"
-    create_test_video(str(video), DateTimeOriginal="2024:06:15 10:30:00")
+    create_test_video(
+        str(video),
+        **{"Keys:CreationDate": "2024-06-15T10:30:00+00:00"},
+        Make="TestMake",
+    )
     return video
 
 
@@ -36,30 +40,29 @@ class TestReadTags:
     """JSON round-trip for read operations."""
 
     def test_read_returns_matching_tags(self, service, sample_video):
-        result = service.read_tags(str(sample_video), ["DateTimeOriginal"])
-        assert "DateTimeOriginal" in result
-        assert result["DateTimeOriginal"].startswith("2024:06:15")
+        result = service.read_tags(str(sample_video), ["CreationDate"])
+        assert "CreationDate" in result
+        assert "2024:06:15" in result["CreationDate"]
 
     def test_read_multiple_tags(self, service, tmp_path):
         video = tmp_path / "multi.mp4"
         create_test_video(
             str(video),
-            DateTimeOriginal="2024:01:01 08:00:00",
             Make="TestCam",
             Model="TestModel",
         )
-        result = service.read_tags(str(video), ["DateTimeOriginal", "Make", "Model"])
+        result = service.read_tags(str(video), ["Make", "Model"])
         assert result["Make"] == "TestCam"
         assert result["Model"] == "TestModel"
 
     def test_read_fast_mode(self, service, sample_video):
         result = service.read_tags(
-            str(sample_video), ["DateTimeOriginal"], extra_args=["-fast2"]
+            str(sample_video), ["CreationDate"], extra_args=["-fast2"]
         )
-        assert "DateTimeOriginal" in result
+        assert "CreationDate" in result
 
     def test_read_missing_file_returns_empty(self, service):
-        result = service.read_tags("/nonexistent/file.mp4", ["DateTimeOriginal"])
+        result = service.read_tags("/nonexistent/file.mp4", ["CreationDate"])
         assert result == {}
 
     def test_read_missing_tag_excluded(self, service, sample_video):
@@ -84,14 +87,14 @@ class TestWriteTags:
         ok = service.write_tags(
             str(sample_video),
             [
-                "-DateTimeOriginal=2025:03:01 12:00:00",
+                "-Keys:CreationDate=2025-03-01T12:00:00+00:00",
                 "-Make=Multi",
                 "-Model=Write",
             ],
         )
         assert ok is True
         result = service.read_tags(
-            str(sample_video), ["DateTimeOriginal", "Make", "Model"]
+            str(sample_video), ["CreationDate", "Make", "Model"]
         )
         assert result["Make"] == "Multi"
         assert result["Model"] == "Write"

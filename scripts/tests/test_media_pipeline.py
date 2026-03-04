@@ -89,13 +89,10 @@ def get_file_birth_time(path: Path) -> str:
 
 
 def get_exif_field(path: Path, field: str) -> str:
-    """Get an exif field value."""
-    result = subprocess.run(
-        ["exiftool", "-s3", f"-{field}", str(path)],
-        capture_output=True,
-        text=True,
-    )
-    return result.stdout.strip()
+    """Get an exif field value via MetadataService."""
+    from lib.metadata import metadata_service
+    result = metadata_service.read_tags(str(path), [field])
+    return result.get(field, "")
 
 
 @pytest.fixture

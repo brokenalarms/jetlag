@@ -184,13 +184,8 @@ class TestGetExistingExifCamera:
 
     def test_get_existing_exif_with_data(self):
         """Test getting EXIF from file with camera data"""
-        # Set EXIF
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-Make=GoPro",
-            "-Model=HERO12 Black",
-            self.test_video
-        ], capture_output=True, check=True)
+        from lib.metadata import metadata_service
+        metadata_service.write_tags(self.test_video, ["-Make=GoPro", "-Model=HERO12 Black"])
 
         data = tm.get_existing_exif_camera(self.test_video)
 
@@ -227,12 +222,8 @@ class TestAddCameraToExif:
 
     def test_add_camera_skips_existing(self):
         """Test that existing fields are skipped"""
-        # Set Make only
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-Make=GoPro",
-            self.test_video
-        ], capture_output=True, check=True)
+        from lib.metadata import metadata_service
+        metadata_service.write_tags(self.test_video, ["-Make=GoPro"])
 
         # Add both Make and Model
         success, fields_updated = tm.add_camera_to_exif(
@@ -293,13 +284,8 @@ class TestAddCameraToExif:
 
     def test_add_camera_none_needed(self):
         """Test when no fields need updating"""
-        # Set both fields
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-Make=GoPro",
-            "-Model=HERO12 Black",
-            self.test_video
-        ], capture_output=True, check=True)
+        from lib.metadata import metadata_service
+        metadata_service.write_tags(self.test_video, ["-Make=GoPro", "-Model=HERO12 Black"])
 
         # Try to set same values
         success, fields_updated = tm.add_camera_to_exif(

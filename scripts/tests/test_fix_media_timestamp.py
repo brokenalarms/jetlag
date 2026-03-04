@@ -218,9 +218,8 @@ class TestFixMediaTimestampIntegration:
 
         # All should have similar output (same corrections needed)
         for i in range(len(results) - 1):
-            # Compare key parts of output (human-readable on stderr)
-            assert "Keys:CreationDate" in results[i].stderr
-            assert "Keys:CreationDate" in results[i + 1].stderr
+            assert "QuickTime CreateDate" in results[i].stderr
+            assert "QuickTime CreateDate" in results[i + 1].stderr
 
 
 class TestFixMediaTimestampMachineOutput:

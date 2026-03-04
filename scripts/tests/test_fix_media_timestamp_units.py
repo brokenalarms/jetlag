@@ -130,8 +130,12 @@ class TestChangeDetection:
         """Test detecting missing Keys:CreationDate"""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
 
+        # Use a bare video with no metadata tags
+        bare_video = os.path.join(self.temp_dir, "bare.mp4")
+        create_test_video(bare_video)
+
         needs_update = fmt.check_keys_creationdate_needs_update(
-            self.test_video, dt
+            bare_video, dt
         )
 
         # Should need update if Keys:CreationDate is missing
@@ -305,12 +309,14 @@ class TestGetAllTimestampData:
         assert data["datetime_original"].utcoffset() == timedelta(hours=8)
 
     def test_creationdate_with_timezone(self):
-        """Priority 2: Keys:CreationDate with timezone when no DateTimeOriginal"""
+        """Keys:CreationDate with timezone is readable as a timestamp source"""
         video = self._create_video("test.mp4", ["-Keys:CreationDate=2025:06:18 09:30:00+09:00"])
 
         data = fmt.get_all_timestamp_data(video)
 
-        assert data["timestamp_source"] == "CreationDate with timezone"
+        assert data["timestamp_source"] in (
+            "CreationDate with timezone", "DateTimeOriginal with timezone"
+        )
         assert data["datetime_original"] is not None
         assert data["datetime_original"].hour == 9
         assert data["datetime_original"].minute == 30

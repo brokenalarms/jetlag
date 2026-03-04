@@ -329,11 +329,8 @@ class TestExtractMetadataTimezone:
         video_path = os.path.join(self.temp_dir, "test_tz.mp4")
         self._create_test_video(video_path)
 
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:10:24 11:48:59+08:00",
-            video_path
-        ], capture_output=True, check=True)
+        from lib.metadata import metadata_service
+        metadata_service.write_tags(video_path, ["-DateTimeOriginal=2025:10:24 11:48:59+08:00"])
 
         fmt._exif_cache.clear()
         result = fmt.extract_metadata_timezone(video_path)
@@ -344,11 +341,8 @@ class TestExtractMetadataTimezone:
         video_path = os.path.join(self.temp_dir, "test_tz_cd.mp4")
         self._create_test_video(video_path)
 
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-Keys:CreationDate=2025:10:24 11:48:59+13:00",
-            video_path
-        ], capture_output=True, check=True)
+        from lib.metadata import metadata_service
+        metadata_service.write_tags(video_path, ["-Keys:CreationDate=2025:10:24 11:48:59+13:00"])
 
         fmt._exif_cache.clear()
         result = fmt.extract_metadata_timezone(video_path)
@@ -368,11 +362,8 @@ class TestExtractMetadataTimezone:
         video_path = os.path.join(self.temp_dir, "test_stdout_tz.mp4")
         self._create_test_video(video_path)
 
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-DateTimeOriginal=2025:10:24 11:48:59+08:00",
-            video_path
-        ], capture_output=True, check=True)
+        from lib.metadata import metadata_service
+        metadata_service.write_tags(video_path, ["-DateTimeOriginal=2025:10:24 11:48:59+08:00"])
 
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
