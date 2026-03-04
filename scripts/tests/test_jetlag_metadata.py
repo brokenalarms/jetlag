@@ -363,6 +363,91 @@ class TestTimezoneFormats:
         assert "2025:06:18 07:25:21" in result["DateTimeOriginal"]
 
 
+# ── Moov-after-mdat (standard camera layout) ─────────────────────────
+
+class TestStandardLayout:
+    """Verify metadata writes on files with moov atom after mdat.
+
+    Standard camera MP4 files have mdat before moov. When moov grows
+    during a full rewrite, mdat stays at its original position. Chunk
+    offsets pointing into mdat must NOT be adjusted — only offsets
+    pointing past moov (if any) should be shifted.
+    """
+
+    def test_write_new_mdta_key_preserves_playability(self, service, tmp_path):
+        """Adding a new mdta key to a bare standard video triggers a full
+        moov rewrite. Chunk offsets into mdat must remain untouched."""
+        video = tmp_path / "standard.mp4"
+        create_test_video(str(video))
+
+        service.write_tags(
+            str(video),
+            ["-Keys:CreationDate=2025-09-15T12:00:00+00:00"],
+        )
+
+        import subprocess
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v",
+             "-show_entries", "stream=nb_frames", "-of", "csv=p=0",
+             str(video)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, f"ffprobe failed: {result.stderr}"
+
+    def test_write_multiple_mdta_keys_preserves_playability(self, service, tmp_path):
+        """Multiple mdta key writes each trigger a full rewrite. After
+        several rewrites, chunk offsets should still be correct."""
+        video = tmp_path / "standard_multi.mp4"
+        create_test_video(str(video))
+
+        service.write_tags(
+            str(video),
+            ["-Keys:CreationDate=2025-01-01T00:00:00+00:00", "-Make=Cam1"],
+        )
+        service.write_tags(
+            str(video),
+            ["-Model=Model2"],
+        )
+
+        import subprocess
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v",
+             "-show_entries", "stream=nb_frames", "-of", "csv=p=0",
+             str(video)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, f"ffprobe failed: {result.stderr}"
+
+        read_result = service.read_tags(
+            str(video), ["CreationDate", "Make", "Model"]
+        )
+        assert "2025" in read_result["CreationDate"]
+        assert read_result["Make"] == "Cam1"
+        assert read_result["Model"] == "Model2"
+
+    def test_overwrite_different_length_preserves_playability(self, service, tmp_path):
+        """Overwriting an mdta key with a different-length value triggers
+        a full rewrite on a standard layout file."""
+        video = tmp_path / "standard_overwrite.mp4"
+        create_test_video(str(video))
+
+        service.write_tags(
+            str(video),
+            ["-Keys:CreationDate=2025-01-01T00:00:00Z"],
+        )
+        service.write_tags(
+            str(video),
+            ["-Keys:CreationDate=2025-12-31T23:59:59+13:45"],
+        )
+
+        import subprocess
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", str(video)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, f"ffprobe failed: {result.stderr}"
+
+
 # ── Moov-before-mdat (faststart) layout ──────────────────────────────
 
 class TestFaststartLayout:

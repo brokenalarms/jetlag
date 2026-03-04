@@ -513,10 +513,12 @@ enum QuickTimeMetadata {
 
         let sizeDelta = Int64(newMoovSize) - Int64(moovAtom.size)
 
-        // Adjust stco/co64 chunk offsets within the new moov content
-        // (these contain absolute file offsets into mdat that shift when moov changes size)
+        // Adjust stco/co64 chunk offsets. These are absolute file offsets.
+        // Only offsets pointing past moov need adjustment — data before moov
+        // (e.g. mdat in standard camera layout) stays at the same position.
+        let moovEnd = moovAtom.offset + moovAtom.size
         if sizeDelta != 0 {
-            adjustChunkOffsets(in: &newMoovContent, delta: sizeDelta)
+            adjustChunkOffsets(in: &newMoovContent, delta: sizeDelta, threshold: moovEnd)
         }
 
         // Write new file
@@ -706,12 +708,12 @@ enum QuickTimeMetadata {
     }
 
     private static func buildHdlrAtom() -> Data {
-        // hdlr atom with mdta handler type
         var data = Data()
         let content = Data(count: 4) // version + flags
+            + Data(count: 4) // pre_defined (0)
             + "mdta".data(using: .ascii)! // handler type
             + Data(count: 12) // reserved
-            + Data(count: 1) // name (empty string with null terminator)
+            + Data(count: 1) // name (null terminator)
 
         var header = Data(count: 8)
         header.writeUInt32BE(UInt32(content.count + 8), at: 0)
@@ -818,7 +820,8 @@ enum QuickTimeMetadata {
 
     private static func adjustChunkOffsets(
         in data: inout Data,
-        delta: Int64
+        delta: Int64,
+        threshold: UInt64
     ) {
         var pos = 0
         while pos + 8 <= data.count {
@@ -827,13 +830,12 @@ enum QuickTimeMetadata {
             let type = data.fourCC(at: pos + 4)
 
             if type == "stco" {
-                adjustStco(in: &data, at: pos, delta: delta)
+                adjustStco(in: &data, at: pos, delta: delta, threshold: threshold)
             } else if type == "co64" {
-                adjustCo64(in: &data, at: pos, delta: delta)
+                adjustCo64(in: &data, at: pos, delta: delta, threshold: threshold)
             } else if ["moov", "trak", "mdia", "minf", "stbl"].contains(type) {
-                // Recurse into container atoms
                 var sub = Data(data[(pos + 8)..<(pos + size)])
-                adjustChunkOffsets(in: &sub, delta: delta)
+                adjustChunkOffsets(in: &sub, delta: delta, threshold: threshold)
                 data.replaceSubrange((pos + 8)..<(pos + size), with: sub)
             }
 
@@ -841,30 +843,44 @@ enum QuickTimeMetadata {
         }
     }
 
-    private static func adjustStco(in data: inout Data, at pos: Int, delta: Int64) {
+    private static func adjustStco(
+        in data: inout Data,
+        at pos: Int,
+        delta: Int64,
+        threshold: UInt64
+    ) {
         guard pos + 16 <= data.count else { return }
         let count = Int(data.uint32BE(at: pos + 12))
         var offset = pos + 16
 
         for _ in 0..<count {
             guard offset + 4 <= data.count else { break }
-            let old = Int64(data.uint32BE(at: offset))
-            let new = UInt32(clamping: max(0, old + delta))
-            data.writeUInt32BE(new, at: offset)
+            let old = UInt64(data.uint32BE(at: offset))
+            if old >= threshold {
+                let adjusted = UInt32(clamping: max(0, Int64(old) + delta))
+                data.writeUInt32BE(adjusted, at: offset)
+            }
             offset += 4
         }
     }
 
-    private static func adjustCo64(in data: inout Data, at pos: Int, delta: Int64) {
+    private static func adjustCo64(
+        in data: inout Data,
+        at pos: Int,
+        delta: Int64,
+        threshold: UInt64
+    ) {
         guard pos + 16 <= data.count else { return }
         let count = Int(data.uint32BE(at: pos + 12))
         var offset = pos + 16
 
         for _ in 0..<count {
             guard offset + 8 <= data.count else { break }
-            let old = Int64(bitPattern: data.uint64BE(at: offset))
-            let new = UInt64(bitPattern: max(0, old + delta))
-            data.writeUInt64BE(new, at: offset)
+            let old = data.uint64BE(at: offset)
+            if old >= threshold {
+                let adjusted = UInt64(bitPattern: max(0, Int64(bitPattern: old) + delta))
+                data.writeUInt64BE(adjusted, at: offset)
+            }
             offset += 8
         }
     }
