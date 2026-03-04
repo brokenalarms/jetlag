@@ -18,6 +18,8 @@
 - TESTING
  - info on testing best practices is at /docs/testing.md
  - This is required reading if dealing with any tests.
+ - If you are working on something that can be built or run in the environment, then a commit should not be made with the build in a broken state; eg all tests should pass, and the build should work (if you can verify)
+ - E.g., in a MacOS environment for an Xcode project, part of allowing a commit would be that you have run `xcodegen generate` and built the project.
 
 - COMMITS & PULL REQUESTS
  - info on commits and pull requests is stored at /docs/committing.md
