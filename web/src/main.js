@@ -3,6 +3,7 @@ import './style.css'
 import { renderNav } from './sections/nav.js'
 import { renderHero } from './sections/hero.js'
 import { renderProblem } from './sections/problem.js'
+import { initTimelineSliders } from './components/timeline.js'
 import { renderFeatures } from './sections/features.js'
 import { renderAudience } from './sections/audience.js'
 import { renderHowItWorks } from './sections/how-it-works.js'
@@ -42,6 +43,8 @@ function mount() {
   document.querySelectorAll('.card, section h2, section p.text-white\\/55').forEach(el => {
     observer.observe(el)
   })
+
+  initTimelineSliders()
 
   // Mobile nav smooth close on link click
   document.querySelectorAll('nav a[href^="#"]').forEach(link => {
