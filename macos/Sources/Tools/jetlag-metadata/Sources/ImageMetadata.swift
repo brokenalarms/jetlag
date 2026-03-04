@@ -102,6 +102,40 @@ enum ImageMetadata {
         return dateStr
     }
 
+    // MARK: - Tag name → CGImageMetadata property mapping
+
+    private struct MetadataProperty {
+        let dictionary: CFString
+        let property: CFString
+    }
+
+    private static func metadataProperty(for exiftoolName: String) -> MetadataProperty? {
+        switch exiftoolName {
+        case "DateTimeOriginal":
+            return MetadataProperty(
+                dictionary: kCGImagePropertyExifDictionary,
+                property: kCGImagePropertyExifDateTimeOriginal)
+        case "CreateDate":
+            return MetadataProperty(
+                dictionary: kCGImagePropertyExifDictionary,
+                property: kCGImagePropertyExifDateTimeDigitized)
+        case "ModifyDate":
+            return MetadataProperty(
+                dictionary: kCGImagePropertyTIFFDictionary,
+                property: kCGImagePropertyTIFFDateTime)
+        case "Make":
+            return MetadataProperty(
+                dictionary: kCGImagePropertyTIFFDictionary,
+                property: kCGImagePropertyTIFFMake)
+        case "Model":
+            return MetadataProperty(
+                dictionary: kCGImagePropertyTIFFDictionary,
+                property: kCGImagePropertyTIFFModel)
+        default:
+            return nil
+        }
+    }
+
     // MARK: - Write
 
     static func writeTags(file: String, tags: [String: String]) -> Bool {
@@ -110,45 +144,41 @@ enum ImageMetadata {
               let sourceType = CGImageSourceGetType(source)
         else { return false }
 
-        var properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil)
-            as? [String: Any] ?? [:]
-        var exifDict = properties[kCGImagePropertyExifDictionary as String]
-            as? [String: Any] ?? [:]
-        var tiffDict = properties[kCGImagePropertyTIFFDictionary as String]
-            as? [String: Any] ?? [:]
+        let origMeta = CGImageSourceCopyMetadataAtIndex(source, 0, nil)
+        let mutableMeta: CGMutableImageMetadata
+        if let om = origMeta {
+            mutableMeta = CGImageMetadataCreateMutableCopy(om)!
+        } else {
+            mutableMeta = CGImageMetadataCreateMutable()
+        }
 
         var changed = false
         for (tag, value) in tags {
-            guard let location = tagLocation(for: tag) else { continue }
-            switch location {
-            case .exif(let key):
-                exifDict[key] = value
-                changed = true
-            case .tiff(let key):
-                tiffDict[key] = value
-                changed = true
-            }
+            guard let prop = metadataProperty(for: tag) else { continue }
+            CGImageMetadataSetValueMatchingImageProperty(
+                mutableMeta, prop.dictionary, prop.property, value as CFString)
+            changed = true
         }
 
         if !changed { return false }
 
-        properties[kCGImagePropertyExifDictionary as String] = exifDict
-        properties[kCGImagePropertyTIFFDictionary as String] = tiffDict
+        let auxProps: [CFString: Any] = [
+            kCGImageDestinationMetadata: mutableMeta,
+            kCGImageMetadataShouldExcludeXMP: false,
+        ]
 
         let tempURL = url.deletingLastPathComponent()
             .appendingPathComponent(".\(UUID().uuidString).\(url.pathExtension)")
 
-        let count = CGImageSourceGetCount(source)
         guard let dest = CGImageDestinationCreateWithURL(
-            tempURL as CFURL, sourceType, count, nil
+            tempURL as CFURL, sourceType, 0, nil
         ) else { return false }
 
-        for i in 0..<count {
-            let props = (i == 0) ? properties as CFDictionary : nil
-            CGImageDestinationAddImageFromSource(dest, source, i, props)
-        }
-
-        guard CGImageDestinationFinalize(dest) else {
+        var error: Unmanaged<CFError>?
+        let ok = CGImageDestinationCopyImageSource(
+            dest, source, auxProps as CFDictionary, &error
+        )
+        guard ok else {
             try? FileManager.default.removeItem(at: tempURL)
             return false
         }

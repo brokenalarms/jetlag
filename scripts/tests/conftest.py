@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from lib.metadata import metadata_service as exiftool
 
 _template_video: Path | None = None
+_template_image: Path | None = None
 
 
 def _ensure_template() -> Path:
@@ -36,9 +37,31 @@ def _ensure_template() -> Path:
     return _template_video
 
 
+def _ensure_image_template() -> Path:
+    global _template_image
+    if _template_image is None:
+        d = tempfile.mkdtemp(prefix="pytest_image_template_")
+        _template_image = Path(d) / "template.jpg"
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=red:s=4x4:d=1",
+            "-frames:v", "1", "-update", "1",
+            str(_template_image)
+        ], capture_output=True, check=True)
+        atexit.register(lambda: shutil.rmtree(d, ignore_errors=True))
+    return _template_image
+
+
 def create_test_video(path, **exif_tags):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(_ensure_template(), str(path))
+    if exif_tags:
+        tag_args = [f"-{field}={value}" for field, value in exif_tags.items()]
+        exiftool.write_tags(str(path), tag_args)
+
+
+def create_test_image(path, **exif_tags):
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(_ensure_image_template(), str(path))
     if exif_tags:
         tag_args = [f"-{field}={value}" for field, value in exif_tags.items()]
         exiftool.write_tags(str(path), tag_args)
