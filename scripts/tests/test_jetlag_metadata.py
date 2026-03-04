@@ -21,7 +21,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from lib.metadata import MetadataService
-from tests.conftest import create_test_image, create_test_video
+from tests.conftest import create_test_image, create_test_video, create_test_video_faststart
 
 
 @pytest.fixture
@@ -361,3 +361,73 @@ class TestTimezoneFormats:
         )
         result = service.read_tags(str(image), ["DateTimeOriginal"])
         assert "2025:06:18 07:25:21" in result["DateTimeOriginal"]
+
+
+# ── Moov-before-mdat (faststart) layout ──────────────────────────────
+
+class TestFaststartLayout:
+    """Verify metadata writes on files with moov atom before mdat.
+
+    Web-optimized (qt-faststart) MP4 files have moov at the start. When
+    moov grows during metadata writes, all stco/co64 chunk offsets pointing
+    into mdat must be adjusted by the size delta, otherwise the video data
+    becomes unreachable and the file is corrupted.
+    """
+
+    def test_write_mdta_key_preserves_playability(self, service, tmp_path):
+        """Adding a new mdta key triggers a full moov rewrite. With moov
+        before mdat, chunk offsets must be adjusted for the file to remain
+        playable."""
+        video = tmp_path / "faststart.mp4"
+        create_test_video_faststart(str(video))
+
+        service.write_tags(
+            str(video),
+            ["-Keys:CreationDate=2025-09-15T12:00:00+00:00"],
+        )
+
+        import subprocess
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", str(video)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, f"ffprobe failed after faststart write: {result.stderr}"
+
+    def test_write_mdta_key_round_trips(self, service, tmp_path):
+        """Written metadata can be read back from a faststart file."""
+        video = tmp_path / "faststart_rt.mp4"
+        create_test_video_faststart(str(video))
+
+        service.write_tags(
+            str(video),
+            ["-Keys:CreationDate=2025-11-20T08:30:00+09:00", "-Make=FastCam"],
+        )
+
+        result = service.read_tags(str(video), ["CreationDate", "Make"])
+        assert "2025" in result["CreationDate"]
+        assert result["Make"] == "FastCam"
+
+    def test_overwrite_mdta_key_preserves_playability(self, service, tmp_path):
+        """Overwriting an mdta key with a different-length value triggers a
+        full rewrite. Verify chunk offsets are adjusted correctly."""
+        video = tmp_path / "faststart_overwrite.mp4"
+        create_test_video_faststart(str(video))
+
+        service.write_tags(
+            str(video),
+            ["-Keys:CreationDate=2025-01-01T00:00:00Z"],
+        )
+        service.write_tags(
+            str(video),
+            ["-Keys:CreationDate=2025-12-31T23:59:59+13:45"],
+        )
+
+        import subprocess
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", str(video)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, f"ffprobe failed after overwrite: {result.stderr}"
+
+        read_result = service.read_tags(str(video), ["CreationDate"])
+        assert "2025:12:31" in read_result["CreationDate"]

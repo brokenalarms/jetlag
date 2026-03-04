@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from lib.metadata import metadata_service as exiftool
 
 _template_video: Path | None = None
+_template_video_faststart: Path | None = None
 _template_image: Path | None = None
 
 
@@ -35,6 +36,22 @@ def _ensure_template() -> Path:
         ], capture_output=True, check=True)
         atexit.register(lambda: shutil.rmtree(d, ignore_errors=True))
     return _template_video
+
+
+def _ensure_faststart_template() -> Path:
+    """MP4 with moov atom before mdat (web-optimized layout)."""
+    global _template_video_faststart
+    if _template_video_faststart is None:
+        d = tempfile.mkdtemp(prefix="pytest_video_faststart_")
+        _template_video_faststart = Path(d) / "template_faststart.mp4"
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=0.04",
+            "-c:v", "libx264", "-t", "0.04", "-pix_fmt", "yuv420p",
+            "-movflags", "faststart",
+            str(_template_video_faststart)
+        ], capture_output=True, check=True)
+        atexit.register(lambda: shutil.rmtree(d, ignore_errors=True))
+    return _template_video_faststart
 
 
 def _ensure_image_template() -> Path:
@@ -54,6 +71,15 @@ def _ensure_image_template() -> Path:
 def create_test_video(path, **exif_tags):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(_ensure_template(), str(path))
+    if exif_tags:
+        tag_args = [f"-{field}={value}" for field, value in exif_tags.items()]
+        exiftool.write_tags(str(path), tag_args)
+
+
+def create_test_video_faststart(path, **exif_tags):
+    """Create an MP4 with moov before mdat (web-optimized / qt-faststart layout)."""
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(_ensure_faststart_template(), str(path))
     if exif_tags:
         tag_args = [f"-{field}={value}" for field, value in exif_tags.items()]
         exiftool.write_tags(str(path), tag_args)

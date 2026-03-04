@@ -498,7 +498,7 @@ enum QuickTimeMetadata {
         )
 
         // Build new moov with updated/added mdta key
-        guard let newMoovContent = buildUpdatedMoov(
+        guard var newMoovContent = buildUpdatedMoov(
             originalContent: moovData,
             moovAtom: moovAtom,
             key: key,
@@ -512,6 +512,12 @@ enum QuickTimeMetadata {
         moovHeader.writeFourCC("moov", at: 4)
 
         let sizeDelta = Int64(newMoovSize) - Int64(moovAtom.size)
+
+        // Adjust stco/co64 chunk offsets within the new moov content
+        // (these contain absolute file offsets into mdat that shift when moov changes size)
+        if sizeDelta != 0 {
+            adjustChunkOffsets(in: &newMoovContent, delta: sizeDelta)
+        }
 
         // Write new file
         let tempURL = url.deletingLastPathComponent()
@@ -535,20 +541,11 @@ enum QuickTimeMetadata {
         writeHandle.write(moovHeader)
         writeHandle.write(newMoovContent)
 
-        // Copy atoms after moov, updating stco/co64 if moov is before mdat
+        // Copy atoms after moov using buffered IO
         let afterMoov = moovAtom.offset + moovAtom.size
         if afterMoov < fileSize {
             readHandle.seek(toFileOffset: afterMoov)
-            let remaining = readHandle.readDataToEndOfFile()
-
-            if sizeDelta != 0 && moovAtom.offset < fileSize {
-                var adjusted = remaining
-                adjustChunkOffsets(in: &adjusted, delta: sizeDelta,
-                    searchStart: 0, fileSize: fileSize)
-                writeHandle.write(adjusted)
-            } else {
-                writeHandle.write(remaining)
-            }
+            copyBytes(from: readHandle, to: writeHandle, count: Int(fileSize - afterMoov))
         }
 
         do {
@@ -821,11 +818,8 @@ enum QuickTimeMetadata {
 
     private static func adjustChunkOffsets(
         in data: inout Data,
-        delta: Int64,
-        searchStart: UInt64,
-        fileSize: UInt64
+        delta: Int64
     ) {
-        // Walk atoms looking for stco and co64
         var pos = 0
         while pos + 8 <= data.count {
             let size = Int(data.uint32BE(at: pos))
@@ -839,8 +833,7 @@ enum QuickTimeMetadata {
             } else if ["moov", "trak", "mdia", "minf", "stbl"].contains(type) {
                 // Recurse into container atoms
                 var sub = Data(data[(pos + 8)..<(pos + size)])
-                adjustChunkOffsets(in: &sub, delta: delta,
-                    searchStart: searchStart, fileSize: fileSize)
+                adjustChunkOffsets(in: &sub, delta: delta)
                 data.replaceSubrange((pos + 8)..<(pos + size), with: sub)
             }
 
