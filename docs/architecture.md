@@ -11,6 +11,7 @@
 │   └── tests/            ← script test suite (belongs with the scripts)
 ├── macos/                ← macOS SwiftUI app (sibling to scripts/, not nested inside)
 │   ├── Sources/          ← Swift source files
+│   │   └── Tools/jetlag-metadata/  ← Swift CLI for metadata operations
 │   └── project.yml       ← XcodeGen project spec
 ├── web/                  ← Vite + Tailwind marketing site
 │   └── src/sections/     ← each section is a standalone render function
@@ -82,6 +83,29 @@ All user-facing text in the macOS app is centralized in `macos/Sources/Strings.s
 - All new user-facing strings must go in `Strings.swift` — no hardcoded strings in views or services
 - Strings used in multiple views belong in `Strings.Common`
 - Dynamic data (profile names, file paths, timezone identifiers) stays inline — only static text is centralized
+
+---
+
+## Metadata service
+
+All EXIF/metadata operations go through `MetadataService` (`scripts/lib/metadata.py`),
+which provides a unified `read_tags`/`write_tags` API. It delegates to one of two backends:
+
+1. **`jetlag-metadata`** (preferred) — a Swift CLI tool (`macos/Sources/Tools/jetlag-metadata/`)
+   that wraps ExifTool behind a JSON-over-stdin/stdout protocol. Runs as a persistent process
+   for low per-operation latency.
+2. **ExifTool directly** (fallback) — used when `jetlag-metadata` isn't available
+   (e.g. Linux CI without Swift). Uses ExifTool's native `-stay_open` protocol.
+
+Backend selection is automatic: `MetadataService` looks for the `jetlag-metadata` binary
+in `scripts/tools/` first, then `$PATH`, falling back to ExifTool if neither is found.
+
+All scripts import the singleton: `from lib.metadata import metadata_service as exiftool`.
+The `as exiftool` alias preserves call-site compatibility with the original ExifTool wrapper.
+
+This abstraction layer is Phase 1 of the App Store migration path
+(`docs/specs/swift-migration.md`). Phase 2 replaces the ExifTool backend inside
+`jetlag-metadata` with native Swift code, without touching any Python callers.
 
 ---
 
