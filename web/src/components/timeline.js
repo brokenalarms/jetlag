@@ -184,18 +184,18 @@ export function initTimelineSliders() {
         const isAfter = t >= 0.5
         const src     = isAfter ? clip.after : clip.before
         tzs[i].textContent = src.tz
-        tzs[i].className   = `text-[10px] tl-tz ${src.correct ? 'text-white/25' : 'text-red-400/70'}`
+        tzs[i].className   = `text-[10px] tl-tz ${src.correct ? 'text-white' : 'text-red-400/70'}`
       })
 
       const isAfter = t >= 0.5
       caption.textContent = isAfter ? data.afterCaption : data.beforeCaption
-      caption.className   = `mt-3 text-xs tl-caption ${isAfter ? 'text-neon-pink/60' : 'text-white/30'}`
+      caption.className   = `mt-3 text-xs tl-caption ${isAfter ? 'text-' : 'text-white/30'}`
 
       beforeLabel.className = `text-xs font-semibold uppercase tracking-widest tl-before-label ${t < 0.5 ? 'text-red-400/80' : 'text-red-400/30'}`
-      afterLabel.className  = `text-xs font-semibold uppercase tracking-widest tl-after-label ${t >= 0.5 ? 'text-neon-pink/80' : 'text-white/20'}`
+      afterLabel.className  = `text-xs font-semibold uppercase tracking-widest tl-after-label ${t >= 0.5 ? 'text-green-400' : 'text-white/20'}`
 
-      dotBefore.className = `h-2 w-2 rounded-full tl-dot ${t < 0.5 ? 'bg-red-400' : 'bg-red-400/30'}`
-      dotAfter.className  = `h-2 w-2 rounded-full tl-dot-after ${t >= 0.5 ? 'bg-neon-pink' : 'bg-neon-pink/30'}`
+      dotBefore.className = `h-2 w-2 rounded-full tl-dot bg-red-400`
+      dotAfter.className  = `h-2 w-2 rounded-full tl-dot-after ${t >= 0.5 ? 'bg-green-500/30': 'bg-neon-pink'}`
 
       card.classList.toggle('timeline-active', t >= 0.5)
     })

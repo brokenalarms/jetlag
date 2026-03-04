@@ -393,12 +393,12 @@ struct WorkflowView: View {
                 .help(session.useTimezonePicker ? Strings.Workflow.typeManuallyHelp : Strings.Workflow.pickFromListHelp)
             }
             .fieldError(session.validateTimezone())
-
+            let parseable = hasParseableFilenames()
             HStack(spacing: 4) {
                 Text(Strings.Workflow.timestampSourceLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                let parseable = hasParseableFilenames()
+
                 Picker("", selection: $session.inferFromFilenames) {
                     Text(Strings.Workflow.timestampSourceMetadata).tag(false)
                     Text(Strings.Workflow.timestampSourceFilenames).tag(true)
@@ -423,6 +423,7 @@ struct WorkflowView: View {
 
             HStack(spacing: 4) {
                 Toggle(Strings.Workflow.updateFilenameDatesToggle, isOn: $session.updateFilenameDates)
+                    .disabled(!parseable)
                 HelpButton(Strings.Workflow.updateFilenameDatesHelp)
             }
 
