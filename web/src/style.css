@@ -224,7 +224,9 @@
   /* Interactive timeline slider */
   .timeline-interactive {
     max-width: 600px;
+    width: 100%;
     transition: border-color 0.3s ease, background-color 0.3s ease;
+    overflow: hidden;
   }
   .timeline-interactive.timeline-active {
     border-color: rgba(255, 45, 120, 0.2);
