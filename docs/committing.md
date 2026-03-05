@@ -26,7 +26,7 @@ Before any commit or push action, every session:
 ## Pull requests
 
 - After pushing, always create the PR with `gh pr create` if available — this supports full markdown bodies without URL-encoding issues
-- Otherwise, provide a fully URL-encoded link for user to click on to create PR
+- If `gh` is not found, **immediately** fall back to a GitHub compare URL — do not attempt alternative API calls, curl workarounds, or auth probing. Generate the URL with `expand=1`, `title`, and `body` query params, using `python3 -c "import urllib.parse; ..."` (or equivalent) to properly URL-encode the title and body. Format: `https://github.com/{owner}/{repo}/compare/{base}...{head}?expand=1&title=...&body=...`
 - PR title and body follow the same format as commit messages: imperative title (lowercase, no period), concise bullet-list body covering **why**, **how**, and test coverage. The PR description should encapsulate the sum of all commits in the PR, not repeat each one individually.
 - If subsequent commits are added to a PR, update the PR title/body with `gh pr edit` to reflect the full scope of changes. If `gh` is unavailable, give the user new description text to paste in.
   
