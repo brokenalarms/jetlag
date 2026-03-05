@@ -205,6 +205,7 @@ export function initTimelineSliders() {
       dotAfter.className  = `h-2 w-2 rounded-full tl-dot-after ${t >= 0.5 ? 'bg-green-500/30': 'bg-neon-pink'}`
 
       card.classList.toggle('timeline-active', t >= 0.5)
+      range.classList.toggle('past-half', t >= 0.5)
     })
   })
 }
