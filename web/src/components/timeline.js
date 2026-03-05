@@ -120,7 +120,7 @@ export function renderInteractiveTimeline(before, after) {
 
   return /* html */`
     <div class="timeline-interactive card" data-scenario="${idx}">
-      <div class="mb-3 flex items-center gap-3">
+      <div class="mb-3 flex items-center gap-3" style="touch-action:none">
         <div class="flex items-center gap-2 flex-shrink-0">
           <div class="h-2 w-2 rounded-full bg-red-400 tl-dot"></div>
           <span class="text-xs font-semibold uppercase tracking-widest text-red-400/80 tl-before-label">Before</span>

@@ -241,30 +241,50 @@
     border-radius: 2px;
     outline: none;
     cursor: pointer;
+    touch-action: none;
+    padding: 12px 0;
+    margin: -12px 0;
+    background-clip: content-box;
   }
   .timeline-range::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 14px;
-    height: 14px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     background: var(--neon-pink);
     box-shadow: 0 0 8px rgba(255, 45, 120, 0.5);
     cursor: pointer;
     transition: box-shadow 0.2s ease;
   }
+  @media (min-width: 640px) {
+    .timeline-range::-webkit-slider-thumb {
+      width: 14px;
+      height: 14px;
+    }
+    .timeline-range {
+      padding: 0;
+      margin: 0;
+    }
+  }
   .timeline-range::-webkit-slider-thumb:hover {
     box-shadow: 0 0 14px rgba(255, 45, 120, 0.8);
   }
   .timeline-range::-moz-range-thumb {
-    width: 14px;
-    height: 14px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     background: var(--neon-pink);
     box-shadow: 0 0 8px rgba(255, 45, 120, 0.5);
     cursor: pointer;
     border: none;
     transition: box-shadow 0.2s ease;
+  }
+  @media (min-width: 640px) {
+    .timeline-range::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+    }
   }
   .timeline-range::-moz-range-thumb:hover {
     box-shadow: 0 0 14px rgba(255, 45, 120, 0.8);
