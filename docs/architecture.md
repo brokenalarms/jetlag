@@ -85,6 +85,23 @@ All user-facing text in the macOS app is centralized in `macos/Sources/Strings.s
 
 ---
 
+## Metadata abstraction layer
+
+All EXIF/metadata operations go through a two-layer abstraction:
+
+1. **`jetlag-metadata`** (`macos/Sources/CLI/`) — Swift CLI that wraps ExifTool behind a JSON protocol using batch mode (`-stay_open`). Accepts JSON commands on stdin, returns JSON results on stdout.
+2. **`scripts/lib/metadata.py`** — Python module that wraps the `jetlag-metadata` CLI. All scripts import from `lib.metadata` rather than calling ExifTool directly.
+
+This separation means the underlying metadata engine (currently ExifTool) can be swapped without touching any calling code.
+
+---
+
+## Distribution
+
+Direct distribution only via notarized DMG. No App Store version — the dependency on ExifTool and gyroflow (bundled CLI tools) makes sandboxing impractical, and direct distribution provides a simpler update path.
+
+---
+
 ## Testing
 
 Tests live in `scripts/tests/`.
