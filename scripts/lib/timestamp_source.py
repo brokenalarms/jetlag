@@ -17,7 +17,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, Optional
 
-from lib.exiftool import exiftool
+from lib.metadata import metadata
 
 # ---------------------------------------------------------------------------
 # EXIF cache — shared across all callers within a process
@@ -37,7 +37,7 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
     ]
 
     try:
-        raw = exiftool.read_tags(file_path, fields)
+        raw = metadata.read_tags(file_path, fields)
 
         data = {}
         for key, value in raw.items():

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
-from lib.exiftool import exiftool
+from lib.metadata import metadata
 from lib.results import emit_result
 
 
@@ -35,7 +35,7 @@ def get_file_date_for_organization(file_path: str) -> Optional[str]:
     Priority: DateTimeOriginal > filename patterns > file mtime
     """
     try:
-        data = exiftool.read_tags(file_path, ["DateTimeOriginal"], extra_args=["-fast2"])
+        data = metadata.read_tags(file_path, ["DateTimeOriginal"], extra_args=["-fast2"])
         dt_str = data.get("DateTimeOriginal", "")
         if dt_str:
             date_part = dt_str.split(' ')[0]

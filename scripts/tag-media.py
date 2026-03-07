@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 import argparse
 
-from lib.exiftool import exiftool
+from lib.metadata import metadata
 from lib.results import emit_result
 
 
@@ -72,7 +72,7 @@ def apply_finder_tags(file_path: str, tags: List[str], dry_run: bool = False) ->
 def get_existing_exif_camera(file_path: str) -> dict:
     """Get existing Make and Model from EXIF data"""
     try:
-        return exiftool.read_tags(file_path, ["Make", "Model"])
+        return metadata.read_tags(file_path, ["Make", "Model"])
     except Exception:
         return {}
 
@@ -111,7 +111,7 @@ def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Option
             return True, []
 
         if not dry_run:
-            exiftool.write_tags(file_path, tag_args)
+            metadata.write_tags(file_path, tag_args)
         return True, fields_to_update
     except Exception as e:
         print(f"Warning: Failed to add camera info to {file_path}: {e}", file=sys.stderr)

@@ -1,10 +1,8 @@
 """
-Persistent jetlag-metadata subprocess wrapper.
+Unified metadata service — abstracts the backend used for reading/writing EXIF.
 
-jetlag-metadata is a Swift CLI that wraps ExifTool behind a JSON-in/JSON-out
-interface. This module keeps a single persistent process alive, sending
-one-line JSON requests via stdin and reading one-line JSON responses from
-stdout — eliminating per-invocation overhead.
+Tries ``jetlag-metadata`` (Swift CLI) first; falls back to ``exiftool``
+(Perl) when the Swift binary is not installed.
 
 Usage:
     from lib.metadata import metadata
@@ -20,7 +18,7 @@ import threading
 
 
 class MetadataService:
-    """Manages a persistent ``jetlag-metadata`` subprocess."""
+    """Backend that talks to the ``jetlag-metadata`` Swift CLI."""
 
     def __init__(self):
         self._process = None
@@ -44,7 +42,6 @@ class MetadataService:
             raise
 
     def _request(self, payload: dict) -> dict:
-        """Send a JSON request and read the JSON response."""
         with self._lock:
             self._ensure_running()
             assert self._process is not None
@@ -63,12 +60,6 @@ class MetadataService:
 
     def read_tags(self, file_path: str, tags: list[str],
                   extra_args: list[str] | None = None) -> dict:
-        """Read specific metadata tags and return a {key: value} dict.
-
-        Matches the ExifTool.read_tags API. The ``extra_args`` parameter
-        supports ``-fast2`` (mapped to the ``fast`` protocol field); other
-        extra_args are ignored.
-        """
         fast = extra_args is not None and "-fast2" in extra_args
         payload = {
             "op": "read",
@@ -80,17 +71,12 @@ class MetadataService:
         return self._request(payload)
 
     def write_tags(self, file_path: str, tag_args: list[str]) -> bool:
-        """Write tags with the same ``["-Tag=Value", ...]`` arg format as ExifTool.
-
-        Returns True when the service reports files were updated.
-        """
         tags = {}
         for arg in tag_args:
             cleaned = arg.lstrip("-")
             if "=" not in cleaned:
                 continue
             key, value = cleaned.split("=", 1)
-            # Strip group prefixes (e.g. "Keys:CreationDate" → "Keys:CreationDate")
             tags[key] = value
 
         payload = {
@@ -102,7 +88,6 @@ class MetadataService:
         return result.get("updated", False)
 
     def close(self):
-        """Shut down the persistent process."""
         with self._lock:
             if self._process is None or self._process.poll() is not None:
                 self._process = None
@@ -116,5 +101,98 @@ class MetadataService:
             self._process = None
 
 
-metadata = MetadataService()
+class _ExifTool:
+    """Fallback backend using ``exiftool -stay_open True`` directly."""
+
+    def __init__(self):
+        self._process = None
+        self._lock = threading.Lock()
+        self._exec_id = 0
+        self._unavailable = False
+
+    def _ensure_running(self):
+        if self._unavailable:
+            raise FileNotFoundError("exiftool not available")
+        if self._process is not None and self._process.poll() is None:
+            return
+        try:
+            self._process = subprocess.Popen(
+                ["exiftool", "-stay_open", "True", "-@", "-"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except FileNotFoundError:
+            self._unavailable = True
+            raise
+
+    def execute(self, *args: str) -> str:
+        with self._lock:
+            self._ensure_running()
+            assert self._process is not None
+            self._exec_id += 1
+            sentinel = f"{{ready{self._exec_id}}}"
+
+            payload = "\n".join(args) + "\n" + f"-execute{self._exec_id}\n"
+            self._process.stdin.write(payload.encode())
+            self._process.stdin.flush()
+
+            output_lines = []
+            while True:
+                line = self._process.stdout.readline()
+                if not line:
+                    break
+                decoded = line.decode().rstrip("\r\n")
+                if decoded == sentinel:
+                    break
+                output_lines.append(decoded)
+
+            return "\n".join(output_lines)
+
+    def read_tags(self, file_path: str, tags: list[str],
+                  extra_args: list[str] | None = None) -> dict:
+        args = ["-s"]
+        if extra_args:
+            args.extend(extra_args)
+        args.extend(f"-{tag}" for tag in tags)
+        args.append(str(file_path))
+
+        raw = self.execute(*args)
+        data = {}
+        for line in raw.split("\n"):
+            if ":" in line:
+                key, value = line.split(":", 1)
+                data[key.strip()] = value.strip()
+        return data
+
+    def write_tags(self, file_path: str, tag_args: list[str]) -> bool:
+        args = ["-P", "-overwrite_original"] + tag_args + [str(file_path)]
+        output = self.execute(*args)
+        match = re.search(r"(\d+) image files? updated", output)
+        return match is not None and int(match.group(1)) > 0
+
+    def close(self):
+        with self._lock:
+            if self._process is None or self._process.poll() is not None:
+                self._process = None
+                return
+            try:
+                self._process.stdin.write(b"-stay_open\nFalse\n")
+                self._process.stdin.flush()
+                self._process.wait(timeout=5)
+            except (BrokenPipeError, OSError, subprocess.TimeoutExpired):
+                self._process.kill()
+                self._process.wait()
+            self._process = None
+
+
+def _create_backend():
+    """Try jetlag-metadata first; fall back to exiftool."""
+    import shutil
+    if shutil.which("jetlag-metadata"):
+        return MetadataService()
+    return _ExifTool()
+
+
+metadata = _create_backend()
 atexit.register(metadata.close)

@@ -21,7 +21,7 @@ def signal_handler(sig, frame):
     print("\n\nInterrupted by user", file=sys.stderr)
     sys.exit(130)
 
-from lib.exiftool import exiftool
+from lib.metadata import metadata
 from lib.results import emit_result
 from lib.timestamp_source import (
     read_exif_data,
@@ -178,7 +178,7 @@ def get_country_name(input_country: str) -> str:
 def write_exif_fields(file_path: str, field_args: list) -> bool:
     """Write multiple EXIF fields in a single exiftool call."""
     try:
-        result = exiftool.write_tags(file_path, field_args)
+        result = metadata.write_tags(file_path, field_args)
         if file_path in _exif_cache:
             del _exif_cache[file_path]
         return result
@@ -190,7 +190,7 @@ def write_exif_fields(file_path: str, field_args: list) -> bool:
 def write_datetime_original(file_path: str, datetime_with_tz: str) -> bool:
     """Write DateTimeOriginal to file if missing"""
     try:
-        result = exiftool.write_tags(file_path, [f"-DateTimeOriginal={datetime_with_tz}"])
+        result = metadata.write_tags(file_path, [f"-DateTimeOriginal={datetime_with_tz}"])
         if file_path in _exif_cache:
             del _exif_cache[file_path]
         return result
@@ -214,7 +214,7 @@ def write_keys_creationdate(file_path: str, datetime_original: datetime) -> bool
         keys_value = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
         keys_value = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', keys_value)
 
-        result = exiftool.write_tags(file_path, [f"-Keys:CreationDate={keys_value}"])
+        result = metadata.write_tags(file_path, [f"-Keys:CreationDate={keys_value}"])
         if file_path in _exif_cache:
             del _exif_cache[file_path]
         return result
@@ -241,7 +241,7 @@ def write_quicktime_createdate(file_path: str, datetime_original: datetime) -> b
         utc_dt = datetime_original.astimezone(timezone.utc)
         utc_time = utc_dt.strftime("%Y:%m:%d %H:%M:%S")
 
-        result = exiftool.write_tags(file_path, [
+        result = metadata.write_tags(file_path, [
             f"-QuickTime:CreateDate={utc_time}",
             f"-QuickTime:MediaCreateDate={utc_time}",
         ])

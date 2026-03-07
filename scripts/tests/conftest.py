@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from lib.exiftool import exiftool
+from lib.metadata import metadata
 
 _template_video: Path | None = None
 
@@ -41,7 +41,7 @@ def create_test_video(path, **exif_tags):
     shutil.copy2(_ensure_template(), str(path))
     if exif_tags:
         tag_args = [f"-{field}={value}" for field, value in exif_tags.items()]
-        exiftool.write_tags(str(path), tag_args)
+        metadata.write_tags(str(path), tag_args)
 
 
 # Map of required tool -> install commands by platform.
