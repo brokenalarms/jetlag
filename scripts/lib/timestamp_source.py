@@ -17,7 +17,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, Optional
 
-from lib.exiftool import exiftool
+from lib.metadata import metadata_service as exiftool
 
 # ---------------------------------------------------------------------------
 # EXIF cache — shared across all callers within a process

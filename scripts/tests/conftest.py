@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from lib.exiftool import exiftool
+from lib.metadata import metadata_service as exiftool
 
 _template_video: Path | None = None
 

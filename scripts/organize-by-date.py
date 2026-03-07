@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
-from lib.exiftool import exiftool
+from lib.metadata import metadata_service as exiftool
 from lib.results import emit_result
 
 
