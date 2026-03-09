@@ -169,7 +169,6 @@ final class PipelineArgsTests: XCTestCase {
 
     func testIsStepReadyFixTimestampsPickerWithTimezone() {
         let session = makeSession()
-        session.useTimezonePicker = true
         session.timezone.value = "+0900"
         XCTAssertTrue(session.isStepReady(.fixTimestamps))
     }

@@ -223,7 +223,6 @@ final class WorkflowSession {
     var timezone: Dirtyable<String>
 
     var group: String = ""
-    var useTimezonePicker: Bool = true
     var copyCompanionFiles: Bool = false
     var sourceAction: SourceAction = .archive
     var appendTimezoneToGroup: Bool = false
@@ -264,11 +263,11 @@ final class WorkflowSession {
 
     private static func computeAvailableSteps(profile: MediaProfile?) -> [PipelineStep] {
         guard let profile else { return [] }
-        var steps: [PipelineStep] = [.ingest, .tag, .fixTimestamps, .organize]
+        var steps: [PipelineStep] = [.ingest, .tag, .fixTimestamps]
         if profile.gyroflowEnabled == true {
             steps.append(.gyroflow)
         }
-        steps.append(.archiveSource)
+        steps.append(contentsOf: [.organize, .archiveSource])
         return steps
     }
 

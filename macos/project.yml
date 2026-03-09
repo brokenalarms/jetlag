@@ -14,7 +14,9 @@ targets:
     type: application
     platform: macOS
     sources:
-      - Sources
+      - path: Sources
+        excludes:
+          - "Tools"
     dependencies:
       - package: Yams
       - sdk: MapKit.framework

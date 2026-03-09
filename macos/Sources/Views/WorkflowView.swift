@@ -14,15 +14,29 @@ struct WorkflowView: View {
 
     var body: some View {
         @Bindable var session = state.workflowSession
-        ScrollView {
-            VStack(spacing: 16) {
+        VStack(spacing: 0) {
+            VStack(spacing: 0) {
                 profileSelector
+                    .padding(.vertical)
                 if !session.profileName.isEmpty {
-                    stepsPipeline
-                    executionBar
+                    pipelineStatusBar
+                        .padding(.vertical, 8)
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.12))
+                        .frame(height: 1)
+                        .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
                 }
             }
-            .padding()
+            .padding(.horizontal, 16)
+            ScrollView {
+                VStack(spacing: 16) {
+                    if !session.profileName.isEmpty {
+                        stepsPipeline
+                        executionBar
+                    }
+                }
+                .padding(16)
+            }
         }
         .onAppear {
             let name = state.workflowSession.profileName
@@ -159,16 +173,58 @@ struct WorkflowView: View {
         }
     }
 
+    // MARK: - Pipeline status bar
+
+    private var pipelineStatusBar: some View {
+        let steps = state.workflowSession.availableSteps
+        let activeSteps = steps.filter { $0.isAlwaysOn || state.workflowSession.enabledSteps.contains($0) }
+        return HStack(spacing: 0) {
+            ForEach(Array(activeSteps.enumerated()), id: \.element.id) { index, step in
+                HStack(spacing: 4) {
+                    Image(systemName: step.systemImage)
+                        .font(.system(size: 9))
+                    Text(step.label)
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(step.iconColor.opacity(0.15))
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                if index < activeSteps.count - 1 {
+                    Image(systemName: "chevron.forward")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(Color.secondary.opacity(0.3))
+                        .padding(.horizontal, 1)
+                }
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(0.03))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+
     // MARK: - Pipeline steps
 
     private var stepsPipeline: some View {
         let steps = state.workflowSession.availableSteps
         return VStack(spacing: 0) {
             ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
-//                    .windowResizeBehavior(.automatic)
                 stepCard(step)
                 if index < steps.count - 1 {
-                    stepArrow
+                    stepConnector(from: step, to: steps[index + 1])
                 }
             }
         }
@@ -179,6 +235,7 @@ struct WorkflowView: View {
         return VStack(spacing: 0) {
             stepHeader(step, isActive: isActive)
             if isActive {
+                Divider()
                 stepOptionsContent(step)
             }
         }
@@ -187,7 +244,7 @@ struct WorkflowView: View {
             RoundedRectangle(cornerRadius: 6)
                 .strokeBorder(
                     isActive ? step.iconColor.opacity(step.isAlwaysOn ? 0.2 : 0.3)
-                             : Color.secondary.opacity(0.5),
+                             : Color.secondary.opacity(0.15),
                     lineWidth: 1
                 )
         )
@@ -245,34 +302,28 @@ struct WorkflowView: View {
         .contentShape(Rectangle())
     }
 
-    private var stepArrow: some View {
-        Image(systemName: "arrow.down")
-            .font(.system(size: 11))
-            .foregroundStyle(.tertiary)
+    private func stepConnector(from: PipelineStep, to: PipelineStep) -> some View {
+        Image(systemName: "chevron.down")
+            .font(.system(size: 8, weight: .bold))
+            .foregroundStyle(Color.secondary.opacity(0.3))
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
+            .padding(.vertical, 6)
     }
 
     @ViewBuilder
     private func stepOptionsContent(_ step: PipelineStep) -> some View {
         switch step {
         case .ingest:
-            Divider()
             ingestOptions
         case .tag:
-            Divider()
             tagOptions
         case .organize:
-            Divider()
             organizeOptions
         case .fixTimestamps:
-            Divider()
             fixTimestampsOptions
         case .gyroflow:
-            Divider()
             gyroflowOptions
         case .archiveSource:
-            Divider()
             archiveSourceOptions
         }
     }
@@ -375,42 +426,24 @@ struct WorkflowView: View {
         @Bindable var session = state.workflowSession
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                if !session.useTimezonePicker {
-                    TextField(Strings.Workflow.timezonePlaceholder, text: $session.timezone.value)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 90)
-                } else {
-                    TimezonePickerView(selectedTimezone: $session.timezone.value)
-                }
+                TimezonePickerView(selectedTimezone: $session.timezone.value)
                 Spacer()
-                Button {
-                    state.workflowSession.useTimezonePicker.toggle()
-                } label: {
-                    Image(systemName: session.useTimezonePicker ? "keyboard" : "globe")
-                        .padding(4)
-                }
-                .contentShape(Rectangle())
-                .help(session.useTimezonePicker ? Strings.Workflow.typeManuallyHelp : Strings.Workflow.pickFromListHelp)
             }
             .fieldError(session.validateTimezone())
             let parseable = hasParseableFilenames()
-            HStack(spacing: 4) {
-                Text(Strings.Workflow.timestampSourceLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Picker("", selection: $session.inferFromFilenames) {
-                    Text(Strings.Workflow.timestampSourceMetadata).tag(false)
-                    Text(Strings.Workflow.timestampSourceFilenames).tag(true)
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 220)
-                .disabled(!parseable)
-                .onChange(of: parseable) { _, newValue in
-                    if !newValue && session.inferFromFilenames {
-                        session.inferFromFilenames = false
+            if parseable {
+                HStack(spacing: 4) {
+                    Text(Strings.Workflow.timestampSourceLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Picker("", selection: $session.inferFromFilenames) {
+                        Text(Strings.Workflow.timestampSourceMetadata).tag(false)
+                        Text(Strings.Workflow.timestampSourceFilenames).tag(true)
                     }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                    Spacer()
                 }
             }
 
@@ -419,6 +452,7 @@ struct WorkflowView: View {
                 TextField(Strings.Workflow.timeOffsetPlaceholder, value: $session.timeOffsetSeconds, format: .number)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 90)
+                Spacer()
             }
 
             HStack(spacing: 4) {
@@ -434,6 +468,11 @@ struct WorkflowView: View {
             }
         }
         .padding(10)
+        .onChange(of: session.sourceDir.value) { _, _ in
+            if !hasParseableFilenames() && session.inferFromFilenames {
+                session.inferFromFilenames = false
+            }
+        }
     }
 
     private var fixTimestampPreview: String? {
@@ -462,7 +501,7 @@ struct WorkflowView: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 4) {
                 Text(Strings.Workflow.sourceActionLabel)
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                 Picker("", selection: $session.sourceAction) {
                     Text(Strings.Workflow.archiveOption).tag(SourceAction.archive)
@@ -470,8 +509,9 @@ struct WorkflowView: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
-                .frame(width: 220)
+                .fixedSize()
                 HelpButton(Strings.Workflow.sourceActionHelp)
+                Spacer()
             }
             if session.sourceAction == .delete {
                 Label(Strings.Workflow.deleteSourceWarning, systemImage: "exclamationmark.triangle.fill")
@@ -485,39 +525,30 @@ struct WorkflowView: View {
     private var gyroflowOptions: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
-                Text(Strings.Profiles.maxZoomLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 100, alignment: .trailing)
+                HelpLabel(Strings.Profiles.maxZoomLabel, help: Strings.Profiles.maxZoomHelp)
                 TextField("", value: gyroflowBinding(\.maxZoom), format: .number)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 70)
-                HelpButton(Strings.Profiles.maxZoomHelp)
+                Spacer()
             }
             HStack(spacing: 4) {
-                Text(Strings.Profiles.adaptiveZoomWindowLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 100, alignment: .trailing)
+                HelpLabel(Strings.Profiles.adaptiveZoomWindowLabel, help: Strings.Profiles.adaptiveZoomWindowHelp)
                 TextField("", value: gyroflowBinding(\.adaptiveZoomWindow), format: .number)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 70)
-                HelpButton(Strings.Profiles.adaptiveZoomWindowHelp)
+                Spacer()
             }
             HStack(spacing: 4) {
-                Text(Strings.Profiles.adaptiveZoomMethodLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 100, alignment: .trailing)
+                HelpLabel(Strings.Profiles.adaptiveZoomMethodLabel, help: Strings.Profiles.adaptiveZoomMethodHelp)
                 Picker("", selection: gyroflowZoomMethodBinding) {
                     ForEach(AdaptiveZoomMethod.allCases) { method in
                         Text(method.label).tag(method)
                     }
                 }
                 .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 200)
-                HelpButton(Strings.Profiles.adaptiveZoomMethodHelp)
+                .pickerStyle(.menu)
+                .fixedSize()
+                Spacer()
             }
         }
         .padding(10)
@@ -564,7 +595,7 @@ struct WorkflowView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(width: 160)
+                    .fixedSize()
 
                     Button(state.isRunning ? Strings.Workflow.runningButton : Strings.Workflow.runButton) { runWorkflow() }
                         .disabled(state.isRunning || !session.allStepsReady)
