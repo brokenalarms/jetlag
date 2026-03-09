@@ -48,6 +48,7 @@ enum Strings {
 
     enum Workflow {
         static let profileLabel = String(localized: "workflow.profile.label", defaultValue: "Profile")
+        static let requiredLabel = String(localized: "workflow.required.label", defaultValue: "Required")
         static let modeLabel = String(localized: "workflow.mode.label", defaultValue: "Mode")
         static let tagsLabel = String(localized: "workflow.tags.label", defaultValue: "Tags:")
         static let cameraLabel = String(localized: "workflow.camera.label", defaultValue: "Camera:")

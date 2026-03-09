@@ -7,6 +7,7 @@ struct WorkflowView: View {
     private var licenseStore: LicenseStore { LicenseStore.shared }
 
     let defaultColumnWidth = 600.00
+    private let optionLabelWidth: CGFloat = 52
 
     private var companionExtensions: String {
         state.workflowSession.workingProfile.companionExtensions?.joined(separator: ", ") ?? ""
@@ -14,15 +15,36 @@ struct WorkflowView: View {
 
     var body: some View {
         @Bindable var session = state.workflowSession
-        ScrollView {
-            VStack(spacing: 16) {
+        VStack(spacing: 0) {
+            VStack(spacing: 0) {
                 profileSelector
+                    .padding(.vertical)
                 if !session.profileName.isEmpty {
-                    stepsPipeline
-                    executionBar
+                    pipelineStatusBar
+                        .padding(.vertical, 8)
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.12))
+                        .frame(height: 1)
+                        .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
                 }
             }
-            .padding()
+            .padding(.horizontal, 16)
+            ScrollView {
+                VStack(spacing: 16) {
+                    if !session.profileName.isEmpty {
+                        stepsPipeline
+                    }
+                }
+                .padding(16)
+            }
+            .safeAreaInset(edge: .bottom) {
+                if !session.profileName.isEmpty {
+                    executionBar
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(.bar)
+                }
+            }
         }
         .onAppear {
             let name = state.workflowSession.profileName
@@ -118,35 +140,32 @@ struct WorkflowView: View {
 
     private var profileSelector: some View {
         @Bindable var session = state.workflowSession
-        return Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
+        return VStack(alignment: .leading, spacing: 10) {
             if let error = state.profileLoadError {
-                GridRow {
-                    Text("").gridColumnAlignment(.trailing)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label(error.message, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
-                        if let detail = error.detail {
-                            Text(detail)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(error.message, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                    if let detail = error.detail {
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                    HStack(spacing: 8) {
+                        Text(error.filePath)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .textSelection(.enabled)
+                        Button(Strings.Common.revealInFinder) {
+                            NSWorkspace.shared.selectFile(error.filePath, inFileViewerRootedAtPath: "")
                         }
-                        HStack(spacing: 8) {
-                            Text(error.filePath)
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                                .textSelection(.enabled)
-                            Button(Strings.Common.revealInFinder) {
-                                NSWorkspace.shared.selectFile(error.filePath, inFileViewerRootedAtPath: "")
-                            }
-                            .controlSize(.small)
-                        }
+                        .controlSize(.small)
                     }
                 }
             }
 
-            GridRow {
-                Text(Strings.Workflow.profileLabel).gridColumnAlignment(.trailing)
+            HStack(spacing: 8) {
+                Text(Strings.Workflow.profileLabel)
                 ProfilePicker(selection: $session.profileName, state: state)
                     .onChange(of: session.profileName) { _, newValue in
                         state.clearLog()
@@ -159,17 +178,48 @@ struct WorkflowView: View {
         }
     }
 
+    // MARK: - Pipeline status bar
+
+    private var pipelineStatusBar: some View {
+        let steps = state.workflowSession.availableSteps
+        let activeSteps = steps.filter { $0.isAlwaysOn || state.workflowSession.enabledSteps.contains($0) }
+        return HStack(spacing: 0) {
+            ForEach(Array(activeSteps.enumerated()), id: \.element.id) { index, step in
+                HStack(spacing: 4) {
+                    Image(systemName: step.systemImage)
+                        .font(.system(size: 9))
+                    Text(step.label)
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(step.iconColor.opacity(0.15))
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                if index < activeSteps.count - 1 {
+                    Image(systemName: "chevron.forward")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(Color.secondary.opacity(0.3))
+                        .padding(.horizontal, 1)
+                }
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+    }
+
     // MARK: - Pipeline steps
 
     private var stepsPipeline: some View {
         let steps = state.workflowSession.availableSteps
-        return VStack(spacing: 0) {
-            ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
-//                    .windowResizeBehavior(.automatic)
+        return VStack(spacing: 8) {
+            ForEach(steps) { step in
                 stepCard(step)
-                if index < steps.count - 1 {
-                    stepArrow
-                }
             }
         }
     }
@@ -179,15 +229,16 @@ struct WorkflowView: View {
         return VStack(spacing: 0) {
             stepHeader(step, isActive: isActive)
             if isActive {
+                Divider()
                 stepOptionsContent(step)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(
-                    isActive ? step.iconColor.opacity(step.isAlwaysOn ? 0.2 : 0.3)
-                             : Color.secondary.opacity(0.5),
+                    isActive ? step.iconColor.opacity(step.isAlwaysOn ? 0.12 : 0.2)
+                             : Color.secondary.opacity(0.15),
                     lineWidth: 1
                 )
         )
@@ -218,20 +269,16 @@ struct WorkflowView: View {
                 .foregroundStyle(isActive ? step.iconColor : .secondary)
                 .frame(width: 16)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(step.label)
-                    .font(.system(size: 12, weight: .medium))
-                Text(step.help)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
+            Text(step.label)
+                .font(.system(size: 12, weight: .medium))
+
+            HelpButton(step.help)
 
             Spacer()
 
             if step.isAlwaysOn {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 10))
+                Text(Strings.Workflow.requiredLabel)
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.tertiary)
             } else {
                 Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
@@ -240,39 +287,25 @@ struct WorkflowView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(isActive ? step.iconColor.opacity(step.isAlwaysOn ? 0.04 : 0.08) : .clear)
+        .background(isActive ? step.iconColor.opacity(step.isAlwaysOn ? 0.03 : 0.05) : .clear)
         .foregroundStyle(isActive ? .primary : .secondary)
         .contentShape(Rectangle())
-    }
-
-    private var stepArrow: some View {
-        Image(systemName: "arrow.down")
-            .font(.system(size: 11))
-            .foregroundStyle(.tertiary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
     }
 
     @ViewBuilder
     private func stepOptionsContent(_ step: PipelineStep) -> some View {
         switch step {
         case .ingest:
-            Divider()
             ingestOptions
         case .tag:
-            Divider()
             tagOptions
         case .organize:
-            Divider()
             organizeOptions
         case .fixTimestamps:
-            Divider()
             fixTimestampsOptions
         case .gyroflow:
-            Divider()
             gyroflowOptions
         case .archiveSource:
-            Divider()
             archiveSourceOptions
         }
     }
@@ -286,6 +319,8 @@ struct WorkflowView: View {
                 HStack(spacing: 6) {
                     TextField(Strings.Workflow.sourceDirPlaceholder, text: $session.sourceDir.value)
                         .textFieldStyle(.roundedBorder)
+                        .truncationMode(.head)
+                        .help(session.sourceDir.current)
                     Button(Strings.Common.browse) { pickSourceDir() }
                         .controlSize(.small)
                 }
@@ -321,14 +356,14 @@ struct WorkflowView: View {
                 Text(Strings.Workflow.tagsLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(width: 52, alignment: .trailing)
+                    .frame(width: optionLabelWidth, alignment: .trailing)
                 CommaSeparatedField(items: $session.tags.value, placeholder: Strings.Workflow.tagPlaceholder)
             }
             HStack(spacing: 4) {
                 Text(Strings.Workflow.cameraLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(width: 52, alignment: .trailing)
+                    .frame(width: optionLabelWidth, alignment: .trailing)
                 let make = session.workingProfile.exif?.make ?? ""
                 let model = session.workingProfile.exif?.model ?? ""
                 let device = [make, model].filter { !$0.isEmpty }.joined(separator: " ")
@@ -347,6 +382,8 @@ struct WorkflowView: View {
                 HStack(spacing: 6) {
                     TextField(Strings.Workflow.readyDirPlaceholder, text: $session.readyDir.value)
                         .textFieldStyle(.roundedBorder)
+                        .truncationMode(.head)
+                        .help(session.readyDir.current)
                     Button(Strings.Common.browse) { pickReadyDir() }
                         .controlSize(.small)
                 }
@@ -375,42 +412,24 @@ struct WorkflowView: View {
         @Bindable var session = state.workflowSession
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                if !session.useTimezonePicker {
-                    TextField(Strings.Workflow.timezonePlaceholder, text: $session.timezone.value)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 90)
-                } else {
-                    TimezonePickerView(selectedTimezone: $session.timezone.value)
-                }
+                TimezonePickerView(selectedTimezone: $session.timezone.value)
                 Spacer()
-                Button {
-                    state.workflowSession.useTimezonePicker.toggle()
-                } label: {
-                    Image(systemName: session.useTimezonePicker ? "keyboard" : "globe")
-                        .padding(4)
-                }
-                .contentShape(Rectangle())
-                .help(session.useTimezonePicker ? Strings.Workflow.typeManuallyHelp : Strings.Workflow.pickFromListHelp)
             }
             .fieldError(session.validateTimezone())
             let parseable = hasParseableFilenames()
-            HStack(spacing: 4) {
-                Text(Strings.Workflow.timestampSourceLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Picker("", selection: $session.inferFromFilenames) {
-                    Text(Strings.Workflow.timestampSourceMetadata).tag(false)
-                    Text(Strings.Workflow.timestampSourceFilenames).tag(true)
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 220)
-                .disabled(!parseable)
-                .onChange(of: parseable) { _, newValue in
-                    if !newValue && session.inferFromFilenames {
-                        session.inferFromFilenames = false
+            if parseable {
+                HStack(spacing: 4) {
+                    Text(Strings.Workflow.timestampSourceLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Picker("", selection: $session.inferFromFilenames) {
+                        Text(Strings.Workflow.timestampSourceMetadata).tag(false)
+                        Text(Strings.Workflow.timestampSourceFilenames).tag(true)
                     }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                    Spacer()
                 }
             }
 
@@ -419,6 +438,7 @@ struct WorkflowView: View {
                 TextField(Strings.Workflow.timeOffsetPlaceholder, value: $session.timeOffsetSeconds, format: .number)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 90)
+                Spacer()
             }
 
             HStack(spacing: 4) {
@@ -434,6 +454,11 @@ struct WorkflowView: View {
             }
         }
         .padding(10)
+        .onChange(of: session.sourceDir.value) { _, _ in
+            if !hasParseableFilenames() && session.inferFromFilenames {
+                session.inferFromFilenames = false
+            }
+        }
     }
 
     private var fixTimestampPreview: String? {
@@ -462,7 +487,7 @@ struct WorkflowView: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 4) {
                 Text(Strings.Workflow.sourceActionLabel)
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                 Picker("", selection: $session.sourceAction) {
                     Text(Strings.Workflow.archiveOption).tag(SourceAction.archive)
@@ -470,8 +495,9 @@ struct WorkflowView: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
-                .frame(width: 220)
+                .fixedSize()
                 HelpButton(Strings.Workflow.sourceActionHelp)
+                Spacer()
             }
             if session.sourceAction == .delete {
                 Label(Strings.Workflow.deleteSourceWarning, systemImage: "exclamationmark.triangle.fill")
@@ -485,39 +511,30 @@ struct WorkflowView: View {
     private var gyroflowOptions: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
-                Text(Strings.Profiles.maxZoomLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 100, alignment: .trailing)
+                HelpLabel(Strings.Profiles.maxZoomLabel, help: Strings.Profiles.maxZoomHelp)
                 TextField("", value: gyroflowBinding(\.maxZoom), format: .number)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 70)
-                HelpButton(Strings.Profiles.maxZoomHelp)
+                Spacer()
             }
             HStack(spacing: 4) {
-                Text(Strings.Profiles.adaptiveZoomWindowLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 100, alignment: .trailing)
+                HelpLabel(Strings.Profiles.adaptiveZoomWindowLabel, help: Strings.Profiles.adaptiveZoomWindowHelp)
                 TextField("", value: gyroflowBinding(\.adaptiveZoomWindow), format: .number)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 70)
-                HelpButton(Strings.Profiles.adaptiveZoomWindowHelp)
+                Spacer()
             }
             HStack(spacing: 4) {
-                Text(Strings.Profiles.adaptiveZoomMethodLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 100, alignment: .trailing)
+                HelpLabel(Strings.Profiles.adaptiveZoomMethodLabel, help: Strings.Profiles.adaptiveZoomMethodHelp)
                 Picker("", selection: gyroflowZoomMethodBinding) {
                     ForEach(AdaptiveZoomMethod.allCases) { method in
                         Text(method.label).tag(method)
                     }
                 }
                 .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 200)
-                HelpButton(Strings.Profiles.adaptiveZoomMethodHelp)
+                .pickerStyle(.menu)
+                .fixedSize()
+                Spacer()
             }
         }
         .padding(10)
@@ -553,31 +570,25 @@ struct WorkflowView: View {
 
     private var executionBar: some View {
         @Bindable var session = state.workflowSession
-        return Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
-            Divider().gridCellUnsizedAxes(.horizontal)
-            GridRow {
-                Text(Strings.Workflow.modeLabel).gridColumnAlignment(.trailing)
-                HStack(spacing: 12) {
-                    Picker("", selection: $session.applyMode) {
-                        Text(Strings.Workflow.dryRunOption).tag(false)
-                        Text(Strings.Workflow.applyOption).tag(true)
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 160)
-
-                    Button(state.isRunning ? Strings.Workflow.runningButton : Strings.Workflow.runButton) { runWorkflow() }
-                        .disabled(state.isRunning || !session.allStepsReady)
-                        .keyboardShortcut(.return, modifiers: .command)
-                        .buttonStyle(.borderedProminent)
-
-                    if state.isRunning {
-                        Button(Strings.Common.cancel, role: .destructive) { state.cancelRunning() }
-                    }
-
-                    Spacer()
-                }
+        return HStack(spacing: 12) {
+            Picker("", selection: $session.applyMode) {
+                Text(Strings.Workflow.dryRunOption).tag(false)
+                Text(Strings.Workflow.applyOption).tag(true)
             }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .fixedSize()
+
+            Button(state.isRunning ? Strings.Workflow.runningButton : Strings.Workflow.runButton) { runWorkflow() }
+                .disabled(state.isRunning || !session.allStepsReady)
+                .keyboardShortcut(.return, modifiers: .command)
+                .buttonStyle(.borderedProminent)
+
+            if state.isRunning {
+                Button(Strings.Common.cancel, role: .destructive) { state.cancelRunning() }
+            }
+
+            Spacer()
         }
     }
 
