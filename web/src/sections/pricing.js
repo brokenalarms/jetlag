@@ -65,7 +65,7 @@ export function renderPricing() {
               </li>
             </ul>
 
-            <a id="download" href="#download" class="btn-secondary w-full justify-center">
+            <a href="#download" class="btn-secondary w-full justify-center">
               Download free
             </a>
           </div>
