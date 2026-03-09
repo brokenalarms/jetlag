@@ -57,9 +57,9 @@ export function renderHero() {
             <span class="ml-3 text-xs text-white/25 font-mono">Jetlag — Workflow</span>
           </div>
           <!-- Fake app content -->
-          <div class="grid grid-cols-[180px_1fr] min-h-[240px]">
+          <div class="grid grid-cols-1 sm:grid-cols-[180px_1fr] min-h-[240px]">
             <!-- Sidebar -->
-            <div class="border-r border-white/8 p-4 space-y-1">
+            <div class="border-b sm:border-b-0 sm:border-r border-white/8 p-4 flex sm:block gap-2 sm:space-y-1">
               <div class="flex items-center gap-2 rounded-lg bg-neon-pink/15 px-3 py-2">
                 <div class="h-4 w-4 rounded bg-neon-pink/50"></div>
                 <span class="text-xs text-neon-pink font-medium">Workflow</span>

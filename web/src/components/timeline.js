@@ -155,6 +155,12 @@ export function renderInteractiveTimeline(before, after) {
       </div>
       ${renderAxis(sharedScale)}
       <p class="mt-3 text-xs tl-caption text-white/30">${before.caption}</p>
+      <p class="mt-2 text-[10px] text-white/20 timeline-hint tl-hint flex items-center gap-1.5">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M2 6h8M8 4l2 2-2 2" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Drag the slider to fix
+      </p>
     </div>
   `
 }
@@ -175,8 +181,13 @@ export function initTimelineSliders() {
     const afterLabel  = card.querySelector('.tl-after-label')
     const dotBefore   = card.querySelector('.tl-dot')
     const dotAfter    = card.querySelector('.tl-dot-after')
+    const hint        = card.querySelector('.tl-hint')
 
     range.addEventListener('input', () => {
+      // Hide drag hint on first interaction
+      if (hint && !hint.classList.contains('hidden')) {
+        hint.classList.add('hidden')
+      }
       const t = range.value / 100
 
       data.clips.forEach((clip, i) => {

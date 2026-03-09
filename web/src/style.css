@@ -309,4 +309,59 @@
     border-radius: 2px;
     border: none;
   }
+
+  /* Scroll-triggered fade-in: elements start invisible and slide up when .in-view is added */
+  .card,
+  section h2,
+  .fade-on-scroll {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  }
+  .card.in-view,
+  section h2.in-view,
+  .fade-on-scroll.in-view {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Stagger cards within a grid */
+  .card:nth-child(2) { transition-delay: 0.08s; }
+  .card:nth-child(3) { transition-delay: 0.16s; }
+  .card:nth-child(4) { transition-delay: 0.24s; }
+  .card:nth-child(5) { transition-delay: 0.32s; }
+  .card:nth-child(6) { transition-delay: 0.4s; }
+
+  /* Hover lift for cards */
+  .card {
+    transition: opacity 0.5s ease-out, transform 0.5s ease-out, box-shadow 0.25s ease, border-color 0.25s ease;
+  }
+  .card.in-view:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3), 0 0 40px rgba(255, 45, 120, 0.06);
+  }
+
+  /* Drag hint pulse on timeline sliders */
+  .timeline-hint {
+    animation: hint-pulse 2s ease-in-out 2;
+    animation-delay: 1s;
+  }
+  @keyframes hint-pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
+  /* Back-to-top button entrance */
+  #back-to-top {
+    transition: opacity 0.25s ease, transform 0.25s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  }
+  #back-to-top.hidden {
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+  }
+  #back-to-top.flex {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
