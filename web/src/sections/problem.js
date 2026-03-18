@@ -84,7 +84,7 @@ export function renderProblem() {
         </div>
 
         <!-- Scenarios -->
-        <div class="space-y-14">
+        <div class="space-y-14 max-w-3xl mx-auto">
           ${scenarios.map(s => /* html */`
             <div>
               <div class="mb-5 flex gap-3 items-start">
@@ -100,7 +100,7 @@ export function renderProblem() {
         </div>
 
         <!-- What Jetlag actually fixes -->
-        <div class="mt-14 rounded-2xl border border-white/8 bg-white/3 px-6 py-5 space-y-2">
+        <div class="mt-14 max-w-3xl mx-auto rounded-2xl border border-white/8 bg-white/3 px-6 py-5 space-y-2">
           <p class="text-sm leading-relaxed text-white/45">
             <span class="font-semibold text-white/70">What actually gets corrected.</span>
             Jetlag fixes timezone labelling relative to UTC — a clip shot at 10am in Seoul is stamped
