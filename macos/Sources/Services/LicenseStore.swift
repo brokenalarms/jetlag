@@ -5,15 +5,22 @@ import Observation
 final class LicenseStore {
     static let shared = LicenseStore()
 
-    private let unlockedKey = "jetlag.pro.unlocked"
+    private static let unlockedKey = "jetlag.pro.unlocked"
 
     var isUnlocked: Bool {
-        get { UserDefaults.standard.bool(forKey: unlockedKey) }
-        set { UserDefaults.standard.set(newValue, forKey: unlockedKey) }
+        didSet { UserDefaults.standard.set(isUnlocked, forKey: Self.unlockedKey) }
+    }
+
+    private init() {
+        isUnlocked = UserDefaults.standard.bool(forKey: Self.unlockedKey)
     }
 
     /// Maximum files per run. Free tier: 50. Unlocked: unlimited.
     var fileLimit: Int { isUnlocked ? Int.max : 50 }
+
+    func exceedsLimit(fileCount: Int) -> Bool {
+        fileCount > fileLimit
+    }
 
     // MARK: - Stub activation (replace with Paddle/Stripe integration)
 

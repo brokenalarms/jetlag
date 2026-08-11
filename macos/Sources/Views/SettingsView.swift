@@ -37,6 +37,10 @@ struct SettingsView: View {
                         NSWorkspace.shared.open(URL(string: "https://jetlag.app")!)
                     }
                 }
+
+                #if DEBUG
+                Toggle(Strings.Settings.debugUnlockToggle, isOn: Bindable(licenseStore).isUnlocked)
+                #endif
             }
 
             Section(Strings.Settings.scriptsSection) {

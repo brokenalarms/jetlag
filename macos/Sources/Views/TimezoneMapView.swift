@@ -4,20 +4,6 @@ struct TimezonePickerView: View {
     @Binding var selectedTimezone: String
     @State private var showingPicker = false
 
-    fileprivate static let timezones: [(id: String, label: String, offset: String)] = {
-        TimeZone.knownTimeZoneIdentifiers.sorted().compactMap { id in
-            guard let tz = TimeZone(identifier: id) else { return nil }
-            let seconds = tz.secondsFromGMT()
-            let sign = seconds >= 0 ? "+" : "-"
-            let abs = abs(seconds)
-            let h = abs / 3600
-            let m = (abs % 3600) / 60
-            let offset = String(format: "%@%02d%02d", sign, h, m)
-            let label = id.replacingOccurrences(of: "_", with: " ")
-            return (id: id, label: label, offset: offset)
-        }
-    }()
-
     var body: some View {
         Button {
             showingPicker = true
@@ -28,17 +14,14 @@ struct TimezonePickerView: View {
                     Text(Strings.Workflow.selectTimezone)
                         .foregroundStyle(.secondary)
 
+                } else if let option = TimezoneCatalog.option(selectedTimezone) {
+                    Text(option.city)
+                    Text(option.offset)
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundStyle(.secondary)
                 } else {
-                    let match = Self.timezones.first { $0.offset == selectedTimezone }
-                    if let match {
-                        Text(match.label.components(separatedBy: "/").last ?? match.label)
-                        Text(match.offset)
-                            .font(.system(.body, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text(selectedTimezone)
-                            .font(.system(.body, design: .monospaced))
-                    }
+                    Text(selectedTimezone)
+                        .font(.system(.body, design: .monospaced))
                 }
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 9))
@@ -69,19 +52,20 @@ private struct TimezonePickerSheet: View {
     @Binding var isPresented: Bool
     @State private var searchText = ""
 
-    private var filtered: [(id: String, label: String, offset: String)] {
-        if searchText.isEmpty { return TimezonePickerView.timezones }
+    private var filtered: [TimezoneOption] {
+        if searchText.isEmpty { return TimezoneCatalog.all }
         let query = searchText.lowercased()
-        return TimezonePickerView.timezones.filter {
-            $0.label.lowercased().contains(query) || $0.offset.contains(query)
+        return TimezoneCatalog.all.filter {
+            $0.path.lowercased().contains(query)
+                || $0.region.lowercased().contains(query)
+                || $0.offset.contains(query)
         }
     }
 
-    private var grouped: [(region: String, items: [(id: String, label: String, offset: String)])] {
-        let dict = Dictionary(grouping: filtered) { entry in
-            entry.id.components(separatedBy: "/").first ?? "Other"
-        }
-        return dict.sorted { $0.key < $1.key }.map { (region: $0.key, items: $0.value) }
+    private var grouped: [(region: String, items: [TimezoneOption])] {
+        Dictionary(grouping: filtered, by: \.region)
+            .sorted { $0.key < $1.key }
+            .map { (region: $0.key, items: $0.value) }
     }
 
     var body: some View {
@@ -103,14 +87,15 @@ private struct TimezonePickerSheet: View {
             List {
                 ForEach(grouped, id: \.region) { group in
                     Section(group.region) {
-                        ForEach(group.items, id: \.id) { item in
+                        ForEach(group.items) { item in
                             Button {
-                                selectedTimezone = item.offset
+                                selectedTimezone = item.id
                                 isPresented = false
                             } label: {
                                 HStack {
-                                    Text(item.label.components(separatedBy: "/").dropFirst().joined(separator: " / "))
+                                    Text(item.path)
                                         .lineLimit(1)
+                                        .fontWeight(item.id == selectedTimezone ? .semibold : .regular)
                                     Spacer()
                                     Text(item.offset)
                                         .font(.system(.caption, design: .monospaced))

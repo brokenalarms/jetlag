@@ -284,10 +284,14 @@ final class WorkflowSession {
         }
     }
 
+    var timezoneOption: TimezoneOption? {
+        TimezoneCatalog.option(timezone.current)
+    }
+
     func validateTimezone() -> String? {
         if !enabledSteps.contains(.fixTimestamps) { return nil }
         if timezone.current.isEmpty { return Strings.Workflow.timezoneRequired }
-        if !timezone.current.contains(/^[+-]\d{4}$/) { return Strings.Workflow.timezoneFormatHelp }
+        if timezoneOption == nil { return Strings.Workflow.timezoneUnknown }
         return nil
     }
 
@@ -341,8 +345,8 @@ final class WorkflowSession {
         if copyCompanionFiles {
             args.append("--copy-companion-files")
         }
-        if enabledSteps.contains(.fixTimestamps) && !timezone.current.isEmpty {
-            args += ["--timezone", timezone.current]
+        if enabledSteps.contains(.fixTimestamps), let option = timezoneOption {
+            args += ["--timezone", option.offset]
         }
         if enabledSteps.contains(.fixTimestamps) && inferFromFilenames {
             args.append("--infer-from-filename")

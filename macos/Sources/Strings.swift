@@ -87,7 +87,7 @@ enum Strings {
         static let showLogOutputHelp = String(localized: "workflow.showLogOutput.help", defaultValue: "Show output log")
         static let inspectorEmptyLabel = String(localized: "workflow.inspectorEmpty.label", defaultValue: "Run a workflow to see results")
 
-        static let timezoneFormatHelp = String(localized: "workflow.timezoneFormat.help", defaultValue: "Expected format: +HHMM or -HHMM")
+        static let timezoneUnknown = String(localized: "workflow.timezoneUnknown", defaultValue: "Unrecognized timezone")
         static let timezoneRequired = String(localized: "workflow.timezoneRequired", defaultValue: "Timezone required")
         static let deleteSourceWarning = String(localized: "workflow.deleteSource.warning",
             defaultValue: "Deletes processed files and companions from source after successful processing")
@@ -220,6 +220,7 @@ What happens to source files after processing:
         static let activateButton = String(localized: "settings.activate.button", defaultValue: "Activate")
         static let activatingButton = String(localized: "settings.activating.button", defaultValue: "Activating…")
         static let buyProButton = String(localized: "settings.buyPro.button", defaultValue: "Buy Jetlag Pro")
+        static let debugUnlockToggle = String(localized: "settings.debugUnlock.toggle", defaultValue: "Unlock Pro (debug builds only)")
 
         static func freePlan(fileLimit: Int) -> String {
             String(localized: "settings.freePlan",

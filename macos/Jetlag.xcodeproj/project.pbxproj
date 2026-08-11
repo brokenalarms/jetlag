@@ -21,6 +21,7 @@
 		7EB40F1EE336843C386D4474 /* SandboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6989D9C650B0383E7ABA46E2 /* SandboxView.swift */; };
 		8989E8C851EEE8A1CA2F436E /* UpgradeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEA322FB3423ED25C28C0860 /* UpgradeView.swift */; };
 		8D5AEC4A3D748ADF6853E7C1 /* JetlagApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1EA0220A8EF5122DF196162 /* JetlagApp.swift */; };
+		8F979D129B6EF35BF9FA8BCB /* TimezoneCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 275EE4D58C8BFA72BF92B86F /* TimezoneCatalog.swift */; };
 		92BA1490C431AC89A5646C85 /* FilenamePatterns.swift in Sources */ = {isa = PBXBuildFile; fileRef = A668F7E7A4F545637B636567 /* FilenamePatterns.swift */; };
 		932EB3F57E4BF42DBFA0EBF9 /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */; };
 		A782F8A1159D170B5CEB4C7E /* LicenseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D2EC9D00CD4EE5A754D59E /* LicenseStore.swift */; };
@@ -51,6 +52,7 @@
 /* Begin PBXFileReference section */
 		155795936E0AF78F19DDB808 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1C1D644A22201A7866455A04 /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
+		275EE4D58C8BFA72BF92B86F /* TimezoneCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimezoneCatalog.swift; sourceTree = "<group>"; };
 		27CF0E7DB6265D0EAF8055CE /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
 		2DB6E838E4C1827858BB004E /* DirtyableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirtyableTests.swift; sourceTree = "<group>"; };
 		3B7884EFEE29BD136A760320 /* FieldValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldValidation.swift; sourceTree = "<group>"; };
@@ -185,6 +187,7 @@
 				73A67A68A82CC97A0B42F497 /* DiffTableRow.swift */,
 				A668F7E7A4F545637B636567 /* FilenamePatterns.swift */,
 				DC0210C9EE3BEF29E07C9DE6 /* MediaProfile.swift */,
+				275EE4D58C8BFA72BF92B86F /* TimezoneCatalog.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -239,9 +242,10 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+				};
 			};
 			buildConfigurationList = 685744F4C7E747627694E7D4 /* Build configuration list for PBXProject "Jetlag" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -254,6 +258,7 @@
 				B84EF0D968CA901D0E38764C /* XCRemoteSwiftPackageReference "Yams" */,
 			);
 			preferredProjectObjectVersion = 77;
+			productRefGroup = 64E008420DD19CC786D2E74C /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -318,6 +323,7 @@
 				AAC3E4FC571BCF92D2EBA219 /* ScriptRunner.swift in Sources */,
 				4FDCE64D99169FBCD837CF2B /* SettingsView.swift in Sources */,
 				CF708EB9D2E1C9376806BA71 /* Strings.swift in Sources */,
+				8F979D129B6EF35BF9FA8BCB /* TimezoneCatalog.swift in Sources */,
 				C61A796CA3B728982C946AD4 /* TimezoneMapView.swift in Sources */,
 				8989E8C851EEE8A1CA2F436E /* UpgradeView.swift in Sources */,
 				5C37852483245BC294545B2B /* WorkflowView.swift in Sources */,
@@ -417,6 +423,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Sources/Tools/jetlag-metadata/.build/arm64-apple-macosx/release/jetlag-metadata.dSYM/Contents/Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Daniel Lawrence";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -531,6 +538,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Sources/Tools/jetlag-metadata/.build/arm64-apple-macosx/release/jetlag-metadata.dSYM/Contents/Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Daniel Lawrence";
 				LD_RUNPATH_SEARCH_PATHS = (
