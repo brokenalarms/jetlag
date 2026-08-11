@@ -85,6 +85,7 @@ enum Strings {
         static let hideLogOutputHelp = String(localized: "workflow.hideLogOutput.help", defaultValue: "Hide output log")
         static let showLogOutputHelp = String(localized: "workflow.showLogOutput.help", defaultValue: "Show output log")
         static let inspectorEmptyLabel = String(localized: "workflow.inspectorEmpty.label", defaultValue: "Run a workflow to see results")
+        static let inspectorStartingLabel = String(localized: "workflow.inspectorStarting.label", defaultValue: "Scanning files…")
 
         static let timezoneUnknown = String(localized: "workflow.timezoneUnknown", defaultValue: "Unrecognized timezone")
         static let timezoneRequired = String(localized: "workflow.timezoneRequired", defaultValue: "Timezone required")

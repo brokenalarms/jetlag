@@ -60,26 +60,6 @@ struct WorkflowView: View {
             }
         }
         .frame(minWidth: 340, idealWidth: defaultColumnWidth, maxWidth: defaultColumnWidth)
-        .inspector(isPresented: $state.showInspector) {
-            VStack(spacing: 0) {
-                if !state.visibleRows.isEmpty || state.isRunning {
-                    DiffTableView(rows: state.visibleRows)
-                } else if !state.showLogOutput {
-                    Spacer()
-                    Text(Strings.Workflow.inspectorEmptyLabel)
-                        .font(.subheadline)
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                }
-
-                if state.showLogOutput {
-                    LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
-                }
-
-                inspectorBottomBar
-            }
-            .inspectorColumnWidth(min: 480, ideal: defaultColumnWidth)
-        }
         .navigationTitle(Strings.Nav.workflow)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -593,21 +573,6 @@ struct WorkflowView: View {
 
     // MARK: - Inspector bars
 
-    private var inspectorBottomBar: some View {
-        HStack {
-            Button {
-                withAnimation { state.showLogOutput.toggle() }
-            } label: {
-                Image(systemName: "terminal")
-                    .foregroundStyle(state.showLogOutput ? .primary : .secondary)
-            }
-            .buttonStyle(.borderless)
-            .help(state.showLogOutput ? Strings.Workflow.hideLogOutputHelp : Strings.Workflow.showLogOutputHelp)
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-    }
 
     // MARK: - Helpers
 

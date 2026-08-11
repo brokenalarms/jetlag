@@ -97,6 +97,13 @@ struct LogLine: Identifiable {
     var isMachineReadable: Bool {
         text.hasPrefix("{")
     }
+
+    /// Text without the ANSI colour codes the scripts write for terminal use.
+    var strippedText: String {
+        text
+            .replacingOccurrences(of: "\u{1B}\\[[0-9;]*m", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+    }
 }
 
 /// JSONL event types emitted by media-pipeline.py on stdout.
@@ -431,6 +438,12 @@ final class AppState {
             return diffTableRows + [live]
         }
         return diffTableRows
+    }
+
+    /// The most recent line of pipeline progress, for the stretch between starting
+    /// a run and the first file appearing in the table.
+    var latestStatusLine: String? {
+        logOutput.last { !$0.strippedText.isEmpty }?.strippedText
     }
 
     init() {
