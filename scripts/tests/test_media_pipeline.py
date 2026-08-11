@@ -381,31 +381,11 @@ class TestGroupTemplate:
         assert expected.exists(), f"Expected: {expected}\nActual files: {actual_files}\nStdout: {result.stdout[-500:]}\nStderr: {result.stderr}"
 
 
-class TestAppendTimezoneToGroup:
-    """Tests for --append-timezone-to-group flag."""
+class TestGroupFolder:
+    """Tests for --group folder placement."""
 
-    def test_appends_timezone_to_group_folder(self, temp_workspace, test_profile):
-        """--append-timezone-to-group appends timezone offset to group folder name."""
-        source = temp_workspace["source"]
-        target = temp_workspace["target"]
-        video = source / "test.mp4"
-        create_test_video(video, media_create_date="2025:08:15 03:00:00")
-
-        run_pipeline([
-            "--profile", test_profile,
-            "--source", str(source),
-            "--timezone", "+0900",
-            "--group", "Japan",
-            "--append-timezone-to-group",
-            "--apply",
-        ])
-
-        expected = target / "2025" / "Japan (+0900)" / "2025-08-15" / "test.mp4"
-        actual_files = list(target.rglob("*.mp4"))
-        assert expected.exists(), f"Expected: {expected}\nActual files: {actual_files}"
-
-    def test_group_without_append_timezone(self, temp_workspace, test_profile):
-        """--group without --append-timezone-to-group uses plain group name."""
+    def test_group_folder(self, temp_workspace, test_profile):
+        """--group inserts a folder between the year and the date."""
         source = temp_workspace["source"]
         target = temp_workspace["target"]
         video = source / "test.mp4"
@@ -422,38 +402,6 @@ class TestAppendTimezoneToGroup:
         expected = target / "2025" / "Japan" / "2025-08-15" / "test.mp4"
         actual_files = list(target.rglob("*.mp4"))
         assert expected.exists(), f"Expected: {expected}\nActual files: {actual_files}"
-
-    def test_append_timezone_without_group_errors(self, temp_workspace, test_profile):
-        """--append-timezone-to-group without --group exits with error."""
-        source = temp_workspace["source"]
-        video = source / "test.mp4"
-        create_test_video(video)
-
-        result = run_pipeline([
-            "--profile", test_profile,
-            "--source", str(source),
-            "--timezone", "+0900",
-            "--append-timezone-to-group",
-        ])
-
-        assert result.returncode != 0
-        assert "--group" in result.output
-
-    def test_append_timezone_without_timezone_errors(self, temp_workspace, test_profile):
-        """--append-timezone-to-group without --timezone exits with error."""
-        source = temp_workspace["source"]
-        video = source / "test.mp4"
-        create_test_video(video)
-
-        result = run_pipeline([
-            "--profile", test_profile,
-            "--source", str(source),
-            "--group", "Japan",
-            "--append-timezone-to-group",
-        ])
-
-        assert result.returncode != 0
-        assert "--timezone" in result.output
 
 
 class TestTimezoneHandling:
@@ -490,6 +438,44 @@ class TestTimezoneHandling:
 
         assert result.returncode != 0
         assert "ERROR" in result.output or "+HHMM" in result.output
+
+    def test_unknown_zone_name_is_rejected(self, temp_workspace, test_profile):
+        """A zone name that is not in the database is rejected."""
+        source = temp_workspace["source"]
+        create_test_video(source / "test.mp4")
+
+        result = run_pipeline(
+            ["--profile", test_profile, "--source", str(source),
+             "--timezone", "Pacific/Atlantis", "--group", "Test"],
+        )
+
+        assert result.returncode != 0
+        assert "unknown timezone" in result.output.lower()
+
+    def test_zone_name_resolves_per_file_across_a_dst_changeover(self, temp_workspace, test_profile):
+        """One run, one zone, two offsets — NZ left daylight time on 2025-04-06.
+
+        Both files carry the same UTC instant on either side of the changeover,
+        so a single frozen offset would give them the same local hour.
+        """
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        create_test_video(source / "summer.mp4", media_create_date="2025:03:15 01:00:00")
+        create_test_video(source / "winter.mp4", media_create_date="2025:07:15 01:00:00")
+
+        run_pipeline(
+            ["--profile", test_profile, "--source", str(source),
+             "--timezone", "Pacific/Auckland", "--group", "Test", "--apply"],
+        )
+
+        moved = {p.name: p for p in target.rglob("*.mp4")}
+        summer = get_exif_field(moved["summer.mp4"], "DateTimeOriginal")
+        winter = get_exif_field(moved["winter.mp4"], "DateTimeOriginal")
+
+        assert "+13:00" in summer, f"March is NZDT, got: {summer}"
+        assert "+12:00" in winter, f"July is NZST, got: {winter}"
+        assert "14:00:00" in summer, f"01:00 UTC is 14:00 NZDT, got: {summer}"
+        assert "13:00:00" in winter, f"01:00 UTC is 13:00 NZST, got: {winter}"
 
 
 class TestSummaryOutput:

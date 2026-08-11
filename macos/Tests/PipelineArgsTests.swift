@@ -103,14 +103,18 @@ final class PipelineArgsTests: XCTestCase {
         let (_, args) = session.buildPipelineArgs()
 
         let tzIndex = args.firstIndex(of: "--timezone")!
-        XCTAssertEqual(args[tzIndex + 1], "+0900")
+        XCTAssertEqual(args[tzIndex + 1], "Asia/Tokyo")
     }
 
     func testTimezoneKeepsIdentityAcrossZonesSharingAnOffset() {
         let session = makeSession()
         session.timezone.value = "Pacific/Auckland"
         XCTAssertEqual(session.timezoneOption?.city, "Auckland")
-        XCTAssertEqual(session.timezoneOption?.offset, TimezoneCatalog.offset("Antarctica/McMurdo"))
+        XCTAssertEqual(session.timezoneOption?.offsets, TimezoneCatalog.option("Antarctica/McMurdo")?.offsets)
+
+        let (_, args) = session.buildPipelineArgs()
+        let tzIndex = args.firstIndex(of: "--timezone")!
+        XCTAssertEqual(args[tzIndex + 1], "Pacific/Auckland")
     }
 
     func testUnknownTimezoneIsNotReady() {
@@ -131,27 +135,15 @@ final class PipelineArgsTests: XCTestCase {
         XCTAssertEqual(args[groupIndex + 1], "Japan")
     }
 
-    func testAppendTimezoneToGroup() {
+    func testGroupWithTimezone() {
         let session = makeSession()
         session.group = "Japan"
         session.timezone.value = "Asia/Tokyo"
-        session.appendTimezoneToGroup = true
         let (_, args) = session.buildPipelineArgs()
 
-        XCTAssertTrue(args.contains("--group"))
-        XCTAssertTrue(args.contains("--append-timezone-to-group"))
+        let groupIndex = args.firstIndex(of: "--group")!
+        XCTAssertEqual(args[groupIndex + 1], "Japan")
         XCTAssertTrue(args.contains("--timezone"))
-    }
-
-    func testAppendTimezoneToGroupNotIncludedWhenDisabled() {
-        let session = makeSession()
-        session.group = "Japan"
-        session.timezone.value = "Asia/Tokyo"
-        session.appendTimezoneToGroup = false
-        let (_, args) = session.buildPipelineArgs()
-
-        XCTAssertTrue(args.contains("--group"))
-        XCTAssertFalse(args.contains("--append-timezone-to-group"))
     }
 
     func testApplyMode() {

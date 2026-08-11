@@ -5,7 +5,11 @@ struct TimezoneOption: Identifiable, Equatable {
     let region: String
     let city: String
     let path: String
-    let offset: String
+    let offsets: [String]
+
+    /// Both offsets for a zone that observes DST — which one applies is decided
+    /// per file, against the date it was shot.
+    var offsetLabel: String { offsets.joined(separator: "/") }
 }
 
 enum TimezoneCatalog {
@@ -20,12 +24,20 @@ enum TimezoneCatalog {
             region: components.first ?? identifier,
             city: names.last ?? identifier,
             path: names.isEmpty ? identifier : names.joined(separator: " / "),
-            offset: formatOffset(tz.secondsFromGMT())
+            offsets: offsets(of: tz)
         )
     }
 
-    static func offset(_ identifier: String) -> String? {
-        option(identifier)?.offset
+    /// Standard offset first, then the daylight offset when the zone observes one.
+    private static func offsets(of tz: TimeZone) -> [String] {
+        let now = Date()
+        let current = formatOffset(tz.secondsFromGMT(for: now))
+        guard let transition = tz.nextDaylightSavingTimeTransition(after: now) else {
+            return [current]
+        }
+        let other = formatOffset(tz.secondsFromGMT(for: transition.addingTimeInterval(1)))
+        guard other != current else { return [current] }
+        return [current, other].sorted()
     }
 
     private static func formatOffset(_ seconds: Int) -> String {

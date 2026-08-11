@@ -16,7 +16,7 @@ struct TimezonePickerView: View {
 
                 } else if let option = TimezoneCatalog.option(selectedTimezone) {
                     Text(option.city)
-                    Text(option.offset)
+                    Text(option.offsetLabel)
                         .font(.system(.body, design: .monospaced))
                         .foregroundStyle(.secondary)
                 } else {
@@ -58,7 +58,7 @@ private struct TimezonePickerSheet: View {
         return TimezoneCatalog.all.filter {
             $0.path.lowercased().contains(query)
                 || $0.region.lowercased().contains(query)
-                || $0.offset.contains(query)
+                || $0.offsets.contains { $0.contains(query) }
         }
     }
 
@@ -97,7 +97,7 @@ private struct TimezonePickerSheet: View {
                                         .lineLimit(1)
                                         .fontWeight(item.id == selectedTimezone ? .semibold : .regular)
                                     Spacer()
-                                    Text(item.offset)
+                                    Text(item.offsetLabel)
                                         .font(.system(.caption, design: .monospaced))
                                         .foregroundStyle(.secondary)
                                 }

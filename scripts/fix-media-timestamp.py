@@ -36,6 +36,9 @@ from lib.timestamp_source import (
     get_best_timestamp,
     extract_metadata_timezone,
     read_timestamp_sources,
+    is_zone_name,
+    is_utc_timestamp_source,
+    resolve_timezone_offset,
     clear_exif_cache,
 )
 
@@ -253,11 +256,15 @@ def write_quicktime_createdate(file_path: str, datetime_original: datetime) -> b
         return False
 
 
-def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None, infer_from_filename: bool = False) -> dict:
+def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, infer_from_filename: bool = False) -> dict:
     """Get all current timestamp data from file.
 
+    timezone_spec is either a fixed +HHMM offset or an IANA zone name. A zone
+    name resolves against this file's own timestamp, so a run spanning a DST
+    changeover gives each file the offset that applied when it was shot.
+
     When infer_from_filename=True:
-    - Requires timezone_offset to be provided
+    - Requires timezone_spec to be provided
     - Uses filename timestamp with provided timezone as source of truth
     - Ignores existing EXIF timestamps
     """
@@ -268,16 +275,19 @@ def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None
         "datetime_original_str": "",
         "datetime_original": None,
         "timestamp_source": "",
-        "timezone_source": ""
+        "timezone_source": "",
+        "timezone_offset": None,
     }
 
     if infer_from_filename:
-        if not timezone_offset:
+        if not timezone_spec:
             raise ValueError("--infer-from-filename requires --timezone to be specified")
-        report = read_timestamp_sources(file_path, timezone_offset)
+        report = read_timestamp_sources(file_path, timezone_spec)
         if not report.filename_parseable:
             raise ValueError(f"--infer-from-filename specified but filename has no parseable date")
         fn_ts, _ = parse_filename_timestamp(file_path)
+        timezone_offset = resolve_timezone_offset(timezone_spec, fn_ts)
+        data["timezone_offset"] = timezone_offset
         datetime_with_tz = f"{fn_ts}{timezone_offset}"
         data["datetime_original_str"] = datetime_with_tz
         data["datetime_original"] = parse_datetime_original(datetime_with_tz)
@@ -286,8 +296,14 @@ def get_all_timestamp_data(file_path: str, timezone_offset: Optional[str] = None
         return data
 
     # Use 6-tier priority system to find best timestamp
-    best_timestamp, source = get_best_timestamp(file_path, timezone_offset)
+    best_timestamp, source = get_best_timestamp(file_path, timezone_spec)
     data["timestamp_source"] = source
+
+    timezone_offset = resolve_timezone_offset(
+        timezone_spec, best_timestamp,
+        timestamp_is_utc=is_utc_timestamp_source(source),
+    )
+    data["timezone_offset"] = timezone_offset
 
     if best_timestamp:
         if source == "CreationDate with timezone":
@@ -684,7 +700,7 @@ def _source_to_machine_token(source: str) -> str:
     return source_lower
 
 
-def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None, force_timezone: bool = False) -> TimestampFixResult:
+def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None, force_timezone: bool = False) -> TimestampFixResult:
     """Fix media (photo/video) timestamps.
 
     Returns:
@@ -697,15 +713,15 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
     detected_tz = extract_metadata_timezone(file_path) or None
 
     # Get all data
-    current_data = get_all_timestamp_data(file_path, timezone_offset, infer_from_filename)
+    current_data = get_all_timestamp_data(file_path, timezone_spec, infer_from_filename)
 
     # When --force-timezone is set: override DTO's embedded timezone with the
     # user-provided timezone, keeping the wall-clock time intact.
-    if force_timezone and timezone_offset and not infer_from_filename:
+    if force_timezone and timezone_spec and not infer_from_filename:
         source = current_data.get("timestamp_source", "")
         if "with timezone" in source and current_data["datetime_original_str"]:
             wall_clock = re.sub(r'[+-]\d{2}:?\d{2}$', '', current_data["datetime_original_str"]).strip()
-            forced_tz = normalize_timezone_input(timezone_offset)
+            forced_tz = current_data["timezone_offset"] or normalize_timezone_input(timezone_spec)
             datetime_with_tz = f"{wall_clock}{forced_tz}"
             current_data["datetime_original_str"] = datetime_with_tz
             current_data["datetime_original"] = parse_datetime_original(datetime_with_tz)
@@ -717,7 +733,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_offset:
     if not current_data["datetime_original"]:
         # Check if we have CreateDate but missing timezone
         create_date = current_data["exif"].get("CreateDate", "")
-        if create_date and not timezone_offset:
+        if create_date and not timezone_spec:
             print("❌ File has CreateDate but no DateTimeOriginal", file=sys.stderr)
             print(f"   CreateDate: {create_date}", file=sys.stderr)
             print("   Use --timezone to specify timezone (e.g., --timezone +09:00)", file=sys.stderr)
@@ -883,31 +899,31 @@ def main():
     file_path = os.path.abspath(args.file)
 
     # Handle country lookup for timezone
-    timezone_offset = args.timezone
-    if timezone_offset:
+    timezone_spec = args.timezone
+    if timezone_spec and not is_zone_name(timezone_spec):
         # Normalize timezone format (add + sign if missing, ensure colon)
-        timezone_offset = normalize_timezone_input(timezone_offset)
+        timezone_spec = normalize_timezone_input(timezone_spec)
 
-    if args.country and not timezone_offset:
-        timezone_offset = get_timezone_for_country(args.country)
-        if timezone_offset:
-            print(f"→ Country: {get_country_name(args.country)} (timezone: {timezone_offset})", file=sys.stderr)
+    if args.country and not timezone_spec:
+        timezone_spec = get_timezone_for_country(args.country)
+        if timezone_spec:
+            print(f"→ Country: {get_country_name(args.country)} (timezone: {timezone_spec})", file=sys.stderr)
         else:
             print(f"Error: Could not determine timezone for country '{args.country}'", file=sys.stderr)
             return 1
 
-    if args.infer_from_filename and not timezone_offset:
+    if args.infer_from_filename and not timezone_spec:
         print("Error: --infer-from-filename requires --timezone", file=sys.stderr)
         return 1
 
-    if args.time_offset is not None and not timezone_offset:
+    if args.time_offset is not None and not timezone_spec:
         print("Error: --time-offset requires --timezone", file=sys.stderr)
         return 1
 
     result = fix_media_timestamps(
         file_path,
         dry_run=not args.apply,
-        timezone_offset=timezone_offset,
+        timezone_spec=timezone_spec,
         infer_from_filename=args.infer_from_filename,
         preserve_wallclock=args.preserve_wallclock_time,
         time_offset_seconds=args.time_offset,

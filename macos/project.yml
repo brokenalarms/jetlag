@@ -24,6 +24,9 @@ targets:
     scheme:
       testTargets:
         - JetlagTests
+      environmentVariables:
+        # Debug builds only — LicenseStore ignores this in Release.
+        JETLAG_PRO_UNLOCKED: "1"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.daniellawrence.Jetlag

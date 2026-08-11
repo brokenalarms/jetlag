@@ -68,7 +68,6 @@ enum Strings {
 
         static let copyCompanionToggle = String(localized: "workflow.copyCompanion.toggle", defaultValue: "Copy companion files")
         static let noCompanionFiles = String(localized: "workflow.noCompanionFiles", defaultValue: "No companion files noted for this device")
-        static let appendTimezoneToggle = String(localized: "workflow.appendTimezone.toggle", defaultValue: "Append timezone to group folder")
         static let readyDirRequired = String(localized: "workflow.readyDirRequired", defaultValue: "Set ready directory above")
 
         static let archiveOption = String(localized: "workflow.archive.option", defaultValue: "Archive")
@@ -105,8 +104,6 @@ What happens to source files after processing:
 • Archive — rename source folder with date suffix (default)
 • Delete — remove only processed files and companions from source
 """)
-        static let appendTimezoneHelp = String(localized: "workflow.appendTimezoneToGroup.help",
-            defaultValue: "Appends the timezone offset to the group folder name, e.g. 'Japan (+0900)'. Useful when a trip spans multiple timezones.")
         static let timezoneHelp = String(localized: "workflow.timezone.help",
             defaultValue: "Timezone the footage was shot in, used to fix timestamps for your video editor")
         static let timestampSourceLabel = String(localized: "workflow.timestampSource.label", defaultValue: "Source:")

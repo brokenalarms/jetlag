@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from lib.metadata import metadata_service as exiftool
 
@@ -129,6 +130,65 @@ def normalize_timezone_format(value: str) -> str:
     if not value:
         return ""
     return re.sub(r'([+-]\d{2}):(\d{2})$', r'\1\2', value)
+
+
+_UTC_TIMESTAMP_SOURCES = {"CreationDate with Z (UTC)", "MediaCreateDate"}
+
+
+def is_utc_timestamp_source(source: str) -> bool:
+    """True when a source's timestamp is UTC rather than local wall-clock time."""
+    return source in _UTC_TIMESTAMP_SOURCES
+
+
+def is_zone_name(timezone_spec: str) -> bool:
+    """True when the spec is an IANA zone name rather than a fixed +HHMM offset."""
+    if not timezone_spec:
+        return False
+    return not re.match(r'^[+-]?\d{2}:?\d{2}$', timezone_spec)
+
+
+def resolve_timezone_offset(
+    timezone_spec: Optional[str],
+    timestamp: Optional[str],
+    timestamp_is_utc: bool = False,
+) -> Optional[str]:
+    """Resolve a timezone spec to the +HH:MM offset in effect at a given timestamp.
+
+    A fixed offset passes through normalized. A zone name is resolved against the
+    timestamp, so a DST zone yields the offset that applied when the file was shot
+    rather than the offset in effect today. Local timestamps inside the repeated
+    hour of a DST changeover resolve to the first occurrence.
+    """
+    if not timezone_spec:
+        return timezone_spec
+    if not is_zone_name(timezone_spec):
+        return normalize_timezone_input(timezone_spec)
+
+    try:
+        zone = ZoneInfo(timezone_spec)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise ValueError(f"Unknown timezone: {timezone_spec}")
+
+    if not timestamp:
+        raise ValueError(f"Cannot resolve {timezone_spec} without a timestamp")
+
+    naive = datetime.strptime(timestamp, "%Y:%m:%d %H:%M:%S")
+    if timestamp_is_utc:
+        local = naive.replace(tzinfo=timezone.utc).astimezone(zone)
+    else:
+        local = naive.replace(tzinfo=zone)
+
+    return ensure_colon_tz(local.strftime("%z"))
+
+
+def resolve_file_timezone_offset(file_path: str, timezone_spec: Optional[str]) -> Optional[str]:
+    """Resolve a timezone spec to the offset that applies to one file's own timestamp."""
+    if not timezone_spec:
+        return None
+    best_timestamp, source = get_best_timestamp(file_path, timezone_spec)
+    return resolve_timezone_offset(
+        timezone_spec, best_timestamp, is_utc_timestamp_source(source)
+    )
 
 
 def normalize_exif_value(value: str) -> str:

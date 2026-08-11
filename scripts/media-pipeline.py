@@ -23,14 +23,15 @@ import signal
 import sys
 from pathlib import Path
 from typing import Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
 
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.filesystem import find_media_files
 from lib.timestamp_source import (
-    build_filename, extract_metadata_timezone, normalize_timezone_input,
-    parse_datetime_original, parse_filename_timestamp,
+    build_filename, extract_metadata_timezone, is_zone_name, normalize_timezone_input,
+    parse_datetime_original, parse_filename_timestamp, resolve_file_timezone_offset,
 )
 
 import importlib
@@ -120,7 +121,7 @@ def run_tag_media(
 
 def run_fix_timestamp(
     file_path: Path,
-    timezone_offset: Optional[str],
+    timezone_spec: Optional[str],
     apply: bool,
     infer_from_filename: bool = False,
     time_offset: Optional[int] = None,
@@ -134,7 +135,7 @@ def run_fix_timestamp(
     return _fix_ts_mod.fix_media_timestamps(
         str(file_path),
         dry_run=not apply,
-        timezone_offset=timezone_offset,
+        timezone_spec=timezone_spec,
         infer_from_filename=infer_from_filename,
         time_offset_seconds=time_offset,
         force_timezone=force_timezone,
@@ -221,7 +222,7 @@ def process_file(
     target_dir: str,
     working_dir: str,
     group: Optional[str],
-    timezone_offset: Optional[str],
+    timezone_spec: Optional[str],
     apply: bool,
     verbose: bool,
     gyroflow_config: Optional[dict] = None,
@@ -303,7 +304,7 @@ def process_file(
         print("🔧 Fixing timestamp...", file=sys.stderr)
         try:
             ts_result = run_fix_timestamp(
-                active_file, timezone_offset, apply,
+                active_file, timezone_spec, apply,
                 infer_from_filename=infer_from_filename,
                 time_offset=time_offset,
                 force_timezone=force_timezone,
@@ -482,9 +483,8 @@ def build_parser():
     parser.add_argument("--source", help="Directory containing video files (default: current directory)")
     parser.add_argument("--target", help="Target directory for organized files")
     parser.add_argument("--location", help="Location name/code for timezone lookup")
-    parser.add_argument("--timezone", help="Timezone in +HHMM format (e.g., +0800)")
+    parser.add_argument("--timezone", help="IANA zone name (e.g., Pacific/Auckland), resolved per file so a run spanning a DST changeover gets the right offset either side, or a fixed offset in +HHMM format (e.g., +0800)")
     parser.add_argument("--group", help="Optional group folder name substituted for {{GROUP}} in the profile's folder_template, or inserted between year and date by default (e.g., 'Japan' → YYYY/Japan/YYYY-MM-DD)")
-    parser.add_argument("--append-timezone-to-group", action="store_true", help="Append timezone offset to the group folder name (e.g., 'Japan' + '+0900' → 'Japan (+0900)'). Requires --group and --timezone.")
     parser.add_argument("--apply", action="store_true", help="Apply changes (default: dry run)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed processing info")
     parser.add_argument(
@@ -585,25 +585,19 @@ def main():
         print(f"ERROR: Source directory not found: {source_dir}", file=sys.stderr)
         sys.exit(1)
 
-    # Validate timezone format if provided
+    # Validate timezone if provided
     if args.timezone:
-        if not re.match(r'^[+-]\d{4}$', args.timezone):
-            print("ERROR: --timezone must be in +HHMM or -HHMM format (e.g., +0800, -0500)", file=sys.stderr)
+        if is_zone_name(args.timezone):
+            try:
+                ZoneInfo(args.timezone)
+            except (ZoneInfoNotFoundError, ValueError):
+                print(f"ERROR: unknown timezone '{args.timezone}' — use an IANA zone name (e.g., Pacific/Auckland) or a +HHMM offset", file=sys.stderr)
+                sys.exit(1)
+        elif not re.match(r'^[+-]\d{4}$', args.timezone):
+            print("ERROR: --timezone must be an IANA zone name (e.g., Pacific/Auckland) or in +HHMM format (e.g., +0800, -0500)", file=sys.stderr)
             sys.exit(1)
 
-    # Validate --append-timezone-to-group requirements
-    if args.append_timezone_to_group:
-        if not args.group:
-            print("ERROR: --append-timezone-to-group requires --group", file=sys.stderr)
-            sys.exit(1)
-        if not args.timezone:
-            print("ERROR: --append-timezone-to-group requires --timezone", file=sys.stderr)
-            sys.exit(1)
-
-    # Apply timezone suffix to group if requested
     group = args.group
-    if group and args.append_timezone_to_group:
-        group = f"{group} ({args.timezone})"
 
     # Validate --infer-from-filename and --time-offset requirements
     if args.infer_from_filename and not args.timezone:
@@ -614,10 +608,10 @@ def main():
         sys.exit(1)
 
     # Resolve timezone upfront (direct module calls need the offset, not CLI args)
-    timezone_offset = args.timezone
-    if args.location and not timezone_offset:
-        timezone_offset = _fix_ts_mod.get_timezone_for_country(args.location)
-        if not timezone_offset:
+    timezone_spec = args.timezone
+    if args.location and not timezone_spec:
+        timezone_spec = _fix_ts_mod.get_timezone_for_country(args.location)
+        if not timezone_spec:
             print(f"ERROR: Could not determine timezone for location '{args.location}'", file=sys.stderr)
             sys.exit(1)
 
@@ -652,8 +646,8 @@ def main():
     print(f"→ Working: {working_dir}", file=sys.stderr)
     print(f"→ Target:  {target_dir}", file=sys.stderr)
     print(f"→ Mode:    {'APPLY (files will be processed)' if args.apply else 'DRY RUN (no changes)'}", file=sys.stderr)
-    if timezone_offset:
-        print(f"→ Timezone: {timezone_offset}", file=sys.stderr)
+    if timezone_spec:
+        print(f"→ Timezone: {timezone_spec}", file=sys.stderr)
     else:
         print("→ Timezone: From video metadata (or will prompt if needed)", file=sys.stderr)
     if "archive-source" in args.tasks:
@@ -683,13 +677,17 @@ def main():
     # Pre-flight timezone check (before processing any files)
     if "fix-timestamp" in args.tasks and not args.infer_from_filename:
         file_timezones = {}
+        # A zone name resolves per file, so each file is compared against the
+        # offset that zone had when that file was shot.
+        expected_by_file = {}
         for fp in files:
             tz = extract_metadata_timezone(str(fp))
             if tz:
                 normalized = normalize_timezone_input(tz).replace(":", "")
                 file_timezones.setdefault(normalized, []).append(fp.name)
-
-        provided_tz_normalized = normalize_timezone_input(timezone_offset).replace(":", "") if timezone_offset else None
+                expected = resolve_file_timezone_offset(str(fp), timezone_spec)
+                if expected:
+                    expected_by_file[fp.name] = expected.replace(":", "")
 
         # Check 1: mixed timezones within the batch
         if len(file_timezones) > 1 and not args.allow_mixed_timezones:
@@ -705,11 +703,14 @@ def main():
             sys.exit(1)
 
         # Check 2: provided --timezone differs from files' embedded timezone
-        if provided_tz_normalized and file_timezones and not args.force_timezone:
-            mismatched = {tz: fnames for tz, fnames in file_timezones.items()
-                          if tz != provided_tz_normalized}
+        if expected_by_file and not args.force_timezone:
+            mismatched = {
+                tz: [name for name in fnames if expected_by_file.get(name, tz) != tz]
+                for tz, fnames in file_timezones.items()
+            }
+            mismatched = {tz: fnames for tz, fnames in mismatched.items() if fnames}
             if mismatched:
-                print(f"⚠️  Timezone conflict: you provided {timezone_offset} but files have different timezones:", file=sys.stderr)
+                print(f"⚠️  Timezone conflict: you provided {timezone_spec} but files have different timezones:", file=sys.stderr)
                 for tz, fnames in sorted(mismatched.items()):
                     print(f"   {tz}: {', '.join(fnames)}", file=sys.stderr)
                 print(file=sys.stderr)
@@ -717,7 +718,7 @@ def main():
                 print("Re-run with --force-timezone to override.", file=sys.stderr)
                 emit_event("timezone_conflict",
                     conflict_type="provided_mismatch",
-                    provided_tz=timezone_offset,
+                    provided_tz=timezone_spec,
                     file_timezones={tz: fnames for tz, fnames in file_timezones.items()},
                 )
                 sys.exit(1)
@@ -766,7 +767,7 @@ def main():
             target_dir,
             working_dir,
             group,
-            timezone_offset,
+            timezone_spec,
             args.apply,
             args.verbose,
             gyroflow_config=gyroflow_config,

@@ -225,7 +225,6 @@ final class WorkflowSession {
     var group: String = ""
     var copyCompanionFiles: Bool = false
     var sourceAction: SourceAction = .archive
-    var appendTimezoneToGroup: Bool = false
     var applyMode: Bool = false
     var inferFromFilenames: Bool = false
     var timeOffsetSeconds: Int?
@@ -320,9 +319,6 @@ final class WorkflowSession {
         if !group.isEmpty {
             args += ["--group", group]
         }
-        if appendTimezoneToGroup {
-            args.append("--append-timezone-to-group")
-        }
 
         let optionalSteps = enabledSteps.filter { !$0.isAlwaysOn }
         let taskNames: [PipelineStep: String] = [
@@ -346,7 +342,7 @@ final class WorkflowSession {
             args.append("--copy-companion-files")
         }
         if enabledSteps.contains(.fixTimestamps), let option = timezoneOption {
-            args += ["--timezone", option.offset]
+            args += ["--timezone", option.id]
         }
         if enabledSteps.contains(.fixTimestamps) && inferFromFilenames {
             args.append("--infer-from-filename")

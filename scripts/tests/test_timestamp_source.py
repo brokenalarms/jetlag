@@ -24,6 +24,9 @@ from lib.timestamp_source import (
     get_best_timestamp,
     read_exif_data,
     clear_exif_cache,
+    is_zone_name,
+    resolve_timezone_offset,
+    resolve_file_timezone_offset,
     TimestampReport,
 )
 
@@ -233,6 +236,74 @@ class TestGetBestTimestamp:
         ts, source = get_best_timestamp(video, timezone_offset="+08:00")
         assert ts == "2025:06:18 07:25:21"
         assert "filename" in source
+
+
+class TestResolveTimezoneOffset:
+    """A zone name resolves against the timestamp, not against today."""
+
+    def test_fixed_offset_passes_through(self):
+        assert resolve_timezone_offset("+0900", "2025:08:15 10:00:00") == "+09:00"
+        assert resolve_timezone_offset("-0500", "2025:08:15 10:00:00") == "-05:00"
+
+    def test_zone_without_dst_is_stable(self):
+        assert resolve_timezone_offset("Asia/Tokyo", "2025:01:15 10:00:00") == "+09:00"
+        assert resolve_timezone_offset("Asia/Tokyo", "2025:07:15 10:00:00") == "+09:00"
+
+    def test_zone_follows_dst_of_the_shooting_date(self):
+        assert resolve_timezone_offset("Pacific/Auckland", "2025:01:15 10:00:00") == "+13:00"
+        assert resolve_timezone_offset("Pacific/Auckland", "2025:07:15 10:00:00") == "+12:00"
+
+    def test_utc_source_converts_before_resolving(self):
+        """A UTC timestamp is converted into the zone, not read as local time."""
+        assert resolve_timezone_offset(
+            "Pacific/Auckland", "2025:07:14 22:00:00", timestamp_is_utc=True
+        ) == "+12:00"
+
+    def test_unknown_zone_rejected(self):
+        with pytest.raises(ValueError, match="Unknown timezone"):
+            resolve_timezone_offset("Pacific/Atlantis", "2025:07:15 10:00:00")
+
+    def test_no_spec_resolves_to_nothing(self):
+        assert resolve_timezone_offset(None, "2025:07:15 10:00:00") is None
+
+    def test_is_zone_name(self):
+        assert is_zone_name("Pacific/Auckland") is True
+        assert is_zone_name("+0900") is False
+        assert is_zone_name("+09:00") is False
+        assert is_zone_name("") is False
+
+
+class TestResolveFileTimezoneOffset:
+    """Each file resolves against its own timestamp."""
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        clear_exif_cache()
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_files_either_side_of_a_changeover_differ(self):
+        """NZ moved to standard time on 2025-04-06 — one run, two offsets."""
+        summer = os.path.join(self.temp_dir, "VID_20250315_100000.mp4")
+        winter = os.path.join(self.temp_dir, "VID_20250715_100000.mp4")
+        create_test_video(summer)
+        create_test_video(winter)
+
+        assert resolve_file_timezone_offset(summer, "Pacific/Auckland") == "+13:00"
+        assert resolve_file_timezone_offset(winter, "Pacific/Auckland") == "+12:00"
+
+    def test_fixed_offset_applies_to_every_file(self):
+        video = os.path.join(self.temp_dir, "VID_20250315_100000.mp4")
+        create_test_video(video)
+
+        assert resolve_file_timezone_offset(video, "+0900") == "+09:00"
+
+    def test_no_spec_resolves_to_nothing(self):
+        video = os.path.join(self.temp_dir, "VID_20250315_100000.mp4")
+        create_test_video(video)
+
+        assert resolve_file_timezone_offset(video, None) is None
 
 
 if __name__ == "__main__":

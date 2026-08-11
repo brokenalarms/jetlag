@@ -401,13 +401,6 @@ struct WorkflowView: View {
                 TextField(Strings.Workflow.groupPlaceholder, text: $session.group)
                     .textFieldStyle(.roundedBorder)
             }
-            if session.enabledSteps.contains(.fixTimestamps) {
-                HStack(spacing: 4) {
-                    Toggle(Strings.Workflow.appendTimezoneToggle, isOn: $session.appendTimezoneToGroup)
-                        .disabled(session.group.isEmpty)
-                    HelpButton(Strings.Workflow.appendTimezoneHelp)
-                }
-            }
         }
         .padding(10)
     }
@@ -478,7 +471,9 @@ struct WorkflowView: View {
             parts.append("Shift timestamps by \(sign)\(offset)s")
         }
         if let option = session.timezoneOption, !session.inferFromFilenames {
-            parts.append("Apply timezone \(option.city) (\(option.offset))")
+            parts.append(option.offsets.count > 1
+                ? "Apply \(option.city) time, resolved per file"
+                : "Apply \(option.city) time (\(option.offsetLabel))")
         }
         if session.updateFilenameDates {
             parts.append("Rename files to match corrected dates")
@@ -620,12 +615,7 @@ struct WorkflowView: View {
         let session = state.workflowSession
         var path = readyDir + "/YYYY"
         if !session.group.isEmpty {
-            var groupName = session.group
-            if session.appendTimezoneToGroup, session.enabledSteps.contains(.fixTimestamps),
-               let option = session.timezoneOption {
-                groupName += " (\(option.offset))"
-            }
-            path += "/\(groupName)"
+            path += "/\(session.group)"
         }
         path += "/YYYY-MM-DD"
         return path
