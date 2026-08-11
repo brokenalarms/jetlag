@@ -1,4 +1,5 @@
 .DS_Store
+.beads
 .claude/
 __pycache__
 .vscode
