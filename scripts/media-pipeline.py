@@ -12,6 +12,8 @@ Source files are read-only inputs — ingest copies them to a working directory,
 all processing happens there, then output moves files to the target.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import os

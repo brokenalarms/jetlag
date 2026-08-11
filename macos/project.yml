@@ -21,6 +21,9 @@ targets:
       - package: Yams
       - sdk: MapKit.framework
       - sdk: CoreLocation.framework
+    scheme:
+      testTargets:
+        - JetlagTests
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.daniellawrence.Jetlag
@@ -39,8 +42,15 @@ targets:
           DEST="${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/scripts"
           rm -rf "$DEST"
           cp -r "${SRCROOT}/../scripts/" "$DEST"
+          # A checkout's .venv holds absolute paths into the checkout — the bundle
+          # imports from site-packages below instead.
+          rm -rf "$DEST/.venv"
+          find "$DEST" -name __pycache__ -type d -prune -exec rm -rf {} +
+          # Vendor dependencies with the same interpreter the app runs them on
+          # (lib/ensure-venv.sh resolves to /usr/bin/python3) — PyYAML ships a C
+          # extension, so wheels built for another version fail to import.
           rm -rf "$DEST/site-packages"
-          python3 -m pip install --quiet --target "$DEST/site-packages" -r "$DEST/requirements.txt"
+          /usr/bin/python3 -m pip install --quiet --target "$DEST/site-packages" -r "$DEST/requirements.txt"
 
           # Build jetlag-metadata Swift CLI and install into bundle
           METADATA_PKG="${SRCROOT}/Sources/Tools/jetlag-metadata"

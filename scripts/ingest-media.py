@@ -8,6 +8,8 @@ Usage: ingest-media.py <source_file> --target <working_dir> [--apply]
 Source files are treated as read-only inputs — this script copies, never moves.
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 import shutil

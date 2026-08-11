@@ -18,4 +18,4 @@ if [[ ! -f "$PYTHON_SCRIPT" ]]; then
 fi
 
 # Pass all arguments directly to Python implementation
-exec python3 "$PYTHON_SCRIPT" "$@"
+exec "$JETLAG_PYTHON" "$PYTHON_SCRIPT" "$@"

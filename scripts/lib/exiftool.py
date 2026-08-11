@@ -11,6 +11,8 @@ Usage:
     exiftool.write_tags(path, ["-Make=GoPro"])
 """
 
+from __future__ import annotations
+
 import atexit
 import re
 import subprocess

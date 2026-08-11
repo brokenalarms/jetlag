@@ -90,6 +90,12 @@ Expected behaviors that regression tests must verify:
 - `.DS_Store` files should be deleted if they're the only thing preventing directory cleanup
 - The shell script entry point to each .py file sources `lib/ensure-venv.sh` to set up `PYTHONPATH`
 
+## Python runtime
+
+- Scripts must run on the Python macOS ships (3.9) so users install nothing — see `docs/specs/python-runtime.md`
+- Wrappers exec `$JETLAG_PYTHON`, resolved by `lib/ensure-venv.sh`, never a bare `python3`
+- A module using `X | None` annotations needs `from __future__ import annotations`; `tests/test_python_compatibility.py` enforces this
+
 ## Source of truth hierarchy
 
 - Base scripts are the source of truth for functionality — push logic down to the lowest level script possible
