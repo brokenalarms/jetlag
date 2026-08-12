@@ -38,14 +38,11 @@ Worth keeping, because several plausible-sounding designs contradict them:
 
 ## Not done, in the order that makes sense
 
-Each is described in `timestamp-source-of-truth.md` under "Not yet done".
+Each is described in `timestamp-source-of-truth.md` under "Not yet done". (The former
+items 1–2 — `--force-timezone` as a pure gate, and offset-bearing sources converting
+into the declared `--timezone` — are done: dry runs always preview, applies without the
+flag are refused, and the per-field truth table now lives in `docs/timestamp-fields.md`.)
 
-1. **`--force-timezone` becomes a gate only.** Delete the block at
-   `fix-media-timestamp.py:723-730` that rebuilds the timestamp from the wall clock. It
-   currently moves the instant by the difference between the two zones.
-2. **Offset-bearing sources honour `--timezone`.** `fix-media-timestamp.py:309` and `:314`
-   use the embedded value verbatim and never read the declared zone, so a user who says
-   "I was in New Zealand" is ignored on any file carrying a zoned tag.
 3. **Clock writes reach the track atoms.** `write_quicktime_createdate()` sends
    `-QuickTime:CreateDate=` and `-QuickTime:MediaCreateDate=`, which only reach the movie
    header. This is why imported files disagree with themselves.
@@ -62,8 +59,8 @@ Each is described in `timestamp-source-of-truth.md` under "Not yet done".
    `--time-offset`; the CLI help claims it is only needed when `DateTimeOriginal` lacks a
    zone. The spec says always. The user's instruction: mirror one rule, and the UI should
    hold no logic beyond assembling the command.
-7. **`scripts/AGENTS.md:46`** still states the filename is the highest-priority source and
-   that filenames are never modified. Both are now wrong.
+7. ~~**`scripts/AGENTS.md:46`**~~ — done: the stale hierarchy is replaced by a pointer to
+   `docs/timestamp-fields.md`, the per-field truth table.
 
 ## Test debt
 
@@ -74,10 +71,10 @@ Each is described in `timestamp-source-of-truth.md` under "Not yet done".
 - Fixtures cannot express a metadata/filename conflict unless a QuickTime date is written
   explicitly — the ffmpeg-generated template carries `0000:00:00`. See
   `TestQuickTimeInstantVersusFilename` for the pattern.
-- `test_generate_gyroflow.py::TestMissingBinary::test_missing_binary_skips_gracefully`
-  passes in CI but fails on macOS: the vendored binary is executable there, and is killed
-  (`exit code -9`) rather than failing to exec, so stderr does not contain "not found".
-  The binary is unsigned. Not investigated.
+- ~~`test_generate_gyroflow.py` missing-binary failure~~ — investigated and fixed: the
+  vendored binary's signature was invalidated by extracting it from Gyroflow.app
+  (SIGKILL on launch, and it can't run outside the bundle anyway — missing frameworks).
+  Removed from git; proper bundling is tracked in TODO.md.
 
 ## The user's library
 

@@ -33,20 +33,24 @@ These behaviors are not in our code — they're observed from external tools and
 
 ### ExifTool
 
-- From ExifTool docs: "According to the specification, integer-format QuickTime date/time tags should be stored as UTC. Unfortunately, digital cameras often store local time values instead (presumably because they don't know the time zone). For this reason, by default ExifTool does not assume a time zone for these values. However, if the API QuickTimeUTC option is set, then ExifTool will assume these values are properly stored as UTC, and will convert them to local time when extracting."
-- Our devices DO write UTC time to MediaCreateDate and QuickTime fields — interpret them as real UTC. Verify by adding the timezone from `DateTimeOriginal` and checking it matches. Avoid using the ExifTool `QuickTimeUTC` flag — it's more complicated than handling UTC explicitly.
 - There is no such thing as writing to a UTC field as wall-clock time and having video editors recognize it's not UTC anymore. They will take an integer QT UTC field as UTC, or a string field with `Z` as UTC or with timezone.
 - For performance: one read call then one write call per file per script. Cache values from the read, accumulate all writes, send in a single exiftool invocation.
 - ExifTool fails silently if an `exiftool_tmp` directory exists alongside the target file (leftover from a crashed run). media-pipeline checks for these at startup.
 
 ## Timestamp source of truth hierarchy
 
-Priority order — each level has specific rules:
+The per-field truth table — what each field means, when a QuickTime date counts as
+UTC, the full ranking, and the `--timezone`/`--force-timezone`/`--time-offset` rules —
+lives in `/docs/timestamp-fields.md`. Required reading before touching timestamp code.
+Summary only:
 
-1. **Filename** — `YYYYMMDD_HHMMSS` pattern is the highest-priority source. Never modify filenames.
-2. **DateTimeOriginal** — contains local time + timezone offset. Source of truth for shoot time. Never modify unless `--infer-from-filename` is explicitly passed (which also requires `--timezone`).
-3. **QuickTime UTC fields** — `MediaCreateDate` etc. Stored as real UTC on our devices. Verify by cross-checking against `DateTimeOriginal` + timezone offset.
-4. **File birth time** — FCP fallback. Set by scripts via `setfile -d`.
+- Self-evidencing sources (zoned tags, proven instants) outrank sources that need the
+  declared `--timezone` assumption (filename, bare tags, unproven QuickTime dates).
+- The filename is the first truth for local wall-clock time in the absence of
+  disconfirming metadata; `--update-filename-dates` renames files to match corrections.
+- QuickTime dates are trusted as UTC per file, on evidence, never globally — and never
+  via exiftool's `QuickTimeUTC` option.
+- Only `--time-offset` moves the actual time; everything else relabels.
 
 ## Camera quirks
 

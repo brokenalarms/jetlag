@@ -180,14 +180,20 @@ legal offset guard, and the reordering. Nothing else changed: the conversion the
 relies on already existed in `get_all_timestamp_data()`, and the destructive QuickTime
 rewrite stops on its own, because a preserved instant leaves that field already correct.
 
+`fix-media-timestamp.py` — offset-bearing sources convert into a declared `--timezone`
+(same instant, re-expressed) instead of being passed through unchanged, and
+`--force-timezone` is a pure confirmation gate: a dry run always previews the proposed
+relabel and emits `requires_force_timezone=true`; applying without the flag is refused.
+The wall-clock rebuild the flag used to perform (which moved the instant) is deleted.
+
+The durable per-field reference — field meanings, the UTC proof rules, the ranking —
+now lives in `docs/timestamp-fields.md`.
+
 ## Not yet done
 
 Each of these is separable, and none is needed for a correction to be right:
 
-- `fix-media-timestamp.py` — offset-bearing sources still ignore `--timezone` rather than
-  converting into it, so a file carrying a zoned `DateTimeOriginal` is passed through
-  unchanged. The `force_timezone` block still rebuilds the timestamp from the wall clock
-  instead of acting purely as a gate. Clock writes still reach only the movie header, not
+- `fix-media-timestamp.py` — clock writes still reach only the movie header, not
   the track atoms, which is what leaves imported files disagreeing with themselves.
 - Provenance — the write-once record of a file's original clock fields and filename does
   not exist.

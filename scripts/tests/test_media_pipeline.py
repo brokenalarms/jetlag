@@ -1131,9 +1131,10 @@ class TestPipelineMachineOutput:
         assert "+0900" in conflict["file_timezones"]
 
     def test_tz_mismatch_proceeds_with_force_timezone(self, temp_workspace, test_profile):
-        """With --force-timezone, timezone mismatch overrides DTO timezone and proceeds.
+        """With --force-timezone, timezone mismatch is confirmed and the run proceeds.
 
-        The wall-clock time is preserved but the timezone is changed to the user-provided one.
+        The file's actual moment in time is preserved; it is re-expressed in the
+        user-provided zone.
         """
         source = temp_workspace["source"]
         video = source / "test.mp4"
