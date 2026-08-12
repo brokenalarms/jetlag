@@ -99,11 +99,31 @@ final class PipelineArgsTests: XCTestCase {
 
     func testTimezone() {
         let session = makeSession()
-        session.timezone.value = "+0900"
+        session.timezone.value = "Asia/Tokyo"
         let (_, args) = session.buildPipelineArgs()
 
         let tzIndex = args.firstIndex(of: "--timezone")!
-        XCTAssertEqual(args[tzIndex + 1], "+0900")
+        XCTAssertEqual(args[tzIndex + 1], "Asia/Tokyo")
+    }
+
+    func testTimezoneKeepsIdentityAcrossZonesSharingAnOffset() {
+        let session = makeSession()
+        session.timezone.value = "Pacific/Auckland"
+        XCTAssertEqual(session.timezoneOption?.city, "Auckland")
+        XCTAssertEqual(session.timezoneOption?.offsets, TimezoneCatalog.option("Antarctica/McMurdo")?.offsets)
+
+        let (_, args) = session.buildPipelineArgs()
+        let tzIndex = args.firstIndex(of: "--timezone")!
+        XCTAssertEqual(args[tzIndex + 1], "Pacific/Auckland")
+    }
+
+    func testUnknownTimezoneIsNotReady() {
+        let session = makeSession()
+        session.timezone.value = "+1200"
+        XCTAssertFalse(session.isStepReady(.fixTimestamps))
+
+        let (_, args) = session.buildPipelineArgs()
+        XCTAssertFalse(args.contains("--timezone"))
     }
 
     func testGroup() {
@@ -115,27 +135,15 @@ final class PipelineArgsTests: XCTestCase {
         XCTAssertEqual(args[groupIndex + 1], "Japan")
     }
 
-    func testAppendTimezoneToGroup() {
+    func testGroupWithTimezone() {
         let session = makeSession()
         session.group = "Japan"
-        session.timezone.value = "+0900"
-        session.appendTimezoneToGroup = true
+        session.timezone.value = "Asia/Tokyo"
         let (_, args) = session.buildPipelineArgs()
 
-        XCTAssertTrue(args.contains("--group"))
-        XCTAssertTrue(args.contains("--append-timezone-to-group"))
+        let groupIndex = args.firstIndex(of: "--group")!
+        XCTAssertEqual(args[groupIndex + 1], "Japan")
         XCTAssertTrue(args.contains("--timezone"))
-    }
-
-    func testAppendTimezoneToGroupNotIncludedWhenDisabled() {
-        let session = makeSession()
-        session.group = "Japan"
-        session.timezone.value = "+0900"
-        session.appendTimezoneToGroup = false
-        let (_, args) = session.buildPipelineArgs()
-
-        XCTAssertTrue(args.contains("--group"))
-        XCTAssertFalse(args.contains("--append-timezone-to-group"))
     }
 
     func testApplyMode() {
@@ -163,13 +171,13 @@ final class PipelineArgsTests: XCTestCase {
 
     func testIsStepReadyFixTimestampsWithTimezone() {
         let session = makeSession()
-        session.timezone.value = "+0900"
+        session.timezone.value = "Asia/Tokyo"
         XCTAssertTrue(session.isStepReady(.fixTimestamps))
     }
 
     func testIsStepReadyFixTimestampsPickerWithTimezone() {
         let session = makeSession()
-        session.timezone.value = "+0900"
+        session.timezone.value = "Asia/Tokyo"
         XCTAssertTrue(session.isStepReady(.fixTimestamps))
     }
 
@@ -199,7 +207,7 @@ final class PipelineArgsTests: XCTestCase {
 
     func testInferFromFilenames() {
         let session = makeSession()
-        session.timezone.value = "+0900"
+        session.timezone.value = "Asia/Tokyo"
         session.inferFromFilenames = true
         let (_, args) = session.buildPipelineArgs()
 
@@ -208,7 +216,7 @@ final class PipelineArgsTests: XCTestCase {
 
     func testInferFromFilenamesNotIncludedByDefault() {
         let session = makeSession()
-        session.timezone.value = "+0900"
+        session.timezone.value = "Asia/Tokyo"
         let (_, args) = session.buildPipelineArgs()
 
         XCTAssertFalse(args.contains("--infer-from-filename"))
@@ -216,7 +224,7 @@ final class PipelineArgsTests: XCTestCase {
 
     func testInferFromFilenamesNotIncludedWhenStepDisabled() {
         let session = makeSession()
-        session.timezone.value = "+0900"
+        session.timezone.value = "Asia/Tokyo"
         session.inferFromFilenames = true
         session.enabledSteps.remove(.fixTimestamps)
         let (_, args) = session.buildPipelineArgs()
@@ -226,7 +234,7 @@ final class PipelineArgsTests: XCTestCase {
 
     func testTimeOffset() {
         let session = makeSession()
-        session.timezone.value = "+0900"
+        session.timezone.value = "Asia/Tokyo"
         session.timeOffsetSeconds = 3600
         let (_, args) = session.buildPipelineArgs()
 
@@ -236,7 +244,7 @@ final class PipelineArgsTests: XCTestCase {
 
     func testTimeOffsetNotIncludedWhenNil() {
         let session = makeSession()
-        session.timezone.value = "+0900"
+        session.timezone.value = "Asia/Tokyo"
         session.timeOffsetSeconds = nil
         let (_, args) = session.buildPipelineArgs()
 
@@ -245,7 +253,7 @@ final class PipelineArgsTests: XCTestCase {
 
     func testTimeOffsetNotIncludedWhenZero() {
         let session = makeSession()
-        session.timezone.value = "+0900"
+        session.timezone.value = "Asia/Tokyo"
         session.timeOffsetSeconds = 0
         let (_, args) = session.buildPipelineArgs()
 

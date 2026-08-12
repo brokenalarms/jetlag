@@ -2,9 +2,13 @@ import SwiftUI
 
 struct WorkflowView: View {
     @Bindable var state: AppState
-    @State private var showUpgradeSheet = false
-    @State private var detectedFileCount = 0
+    @State private var upgradePrompt: UpgradePrompt?
     private var licenseStore: LicenseStore { LicenseStore.shared }
+
+    private struct UpgradePrompt: Identifiable {
+        let fileCount: Int
+        var id: Int { fileCount }
+    }
 
     let defaultColumnWidth = 600.00
     private let optionLabelWidth: CGFloat = 52
@@ -56,26 +60,6 @@ struct WorkflowView: View {
             }
         }
         .frame(minWidth: 340, idealWidth: defaultColumnWidth, maxWidth: defaultColumnWidth)
-        .inspector(isPresented: $state.showInspector) {
-            VStack(spacing: 0) {
-                if !state.visibleRows.isEmpty || state.isRunning {
-                    DiffTableView(rows: state.visibleRows)
-                } else if !state.showLogOutput {
-                    Spacer()
-                    Text(Strings.Workflow.inspectorEmptyLabel)
-                        .font(.subheadline)
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                }
-
-                if state.showLogOutput {
-                    LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
-                }
-
-                inspectorBottomBar
-            }
-            .inspectorColumnWidth(min: 480, ideal: defaultColumnWidth)
-        }
         .navigationTitle(Strings.Nav.workflow)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -87,13 +71,13 @@ struct WorkflowView: View {
                 .help(state.showInspector ? Strings.Workflow.hideInspectorHelp : Strings.Workflow.showInspectorHelp)
             }
         }
-        .sheet(isPresented: $showUpgradeSheet) {
+        .sheet(item: $upgradePrompt) { prompt in
             UpgradeView(
-                fileCount: detectedFileCount,
+                fileCount: prompt.fileCount,
                 store: licenseStore,
-                onDismiss: { showUpgradeSheet = false },
+                onDismiss: { upgradePrompt = nil },
                 onUnlocked: {
-                    showUpgradeSheet = false
+                    upgradePrompt = nil
                     runWorkflow()
                 }
             )
@@ -397,13 +381,6 @@ struct WorkflowView: View {
                 TextField(Strings.Workflow.groupPlaceholder, text: $session.group)
                     .textFieldStyle(.roundedBorder)
             }
-            if session.enabledSteps.contains(.fixTimestamps) {
-                HStack(spacing: 4) {
-                    Toggle(Strings.Workflow.appendTimezoneToggle, isOn: $session.appendTimezoneToGroup)
-                        .disabled(session.group.isEmpty)
-                    HelpButton(Strings.Workflow.appendTimezoneHelp)
-                }
-            }
         }
         .padding(10)
     }
@@ -473,8 +450,10 @@ struct WorkflowView: View {
             let sign = offset > 0 ? "+" : ""
             parts.append("Shift timestamps by \(sign)\(offset)s")
         }
-        if !session.timezone.current.isEmpty && !session.inferFromFilenames {
-            parts.append("Apply timezone \(session.timezone.current)")
+        if let option = session.timezoneOption, !session.inferFromFilenames {
+            parts.append(option.offsets.count > 1
+                ? "Apply \(option.city) time, resolved per file"
+                : "Apply \(option.city) time (\(option.offsetLabel))")
         }
         if session.updateFilenameDates {
             parts.append("Rename files to match corrected dates")
@@ -594,21 +573,6 @@ struct WorkflowView: View {
 
     // MARK: - Inspector bars
 
-    private var inspectorBottomBar: some View {
-        HStack {
-            Button {
-                withAnimation { state.showLogOutput.toggle() }
-            } label: {
-                Image(systemName: "terminal")
-                    .foregroundStyle(state.showLogOutput ? .primary : .secondary)
-            }
-            .buttonStyle(.borderless)
-            .help(state.showLogOutput ? Strings.Workflow.hideLogOutputHelp : Strings.Workflow.showLogOutputHelp)
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-    }
 
     // MARK: - Helpers
 
@@ -616,11 +580,7 @@ struct WorkflowView: View {
         let session = state.workflowSession
         var path = readyDir + "/YYYY"
         if !session.group.isEmpty {
-            var groupName = session.group
-            if session.appendTimezoneToGroup && session.enabledSteps.contains(.fixTimestamps) && !session.timezone.current.isEmpty {
-                groupName += " (\(session.timezone.current))"
-            }
-            path += "/\(groupName)"
+            path += "/\(session.group)"
         }
         path += "/YYYY-MM-DD"
         return path
@@ -673,9 +633,8 @@ struct WorkflowView: View {
 
     private func runWorkflow() {
         let fileCount = countMediaFiles()
-        if fileCount > licenseStore.fileLimit {
-            detectedFileCount = fileCount
-            showUpgradeSheet = true
+        if licenseStore.exceedsLimit(fileCount: fileCount) {
+            upgradePrompt = UpgradePrompt(fileCount: fileCount)
             return
         }
 

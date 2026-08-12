@@ -5,6 +5,8 @@ Tests must never be skipped because a tool is missing. If a tool is required,
 install it automatically. macOS-only tests (tag/SetFile) are skipped on Linux.
 """
 
+from __future__ import annotations
+
 import atexit
 import json
 import os

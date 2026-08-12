@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from lib.metadata import metadata_service as exiftool
 
@@ -129,6 +130,65 @@ def normalize_timezone_format(value: str) -> str:
     if not value:
         return ""
     return re.sub(r'([+-]\d{2}):(\d{2})$', r'\1\2', value)
+
+
+_UTC_TIMESTAMP_SOURCES = {"CreationDate with Z (UTC)", "MediaCreateDate"}
+
+
+def is_utc_timestamp_source(source: str) -> bool:
+    """True when a source's timestamp is UTC rather than local wall-clock time."""
+    return source in _UTC_TIMESTAMP_SOURCES
+
+
+def is_zone_name(timezone_spec: str) -> bool:
+    """True when the spec is an IANA zone name rather than a fixed +HHMM offset."""
+    if not timezone_spec:
+        return False
+    return not re.match(r'^[+-]?\d{2}:?\d{2}$', timezone_spec)
+
+
+def resolve_timezone_offset(
+    timezone_spec: Optional[str],
+    timestamp: Optional[str],
+    timestamp_is_utc: bool = False,
+) -> Optional[str]:
+    """Resolve a timezone spec to the +HH:MM offset in effect at a given timestamp.
+
+    A fixed offset passes through normalized. A zone name is resolved against the
+    timestamp, so a DST zone yields the offset that applied when the file was shot
+    rather than the offset in effect today. Local timestamps inside the repeated
+    hour of a DST changeover resolve to the first occurrence.
+    """
+    if not timezone_spec:
+        return timezone_spec
+    if not is_zone_name(timezone_spec):
+        return normalize_timezone_input(timezone_spec)
+
+    try:
+        zone = ZoneInfo(timezone_spec)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise ValueError(f"Unknown timezone: {timezone_spec}")
+
+    if not timestamp:
+        raise ValueError(f"Cannot resolve {timezone_spec} without a timestamp")
+
+    naive = datetime.strptime(timestamp, "%Y:%m:%d %H:%M:%S")
+    if timestamp_is_utc:
+        local = naive.replace(tzinfo=timezone.utc).astimezone(zone)
+    else:
+        local = naive.replace(tzinfo=zone)
+
+    return ensure_colon_tz(local.strftime("%z"))
+
+
+def resolve_file_timezone_offset(file_path: str, timezone_spec: Optional[str]) -> Optional[str]:
+    """Resolve a timezone spec to the offset that applies to one file's own timestamp."""
+    if not timezone_spec:
+        return None
+    best_timestamp, source = get_best_timestamp(file_path, timezone_spec)
+    return resolve_timezone_offset(
+        timezone_spec, best_timestamp, is_utc_timestamp_source(source)
+    )
 
 
 def normalize_exif_value(value: str) -> str:
@@ -253,6 +313,41 @@ def extract_metadata_timezone(file_path: str) -> Optional[str]:
 # Best timestamp (6-tier priority)
 # ---------------------------------------------------------------------------
 
+_MIN_ZONE_OFFSET = timedelta(hours=-12)
+_MAX_ZONE_OFFSET = timedelta(hours=14)
+
+
+def _is_legal_zone_offset(delta: timedelta) -> bool:
+    """Whether a difference from UTC is one a real zone uses: -12:00 to +14:00,
+    in quarter-hour steps."""
+    if not _MIN_ZONE_OFFSET <= delta <= _MAX_ZONE_OFFSET:
+        return False
+    return delta.total_seconds() % 900 == 0
+
+
+def _quicktime_is_instant(quicktime_timestamp: str, filename_timestamp: Optional[str]) -> bool:
+    """Whether a QuickTime date and a filename describe one instant in some zone.
+
+    QuickTime dates are UTC by specification, but not every device honours that and a
+    camera clock can simply be wrong. The filename is the camera's own local reading, so
+    a legal zone offset between the two is what shows the QuickTime date to be an instant.
+    """
+    if not (quicktime_timestamp and filename_timestamp):
+        return False
+    try:
+        quicktime = datetime.strptime(quicktime_timestamp, "%Y:%m:%d %H:%M:%S")
+        local = datetime.strptime(filename_timestamp, "%Y:%m:%d %H:%M:%S")
+    except ValueError:
+        return False
+
+    delta = local - quicktime
+    if delta == timedelta(0):
+        # Identical values cannot separate a camera at UTC+0 from one writing local
+        # time into a field defined as UTC.
+        return False
+    return _is_legal_zone_offset(delta)
+
+
 def get_best_timestamp(
     file_path: str,
     timezone_offset: Optional[str] = None,
@@ -286,27 +381,39 @@ def get_best_timestamp(
         if re.match(r'[0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}', timestamp):
             return timestamp, "CreationDate with Z (UTC)"
 
-    # Priority 3: Filename for VID/IMG/LRV/DJI
+    media_create_date = exif_data.get("MediaCreateDate", "")
+    media_timestamp = ""
+    if media_create_date and re.search(r'[0-9]', media_create_date):
+        candidate = re.sub(
+            r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1',
+            media_create_date)
+        if is_valid_timestamp(candidate):
+            media_timestamp = candidate
+
     ts, _ = parse_filename_timestamp(file_path)
+
+    # Priority 3: a QuickTime date the filename shows to be an instant. A camera left on
+    # the previous country's time writes a filename that is wrong for where it was shot;
+    # the instant survives that, so it wins where the two contradict each other. Without
+    # a declared timezone there is nothing to convert the instant into.
+    if timezone_offset and _quicktime_is_instant(media_timestamp, ts):
+        return media_timestamp, "MediaCreateDate"
+
+    # Priority 4: Filename for VID/IMG/LRV/DJI
     if ts and (re.match(r'^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6}', base) or
                re.match(r'^DJI_[0-9]{14}_', base)):
         return ts, "filename"
 
-    # Priority 4: DateTimeOriginal without timezone
+    # Priority 5: DateTimeOriginal without timezone
     if datetime_original and re.search(r'[0-9]', datetime_original):
         timestamp = re.sub(
             r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1',
             datetime_original)
         return timestamp, "DateTimeOriginal"
 
-    # Priority 5: MediaCreateDate (usually UTC)
-    media_create_date = exif_data.get("MediaCreateDate", "")
-    if media_create_date and re.search(r'[0-9]', media_create_date):
-        timestamp = re.sub(
-            r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1',
-            media_create_date)
-        if is_valid_timestamp(timestamp):
-            return timestamp, "MediaCreateDate"
+    # Priority 6: MediaCreateDate with nothing to cross-check it against
+    if media_timestamp:
+        return media_timestamp, "MediaCreateDate"
 
     # Priority 6: File timestamps
     try:

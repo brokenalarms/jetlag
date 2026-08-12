@@ -97,6 +97,13 @@ struct LogLine: Identifiable {
     var isMachineReadable: Bool {
         text.hasPrefix("{")
     }
+
+    /// Text without the ANSI colour codes the scripts write for terminal use.
+    var strippedText: String {
+        text
+            .replacingOccurrences(of: "\u{1B}\\[[0-9;]*m", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+    }
 }
 
 /// JSONL event types emitted by media-pipeline.py on stdout.
@@ -225,7 +232,6 @@ final class WorkflowSession {
     var group: String = ""
     var copyCompanionFiles: Bool = false
     var sourceAction: SourceAction = .archive
-    var appendTimezoneToGroup: Bool = false
     var applyMode: Bool = false
     var inferFromFilenames: Bool = false
     var timeOffsetSeconds: Int?
@@ -284,10 +290,14 @@ final class WorkflowSession {
         }
     }
 
+    var timezoneOption: TimezoneOption? {
+        TimezoneCatalog.option(timezone.current)
+    }
+
     func validateTimezone() -> String? {
         if !enabledSteps.contains(.fixTimestamps) { return nil }
         if timezone.current.isEmpty { return Strings.Workflow.timezoneRequired }
-        if !timezone.current.contains(/^[+-]\d{4}$/) { return Strings.Workflow.timezoneFormatHelp }
+        if timezoneOption == nil { return Strings.Workflow.timezoneUnknown }
         return nil
     }
 
@@ -316,9 +326,6 @@ final class WorkflowSession {
         if !group.isEmpty {
             args += ["--group", group]
         }
-        if appendTimezoneToGroup {
-            args.append("--append-timezone-to-group")
-        }
 
         let optionalSteps = enabledSteps.filter { !$0.isAlwaysOn }
         let taskNames: [PipelineStep: String] = [
@@ -341,8 +348,8 @@ final class WorkflowSession {
         if copyCompanionFiles {
             args.append("--copy-companion-files")
         }
-        if enabledSteps.contains(.fixTimestamps) && !timezone.current.isEmpty {
-            args += ["--timezone", timezone.current]
+        if enabledSteps.contains(.fixTimestamps), let option = timezoneOption {
+            args += ["--timezone", option.id]
         }
         if enabledSteps.contains(.fixTimestamps) && inferFromFilenames {
             args.append("--infer-from-filename")
@@ -431,6 +438,12 @@ final class AppState {
             return diffTableRows + [live]
         }
         return diffTableRows
+    }
+
+    /// The most recent line of pipeline progress, for the stretch between starting
+    /// a run and the first file appearing in the table.
+    var latestStatusLine: String? {
+        logOutput.last { !$0.strippedText.isEmpty }?.strippedText
     }
 
     init() {

@@ -320,7 +320,7 @@ class TestGetAllTimestampData:
         """CreationDate with Z (UTC) needs --timezone to convert to local time"""
         video = self._create_video("test.mp4", ["-Keys:CreationDate=2025:06:17 23:25:21Z"])
 
-        data = fmt.get_all_timestamp_data(video, timezone_offset="+08:00")
+        data = fmt.get_all_timestamp_data(video, timezone_spec="+08:00")
 
         assert data["timestamp_source"] == "CreationDate with Z (UTC)"
         assert data["datetime_original"] is not None
@@ -333,7 +333,7 @@ class TestGetAllTimestampData:
         """MediaCreateDate (UTC) needs --timezone to convert to local time"""
         video = self._create_video("test.mp4", ["-QuickTime:MediaCreateDate=2025:06:17 23:25:21"])
 
-        data = fmt.get_all_timestamp_data(video, timezone_offset="+08:00")
+        data = fmt.get_all_timestamp_data(video, timezone_spec="+08:00")
 
         assert data["timestamp_source"] == "MediaCreateDate"
         assert data["datetime_original"] is not None
@@ -341,11 +341,28 @@ class TestGetAllTimestampData:
         assert data["datetime_original"].hour == 7
         assert data["datetime_original"].day == 18
 
+    def test_camera_filename_with_quicktime_instant_converts(self):
+        """A camera filename loses to an instant it contradicts, and the instant is
+        converted into the declared zone rather than the filename being labelled."""
+        video = self._create_video(
+            "VID_20260104_033532_00_001.mp4",
+            ["-QuickTime:MediaCreateDate=2026:01:03 18:35:32"],
+        )
+
+        data = fmt.get_all_timestamp_data(video, timezone_spec="+13:00")
+
+        assert data["timestamp_source"] == "MediaCreateDate"
+        assert data["datetime_original"] is not None
+        assert data["datetime_original"].day == 4
+        assert data["datetime_original"].hour == 7
+        assert data["datetime_original"].minute == 35
+        assert data["datetime_original"].utcoffset() == timedelta(hours=13)
+
     def test_filename_with_timezone_flag(self):
         """Filename pattern VID_YYYYMMDD_HHMMSS needs --timezone"""
         video = self._create_video("VID_20250618_072521.mp4")
 
-        data = fmt.get_all_timestamp_data(video, timezone_offset="+08:00")
+        data = fmt.get_all_timestamp_data(video, timezone_spec="+08:00")
 
         assert "filename" in data["timestamp_source"]
         assert data["datetime_original"] is not None
@@ -363,7 +380,7 @@ class TestGetAllTimestampData:
 
         data = fmt.get_all_timestamp_data(
             video,
-            timezone_offset="+08:00",
+            timezone_spec="+08:00",
             infer_from_filename=True
         )
 
@@ -386,7 +403,7 @@ class TestGetAllTimestampData:
         video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
 
         with pytest.raises(ValueError) as exc_info:
-            fmt.get_all_timestamp_data(video, timezone_offset="+08:00", infer_from_filename=True)
+            fmt.get_all_timestamp_data(video, timezone_spec="+08:00", infer_from_filename=True)
 
         assert "no parseable date" in str(exc_info.value)
 
@@ -394,7 +411,7 @@ class TestGetAllTimestampData:
         """DateTimeOriginal without timezone uses --timezone flag"""
         video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21"])
 
-        data = fmt.get_all_timestamp_data(video, timezone_offset="+08:00")
+        data = fmt.get_all_timestamp_data(video, timezone_spec="+08:00")
 
         assert data["timestamp_source"] == "DateTimeOriginal"
         assert data["datetime_original"] is not None
@@ -656,7 +673,7 @@ class TestTimestampFixResult:
         Expected: TimestampFixResult dataclass instance
         """
         result = fmt.fix_media_timestamps(
-            self.test_video, dry_run=True, timezone_offset="+08:00"
+            self.test_video, dry_run=True, timezone_spec="+08:00"
         )
         assert isinstance(result, fmt.TimestampFixResult)
         assert result.file == "VID_20250618_072521.mp4"
@@ -685,7 +702,7 @@ class TestTimestampFixResult:
         Expected: timezone from file metadata
         """
         result = fmt.fix_media_timestamps(
-            self.test_video, dry_run=True, timezone_offset="+08:00"
+            self.test_video, dry_run=True, timezone_spec="+08:00"
         )
         assert isinstance(result, fmt.TimestampFixResult)
         # timezone is populated from metadata detection (may be None if not detected)

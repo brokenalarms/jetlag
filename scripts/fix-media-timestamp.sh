@@ -19,4 +19,4 @@ fi
 
 # Pass all arguments directly to Python implementation
 # Python will handle path resolution
-exec python3 "$PYTHON_SCRIPT" "$@"
+exec "$JETLAG_PYTHON" "$PYTHON_SCRIPT" "$@"
