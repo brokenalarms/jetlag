@@ -19,7 +19,7 @@ scripts/tests/perf_baseline.json
 
 # Vendored tool binaries (downloaded/built locally per developer — see scripts/tools/README)
 # scripts/tools/ffprobe
-# scripts/tools/gyroflow
+scripts/tools/gyroflow
 # scripts/tools/jetlag-metadata
 
 # Xcode generated

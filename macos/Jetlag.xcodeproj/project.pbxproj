@@ -21,6 +21,7 @@
 		7EB40F1EE336843C386D4474 /* SandboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6989D9C650B0383E7ABA46E2 /* SandboxView.swift */; };
 		8989E8C851EEE8A1CA2F436E /* UpgradeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEA322FB3423ED25C28C0860 /* UpgradeView.swift */; };
 		8D5AEC4A3D748ADF6853E7C1 /* JetlagApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1EA0220A8EF5122DF196162 /* JetlagApp.swift */; };
+		8D73DAA303CE63DEDF874F35 /* InspectorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBCBF55CE9225F7CC1BE2FA /* InspectorPanel.swift */; };
 		8F979D129B6EF35BF9FA8BCB /* TimezoneCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 275EE4D58C8BFA72BF92B86F /* TimezoneCatalog.swift */; };
 		92BA1490C431AC89A5646C85 /* FilenamePatterns.swift in Sources */ = {isa = PBXBuildFile; fileRef = A668F7E7A4F545637B636567 /* FilenamePatterns.swift */; };
 		932EB3F57E4BF42DBFA0EBF9 /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */; };
@@ -69,6 +70,7 @@
 		824A528222BFA2E5BFFCDF48 /* ProfilePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilePicker.swift; sourceTree = "<group>"; };
 		886F8C8992B2C0546F301A05 /* Strings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings.swift; sourceTree = "<group>"; };
 		88D2EC9D00CD4EE5A754D59E /* LicenseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseStore.swift; sourceTree = "<group>"; };
+		8DBCBF55CE9225F7CC1BE2FA /* InspectorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorPanel.swift; sourceTree = "<group>"; };
 		93163EBEB8CD8B13330BAB7C /* LogOutputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogOutputView.swift; sourceTree = "<group>"; };
 		9C5FD29C41D642C67671FBAF /* ScriptRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptRunner.swift; sourceTree = "<group>"; };
 		A142786B3A2C61DF018E00D1 /* DiffTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffTableView.swift; sourceTree = "<group>"; };
@@ -167,6 +169,7 @@
 				5DCC75F647AA2A41BF2B17B9 /* ContentView.swift */,
 				A142786B3A2C61DF018E00D1 /* DiffTableView.swift */,
 				3B7884EFEE29BD136A760320 /* FieldValidation.swift */,
+				8DBCBF55CE9225F7CC1BE2FA /* InspectorPanel.swift */,
 				93163EBEB8CD8B13330BAB7C /* LogOutputView.swift */,
 				689D9A69FF07CCA892429C0A /* PillField.swift */,
 				824A528222BFA2E5BFFCDF48 /* ProfilePicker.swift */,
@@ -296,7 +299,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\nDEST=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/scripts\"\nrm -rf \"$DEST\"\ncp -r \"${SRCROOT}/../scripts/\" \"$DEST\"\nrm -rf \"$DEST/site-packages\"\npython3 -m pip install --quiet --target \"$DEST/site-packages\" -r \"$DEST/requirements.txt\"\n\n# Build jetlag-metadata Swift CLI and install into bundle\nMETADATA_PKG=\"${SRCROOT}/Sources/Tools/jetlag-metadata\"\nif [ -d \"$METADATA_PKG\" ]; then\n  swift build -c release --package-path \"$METADATA_PKG\" 2>&1\n  cp \"$METADATA_PKG/.build/release/jetlag-metadata\" \"$DEST/tools/jetlag-metadata\"\nfi\n\n# Verify vendored tools are present (copied by cp -r above)\nfor tool in exiftool tag ffprobe gyroflow jetlag-metadata; do\n  if [ ! -f \"$DEST/tools/$tool\" ]; then\n    echo \"error: scripts/tools/$tool missing — run scripts/tools/download-${tool}.sh or scripts/tools/build-jetlag-metadata.sh or see scripts/tools/README\" >&2\n    exit 1\n  fi\ndone\n";
+			shellScript = "set -e\nDEST=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/scripts\"\nrm -rf \"$DEST\"\ncp -r \"${SRCROOT}/../scripts/\" \"$DEST\"\n# A checkout's .venv holds absolute paths into the checkout — the bundle\n# imports from site-packages below instead.\nrm -rf \"$DEST/.venv\"\nfind \"$DEST\" -name __pycache__ -type d -prune -exec rm -rf {} +\n# Vendor dependencies with the same interpreter the app runs them on\n# (lib/ensure-venv.sh resolves to /usr/bin/python3) — PyYAML ships a C\n# extension, so wheels built for another version fail to import.\nrm -rf \"$DEST/site-packages\"\n/usr/bin/python3 -m pip install --quiet --target \"$DEST/site-packages\" -r \"$DEST/requirements.txt\"\n\n# Build jetlag-metadata Swift CLI and install into bundle\nMETADATA_PKG=\"${SRCROOT}/Sources/Tools/jetlag-metadata\"\nif [ -d \"$METADATA_PKG\" ]; then\n  swift build -c release --package-path \"$METADATA_PKG\" 2>&1\n  cp \"$METADATA_PKG/.build/release/jetlag-metadata\" \"$DEST/tools/jetlag-metadata\"\nfi\n\n# Verify vendored tools are present (copied by cp -r above)\nfor tool in exiftool tag ffprobe jetlag-metadata; do\n  if [ ! -f \"$DEST/tools/$tool\" ]; then\n    echo \"error: scripts/tools/$tool missing — run scripts/tools/download-${tool}.sh or scripts/tools/build-jetlag-metadata.sh or see scripts/tools/README\" >&2\n    exit 1\n  fi\ndone\n# Gyroflow is optional: the pipeline skips stabilization gracefully when\n# absent, and the app gates gyroflow features on its presence.\nif [ ! -f \"$DEST/tools/gyroflow\" ]; then\n  echo \"note: scripts/tools/gyroflow not bundled — gyroflow features disabled in this build\" >&2\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -311,6 +314,7 @@
 				D4148DE34CA1305FAAEB74E7 /* DiffTableView.swift in Sources */,
 				E6DEE560FAFDCFE9F48B205B /* FieldValidation.swift in Sources */,
 				92BA1490C431AC89A5646C85 /* FilenamePatterns.swift in Sources */,
+				8D73DAA303CE63DEDF874F35 /* InspectorPanel.swift in Sources */,
 				8D5AEC4A3D748ADF6853E7C1 /* JetlagApp.swift in Sources */,
 				A782F8A1159D170B5CEB4C7E /* LicenseStore.swift in Sources */,
 				53E52584D7A0F04EBD764B7D /* LogOutputView.swift in Sources */,
