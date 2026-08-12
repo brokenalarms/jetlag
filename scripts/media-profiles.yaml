@@ -15,7 +15,7 @@ profiles:
     backup_enabled: true
     gyroflow_enabled: true
     ready_dir: /Users/daniellawrence/Movies/2025-08-16/processed
-    backup_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7V/Ready
+    backup_dir: /Volumes/Samsung 990/Videos/Source Video/Sony A7V/Ready
     backup_exclude_subdirs: []
     tags:
     - sony-a7v
@@ -32,10 +32,10 @@ profiles:
   insta360:
     type: video
     source_dir: /Volumes/Untitled/DCIM
-    ready_dir: /Volumes/Extreme GRN/Videos/Source Video/Insta360/Ready
+    ready_dir: /Volumes/Samsung 990/Videos/Source Video/Insta360/Ready
     backup_enabled: true
     gyroflow_enabled: false
-    backup_dir: /Volumes/Extreme GRN/Videos/Source Video/Insta360
+    backup_dir: /Volumes/Samsung 990/Videos/Source Video/Insta360
     backup_exclude_subdirs:
     - Exports
     tags:
@@ -53,10 +53,10 @@ profiles:
   gopro:
     type: video
     source_dir: /Volumes/Untitled/DCIM
-    ready_dir: /Volumes/Extreme GRN/Videos/Source Video/GoPro/Ready
+    ready_dir: /Volumes/Samsung 990/Videos/Source Video/GoPro/Ready
     backup_enabled: true
     gyroflow_enabled: true
-    backup_dir: /Volumes/Extreme GRN/Videos/Source Video/GoPro/Ready
+    backup_dir: /Volumes/Samsung 990/Videos/Source Video/GoPro/Ready
     backup_exclude_subdirs: []
     tags:
     - gopro-hero-12
@@ -72,10 +72,10 @@ profiles:
   dji-mini-4-pro-video:
     type: video
     source_dir: /Volumes/Untitled/DCIM
-    ready_dir: /Volumes/Extreme GRN/Videos/Source Video/DJI/Ready
+    ready_dir: /Volumes/Samsung 990/Videos/Source Video/DJI/Ready
     backup_enabled: true
     gyroflow_enabled: false
-    backup_dir: /Volumes/Extreme GRN/Videos/Source Video/DJI/Ready
+    backup_dir: /Volumes/Samsung 990/Videos/Source Video/DJI/Ready
     backup_exclude_subdirs: []
     tags:
     - dji-mini-4-pro
@@ -92,9 +92,9 @@ profiles:
   dji-mini-4-pro-photo:
     type: photo
     source_dir: /Volumes/Untitled/DCIM
-    ready_dir: /Volumes/Extreme GRN/Photos/Import
+    ready_dir: /Volumes/Samsung 990/Photos/Import
     backup_enabled: true
-    backup_dir: /Volumes/Extreme GRN/Photos/Originals
+    backup_dir: /Volumes/Samsung 990/Photos/Originals
     backup_exclude_subdirs: []
     tags:
     - dji-mini-4-pro
@@ -108,9 +108,9 @@ profiles:
   sony-a7iv-photo:
     type: photo
     source_dir: /Volumes/Untitled/DCIM
-    ready_dir: /Volumes/Extreme GRN/Photos/Import
+    ready_dir: /Volumes/Samsung 990/Photos/Import
     backup_enabled: true
-    backup_dir: /Volumes/Extreme GRN/Photos/Originals
+    backup_dir: /Volumes/Samsung 990/Photos/Originals
     backup_exclude_subdirs:
     - Import
     tags:
@@ -130,8 +130,8 @@ profiles:
     source_dir: /Volumes/Untitled/PRIVATE
     backup_enabled: true
     gyroflow_enabled: true
-    ready_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Ready
-    backup_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7IV/Ready
+    ready_dir: /Volumes/Samsung 990/Videos/Source Video/Sony A7IV/Ready
+    backup_dir: /Volumes/Samsung 990/Videos/Source Video/Sony A7IV/Ready
     backup_exclude_subdirs: []
     tags:
     - sony-a7iv
@@ -148,9 +148,9 @@ profiles:
   sony-a7v-photo:
     type: photo
     source_dir: /Volumes/Untitled/DCIM
-    ready_dir: /Volumes/Extreme GRN/Photos/Import
+    ready_dir: /Volumes/Samsung 990/Photos/Import
     backup_enabled: true
-    backup_dir: /Volumes/Extreme GRN/Photos/Originals
+    backup_dir: /Volumes/Samsung 990/Photos/Originals
     backup_exclude_subdirs:
     - Import
     tags:
@@ -170,8 +170,8 @@ profiles:
     source_dir: /Volumes/Untitled/PRIVATE
     backup_enabled: true
     gyroflow_enabled: true
-    ready_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7V/Ready
-    backup_dir: /Volumes/Extreme GRN/Videos/Source Video/Sony A7V/Ready
+    ready_dir: /Volumes/Samsung 990/Videos/Source Video/Sony A7V/Ready
+    backup_dir: /Volumes/Samsung 990/Videos/Source Video/Sony A7V/Ready
     backup_exclude_subdirs: []
     tags:
     - sony-a7v
@@ -188,10 +188,10 @@ profiles:
   iphone-16-pro:
     type: video
     source_dir: /Volumes/Untitled/DCIM
-    ready_dir: /Volumes/Extreme GRN/Videos/Source Video/iPhone/Ready
+    ready_dir: /Volumes/Samsung 990/Videos/Source Video/iPhone/Ready
     backup_enabled: false
     gyroflow_enabled: false
-    backup_dir: /Volumes/Extreme GRN/Videos/Source Video/iPhone
+    backup_dir: /Volumes/Samsung 990/Videos/Source Video/iPhone
     backup_exclude_subdirs: []
     tags:
     - iphone-16-pro
