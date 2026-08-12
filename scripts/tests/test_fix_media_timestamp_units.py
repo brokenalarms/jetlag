@@ -418,6 +418,37 @@ class TestGetAllTimestampData:
         assert data["datetime_original"].utcoffset() == timedelta(hours=8)
         assert "--timezone flag" in data["timezone_source"]
 
+    def test_zoned_datetimeoriginal_converts_into_declared_zone(self):
+        """A zoned DateTimeOriginal defines a moment in time; a declared --timezone
+        re-expresses that moment in the declared zone rather than being ignored.
+        The UTC value must not move — only the wall clock and its zone label do."""
+        video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:10:05 01:00:00+09:00"])
+
+        data = fmt.get_all_timestamp_data(video, timezone_spec="+02:00")
+
+        assert data["timestamp_source"] == "DateTimeOriginal with timezone"
+        converted = data["datetime_original"]
+        assert converted is not None
+        assert converted.utcoffset() == timedelta(hours=2)
+        # 01:00 at +09:00 is 16:00 UTC the previous day, i.e. 18:00 at +02:00
+        assert converted.day == 4
+        assert converted.hour == 18
+        embedded = fmt.parse_datetime_original("2025:10:05 01:00:00+09:00")
+        assert converted.timestamp() == embedded.timestamp(), \
+            "conversion must not move the actual moment in time"
+        assert data["datetime_original_str"] == "2025:10:04 18:00:00+02:00"
+
+    def test_zoned_datetimeoriginal_without_declared_zone_passes_through(self):
+        """With no --timezone there is nothing to convert into: the zoned value is
+        used verbatim, which is what keeps reprocessing corrected files a no-op."""
+        video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:10:05 01:00:00+09:00"])
+
+        data = fmt.get_all_timestamp_data(video)
+
+        assert data["datetime_original"].utcoffset() == timedelta(hours=9)
+        assert data["datetime_original"].hour == 1
+        assert data["timezone_source"] == "DateTimeOriginal metadata"
+
 
 class TestTimeOffset:
     """Test --time-offset functionality"""
@@ -525,6 +556,115 @@ class TestTimeOffset:
         assert result.returncode == 0
         at_lines = self._parse_at_lines(result.stdout)
         assert at_lines.get("time_offset_display") == "+1d 2h 3m 4s"
+
+
+class TestForceTimezoneGate:
+    """--force-timezone is a confirmation gate, not arithmetic.
+
+    A file whose metadata already carries a timezone is refused an --apply with a
+    different declared --timezone unless --force-timezone confirms the relabel.
+    Dry runs always preview the relabel and mark it as needing confirmation.
+    When the relabel is confirmed, the file's actual moment in time (UTC) must not
+    move — only the wall clock and zone label are rewritten. Only --time-offset may
+    move the actual time. This pins the fix for the #111 defect where forcing kept
+    the wall-clock digits and swapped the zone, shifting the file's UTC.
+    """
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.video = os.path.join(self.temp_dir, "test.mp4")
+        create_test_video(self.video, DateTimeOriginal="2025:10:05 01:00:00+09:00")
+        fmt._exif_cache.clear()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    def _run(self, *extra_args):
+        return subprocess.run([
+            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            self.video, *extra_args,
+        ], capture_output=True, text=True)
+
+    def _parse_at_lines(self, stdout: str) -> dict:
+        result = {}
+        for line in stdout.strip().split("\n"):
+            if line.startswith("@@") and "=" in line[2:]:
+                key, value = line[2:].split("=", 1)
+                result[key] = value
+        return result
+
+    def _read_dto(self) -> str:
+        fmt._exif_cache.clear()
+        return fmt.read_exif_data(self.video).get("DateTimeOriginal", "")
+
+    def test_apply_with_conflicting_timezone_refused_without_force(self):
+        """Applying a different zone over an embedded one is refused, and the
+        file is untouched."""
+        before = self._read_dto()
+        result = self._run("--timezone", "+02:00", "--apply")
+
+        assert result.returncode != 0
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("timestamp_action") == "error"
+        assert at_lines.get("requires_force_timezone") == "true"
+        assert self._read_dto() == before, "refused apply must not modify the file"
+
+    def test_dry_run_previews_conflict_without_force(self):
+        """A dry run is never blocked: it shows the would-be relabel and flags
+        that applying needs --force-timezone. The file is untouched."""
+        before = self._read_dto()
+        result = self._run("--timezone", "+02:00")
+
+        assert result.returncode == 0
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("requires_force_timezone") == "true"
+        assert at_lines.get("timestamp_action") in ("would_fix", "no_change")
+        # Preview shows the conversion: same moment, expressed at +02:00
+        assert "2025:10:04 18:00:00+02:00" in at_lines.get("corrected_time", "")
+        assert self._read_dto() == before, "dry run must not modify the file"
+
+    def test_forced_relabel_preserves_utc(self):
+        """With --force-timezone the relabel proceeds: the stored tag gets the
+        declared zone's wall clock for the same UTC moment."""
+        result = self._run("--timezone", "+02:00", "--force-timezone", "--apply")
+
+        assert result.returncode == 0
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("original_epoch") == at_lines.get("corrected_epoch"), \
+            "relabelling must not move the actual time"
+        dto = self._read_dto()
+        assert dto.startswith("2025:10:04 18:00:00"), f"expected converted wall clock, got {dto}"
+        assert dto.replace(":", "").endswith("+0200")
+
+    def test_matching_timezone_needs_no_force(self):
+        """Declaring the zone the file already carries is not a relabel: no
+        refusal, no confirmation flag emitted."""
+        result = self._run("--timezone", "+09:00", "--apply")
+
+        assert result.returncode == 0
+        at_lines = self._parse_at_lines(result.stdout)
+        assert "requires_force_timezone" not in at_lines
+        assert self._read_dto().replace(":", "").endswith("+0900")
+
+    def test_naive_filename_source_preserves_wall_clock(self):
+        """A file with no timezone in metadata (e.g. a reset camera clock where the
+        filename is the only source) keeps its wall-clock digits: the declared zone
+        is attached to them, not used to shift them. The gate never fires — there
+        is no embedded zone to conflict with."""
+        video = os.path.join(self.temp_dir, "VID_20250618_072521.mp4")
+        create_test_video(video)
+        fmt._exif_cache.clear()
+
+        result = subprocess.run([
+            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            video, "--timezone", "+01:00", "--apply",
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0
+        at_lines = self._parse_at_lines(result.stdout)
+        assert "requires_force_timezone" not in at_lines
+        assert "2025:06:18 07:25:21+01:00" in at_lines.get("corrected_time", "")
 
 
 class TestFormatOffsetDisplay:

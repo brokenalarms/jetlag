@@ -152,7 +152,13 @@ class TestInferFromFilenameRequiresTimezone:
 
 
 class TestTimezoneMismatchDetection:
-    """Timezone mismatch handling: DTO timezone wins unless --force-timezone is used."""
+    """Timezone mismatch handling: --timezone never overrides an embedded timezone
+    without --force-timezone confirming it, and confirming never moves the file's
+    actual moment in time — the value is re-expressed in the declared zone.
+
+    A dry run always previews the proposed relabel and marks it as needing
+    confirmation via @@requires_force_timezone, so the UI can show exactly what
+    the user would be assenting to; applying without the flag is refused."""
 
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
@@ -171,15 +177,17 @@ class TestTimezoneMismatchDetection:
                     result[key] = value
         return result
 
-    def test_timezone_mismatch_uses_dto_timezone(self):
-        """When DTO has timezone and user provides a different one, DTO timezone wins.
+    def test_timezone_mismatch_previews_and_requires_force(self):
+        """Dry run with a conflicting --timezone previews the conversion into the
+        declared zone and flags that applying requires --force-timezone.
 
-        The script proceeds using DTO's timezone (+08:00), not the user's (+09:00).
-        The result may be would_fix (if derived fields need syncing) or no_change.
-        The pre-flight check in media-pipeline.py handles the mismatch warning.
+        06:38:09+08:00 is 22:38:09 UTC, i.e. 07:38:09 at +09:00 — the preview
+        shows that converted value; the file itself must be untouched.
         """
         video_path = os.path.join(self.temp_dir, "test_video.mp4")
         create_test_video(video_path, DateTimeOriginal="2025:06:19 06:38:09+08:00")
+        fmt._exif_cache.clear()
+        dto_before = fmt.read_exif_data(video_path).get("DateTimeOriginal", "")
 
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
@@ -189,14 +197,18 @@ class TestTimezoneMismatchDetection:
 
         assert result.returncode == 0
         at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("requires_force_timezone") == "true"
         assert at_lines.get("timestamp_action") in ("would_fix", "no_change")
-        assert "+08:00" in at_lines.get("corrected_time", ""), \
-            "DTO timezone should win — corrected time should use +08:00, not +09:00"
+        assert "2025:06:19 07:38:09+09:00" in at_lines.get("corrected_time", ""), \
+            "preview must show the same moment re-expressed at +09:00"
+        fmt._exif_cache.clear()
+        assert fmt.read_exif_data(video_path).get("DateTimeOriginal", "") == dto_before, \
+            "dry run must not modify the file"
 
-    def test_force_timezone_overrides_dto(self):
-        """With --force-timezone, the user-provided timezone overrides DTO's embedded timezone.
-
-        The wall-clock time is preserved, only the timezone label changes.
+    def test_force_timezone_converts_preserving_instant(self):
+        """With --force-timezone the relabel is confirmed: the corrected time is the
+        same moment expressed in the declared zone, never the old digits with a
+        swapped zone suffix (the #111 defect, which shifted the file's UTC).
         """
         video_path = os.path.join(self.temp_dir, "test_video.mp4")
         create_test_video(video_path, DateTimeOriginal="2025:06:19 06:38:09+08:00")
@@ -211,7 +223,10 @@ class TestTimezoneMismatchDetection:
         assert result.returncode == 0
         at_lines = self._parse_at_lines(result.stdout)
         assert at_lines.get("timestamp_action") == "would_fix"
-        assert "+09:00" in at_lines.get("corrected_time", "")
+        assert "2025:06:19 07:38:09+09:00" in at_lines.get("corrected_time", ""), \
+            "converted wall clock must be 07:38:09, not the old digits relabelled"
+        assert at_lines.get("original_epoch") == at_lines.get("corrected_epoch"), \
+            "relabelling must not move the actual time"
 
 
 class TestTimezoneConversion:
