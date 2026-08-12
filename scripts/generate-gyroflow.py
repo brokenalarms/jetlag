@@ -169,7 +169,14 @@ def generate_gyroflow_project(
     if preset_json and preset_json != "{}":
         cmd.extend(["--preset", preset_json])
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+    except OSError as e:
+        # A binary that cannot be executed here — built for another platform, or not an
+        # executable at all — is as unusable as a missing one, so skip rather than crash.
+        error_msg = f"Gyroflow not found: cannot execute {binary} ({e.strerror})"
+        print(f"Warning: {error_msg}", file=sys.stderr)
+        return GyroflowResult(gyroflow_path=gyroflow_path, action="skipped", error=error_msg)
 
     if result.returncode != 0:
         error_msg = result.stderr.rstrip() if result.stderr else f"exit code {result.returncode}"
