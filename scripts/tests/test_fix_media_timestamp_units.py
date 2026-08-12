@@ -341,6 +341,23 @@ class TestGetAllTimestampData:
         assert data["datetime_original"].hour == 7
         assert data["datetime_original"].day == 18
 
+    def test_camera_filename_with_quicktime_instant_converts(self):
+        """A camera filename loses to an instant it contradicts, and the instant is
+        converted into the declared zone rather than the filename being labelled."""
+        video = self._create_video(
+            "VID_20260104_033532_00_001.mp4",
+            ["-QuickTime:MediaCreateDate=2026:01:03 18:35:32"],
+        )
+
+        data = fmt.get_all_timestamp_data(video, timezone_spec="+13:00")
+
+        assert data["timestamp_source"] == "MediaCreateDate"
+        assert data["datetime_original"] is not None
+        assert data["datetime_original"].day == 4
+        assert data["datetime_original"].hour == 7
+        assert data["datetime_original"].minute == 35
+        assert data["datetime_original"].utcoffset() == timedelta(hours=13)
+
     def test_filename_with_timezone_flag(self):
         """Filename pattern VID_YYYYMMDD_HHMMSS needs --timezone"""
         video = self._create_video("VID_20250618_072521.mp4")
