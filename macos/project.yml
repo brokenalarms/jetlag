@@ -63,12 +63,17 @@ targets:
           fi
 
           # Verify vendored tools are present (copied by cp -r above)
-          for tool in exiftool tag ffprobe gyroflow jetlag-metadata; do
+          for tool in exiftool tag ffprobe jetlag-metadata; do
             if [ ! -f "$DEST/tools/$tool" ]; then
               echo "error: scripts/tools/$tool missing — run scripts/tools/download-${tool}.sh or scripts/tools/build-jetlag-metadata.sh or see scripts/tools/README" >&2
               exit 1
             fi
           done
+          # Gyroflow is optional: the pipeline skips stabilization gracefully when
+          # absent, and the app gates gyroflow features on its presence.
+          if [ ! -f "$DEST/tools/gyroflow" ]; then
+            echo "note: scripts/tools/gyroflow not bundled — gyroflow features disabled in this build" >&2
+          fi
   JetlagTests:
     type: bundle.unit-test
     platform: macOS
