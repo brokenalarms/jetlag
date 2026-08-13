@@ -113,8 +113,18 @@ class TestPerformance:
             f"(threshold {REGRESSION_THRESHOLD*100:.0f}%)"
         )
 
-    def test_media_pipeline(self, request, monkeypatch):
-        """media-pipeline: fix-timestamp + organize on multiple files."""
+    def test_media_pipeline(self, request):
+        """media-pipeline: fix-timestamp + organize on multiple files.
+
+        Mutates the repo media-profiles.yaml (with restore) rather than using
+        the JETLAG_PROFILES_FILE override: CI records the baseline by running
+        this test against origin/main's scripts, which must keep working even
+        when they predate the override. Safe because this file is excluded
+        from the parallel suite — it is timed, serial by design.
+        """
+        profiles_path = SCRIPT_DIR / "media-profiles.yaml"
+        original_yaml = profiles_path.read_text()
+
         file_count = 100
         timestamps = [
             f"2025:10:{5 + i:02d} {i:02d}:00:00"
@@ -122,39 +132,42 @@ class TestPerformance:
         ]
 
         times = []
-        for _ in range(TIMED_RUNS):
-            with tempfile.TemporaryDirectory() as tmpdir:
-                workspace = Path(tmpdir)
-                source = workspace / "source"
-                target = workspace / "target"
-                source.mkdir()
-                target.mkdir()
+        try:
+            for _ in range(TIMED_RUNS):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    workspace = Path(tmpdir)
+                    source = workspace / "source"
+                    target = workspace / "target"
+                    source.mkdir()
+                    target.mkdir()
 
-                for j, ts in enumerate(timestamps):
-                    create_test_video(source / f"file_{j}.mp4", media_create_date=ts)
+                    for j, ts in enumerate(timestamps):
+                        create_test_video(source / f"file_{j}.mp4", media_create_date=ts)
 
-                # Isolated copy via JETLAG_PROFILES_FILE — the shared repo
-                # file is never touched, so this is parallel-safe.
-                with open(SCRIPT_DIR / "media-profiles.yaml") as f:
-                    profiles = yaml.safe_load(f)
-                profiles["profiles"]["_perf_test"] = {
-                    "source_dir": str(source),
-                    "ready_dir": str(target),
-                    "file_extensions": [".mp4"],
-                }
-                profiles_copy = workspace / "media-profiles.yaml"
-                with open(profiles_copy, "w") as f:
-                    yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
-                monkeypatch.setenv("JETLAG_PROFILES_FILE", str(profiles_copy))
+                    with open(profiles_path) as f:
+                        profiles = yaml.safe_load(f)
+                    profiles["profiles"]["_perf_test"] = {
+                        "source_dir": str(source),
+                        "ready_dir": str(target),
+                        "file_extensions": [".mp4"],
+                    }
+                    with open(profiles_path, "w") as f:
+                        yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
 
-                t0 = time.perf_counter()
-                run_pipeline([
-                    "--profile", "_perf_test",
-                    "--source", str(source),
-                    "--timezone", "+0900",
-                    "--tasks", "fix-timestamp",
-                    "--apply",
-                ])
-                times.append(time.perf_counter() - t0)
+                    t0 = time.perf_counter()
+                    result = run_pipeline([
+                        "--profile", "_perf_test",
+                        "--source", str(source),
+                        "--timezone", "+0900",
+                        "--tasks", "fix-timestamp",
+                        "--apply",
+                    ])
+                    times.append(time.perf_counter() - t0)
+                    assert result.returncode == 0, (
+                        f"pipeline failed during timing run — measurement is meaningless.\n"
+                        f"stderr: {result.stderr[-500:]}"
+                    )
+        finally:
+            profiles_path.write_text(original_yaml)
 
         self._check("media_pipeline", statistics.median(times), request)
