@@ -299,7 +299,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\nDEST=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/scripts\"\nrm -rf \"$DEST\"\ncp -r \"${SRCROOT}/../scripts/\" \"$DEST\"\n# A checkout's .venv holds absolute paths into the checkout — the bundle\n# imports from site-packages below instead.\nrm -rf \"$DEST/.venv\"\nfind \"$DEST\" -name __pycache__ -type d -prune -exec rm -rf {} +\n# Vendor dependencies with the same interpreter the app runs them on\n# (lib/ensure-venv.sh resolves to /usr/bin/python3) — PyYAML ships a C\n# extension, so wheels built for another version fail to import.\nrm -rf \"$DEST/site-packages\"\n/usr/bin/python3 -m pip install --quiet --target \"$DEST/site-packages\" -r \"$DEST/requirements.txt\"\n\n# Build jetlag-metadata Swift CLI and install into bundle\nMETADATA_PKG=\"${SRCROOT}/Sources/Tools/jetlag-metadata\"\nif [ -d \"$METADATA_PKG\" ]; then\n  swift build -c release --package-path \"$METADATA_PKG\" 2>&1\n  cp \"$METADATA_PKG/.build/release/jetlag-metadata\" \"$DEST/tools/jetlag-metadata\"\nfi\n\n# Verify vendored tools are present (copied by cp -r above)\nfor tool in exiftool tag ffprobe jetlag-metadata; do\n  if [ ! -f \"$DEST/tools/$tool\" ]; then\n    echo \"error: scripts/tools/$tool missing — run scripts/tools/download-${tool}.sh or scripts/tools/build-jetlag-metadata.sh or see scripts/tools/README\" >&2\n    exit 1\n  fi\ndone\n# Gyroflow is optional: the pipeline skips stabilization gracefully when\n# absent, and the app gates gyroflow features on its presence.\nif [ ! -f \"$DEST/tools/gyroflow\" ]; then\n  echo \"note: scripts/tools/gyroflow not bundled — gyroflow features disabled in this build\" >&2\nfi\n";
+			shellScript = "set -e\nDEST=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/scripts\"\nrm -rf \"$DEST\"\ncp -r \"${SRCROOT}/../scripts/\" \"$DEST\"\n# A checkout's .venv holds absolute paths into the checkout — the bundle\n# imports from site-packages below instead.\nrm -rf \"$DEST/.venv\"\nfind \"$DEST\" -name __pycache__ -type d -prune -exec rm -rf {} +\n# Vendor dependencies with the same interpreter the app runs them on\n# (lib/ensure-venv.sh resolves to /usr/bin/python3) — PyYAML ships a C\n# extension, so wheels built for another version fail to import.\n# pip resolution takes ~30-60s per build; cache the installed tree in\n# DerivedData keyed by the requirements hash and copy it in instead.\nrm -rf \"$DEST/site-packages\"\nREQ_HASH=$(shasum \"$DEST/requirements.txt\" | awk '{print $1}')\nPIP_CACHE=\"${BUILT_PRODUCTS_DIR}/jetlag-site-packages-cache\"\nif [ ! -f \"$PIP_CACHE/.stamp\" ] || [ \"$(cat \"$PIP_CACHE/.stamp\")\" != \"$REQ_HASH\" ]; then\n  rm -rf \"$PIP_CACHE\"\n  /usr/bin/python3 -m pip install --quiet --target \"$PIP_CACHE\" -r \"$DEST/requirements.txt\"\n  echo \"$REQ_HASH\" > \"$PIP_CACHE/.stamp\"\nfi\ncp -R \"$PIP_CACHE\" \"$DEST/site-packages\"\nrm -f \"$DEST/site-packages/.stamp\"\n\n# Build jetlag-metadata Swift CLI and install into bundle\nMETADATA_PKG=\"${SRCROOT}/Sources/Tools/jetlag-metadata\"\nif [ -d \"$METADATA_PKG\" ]; then\n  swift build -c release --package-path \"$METADATA_PKG\" 2>&1\n  cp \"$METADATA_PKG/.build/release/jetlag-metadata\" \"$DEST/tools/jetlag-metadata\"\nfi\n\n# Verify vendored tools are present (copied by cp -r above)\nfor tool in exiftool tag ffprobe jetlag-metadata; do\n  if [ ! -f \"$DEST/tools/$tool\" ]; then\n    echo \"error: scripts/tools/$tool missing — run scripts/tools/download-${tool}.sh or scripts/tools/build-jetlag-metadata.sh or see scripts/tools/README\" >&2\n    exit 1\n  fi\ndone\n# Gyroflow is optional: the pipeline skips stabilization gracefully when\n# absent, and the app gates gyroflow features on its presence.\nif [ ! -f \"$DEST/tools/gyroflow\" ]; then\n  echo \"note: scripts/tools/gyroflow not bundled — gyroflow features disabled in this build\" >&2\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -427,7 +427,6 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Sources/Tools/jetlag-metadata/.build/arm64-apple-macosx/release/jetlag-metadata.dSYM/Contents/Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Daniel Lawrence";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -542,7 +541,6 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Sources/Tools/jetlag-metadata/.build/arm64-apple-macosx/release/jetlag-metadata.dSYM/Contents/Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Daniel Lawrence";
 				LD_RUNPATH_SEARCH_PATHS = (

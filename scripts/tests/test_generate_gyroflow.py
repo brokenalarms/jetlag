@@ -182,35 +182,32 @@ class TestMissingBinary:
             )
             fake_ffprobe.chmod(0o755)
 
+            # Point the script at a modified copy of the profiles file via the
+            # JETLAG_PROFILES_FILE override — the shared repo file is never
+            # touched, so this test is safe under parallel workers.
             with open(PROFILES_FILE) as f:
-                original_config = f.read()
-                data = yaml.safe_load(original_config)
-
+                data = yaml.safe_load(f)
             data["gyroflow"]["binary"] = "/nonexistent/path/to/gyroflow"
+            profiles_copy = Path(tmpdir) / "media-profiles.yaml"
+            with open(profiles_copy, "w") as f:
+                yaml.dump(data, f, default_flow_style=False, sort_keys=False)
 
-            try:
-                with open(PROFILES_FILE, "w") as f:
-                    yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+            env = os.environ.copy()
+            env["JETLAG_PROFILES_FILE"] = str(profiles_copy)
+            # Restrict PATH to tmpdir (fake ffprobe) + essentials only,
+            # so shutil.which("gyroflow") won't find a real install
+            env["PATH"] = f"{tmpdir}:/usr/bin:/bin"
 
-                env = os.environ.copy()
-                # Restrict PATH to tmpdir (fake ffprobe) + essentials only,
-                # so shutil.which("gyroflow") won't find a real install
-                env["PATH"] = f"{tmpdir}:/usr/bin:/bin"
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT_DIR / "generate-gyroflow.py"),
+                 str(video), "--preset", get_test_preset(), "--apply"],
+                capture_output=True, text=True, env=env, cwd=SCRIPT_DIR,
+            )
 
-                result = subprocess.run(
-                    [sys.executable, str(SCRIPT_DIR / "generate-gyroflow.py"),
-                     str(video), "--preset", get_test_preset(), "--apply"],
-                    capture_output=True, text=True, env=env, cwd=SCRIPT_DIR,
-                )
-
-                assert result.returncode == 0, "Missing binary should not crash — exit 0 and skip"
-                assert "not found" in result.stderr.lower()
-                assert "@@error=" in result.stdout
-                assert "@@action=skipped" in result.stdout
-
-            finally:
-                with open(PROFILES_FILE, "w") as f:
-                    f.write(original_config)
+            assert result.returncode == 0, "Missing binary should not crash — exit 0 and skip"
+            assert "not found" in result.stderr.lower()
+            assert "@@error=" in result.stdout
+            assert "@@action=skipped" in result.stdout
 
     def test_nonexistent_file_emits_error(self):
         """@@error should be emitted for a nonexistent input file."""

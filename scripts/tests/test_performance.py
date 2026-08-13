@@ -59,7 +59,10 @@ def create_test_video(path: Path, media_create_date: str = "2025:10:05 01:00:00"
 
 
 def run_pipeline(args: list[str]) -> subprocess.CompletedProcess:
-    """Run media-pipeline.sh with given args."""
+    """Run media-pipeline.sh with given args, isolating the working directory
+    (the shared default collides across parallel workers)."""
+    if "--working-dir" not in args:
+        args = args + ["--working-dir", tempfile.mkdtemp(prefix="pipeline_working_")]
     quoted_args = " ".join(shlex.quote(arg) for arg in args)
     cmd = f"{MEDIA_PIPELINE} {quoted_args}"
     return subprocess.run(
@@ -111,7 +114,14 @@ class TestPerformance:
         )
 
     def test_media_pipeline(self, request):
-        """media-pipeline: fix-timestamp + organize on multiple files."""
+        """media-pipeline: fix-timestamp + organize on multiple files.
+
+        Mutates the repo media-profiles.yaml (with restore) rather than using
+        the JETLAG_PROFILES_FILE override: CI records the baseline by running
+        this test against origin/main's scripts, which must keep working even
+        when they predate the override. Safe because this file is excluded
+        from the parallel suite — it is timed, serial by design.
+        """
         profiles_path = SCRIPT_DIR / "media-profiles.yaml"
         original_yaml = profiles_path.read_text()
 
@@ -145,7 +155,7 @@ class TestPerformance:
                         yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
 
                     t0 = time.perf_counter()
-                    run_pipeline([
+                    result = run_pipeline([
                         "--profile", "_perf_test",
                         "--source", str(source),
                         "--timezone", "+0900",
@@ -153,6 +163,10 @@ class TestPerformance:
                         "--apply",
                     ])
                     times.append(time.perf_counter() - t0)
+                    assert result.returncode == 0, (
+                        f"pipeline failed during timing run — measurement is meaningless.\n"
+                        f"stderr: {result.stderr[-500:]}"
+                    )
         finally:
             profiles_path.write_text(original_yaml)
 

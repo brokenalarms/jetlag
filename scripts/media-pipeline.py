@@ -29,6 +29,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.filesystem import find_media_files
+from lib.profiles import resolve_profiles_file
 from lib.timestamp_source import (
     build_filename, extract_metadata_timezone, is_zone_name, normalize_timezone_input,
     parse_datetime_original, parse_filename_timestamp, resolve_file_timezone_offset,
@@ -77,7 +78,7 @@ def load_config(profile_name: str) -> tuple[dict, dict]:
     Returns:
         tuple of (profile_dict, full_config_dict)
     """
-    profiles_file = SCRIPT_DIR / "media-profiles.yaml"
+    profiles_file = resolve_profiles_file()
     if not profiles_file.exists():
         print(f"ERROR: Profile file not found: {profiles_file}", file=sys.stderr)
         sys.exit(1)

@@ -8,6 +8,7 @@ import subprocess
 import sys
 import os
 import argparse
+from lib.profiles import resolve_profiles_file
 
 # Ensure we're running with the media-import venv
 try:
@@ -50,12 +51,7 @@ def load_config(profile_path: str) -> Tuple[Dict, Dict]:
 
 def get_default_profile_path() -> str:
     """Get default profile file path"""
-    script_dir = Path(__file__).parent
-    for filename in ['media-profiles.yaml', 'media-profiles.yml']:
-        profile_path = script_dir / filename
-        if profile_path.exists():
-            return str(profile_path)
-    return str(script_dir / 'media-profiles.yaml')
+    return str(resolve_profiles_file())
 
 def transform_local_to_remote_path(local_path: str, local_base_path: str, remote_base_path: str) -> str:
     """Transform a local path to its corresponding remote path
