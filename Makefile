@@ -57,8 +57,12 @@ $(VENV_STAMP): scripts/requirements.txt scripts/tests/requirements.txt
 	touch $(VENV_STAMP)
 
 ## Run script tests (any platform); tests are profile-isolated so they parallelize
+# stdin comes from /dev/null: under a supervisor that runs make in its own
+# process group on a tmux tty (the ralph loop), any child that reads the
+# inherited terminal gets the whole group SIGTTIN-suspended — the suite then
+# hangs frozen until the supervisor's timeout, looking like a test hang.
 test-scripts: $(VENV_STAMP)
-	$(PYTEST) scripts/tests/ -x -n auto --ignore=scripts/tests/test_performance.py
+	$(PYTEST) scripts/tests/ -x -n auto --ignore=scripts/tests/test_performance.py < /dev/null
 
 ## Run Swift unit tests (macOS only, requires Xcode)
 # No xcpretty pipe: when xcpretty is missing the old `| xcpretty || xcodebuild`
@@ -70,7 +74,7 @@ test-macos: generate
 		-derivedDataPath $(DERIVED_DIR) \
 		-project $(MACOS_DIR)/$(APP_NAME).xcodeproj \
 		-quiet \
-		test
+		test < /dev/null
 
 ## Run all tests available on this platform
 test: test-scripts
