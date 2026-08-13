@@ -1369,6 +1369,34 @@ class TestPipelineMachineOutput:
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS")
+class TestStaleExiftoolTmp:
+    """Stale exiftool_tmp directories must fail fast when no terminal is attached.
+
+    The old code called input(), which under Xcode's Python opens /dev/tty even
+    with stdin redirected — a non-interactive runner (tests, the app, the ralph
+    loop) in a background process group then gets SIGTTIN and the entire run
+    freezes instead of failing. This pins the non-interactive path: immediate
+    exit 1, source untouched, no prompt wait.
+    """
+
+    def test_noninteractive_run_fails_fast_on_stale_tmp(self, temp_workspace, test_profile):
+        source = temp_workspace["source"]
+        create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
+        stale = source / "exiftool_tmp"
+        stale.mkdir()
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+        ])
+
+        assert result.returncode == 1, "stale exiftool_tmp must abort the run"
+        assert "exiftool_tmp" in result.stderr
+        assert "Cannot proceed" in result.stderr
+        assert stale.exists(), "non-interactive run must never delete the directories itself"
+
+
 class TestCLIOverrides:
     """Tests for --tags, --make, --model CLI overrides that take precedence over profile values."""
 
