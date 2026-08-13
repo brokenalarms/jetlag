@@ -48,11 +48,17 @@ class PipelineResult:
 def run_pipeline(args: list[str], cwd: Optional[Path] = None) -> PipelineResult:
     """Run media-pipeline.sh with given args.
 
+    Each invocation gets its own working directory: the default is a single
+    shared path under Application Support, where identically-named files from
+    parallel test workers collide.
+
     Note on output streams:
     - stdout: media-pipeline's own messages (summary, config, per-file status)
     - stderr: child script messages (organize-by-date, fix-timestamp details)
     - combined: use result.output for full output
     """
+    if "--working-dir" not in args:
+        args = args + ["--working-dir", tempfile.mkdtemp(prefix="pipeline_working_")]
     quoted_args = " ".join(shlex.quote(arg) for arg in args)
     cmd = f"{MEDIA_PIPELINE} {quoted_args}"
     result = subprocess.run(
@@ -111,15 +117,19 @@ def temp_workspace():
 
 
 @pytest.fixture
-def test_profile(temp_workspace):
-    """Create a temporary test profile in media-profiles.yaml."""
-    profiles_path = SCRIPT_DIR / "media-profiles.yaml"
+def test_profile(temp_workspace, monkeypatch):
+    """Create a test profile in an isolated copy of media-profiles.yaml.
 
-    # Read existing profiles
-    with open(profiles_path) as f:
+    The copy plus the JETLAG_PROFILES_FILE override keeps every test (and its
+    spawned scripts) off the shared repo file, which is what allows the suite
+    to run in parallel workers. Tests that need to tweak the profile edit the
+    copy via os.environ["JETLAG_PROFILES_FILE"].
+    """
+    profiles_path = temp_workspace["root"] / "media-profiles.yaml"
+
+    with open(SCRIPT_DIR / "media-profiles.yaml") as f:
         profiles = yaml.safe_load(f)
 
-    # Add test profile
     profiles["profiles"]["_test"] = {
         "source_dir": str(temp_workspace["source"]),
         "ready_dir": str(temp_workspace["target"]),
@@ -129,19 +139,11 @@ def test_profile(temp_workspace):
         "companion_extensions": [".thm", ".lrv"],
     }
 
-    # Write back (preserve formatting)
     with open(profiles_path, "w") as f:
         yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
 
+    monkeypatch.setenv("JETLAG_PROFILES_FILE", str(profiles_path))
     yield "_test"
-
-    # Cleanup: remove test profile
-    with open(profiles_path) as f:
-        profiles = yaml.safe_load(f)
-    if "_test" in profiles.get("profiles", {}):
-        del profiles["profiles"]["_test"]
-        with open(profiles_path, "w") as f:
-            yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
 
 
 class TestFileDiscovery:
@@ -338,7 +340,7 @@ class TestGroupTemplate:
 
     def test_folder_template_with_group(self, temp_workspace, test_profile):
         """Profile folder_template with {{GROUP}} token substitutes the group value."""
-        profiles_path = SCRIPT_DIR / "media-profiles.yaml"
+        profiles_path = Path(os.environ["JETLAG_PROFILES_FILE"])
         with open(profiles_path) as f:
             profiles = yaml.safe_load(f)
         profiles["profiles"]["_test"]["folder_template"] = "{{YYYY}}/{{MM}}/{{GROUP}}/{{YYYY}}-{{MM}}-{{DD}}"
@@ -360,7 +362,7 @@ class TestGroupTemplate:
 
     def test_folder_template_without_group(self, temp_workspace, test_profile):
         """Profile folder_template used as-is when no --group given."""
-        profiles_path = SCRIPT_DIR / "media-profiles.yaml"
+        profiles_path = Path(os.environ["JETLAG_PROFILES_FILE"])
         with open(profiles_path) as f:
             profiles = yaml.safe_load(f)
         profiles["profiles"]["_test"]["folder_template"] = "{{YYYY}}/{{MM}}/{{GROUP}}/{{YYYY}}-{{MM}}-{{DD}}"
@@ -1009,7 +1011,7 @@ class TestPipelineMachineOutput:
         Actual: no error in stdout when gyroflow is enabled but --apply is not passed
         Expected: gyroflow step runs without error in dry run
         """
-        profiles_path = SCRIPT_DIR / "media-profiles.yaml"
+        profiles_path = Path(os.environ["JETLAG_PROFILES_FILE"])
         with open(profiles_path) as f:
             profiles = yaml.safe_load(f)
         profiles["profiles"]["_test"]["gyroflow_enabled"] = True

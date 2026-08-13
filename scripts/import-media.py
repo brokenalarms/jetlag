@@ -18,6 +18,7 @@ import argparse
 
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.filesystem import cleanup_empty_parent_dirs, parse_machine_output
+from lib.profiles import resolve_profiles_file
 
 # Handle Ctrl-C gracefully
 def signal_handler(sig, frame):

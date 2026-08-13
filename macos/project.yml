@@ -52,8 +52,18 @@ targets:
           # Vendor dependencies with the same interpreter the app runs them on
           # (lib/ensure-venv.sh resolves to /usr/bin/python3) — PyYAML ships a C
           # extension, so wheels built for another version fail to import.
+          # pip resolution takes ~30-60s per build; cache the installed tree in
+          # DerivedData keyed by the requirements hash and copy it in instead.
           rm -rf "$DEST/site-packages"
-          /usr/bin/python3 -m pip install --quiet --target "$DEST/site-packages" -r "$DEST/requirements.txt"
+          REQ_HASH=$(shasum "$DEST/requirements.txt" | awk '{print $1}')
+          PIP_CACHE="${BUILT_PRODUCTS_DIR}/jetlag-site-packages-cache"
+          if [ ! -f "$PIP_CACHE/.stamp" ] || [ "$(cat "$PIP_CACHE/.stamp")" != "$REQ_HASH" ]; then
+            rm -rf "$PIP_CACHE"
+            /usr/bin/python3 -m pip install --quiet --target "$PIP_CACHE" -r "$DEST/requirements.txt"
+            echo "$REQ_HASH" > "$PIP_CACHE/.stamp"
+          fi
+          cp -R "$PIP_CACHE" "$DEST/site-packages"
+          rm -f "$DEST/site-packages/.stamp"
 
           # Build jetlag-metadata Swift CLI and install into bundle
           METADATA_PKG="${SRCROOT}/Sources/Tools/jetlag-metadata"

@@ -24,6 +24,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.results import emit_result
+from lib.profiles import resolve_profiles_file
 
 
 SCRIPT_DIR = Path(__file__).parent
@@ -98,7 +99,7 @@ def resolve_gyroflow_binary(configured_path: Optional[str] = None) -> Optional[s
 
 def load_gyroflow_config() -> dict:
     """Load gyroflow config from media-profiles.yaml."""
-    profiles_file = SCRIPT_DIR / "media-profiles.yaml"
+    profiles_file = resolve_profiles_file()
     if not profiles_file.exists():
         print(f"ERROR: Config file not found: {profiles_file}", file=sys.stderr)
         print("Add a 'gyroflow' section to media-profiles.yaml", file=sys.stderr)

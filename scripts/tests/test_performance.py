@@ -59,7 +59,10 @@ def create_test_video(path: Path, media_create_date: str = "2025:10:05 01:00:00"
 
 
 def run_pipeline(args: list[str]) -> subprocess.CompletedProcess:
-    """Run media-pipeline.sh with given args."""
+    """Run media-pipeline.sh with given args, isolating the working directory
+    (the shared default collides across parallel workers)."""
+    if "--working-dir" not in args:
+        args = args + ["--working-dir", tempfile.mkdtemp(prefix="pipeline_working_")]
     quoted_args = " ".join(shlex.quote(arg) for arg in args)
     cmd = f"{MEDIA_PIPELINE} {quoted_args}"
     return subprocess.run(
@@ -110,11 +113,8 @@ class TestPerformance:
             f"(threshold {REGRESSION_THRESHOLD*100:.0f}%)"
         )
 
-    def test_media_pipeline(self, request):
+    def test_media_pipeline(self, request, monkeypatch):
         """media-pipeline: fix-timestamp + organize on multiple files."""
-        profiles_path = SCRIPT_DIR / "media-profiles.yaml"
-        original_yaml = profiles_path.read_text()
-
         file_count = 100
         timestamps = [
             f"2025:10:{5 + i:02d} {i:02d}:00:00"
@@ -122,38 +122,39 @@ class TestPerformance:
         ]
 
         times = []
-        try:
-            for _ in range(TIMED_RUNS):
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    workspace = Path(tmpdir)
-                    source = workspace / "source"
-                    target = workspace / "target"
-                    source.mkdir()
-                    target.mkdir()
+        for _ in range(TIMED_RUNS):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                workspace = Path(tmpdir)
+                source = workspace / "source"
+                target = workspace / "target"
+                source.mkdir()
+                target.mkdir()
 
-                    for j, ts in enumerate(timestamps):
-                        create_test_video(source / f"file_{j}.mp4", media_create_date=ts)
+                for j, ts in enumerate(timestamps):
+                    create_test_video(source / f"file_{j}.mp4", media_create_date=ts)
 
-                    with open(profiles_path) as f:
-                        profiles = yaml.safe_load(f)
-                    profiles["profiles"]["_perf_test"] = {
-                        "source_dir": str(source),
-                        "ready_dir": str(target),
-                        "file_extensions": [".mp4"],
-                    }
-                    with open(profiles_path, "w") as f:
-                        yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
+                # Isolated copy via JETLAG_PROFILES_FILE — the shared repo
+                # file is never touched, so this is parallel-safe.
+                with open(SCRIPT_DIR / "media-profiles.yaml") as f:
+                    profiles = yaml.safe_load(f)
+                profiles["profiles"]["_perf_test"] = {
+                    "source_dir": str(source),
+                    "ready_dir": str(target),
+                    "file_extensions": [".mp4"],
+                }
+                profiles_copy = workspace / "media-profiles.yaml"
+                with open(profiles_copy, "w") as f:
+                    yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
+                monkeypatch.setenv("JETLAG_PROFILES_FILE", str(profiles_copy))
 
-                    t0 = time.perf_counter()
-                    run_pipeline([
-                        "--profile", "_perf_test",
-                        "--source", str(source),
-                        "--timezone", "+0900",
-                        "--tasks", "fix-timestamp",
-                        "--apply",
-                    ])
-                    times.append(time.perf_counter() - t0)
-        finally:
-            profiles_path.write_text(original_yaml)
+                t0 = time.perf_counter()
+                run_pipeline([
+                    "--profile", "_perf_test",
+                    "--source", str(source),
+                    "--timezone", "+0900",
+                    "--tasks", "fix-timestamp",
+                    "--apply",
+                ])
+                times.append(time.perf_counter() - t0)
 
         self._check("media_pipeline", statistics.median(times), request)

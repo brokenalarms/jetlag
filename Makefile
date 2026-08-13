@@ -46,29 +46,30 @@ generate:
 	cd $(MACOS_DIR) && xcodegen generate
 
 # Fresh checkouts and worktrees have no venv; bootstrap one so test runs are
-# self-contained instead of depending on whichever pytest PATH offers.
+# self-contained instead of depending on whichever pytest PATH offers. The
+# stamp re-installs deps whenever a requirements file changes.
 PYTEST := scripts/.venv/bin/pytest
+VENV_STAMP := scripts/.venv/.deps-stamp
 
-$(PYTEST):
+$(VENV_STAMP): scripts/requirements.txt scripts/tests/requirements.txt
 	python3 -m venv scripts/.venv
-	scripts/.venv/bin/pip install --quiet -r scripts/requirements.txt
+	scripts/.venv/bin/pip install --quiet -r scripts/requirements.txt -r scripts/tests/requirements.txt
+	touch $(VENV_STAMP)
 
-## Run script tests (any platform)
-test-scripts: $(PYTEST)
-	$(PYTEST) scripts/tests/ -x --ignore=scripts/tests/test_performance.py
+## Run script tests (any platform); tests are profile-isolated so they parallelize
+test-scripts: $(VENV_STAMP)
+	$(PYTEST) scripts/tests/ -x -n auto --ignore=scripts/tests/test_performance.py
 
 ## Run Swift unit tests (macOS only, requires Xcode)
+# No xcpretty pipe: when xcpretty is missing the old `| xcpretty || xcodebuild`
+# fallback silently ran the entire suite twice.
 test-macos: generate
 	xcodebuild \
 		-scheme $(SCHEME) \
 		-configuration Debug \
 		-derivedDataPath $(DERIVED_DIR) \
 		-project $(MACOS_DIR)/$(APP_NAME).xcodeproj \
-		test | xcpretty 2>/dev/null || xcodebuild \
-		-scheme $(SCHEME) \
-		-configuration Debug \
-		-derivedDataPath $(DERIVED_DIR) \
-		-project $(MACOS_DIR)/$(APP_NAME).xcodeproj \
+		-quiet \
 		test
 
 ## Run all tests available on this platform
@@ -87,11 +88,7 @@ build: generate
 		-configuration Debug \
 		-derivedDataPath $(DERIVED_DIR) \
 		-project $(MACOS_DIR)/$(APP_NAME).xcodeproj \
-		build | xcpretty 2>/dev/null || xcodebuild \
-		-scheme $(SCHEME) \
-		-configuration Debug \
-		-derivedDataPath $(DERIVED_DIR) \
-		-project $(MACOS_DIR)/$(APP_NAME).xcodeproj \
+		-quiet \
 		build
 
 ## Create a Release archive
