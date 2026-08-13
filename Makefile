@@ -37,7 +37,7 @@ DMG_STAGING     := $(BUILD_DIR)/dmg-staging
 DMG_PATH        := $(BUILD_DIR)/$(APP_NAME).dmg
 EXPORT_PLIST    := $(MACOS_DIR)/ExportOptions.plist
 
-.PHONY: all generate test test-scripts test-macos build archive export dmg clean
+.PHONY: all generate test test-scripts test-macos ralph-verify build archive export dmg clean
 
 all: dmg
 
@@ -45,9 +45,17 @@ all: dmg
 generate:
 	cd $(MACOS_DIR) && xcodegen generate
 
+# Fresh checkouts and worktrees have no venv; bootstrap one so test runs are
+# self-contained instead of depending on whichever pytest PATH offers.
+PYTEST := scripts/.venv/bin/pytest
+
+$(PYTEST):
+	python3 -m venv scripts/.venv
+	scripts/.venv/bin/pip install --quiet -r scripts/requirements.txt
+
 ## Run script tests (any platform)
-test-scripts:
-	pytest scripts/tests/ -x --ignore=scripts/tests/test_performance.py
+test-scripts: $(PYTEST)
+	$(PYTEST) scripts/tests/ -x --ignore=scripts/tests/test_performance.py
 
 ## Run Swift unit tests (macOS only, requires Xcode)
 test-macos: generate
@@ -68,6 +76,9 @@ test: test-scripts
 ifeq ($(shell uname),Darwin)
 test: test-macos
 endif
+
+## Test-based verification for the ralph loop (per-task baseline = the full suite)
+ralph-verify: test
 
 ## Build Debug app into build/derived (quick iteration)
 build: generate
