@@ -624,8 +624,14 @@ def main():
             print(f"   {d}", file=sys.stderr)
         print(file=sys.stderr)
 
-        try:
-            response = input("Delete them? This will allow exiftool to run. (y/n) ")
+        # Prompt only on a real terminal. input() must never run otherwise: under
+        # Xcode's Python it opens /dev/tty regardless of where stdin points, and a
+        # non-interactive runner (tests, the app, a supervisor) reading the terminal
+        # from a background process group is stopped by SIGTTIN — the whole run
+        # freezes instead of failing.
+        if sys.stdin.isatty() and sys.stderr.isatty():
+            print("Delete them? This will allow exiftool to run. (y/n) ", end="", file=sys.stderr, flush=True)
+            response = sys.stdin.readline().strip()
             if response.lower() == "y":
                 for d in tmp_dirs:
                     shutil.rmtree(d)
@@ -633,8 +639,9 @@ def main():
             else:
                 print("ERROR: Cannot proceed - exiftool will fail with these directories present", file=sys.stderr)
                 sys.exit(1)
-        except EOFError:
-            print("ERROR: Cannot proceed - exiftool will fail with these directories present", file=sys.stderr)
+        else:
+            print("ERROR: Cannot proceed - exiftool will fail with these directories present.", file=sys.stderr)
+            print("Delete the directories listed above, or re-run from a terminal to be prompted.", file=sys.stderr)
             sys.exit(1)
 
     # Set up working directory
