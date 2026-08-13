@@ -1,7 +1,0 @@
-{
-  "database": "dolt",
-  "backend": "dolt",
-  "dolt_mode": "embedded",
-  "dolt_database": "jetlag",
-  "project_id": "55c46e0d-5e68-47e5-9964-5068f5d3a1b7"
-}
