@@ -106,13 +106,22 @@ def _handle_existing_target(file_path, target_file, target_path, abs_target,
     elif apply:
         print(f"\u26a0\ufe0f  File exists: {base}", file=sys.stderr)
         print(f"   Source: {src_size} bytes, Dest: {dst_size} bytes", file=sys.stderr)
-        try:
-            sys.stderr.write("   (o)verwrite / (s)kip? ")
-            sys.stderr.flush()
-            with open('/dev/tty') as tty:
-                choice = tty.readline().strip()
-            action = "overwrite" if choice.lower().startswith('o') else "skip"
-        except (OSError, EOFError):
+        # Prompt only when a real terminal is attached. Reading /dev/tty from a
+        # background process group does not raise \u2014 the kernel SIGTTIN-stops the
+        # entire group, freezing any non-interactive runner (tests, the app, a
+        # supervisor) until its timeout. The OSError/EOFError fallback cannot
+        # catch that, so the tty read must be gated on an actual terminal.
+        if sys.stderr.isatty():
+            try:
+                sys.stderr.write("   (o)verwrite / (s)kip? ")
+                sys.stderr.flush()
+                with open('/dev/tty') as tty:
+                    choice = tty.readline().strip()
+                action = "overwrite" if choice.lower().startswith('o') else "skip"
+            except (OSError, EOFError):
+                action = "skip"
+        else:
+            print("   No terminal attached \u2014 skipping (use --overwrite to replace)", file=sys.stderr)
             action = "skip"
     else:
         action = "skip"

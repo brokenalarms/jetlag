@@ -496,6 +496,44 @@ class TestOverwriteMode:
         assert result.returncode == 0
         assert "@@action=skipped" in result.stdout
 
+    def test_different_size_without_terminal_skips_not_hangs(self, temp_dir):
+        """Existing file with a DIFFERENT size, no --overwrite, no terminal:
+        must skip immediately, never prompt.
+
+        The old code opened /dev/tty to ask (o)verwrite/(s)kip. From a background
+        process group that read does not raise — the kernel SIGTTIN-stops the
+        whole group, which froze every non-interactive runner (the test suite
+        under the ralph loop, the app) until an external timeout. The OSError
+        fallback can only catch missing-tty contexts, not background ones.
+        """
+        source = os.path.join(temp_dir, "source", "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+
+        subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--copy", "--apply"
+        ], capture_output=True, check=True)
+
+        # Grow the target so sizes differ — the prompt path, not the same-size skip
+        dest = next(Path(target_dir).rglob("test.mp4"))
+        with open(dest, "ab") as f:
+            f.write(b"x" * 100)
+        dest_size = os.path.getsize(dest)
+
+        result = subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--copy", "--apply"
+        ], capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=60)
+
+        assert result.returncode == 0
+        assert "@@action=skipped" in result.stdout
+        assert os.path.getsize(dest) == dest_size, "existing target must be untouched"
+
     def test_overwrite_replaces_existing(self, temp_dir):
         """--overwrite replaces existing file instead of skipping."""
         source = os.path.join(temp_dir, "source", "test.mp4")
