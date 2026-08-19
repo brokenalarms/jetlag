@@ -38,8 +38,8 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
     # The provenance tag rides along here rather than in a read of its own: an extra
     # exiftool round-trip per file costs more than every field in this list.
     fields = [
-        "DateTimeOriginal", "CreateDate", "ModifyDate", "CreationDate",
-        "QuickTime:MediaCreateDate", "QuickTime:MediaModifyDate",
+        "DateTimeOriginal", "OffsetTimeOriginal", "CreateDate", "ModifyDate",
+        "CreationDate", "QuickTime:MediaCreateDate", "QuickTime:MediaModifyDate",
         "QuickTime:TrackCreateDate", "Keys:CreationDate", PROVENANCE_TAG
     ]
 
@@ -55,6 +55,7 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
             else:
                 data[key] = value
 
+        _complete_datetime_original(data)
         _exif_cache[file_path] = data
         return data
     except FileNotFoundError as e:
@@ -64,6 +65,24 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
         print(f"❌ EXIF read failed for {os.path.basename(file_path)}: {e}",
               file=__import__('sys').stderr)
         return {}
+
+
+def _complete_datetime_original(data: Dict[str, str]) -> None:
+    """Attach OffsetTimeOriginal to a bare DateTimeOriginal, in place.
+
+    Binary EXIF DateTimeOriginal is exactly 19 characters, so a still camera has
+    nowhere to put a zone except OffsetTimeOriginal — which is always and only the
+    zone of those digits. Joining them here means every reader of the cached dict
+    sees one zoned value and ranks it as a zoned source, with no special case of
+    its own.
+    """
+    datetime_original = data.get("DateTimeOriginal", "")
+    if not datetime_original or re.search(r'[+-]\d{2}:?\d{2}$', datetime_original):
+        return
+
+    offset = ensure_colon_tz((data.get("OffsetTimeOriginal") or "").strip())
+    if re.fullmatch(r'[+-]\d{2}:\d{2}', offset):
+        data["DateTimeOriginal"] = f"{datetime_original}{offset}"
 
 
 def clear_exif_cache(file_path: str = None):

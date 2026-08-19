@@ -14,7 +14,7 @@ from pathlib import Path
 import subprocess
 import pytest
 
-from conftest import create_test_video
+from conftest import create_test_photo, create_test_video
 
 # Add parent directory to path to import the script
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -300,6 +300,24 @@ class TestGetAllTimestampData:
         data = fmt.get_all_timestamp_data(video)
 
         assert data["timestamp_source"] == "DateTimeOriginal with timezone"
+        assert data["datetime_original"] is not None
+        assert data["datetime_original"].hour == 7
+        assert data["datetime_original"].minute == 25
+        assert data["datetime_original"].utcoffset() == timedelta(hours=8)
+
+    def test_datetimeoriginal_completed_by_offset_time_original(self):
+        """A still whose zone lives in OffsetTimeOriginal reaches the correction pipeline
+        as a fully zoned Priority 1 source, needing no declared --timezone."""
+        photo = os.path.join(self.temp_dir, "IMG_0007.jpg")
+        create_test_photo(photo,
+                          DateTimeOriginal="2025:06:18 07:25:21",
+                          OffsetTimeOriginal="+08:00")
+        fmt._exif_cache.clear()
+
+        data = fmt.get_all_timestamp_data(photo)
+
+        assert data["timestamp_source"] == "DateTimeOriginal with timezone"
+        assert data["timezone_source"] == "DateTimeOriginal metadata"
         assert data["datetime_original"] is not None
         assert data["datetime_original"].hour == 7
         assert data["datetime_original"].minute == 25

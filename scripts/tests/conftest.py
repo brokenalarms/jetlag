@@ -46,6 +46,32 @@ def create_test_video(path, **exif_tags):
         exiftool.write_tags(str(path), tag_args)
 
 
+_template_photo: Path | None = None
+
+
+def _ensure_template_photo() -> Path:
+    """A real JPEG. The MP4 template has no ExifIFD group, so binary-EXIF stills
+    tags such as OffsetTimeOriginal cannot round-trip through it at all."""
+    global _template_photo
+    if _template_photo is None:
+        d = tempfile.mkdtemp(prefix="pytest_photo_template_")
+        _template_photo = Path(d) / "template.jpg"
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=64x48:d=0.04",
+            "-frames:v", "1", str(_template_photo)
+        ], capture_output=True, check=True)
+        atexit.register(lambda: shutil.rmtree(d, ignore_errors=True))
+    return _template_photo
+
+
+def create_test_photo(path, **exif_tags):
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(_ensure_template_photo(), str(path))
+    if exif_tags:
+        tag_args = [f"-{field}={value}" for field, value in exif_tags.items()]
+        exiftool.write_tags(str(path), tag_args)
+
+
 # Map of required tool -> install commands by platform.
 # exiftool is vendored at scripts/tools/ — no install needed.
 REQUIRED_TOOLS = {

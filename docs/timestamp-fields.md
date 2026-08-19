@@ -23,7 +23,7 @@ per-field facts live here.
 |---|---|---|---|---|---|---|
 | `Keys:CreationDate` | `com.apple.quicktime.creationdate` (Keys metadata) | text | self-describing: `Z` = digits are UTC; `±HH:MM` = digits are local in that zone; bare = naive | iPhone writes zoned local; trustworthy when zoned. FCP keys off this field | yes | yes — zoned local |
 | `DateTimeOriginal` | `XMP-exif` on video (where a bare exiftool write lands); UserData/`IDIT` natively; binary EXIF on stills | text | XMP is ISO-8601, zone may ride in the value; **binary EXIF is exactly 19 chars — no zone possible** (see `OffsetTimeOriginal`) | camera-written: local + camera's zone setting; jetlag-written: local + declared zone | yes | yes |
-| `OffsetTimeOriginal` | binary EXIF (stills), added in EXIF 2.31 | text `±HH:MM` | **always and only the zone** of `DateTimeOriginal`'s digits — never an instruction to shift time | cameras that set it are stating their zone setting | **not yet** (gap — see TODO) | not yet |
+| `OffsetTimeOriginal` | binary EXIF (stills), added in EXIF 2.31 | text `±HH:MM` | **always and only the zone** of `DateTimeOriginal`'s digits — never an instruction to shift time | cameras that set it are stating their zone setting | yes — completes a bare `DateTimeOriginal` into a zoned value at read time | not yet (see policy below) |
 | `QuickTime:CreateDate`, `ModifyDate` | `mvhd` movie header atom | integer, seconds since 1904 | UTC by specification | devices vary; ecosystem docs (exiftool, PhotoPrism #1388) report local-time writers. Not observed on our devices — X4 writes true UTC. **Proof required per file** (below) | yes | yes — UTC, computed in Python, written raw |
 | `QuickTime:MediaCreateDate`, `MediaModifyDate` | `mdhd` per-track atom | integer, seconds since 1904 | UTC by specification | as above | yes | claimed to reach only the header — **verify** (spec item 3) |
 | `TrackCreateDate`, `TrackModifyDate` | `tkhd` per-track atom | integer, seconds since 1904 | UTC by specification | untouched by jetlag to date — this is why damaged files are recoverable | no | no (spec item 3 adds) |
@@ -67,10 +67,10 @@ The filename side of the subtraction is always local wall clock — the check wo
 |---|---|---|
 | 1 | `Keys:CreationDate` ending `Z` | yes — an instant can't be labelled without one |
 | 2 | QuickTime date proven an instant | yes — same |
-| 3 | `DateTimeOriginal` with zone | no (self-contained); declared zone converts it, gated by `--force-timezone` |
+| 3 | `DateTimeOriginal` with zone — inline, **or** completed by `OffsetTimeOriginal` | no (self-contained); declared zone converts it, gated by `--force-timezone` |
 | 4 | `Keys:CreationDate` with zone | no — same |
 | 5 | filename digits (camera patterns) | yes — digits are naive |
-| 6 | `DateTimeOriginal` bare; bare `Keys:CreationDate` belongs here too (currently ignored entirely — see TODO) | yes |
+| 6 | `DateTimeOriginal` bare **and** no `OffsetTimeOriginal`; bare `Keys:CreationDate` belongs here too (currently ignored entirely — see TODO) | yes |
 | 7 | QuickTime date, unproven | yes |
 | 8 | file birth / mtime | yes |
 
@@ -91,6 +91,37 @@ consume: corrections rewrite **all** clock fields, so FCP reads a corrected
   digits and swaps the zone suffix.
 - `--time-offset` is the only operation that moves the actual time, and it is a delta:
   running it twice shifts twice, by design.
+
+### `OffsetTimeOriginal` completes a bare `DateTimeOriginal` on read
+
+A still's `DateTimeOriginal` can never carry an inline zone — binary EXIF gives it
+exactly 19 characters — so `OffsetTimeOriginal` is the only zone it can have. On read,
+a bare `DateTimeOriginal` plus a legal `±HH:MM` `OffsetTimeOriginal` are joined into
+one zoned value, which lifts the file from row 6 to row 3. A bare `DateTimeOriginal`
+with no `OffsetTimeOriginal`, or with an unparseable one, stays at row 6.
+
+### Writing a zoned `DateTimeOriginal` to a still silently drops the zone
+
+Verified against the vendored exiftool 13.50, not assumed. Writing
+`-DateTimeOriginal="2024:03:15 08:30:00+09:00"` to a JPEG stores only the bare digits:
+exiftool does **not** split the zone out into `OffsetTimeOriginal`, does not create
+that tag, and prints no warning — it reports success and discards what will not fit
+the 19-byte field.
+
+```
+$ exiftool -overwrite_original -DateTimeOriginal="2024:03:15 08:30:00+09:00" still.jpg
+    1 image files updated
+$ exiftool -s -G -time:all -OffsetTimeOriginal still.jpg
+[EXIF]          DateTimeOriginal                : 2024:03:15 08:30:00
+```
+
+(`OffsetTimeOriginal` absent — the tag is never touched. Writing it explicitly does
+round-trip: `-OffsetTimeOriginal="+09:00"` reads back intact.)
+
+Consequence: corrections currently lose a still's zone, because they write
+`DateTimeOriginal` alone. Closing that requires writing `OffsetTimeOriginal` as its own
+tag alongside `DateTimeOriginal` whenever the target is a still — write-path work, kept
+separate from the read-side completion above.
 
 ### Caveat: metadata previously written with a wrong declared zone
 

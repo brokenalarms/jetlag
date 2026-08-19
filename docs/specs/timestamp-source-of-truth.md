@@ -47,7 +47,9 @@ Container defaults differ. QuickTime dates are seconds since 1904 UTC, so a miss
 offset means UTC. QuickTime carries `DateTimeOriginal` natively in the `IDIT` and
 UserData `date` atoms, but a bare `-DateTimeOriginal=` write lands in `XMP-exif`, whose
 ISO-8601 values carry an offset. In EXIF proper, on stills, `DateTimeOriginal` has no
-offset at all, which is why EXIF 2.31 added `OffsetTimeOriginal`.
+offset at all, which is why EXIF 2.31 added `OffsetTimeOriginal`. A bare
+`DateTimeOriginal` accompanied by that tag is read as one zoned value, so it ranks as
+explicit rather than naive.
 
 Devices vary in what they write and in whether they honour the QuickTime specification —
 some write local time into fields defined as UTC. The hierarchy exists because of that
@@ -205,6 +207,10 @@ Each of these is separable, and none is needed for a correction to be right:
 
 - `fix-media-timestamp.py` — clock writes still reach only the movie header, not
   the track atoms, which is what leaves imported files disagreeing with themselves.
+- `fix-media-timestamp.py` — a correction to a still loses its zone. `DateTimeOriginal`
+  is written alone, and exiftool silently drops the zone from a value bound for binary
+  EXIF rather than splitting it out (verified; see `timestamp-fields.md`). Stills need
+  `OffsetTimeOriginal` written as its own tag alongside `DateTimeOriginal`.
 - `media-pipeline.py` — the provided-versus-embedded mismatch still blocks, against the
   intent recorded in `time-correction-pipeline-step.md`, where it is informational and
   dry-run plus explicit apply is the safety gate.
