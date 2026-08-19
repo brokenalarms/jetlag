@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>logFormatVersion</key>
+	<integer>12</integer>
+	<key>logs</key>
+	<dict>
+		<key>BFA911D5-1094-48EE-9649-BE56CDCAC874</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>BFA911D5-1094-48EE-9649-BE56CDCAC874.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>W</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>0</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>1</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>Jetlag project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>Jetlag</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Testing project Jetlag with scheme Jetlag</string>
+			<key>timeStartedRecording</key>
+			<real>808845401.27570796</real>
+			<key>timeStoppedRecording</key>
+			<real>808845404.06952095</real>
+			<key>title</key>
+			<string>Testing project Jetlag with scheme Jetlag</string>
+			<key>uniqueIdentifier</key>
+			<string>BFA911D5-1094-48EE-9649-BE56CDCAC874</string>
+		</dict>
+		<key>C7DCF5FD-618D-4B2F-B8EF-BC4069133B4D</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>C7DCF5FD-618D-4B2F-B8EF-BC4069133B4D.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>W</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>0</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>1</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>Jetlag project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>Jetlag</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Testing project Jetlag with scheme Jetlag</string>
+			<key>timeStartedRecording</key>
+			<real>808845354.20374</real>
+			<key>timeStoppedRecording</key>
+			<real>808845358.48333597</real>
+			<key>title</key>
+			<string>Testing project Jetlag with scheme Jetlag</string>
+			<key>uniqueIdentifier</key>
+			<string>C7DCF5FD-618D-4B2F-B8EF-BC4069133B4D</string>
+		</dict>
+		<key>D748656A-53AC-44D7-8846-5939F6A9DD43</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>D748656A-53AC-44D7-8846-5939F6A9DD43.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>W</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>0</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>3</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>Jetlag project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>Jetlag</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Testing project Jetlag with scheme Jetlag</string>
+			<key>timeStartedRecording</key>
+			<real>808845124.16283703</real>
+			<key>timeStoppedRecording</key>
+			<real>808845143.13709795</real>
+			<key>title</key>
+			<string>Testing project Jetlag with scheme Jetlag</string>
+			<key>uniqueIdentifier</key>
+			<string>D748656A-53AC-44D7-8846-5939F6A9DD43</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

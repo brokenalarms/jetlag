@@ -1,0 +1,66 @@
+{
+  "buildCommand" : {
+    "command" : "build",
+    "skipDependencies" : false,
+    "style" : "buildAndRun"
+  },
+  "configuredTargets" : [
+    {
+      "guid" : "5a47c33f68c737e37e3241e4d0162177788e10031a651f1946755026a1318673"
+    },
+    {
+      "guid" : "5a47c33f68c737e37e3241e4d0162177262d11e95c47b2870091de06e64e0b09"
+    }
+  ],
+  "containerPath" : "/Users/daniel/Developer/jetlag/.ralph/worktrees/ralph-20260819-01/macos/Jetlag.xcodeproj",
+  "continueBuildingAfterErrors" : false,
+  "dependencyScope" : "workspace",
+  "enableIndexBuildArena" : false,
+  "hideShellScriptEnvironment" : false,
+  "parameters" : {
+    "action" : "build",
+    "activeArchitecture" : "arm64",
+    "activeRunDestination" : {
+      "disableOnlyActiveArch" : false,
+      "hostTargetedPlatform" : null,
+      "platform" : "macosx",
+      "sdk" : "macosx26.5",
+      "sdkVariant" : "macos",
+      "supportedArchitectures" : [
+        "arm64e",
+        "arm64",
+        "x86_64"
+      ],
+      "targetArchitecture" : "arm64"
+    },
+    "arenaInfo" : {
+      "buildIntermediatesPath" : "/Users/daniel/Developer/jetlag/.ralph/worktrees/ralph-20260819-01/build/derived/Build/Intermediates.noindex",
+      "buildProductsPath" : "/Users/daniel/Developer/jetlag/.ralph/worktrees/ralph-20260819-01/build/derived/Build/Products",
+      "derivedDataPath" : "/Users/daniel/Developer/jetlag/.ralph/worktrees/ralph-20260819-01/build/derived",
+      "indexDataStoreFolderPath" : "/Users/daniel/Developer/jetlag/.ralph/worktrees/ralph-20260819-01/build/derived/Index.noindex/DataStore",
+      "indexEnableDataStore" : true,
+      "indexPCHPath" : "/Users/daniel/Developer/jetlag/.ralph/worktrees/ralph-20260819-01/build/derived/Index.noindex/PrecompiledHeaders",
+      "pchPath" : "/Users/daniel/Developer/jetlag/.ralph/worktrees/ralph-20260819-01/build/derived/Build/Intermediates.noindex/PrecompiledHeaders"
+    },
+    "configurationName" : "Debug",
+    "overrides" : {
+      "commandLine" : {
+        "table" : {
+
+        }
+      },
+      "synthesized" : {
+        "table" : {
+          "ENABLE_PREVIEWS" : "NO",
+          "ENABLE_XOJIT_PREVIEWS" : "YES"
+        }
+      }
+    }
+  },
+  "schemeCommand" : "test",
+  "showNonLoggedProgress" : true,
+  "useDryRun" : false,
+  "useImplicitDependencies" : true,
+  "useLegacyBuildLocations" : false,
+  "useParallelTargets" : true
+}

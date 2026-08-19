@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>colors</key>
+	<array>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/daniel/Developer/jetlag/.ralph/worktrees/ralph-20260819-01/macos/Sources/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameAccentColor</string>
+			<key>relativePath</key>
+			<string>./AccentColor.colorset</string>
+			<key>swiftSymbol</key>
+			<string>accent</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/daniel/Developer/jetlag/.ralph/worktrees/ralph-20260819-01/macos/Sources/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameNeonCyan</string>
+			<key>relativePath</key>
+			<string>./NeonCyan.colorset</string>
+			<key>swiftSymbol</key>
+			<string>neonCyan</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/daniel/Developer/jetlag/.ralph/worktrees/ralph-20260819-01/macos/Sources/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameNeonPink</string>
+			<key>relativePath</key>
+			<string>./NeonPink.colorset</string>
+			<key>swiftSymbol</key>
+			<string>neonPink</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/daniel/Developer/jetlag/.ralph/worktrees/ralph-20260819-01/macos/Sources/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameNeonPurple</string>
+			<key>relativePath</key>
+			<string>./NeonPurple.colorset</string>
+			<key>swiftSymbol</key>
+			<string>neonPurple</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/daniel/Developer/jetlag/.ralph/worktrees/ralph-20260819-01/macos/Sources/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameNeonYellow</string>
+			<key>relativePath</key>
+			<string>./NeonYellow.colorset</string>
+			<key>swiftSymbol</key>
+			<string>neonYellow</string>
+		</dict>
+	</array>
+	<key>images</key>
+	<array/>
+	<key>symbols</key>
+	<array/>
+</dict>
+</plist>
