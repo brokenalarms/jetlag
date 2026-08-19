@@ -410,6 +410,66 @@ class TestFixMediaTimestampMachineOutput:
         at_lines = self._parse_at_lines(result.stdout)
         assert at_lines.get("timestamp_source") == "filename", f"Actual: @@timestamp_source={at_lines.get('timestamp_source')}, Expected: filename"
 
+    def test_camera_zone_offset_present_when_quicktime_wins(self, temp_dir):
+        """@@camera_zone_offset is emitted when a declared --timezone lets the
+        QuickTime date win the ranking — camera was on Japan time in New Zealand.
+
+        Actual: stdout contains @@camera_zone_offset=+09:00 alongside the winning
+        MediaCreateDate source.
+        Expected: the camera's own zone offset surfaces independently of --timezone.
+        """
+        video = os.path.join(temp_dir, "VID_20260104_033532_00_001.mp4")
+        create_test_video(video, **{"QuickTime:MediaCreateDate": "2026:01:03 18:35:32"})
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            "--timezone", "+13:00"
+        ], capture_output=True, text=True)
+
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("timestamp_source") == "mediacreatedate"
+        assert at_lines.get("camera_zone_offset") == "+09:00", f"Actual: @@camera_zone_offset={at_lines.get('camera_zone_offset')}, Expected: +09:00"
+
+    def test_camera_zone_offset_present_when_a_different_source_wins(self, temp_dir):
+        """@@camera_zone_offset is emitted even when neither the filename nor the
+        QuickTime date wins the ranking — a zoned DateTimeOriginal outranks both, but
+        emission does not depend on which source wins.
+
+        Actual: stdout contains @@camera_zone_offset=+09:00 alongside the winning
+        DateTimeOriginal source.
+        Expected: the field is independent of ranking outcome.
+        """
+        video = os.path.join(temp_dir, "VID_20260104_033532_00_001.mp4")
+        create_test_video(video, DateTimeOriginal="2025:06:18 07:25:21+08:00",
+                           **{"QuickTime:MediaCreateDate": "2026:01:03 18:35:32"})
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            "--timezone", "+13:00"
+        ], capture_output=True, text=True)
+
+        at_lines = self._parse_at_lines(result.stdout)
+        assert at_lines.get("timestamp_source") == "datetimeoriginal", f"Actual: @@timestamp_source={at_lines.get('timestamp_source')}, Expected: datetimeoriginal"
+        assert at_lines.get("camera_zone_offset") == "+09:00", f"Actual: @@camera_zone_offset={at_lines.get('camera_zone_offset')}, Expected: +09:00"
+
+    def test_camera_zone_offset_absent_without_quicktime_date(self, temp_dir):
+        """@@camera_zone_offset is absent when there's no QuickTime date to compare
+        against the filename.
+
+        Actual: @@camera_zone_offset key is missing from stdout.
+        Expected: the field is only emitted when both sources coexist.
+        """
+        video = os.path.join(temp_dir, "VID_20250618_072521.mp4")
+        create_test_video(video)
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            "--timezone", "+0800"
+        ], capture_output=True, text=True)
+
+        at_lines = self._parse_at_lines(result.stdout)
+        assert "camera_zone_offset" not in at_lines, f"Actual: @@camera_zone_offset={at_lines.get('camera_zone_offset')}, Expected: absent"
+
     def test_stdout_only_has_at_lines(self, temp_dir):
         """Stdout contains only @@key=value lines, no human-readable text
 

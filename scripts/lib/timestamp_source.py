@@ -331,6 +331,43 @@ def _is_legal_zone_offset(delta: timedelta) -> bool:
     return delta.total_seconds() % 900 == 0
 
 
+def _format_zone_offset(delta: timedelta) -> str:
+    """Format a timedelta as a signed +HH:MM zone offset string."""
+    total_minutes = int(delta.total_seconds() // 60)
+    sign = "+" if total_minutes >= 0 else "-"
+    total_minutes = abs(total_minutes)
+    return f"{sign}{total_minutes // 60:02d}:{total_minutes % 60:02d}"
+
+
+def camera_zone_offset(
+    quicktime_timestamp: Optional[str], filename_timestamp: Optional[str]
+) -> Optional[str]:
+    """The camera's own zone setting at shoot time, when discoverable.
+
+    QuickTime dates are UTC by specification; the filename is the camera's own local
+    reading. When their difference is a legal zone offset, that difference IS the zone
+    the camera's clock was set to — independent of whether the QuickTime date ends up
+    winning get_best_timestamp()'s priority race. Returns None when either timestamp is
+    missing or the delta isn't a legal zone offset.
+    """
+    if not (quicktime_timestamp and filename_timestamp):
+        return None
+    try:
+        quicktime = datetime.strptime(quicktime_timestamp, "%Y:%m:%d %H:%M:%S")
+        local = datetime.strptime(filename_timestamp, "%Y:%m:%d %H:%M:%S")
+    except ValueError:
+        return None
+
+    delta = local - quicktime
+    if delta == timedelta(0):
+        # Identical values cannot separate a camera at UTC+0 from one writing local
+        # time into a field defined as UTC.
+        return None
+    if not _is_legal_zone_offset(delta):
+        return None
+    return _format_zone_offset(delta)
+
+
 def _quicktime_is_instant(quicktime_timestamp: str, filename_timestamp: Optional[str]) -> bool:
     """Whether a QuickTime date and a filename describe one instant in some zone.
 
@@ -338,20 +375,31 @@ def _quicktime_is_instant(quicktime_timestamp: str, filename_timestamp: Optional
     camera clock can simply be wrong. The filename is the camera's own local reading, so
     a legal zone offset between the two is what shows the QuickTime date to be an instant.
     """
-    if not (quicktime_timestamp and filename_timestamp):
-        return False
-    try:
-        quicktime = datetime.strptime(quicktime_timestamp, "%Y:%m:%d %H:%M:%S")
-        local = datetime.strptime(filename_timestamp, "%Y:%m:%d %H:%M:%S")
-    except ValueError:
-        return False
+    return camera_zone_offset(quicktime_timestamp, filename_timestamp) is not None
 
-    delta = local - quicktime
-    if delta == timedelta(0):
-        # Identical values cannot separate a camera at UTC+0 from one writing local
-        # time into a field defined as UTC.
-        return False
-    return _is_legal_zone_offset(delta)
+
+def _media_create_date_timestamp(exif_data: Dict[str, str]) -> str:
+    """Normalize QuickTime:MediaCreateDate to 'YYYY:MM:DD HH:MM:SS', or '' if unusable."""
+    media_create_date = exif_data.get("MediaCreateDate", "")
+    if not (media_create_date and re.search(r'[0-9]', media_create_date)):
+        return ""
+    candidate = re.sub(
+        r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1',
+        media_create_date)
+    return candidate if is_valid_timestamp(candidate) else ""
+
+
+def camera_zone_offset_for_file(file_path: str) -> Optional[str]:
+    """The camera's own zone offset for a file, independent of --timezone or priority.
+
+    Reads the raw QuickTime MediaCreateDate and filename timestamp directly, so it is
+    available whenever both sources coexist and their delta is a legal zone offset —
+    regardless of whether the QuickTime date wins get_best_timestamp()'s priority race.
+    """
+    exif_data = read_exif_data(file_path)
+    media_timestamp = _media_create_date_timestamp(exif_data)
+    filename_timestamp, _ = parse_filename_timestamp(file_path)
+    return camera_zone_offset(media_timestamp, filename_timestamp)
 
 
 def get_best_timestamp(
@@ -387,14 +435,7 @@ def get_best_timestamp(
         if re.match(r'[0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}', timestamp):
             return timestamp, "CreationDate with Z (UTC)"
 
-    media_create_date = exif_data.get("MediaCreateDate", "")
-    media_timestamp = ""
-    if media_create_date and re.search(r'[0-9]', media_create_date):
-        candidate = re.sub(
-            r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1',
-            media_create_date)
-        if is_valid_timestamp(candidate):
-            media_timestamp = candidate
+    media_timestamp = _media_create_date_timestamp(exif_data)
 
     ts, _ = parse_filename_timestamp(file_path)
 
