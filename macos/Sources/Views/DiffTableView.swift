@@ -233,9 +233,17 @@ struct DiffTableView: View {
         let text = changeBadgeText(row)
         switch row.timestampAction {
         case "would_fix":
-            Text(text)
-                .font(.system(size: 11))
-                .foregroundStyle(Color("NeonCyan").opacity(0.7))
+            HStack(spacing: 4) {
+                if row.requiresForceTimezone {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.orange)
+                        .help(Strings.DiffTable.requiresForceTimezoneHelp)
+                }
+                Text(text)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color("NeonCyan").opacity(0.7))
+            }
         case "fixed":
             Text(text)
                 .font(.system(size: 11))

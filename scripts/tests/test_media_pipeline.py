@@ -898,6 +898,7 @@ class TestPipelineMachineOutput:
                 current["timestamp_source"] = event.get("source")
                 current["timezone"] = event.get("timezone")
                 current["correction_mode"] = event.get("correction_mode")
+                current["requires_force_timezone"] = event.get("requires_force_timezone")
                 current["time_offset_seconds"] = event.get("time_offset_seconds")
                 current["time_offset_display"] = event.get("time_offset_display")
                 if event.get("error"):
@@ -1099,12 +1100,13 @@ class TestPipelineMachineOutput:
                 if event["event"] not in ("stage_complete",):
                     assert "file" in event, f"Event {event['event']} should include file field"
 
-    def test_tz_mismatch_stops_with_conflict_event(self, temp_workspace, test_profile):
-        """Timezone mismatch stops the pipeline and emits timezone_conflict event.
+    def test_tz_mismatch_informational_in_dry_run(self, temp_workspace, test_profile):
+        """A dry run previews a timezone-mismatched file instead of aborting.
 
-        When a file's DateTimeOriginal has a timezone that differs from --timezone,
-        the pipeline should stop before processing and emit a timezone_conflict event.
-        The user must re-run with --force-timezone to proceed.
+        The user asks "what would happen?" — the answer is the full preview,
+        with the conflict reported as data: an informational timezone_conflict
+        event plus a per-file requires_force_timezone flag the app can flag in
+        its diff table. Exit status stays 0 so the preview is usable.
         """
         source = temp_workspace["source"]
         video = source / "test.mp4"
@@ -1122,7 +1124,8 @@ class TestPipelineMachineOutput:
             "--tasks", "fix-timestamp",
         ])
 
-        assert result.returncode != 0, "Pipeline should exit non-zero on timezone conflict"
+        assert result.returncode == 0, \
+            f"Dry run should continue past a timezone conflict, got {result.returncode}"
 
         events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
         conflict_events = [e for e in events if e.get("event") == "timezone_conflict"]
@@ -1131,6 +1134,46 @@ class TestPipelineMachineOutput:
         assert conflict["conflict_type"] == "provided_mismatch"
         assert conflict["provided_tz"] == "+0200"
         assert "+0900" in conflict["file_timezones"]
+
+        files = self._parse_events(result.stdout)
+        assert len(files) == 1, f"Dry run should still preview the file, got: {files}"
+        f = files[0]
+        assert f.get("timestamp_action") == "would_fix", \
+            f"Expected a would_fix preview, got: {f.get('timestamp_action')}"
+        assert f.get("requires_force_timezone") is True, \
+            f"Preview row should be flagged as needing --force-timezone, got: {f}"
+
+    def test_tz_mismatch_blocks_apply_without_force(self, temp_workspace, test_profile):
+        """Applying a timezone-mismatched batch without --force-timezone is refused.
+
+        The dry run is informational, but relabelling a file whose camera already
+        recorded a zone is destructive — it needs explicit confirmation.
+        """
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        _create_video_raw(
+            video,
+            MediaCreateDate="2025:10:05 01:00:00",
+            CreateDate="2025:10:05 01:00:00",
+            DateTimeOriginal="2025:10:05 01:00:00+09:00",
+        )
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0200",
+            "--tasks", "fix-timestamp",
+            "--apply",
+        ])
+
+        assert result.returncode != 0, "Apply should exit non-zero on timezone conflict"
+
+        events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
+        conflict_events = [e for e in events if e.get("event") == "timezone_conflict"]
+        assert len(conflict_events) == 1, f"Expected 1 timezone_conflict event, got {len(conflict_events)}"
+        assert conflict_events[0]["conflict_type"] == "provided_mismatch"
+        assert not [e for e in events if e.get("event") == "timestamp_result"], \
+            "Apply should refuse before touching any file"
 
     def test_tz_mismatch_proceeds_with_force_timezone(self, temp_workspace, test_profile):
         """With --force-timezone, timezone mismatch is confirmed and the run proceeds.

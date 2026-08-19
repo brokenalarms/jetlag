@@ -88,12 +88,7 @@ struct WorkflowView: View {
             isPresented: $state.workflowSession.showTimezoneConflict
         ) {
             Button(Strings.Workflow.forceTimezoneButton, role: .destructive) {
-                if state.workflowSession.timezoneConflictType == "mixed_timezones" {
-                    state.workflowSession.allowMixedTimezones = true
-                } else {
-                    state.workflowSession.forceTimezone = true
-                }
-                state.workflowSession.showTimezoneConflict = false
+                state.workflowSession.grantTimezoneAssent()
                 runWorkflow()
             }
             Button(Strings.Common.cancel, role: .cancel) {
@@ -560,7 +555,10 @@ struct WorkflowView: View {
             .pickerStyle(.segmented)
             .fixedSize()
 
-            Button(state.isRunning ? Strings.Workflow.runningButton : Strings.Workflow.runButton) { runWorkflow() }
+            Button(state.isRunning ? Strings.Workflow.runningButton : Strings.Workflow.runButton) {
+                state.workflowSession.clearTimezoneAssent()
+                runWorkflow()
+            }
                 .disabled(state.isRunning || !session.allStepsReady)
                 .keyboardShortcut(.return, modifiers: .command)
                 .buttonStyle(.borderedProminent)
