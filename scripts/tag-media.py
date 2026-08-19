@@ -15,6 +15,7 @@ import argparse
 
 from lib.metadata import metadata_service as exiftool
 from lib.results import emit_result
+from lib.timestamp_source import clear_exif_cache, read_exif_data
 
 
 @dataclass
@@ -70,11 +71,14 @@ def apply_finder_tags(file_path: str, tags: List[str], dry_run: bool = False) ->
         return False, []
 
 def get_existing_exif_camera(file_path: str) -> dict:
-    """Get existing Make and Model from EXIF data"""
-    try:
-        return exiftool.read_tags(file_path, ["Make", "Model"])
-    except Exception:
-        return {}
+    """Get existing Make and Model from EXIF data
+
+    Reads through the shared per-file EXIF cache (lib.timestamp_source) instead of
+    spawning its own exiftool subprocess, so a file already read by the
+    fix-timestamp step (or vice versa) doesn't pay a second round-trip.
+    """
+    data = read_exif_data(file_path)
+    return {key: data[key] for key in ("Make", "Model") if key in data}
 
 def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Optional[str] = None, dry_run: bool = False) -> Tuple[bool, List[str]]:
     """Add camera info to EXIF Make and Model fields
@@ -112,6 +116,7 @@ def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Option
 
         if not dry_run:
             exiftool.write_tags(file_path, tag_args)
+            clear_exif_cache(file_path)
         return True, fields_to_update
     except Exception as e:
         print(f"Warning: Failed to add camera info to {file_path}: {e}", file=sys.stderr)

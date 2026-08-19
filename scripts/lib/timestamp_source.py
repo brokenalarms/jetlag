@@ -35,12 +35,14 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
     if file_path in _exif_cache:
         return _exif_cache[file_path]
 
-    # The provenance tag rides along here rather than in a read of its own: an extra
-    # exiftool round-trip per file costs more than every field in this list.
+    # The provenance tag and camera Make/Model ride along here rather than in reads
+    # of their own: an extra exiftool round-trip per file costs more than every
+    # field in this list.
     fields = [
         "DateTimeOriginal", "OffsetTimeOriginal", "CreateDate", "ModifyDate",
         "CreationDate", "QuickTime:MediaCreateDate", "QuickTime:MediaModifyDate",
-        "QuickTime:TrackCreateDate", "Keys:CreationDate", PROVENANCE_TAG
+        "QuickTime:TrackCreateDate", "Keys:CreationDate", PROVENANCE_TAG,
+        "Make", "Model",
     ]
 
     try:
