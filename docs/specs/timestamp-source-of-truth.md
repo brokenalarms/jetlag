@@ -132,10 +132,20 @@ must be written too.
 
 ### Provenance
 
-Before the first write, a file's original clock fields and filename are recorded once in
-a jetlag XMP namespace. That record is never overwritten and never read back as a
-timestamp source — corrections always derive from the camera's own fields and the
-filename. It exists so a future defect is recoverable outside the app, nothing more.
+Before the first write, a file's original clock fields and filename are recorded once as
+compact JSON in `XMP-xmpDM:LogComment`. That record is never overwritten and never read
+back as a timestamp source — corrections always derive from the camera's own fields and
+the filename. It exists so a future defect is recoverable outside the app, nothing more.
+
+The record costs no exiftool call of its own: the tag is read with the fields the
+correction already reads, and written in the same call the correction writes. A read or
+write per file of its own runs the pipeline measurably slower, which the performance
+snapshot rejects.
+
+A namespace of jetlag's own would be tidier, but exiftool only writes tags it has a
+definition for, so it would mean shipping an `-config` file and threading it through both
+the Python wrapper and the Swift `jetlag-metadata` backend. `LogComment` is a free-form
+string no camera writes and no correction reads, which is the whole requirement.
 
 ### `--timezone`
 
@@ -195,8 +205,6 @@ Each of these is separable, and none is needed for a correction to be right:
 
 - `fix-media-timestamp.py` — clock writes still reach only the movie header, not
   the track atoms, which is what leaves imported files disagreeing with themselves.
-- Provenance — the write-once record of a file's original clock fields and filename does
-  not exist.
 - `media-pipeline.py` — the provided-versus-embedded mismatch still blocks, against the
   intent recorded in `time-correction-pipeline-step.md`, where it is informational and
   dry-run plus explicit apply is the safety gate.
@@ -231,6 +239,10 @@ Fixtures for this need a real QuickTime date written explicitly: the template th
 `create_test_video()` copies carries `0000:00:00`, which is why no test before these
 could express a conflict between metadata and filename.
 
+`TestProvenanceRecord` in `tests/test_fix_media_timestamp_units.py` covers the record:
+written on the first correction, byte-identical after a later forced relabel, absent
+after a dry run, and omitting the fields a file never carried.
+
 Not yet covered, and worth adding alongside the work above:
 
 - An offset-bearing `DateTimeOriginal` converts into the declared zone rather than being
@@ -242,7 +254,6 @@ Not yet covered, and worth adding alongside the work above:
   source in the ranking. The one existing idempotence test, `test_fix_media_timestamp.py`,
   runs a file that already carries a zoned `DateTimeOriginal` with no declared timezone,
   so it exercises only the pass-through path.
-- The provenance record is written on first touch and unchanged by later corrections.
 
 ## Out of scope
 

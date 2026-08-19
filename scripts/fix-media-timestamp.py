@@ -6,6 +6,7 @@ Ensures file system timestamps match EXIF data for both photos and videos
 """
 
 import argparse
+import json
 import os
 import re
 import signal
@@ -26,6 +27,8 @@ from lib.results import emit_result
 from lib.timestamp_source import (
     read_exif_data,
     _exif_cache,
+    PROVENANCE_TAG,
+    PROVENANCE_KEY,
     is_valid_timestamp,
     parse_datetime_original,
     ensure_colon_tz,
@@ -189,6 +192,52 @@ def write_exif_fields(file_path: str, field_args: list) -> bool:
     except Exception as e:
         print(f"Error writing EXIF fields: {e}", file=sys.stderr)
         return False
+
+
+PROVENANCE_VERSION = 1
+PROVENANCE_SOURCE_TAGS = [
+    "DateTimeOriginal",
+    "CreateDate",
+    "MediaCreateDate",
+    "TrackCreateDate",
+    "CreationDate",
+]
+
+
+def read_provenance_record(file_path: str) -> str:
+    """Return the raw provenance record stored in the file, or "" if there is none."""
+    try:
+        return exiftool.read_tags(file_path, [PROVENANCE_TAG]).get(PROVENANCE_KEY, "")
+    except Exception as e:
+        print(f"Error reading provenance record: {e}", file=sys.stderr)
+        return ""
+
+
+def provenance_field_args(file_path: str, exif: Dict[str, str]) -> list:
+    """Field args recording a file's clock fields and filename, or [] if already recorded.
+
+    Written for recovery outside the app and never read back as a timestamp source:
+    corrections always derive from the camera's own fields and the filename. A file
+    that already carries a record is left untouched, so the record keeps describing
+    the state before the first correction rather than the previous one's output.
+
+    Built from the fields already read for the correction and returned as args rather
+    than written here, so recording costs neither an extra read nor an extra write.
+    """
+    if exif.get(PROVENANCE_KEY):
+        return []
+
+    record = {
+        "version": PROVENANCE_VERSION,
+        "filename": os.path.basename(file_path),
+    }
+    for tag in PROVENANCE_SOURCE_TAGS:
+        value = exif.get(tag, "")
+        if value:
+            record[tag] = value
+
+    payload = json.dumps(record, separators=(",", ":"))
+    return [f"-{PROVENANCE_TAG}={payload}"]
 
 
 def write_datetime_original(file_path: str, datetime_with_tz: str) -> bool:
@@ -877,6 +926,10 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
     # Apply changes
     success = True
 
+    # Capture what the file held before jetlag touches it, in the same write as the
+    # correction below.
+    provenance_args = provenance_field_args(file_path, current_data["exif"])
+
     # Write DateTimeOriginal if:
     # 1. It's missing and we have timezone info, OR
     # 2. infer_from_filename is set (filename is the source of truth, DTO may be wrong/missing)
@@ -893,26 +946,31 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
         print("   ⚠️  Overwriting existing DateTimeOriginal timezone (--force-timezone flag)", file=sys.stderr)
 
     # Build all EXIF writes and apply in one exiftool call
-    field_args = []
+    correction_args = []
     if should_write_datetime_original:
-        field_args.append(f"-DateTimeOriginal={current_data['datetime_original_str']}")
+        correction_args.append(f"-DateTimeOriginal={current_data['datetime_original_str']}")
     if changes.get("keys_creationdate"):
         keys_value = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
         keys_value = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', keys_value)
-        field_args.append(f"-Keys:CreationDate={keys_value}")
+        correction_args.append(f"-Keys:CreationDate={keys_value}")
     if changes.get("quicktime_createdate"):
         utc_time = datetime_original.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
-        field_args.append(f"-QuickTime:CreateDate={utc_time}")
-        field_args.append(f"-QuickTime:MediaCreateDate={utc_time}")
+        correction_args.append(f"-QuickTime:CreateDate={utc_time}")
+        correction_args.append(f"-QuickTime:MediaCreateDate={utc_time}")
+    field_args = provenance_args + correction_args
     if field_args:
         if not write_exif_fields(file_path, field_args):
+            if provenance_args:
+                print("   ⚠️  Failed to record original timestamps for recovery", file=sys.stderr)
             if should_write_datetime_original:
                 print("   ❌ Failed to write DateTimeOriginal", file=sys.stderr)
             if changes.get("keys_creationdate"):
                 print("   ❌ Failed to write Keys:CreationDate", file=sys.stderr)
             if changes.get("quicktime_createdate"):
                 print("   ❌ Failed to heal QuickTime CreateDate", file=sys.stderr)
-            success = False
+            # A lost recovery record does not invalidate the correction.
+            if correction_args:
+                success = False
 
     # Update file system timestamps if needed
     if changes["file_timestamps"]:

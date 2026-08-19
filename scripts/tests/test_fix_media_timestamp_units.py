@@ -4,6 +4,7 @@ Unit tests for fix-media-timestamp.py
 Tests individual functions without relying on output strings
 """
 
+import json
 import os
 import sys
 import tempfile
@@ -848,6 +849,72 @@ class TestTimestampFixResult:
         # timezone is populated from metadata detection (may be None if not detected)
         # just verify it doesn't crash and is Optional[str]
         assert result.timezone is None or isinstance(result.timezone, str)
+
+
+
+
+class TestProvenanceRecord:
+    """A file's pre-correction clock fields are recorded once, before jetlag first writes."""
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.video = os.path.join(self.temp_dir, "VID_20250618_072521.mp4")
+        create_test_video(
+            self.video,
+            DateTimeOriginal="2025:06:18 07:25:21",
+            **{"QuickTime:CreateDate": "2025:06:17 23:25:21",
+               "QuickTime:MediaCreateDate": "2025:06:17 23:25:21"},
+        )
+
+    def teardown_method(self):
+        fmt.clear_exif_cache()
+        shutil.rmtree(self.temp_dir)
+
+    def test_provenance_written_on_first_correction(self):
+        """Correcting a file records what its clock fields and filename held beforehand,
+        so a bad correction is recoverable from the file itself."""
+        result = fmt.fix_media_timestamps(self.video, timezone_spec="+08:00")
+        assert result.timestamp_action == "fixed"
+
+        record = json.loads(fmt.read_provenance_record(self.video))
+        assert record["filename"] == "VID_20250618_072521.mp4"
+        assert record["DateTimeOriginal"] == "2025:06:18 07:25:21"
+        assert record["CreateDate"] == "2025:06:17 23:25:21"
+        assert record["MediaCreateDate"] == "2025:06:17 23:25:21"
+
+    def test_provenance_unchanged_by_later_corrections(self):
+        """Re-correcting an already-tagged file leaves the record byte-identical, so it
+        keeps describing the state before jetlag's first write, not the previous run's."""
+        fmt.fix_media_timestamps(self.video, timezone_spec="+08:00")
+        first = fmt.read_provenance_record(self.video)
+        assert first
+
+        fmt.clear_exif_cache()
+        second_run = fmt.fix_media_timestamps(
+            self.video, timezone_spec="+09:00", force_timezone=True
+        )
+        assert second_run.timestamp_action == "fixed"
+
+        assert fmt.read_provenance_record(self.video) == first
+
+    def test_dry_run_writes_no_provenance(self):
+        """A dry run previews without touching the file, the provenance tag included."""
+        result = fmt.fix_media_timestamps(self.video, dry_run=True, timezone_spec="+08:00")
+        assert result.timestamp_action == "would_fix"
+        assert fmt.read_provenance_record(self.video) == ""
+
+    def test_provenance_omits_fields_the_file_never_had(self):
+        """A file carrying none of the recorded clock fields still corrects, and its
+        record simply omits what was never there."""
+        bare = os.path.join(self.temp_dir, "VID_20250618_072521_bare.mp4")
+        create_test_video(bare)
+
+        result = fmt.fix_media_timestamps(bare, timezone_spec="+08:00")
+        assert result.timestamp_action == "fixed"
+
+        record = json.loads(fmt.read_provenance_record(bare))
+        assert record["filename"] == "VID_20250618_072521_bare.mp4"
+        assert "DateTimeOriginal" not in record
 
 
 if __name__ == "__main__":
