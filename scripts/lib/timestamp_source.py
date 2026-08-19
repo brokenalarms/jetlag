@@ -26,15 +26,21 @@ from lib.metadata import metadata_service as exiftool
 
 _exif_cache: Dict[str, Dict[str, str]] = {}
 
+PROVENANCE_TAG = "XMP-xmpDM:LogComment"
+PROVENANCE_KEY = PROVENANCE_TAG.split(":")[-1]
+
 
 def read_exif_data(file_path: str) -> Dict[str, str]:
     """Read all relevant EXIF timestamp fields with single exiftool call (cached)."""
     if file_path in _exif_cache:
         return _exif_cache[file_path]
 
+    # The provenance tag rides along here rather than in a read of its own: an extra
+    # exiftool round-trip per file costs more than every field in this list.
     fields = [
         "DateTimeOriginal", "CreateDate", "ModifyDate", "CreationDate",
-        "QuickTime:MediaCreateDate", "QuickTime:MediaModifyDate", "Keys:CreationDate"
+        "QuickTime:MediaCreateDate", "QuickTime:MediaModifyDate",
+        "QuickTime:TrackCreateDate", "Keys:CreationDate", PROVENANCE_TAG
     ]
 
     try:
