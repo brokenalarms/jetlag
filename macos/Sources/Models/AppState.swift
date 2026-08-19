@@ -252,25 +252,40 @@ final class WorkflowSession {
         }
     }
 
-    init(profile: MediaProfile? = nil, profileName: String = "") {
+    /// Whether a Gyroflow install was found on this machine. Without one the
+    /// step could only ever skip files, so it is not offered at all.
+    var gyroflowAvailable: Bool {
+        didSet {
+            if !gyroflowAvailable {
+                enabledSteps.remove(.gyroflow)
+            }
+        }
+    }
+
+    init(profile: MediaProfile? = nil, profileName: String = "", gyroflowAvailable: Bool = false) {
         self.profileName = profileName
         self.workingProfile = profile ?? MediaProfile()
         self.sourceDir = Dirtyable(profile?.sourceDir ?? "")
         self.readyDir = Dirtyable(profile?.readyDir ?? "")
         self.tags = Dirtyable(profile?.tags)
         self.timezone = Dirtyable("")
-        let availableSteps = Self.computeAvailableSteps(profile: profile)
+        self.gyroflowAvailable = gyroflowAvailable
+        let availableSteps = Self.computeAvailableSteps(
+            profile: profile, gyroflowAvailable: gyroflowAvailable
+        )
         self.enabledSteps = Set(availableSteps.filter { $0 != .archiveSource })
     }
 
     var availableSteps: [PipelineStep] {
-        Self.computeAvailableSteps(profile: workingProfile)
+        Self.computeAvailableSteps(profile: workingProfile, gyroflowAvailable: gyroflowAvailable)
     }
 
-    private static func computeAvailableSteps(profile: MediaProfile?) -> [PipelineStep] {
+    private static func computeAvailableSteps(
+        profile: MediaProfile?, gyroflowAvailable: Bool
+    ) -> [PipelineStep] {
         guard let profile else { return [] }
         var steps: [PipelineStep] = [.ingest, .tag, .fixTimestamps]
-        if profile.gyroflowEnabled == true {
+        if gyroflowAvailable && profile.gyroflowEnabled == true {
             steps.append(.gyroflow)
         }
         steps.append(contentsOf: [.organize, .archiveSource])
@@ -421,6 +436,14 @@ final class AppState {
 
     var workflowSession = WorkflowSession()
 
+    /// Presence of the optional Gyroflow install, refreshed on launch and after
+    /// an install. Every gyroflow feature in the app is gated on this.
+    var gyroflowStatus: GyroflowStatus = .notInstalled {
+        didSet { workflowSession.gyroflowAvailable = gyroflowStatus.isInstalled }
+    }
+    var isInstallingGyroflow: Bool = false
+    var gyroflowInstallProgress: String?
+
     var showInspector: Bool = false
     var showLogOutput: Bool = false
 
@@ -550,6 +573,39 @@ final class AppState {
         case .pipelineError(let message):
             logOutput.append(LogLine(text: "ERROR: \(message)", stream: .stderr))
         }
+    }
+
+    /// Ask download-gyroflow.sh where Gyroflow is, without downloading anything.
+    func refreshGyroflowStatus() async {
+        gyroflowStatus = await runGyroflowScript(args: ["--check"])
+    }
+
+    /// Download and install Gyroflow.app into Application Support.
+    func installGyroflow() async {
+        isInstallingGyroflow = true
+        gyroflowInstallProgress = nil
+        gyroflowStatus = await runGyroflowScript(args: [])
+        isInstallingGyroflow = false
+        gyroflowInstallProgress = nil
+    }
+
+    private func runGyroflowScript(args: [String]) async -> GyroflowStatus {
+        let (process, stream) = ScriptRunner.run(
+            script: "tools/download-gyroflow.sh",
+            args: args,
+            workingDir: scriptsDirectory
+        )
+        var presenceData: [String] = []
+        for await line in stream {
+            switch line.stream {
+            case .stdout:
+                presenceData.append(line.text)
+            case .stderr:
+                gyroflowInstallProgress = line.strippedText
+            }
+        }
+        process.waitUntilExit()
+        return GyroflowStatus.parse(presenceData.joined(separator: "\n"))
     }
 
     func cancelRunning() {

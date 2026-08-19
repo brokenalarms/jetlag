@@ -43,6 +43,45 @@ struct SettingsView: View {
                 #endif
             }
 
+            Section(Strings.Settings.gyroflowSection) {
+                if state.gyroflowStatus.isInstalled {
+                    Label(Strings.Settings.gyroflowInstalled, systemImage: "checkmark.circle")
+                        .foregroundStyle(.green)
+                    LabeledContent(Strings.Settings.gyroflowSourceLabel) {
+                        Text(state.gyroflowStatus.displayName)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                } else {
+                    Label(Strings.Settings.gyroflowMissing, systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+
+                    HStack(spacing: 8) {
+                        Button(state.isInstallingGyroflow
+                               ? Strings.Settings.gyroflowInstallingButton
+                               : Strings.Settings.gyroflowInstallButton) {
+                            Task { await state.installGyroflow() }
+                        }
+                        .disabled(state.isInstallingGyroflow)
+
+                        if state.isInstallingGyroflow {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(state.gyroflowInstallProgress ?? "")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        } else {
+                            Text(Strings.Settings.gyroflowDownloadNote)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
             Section(Strings.Settings.scriptsSection) {
                 LabeledContent(Strings.Settings.scriptsDirLabel) {
                     Text(state.scriptsDirectory)
@@ -82,6 +121,7 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 500)
         .padding()
+        .task { await state.refreshGyroflowStatus() }
     }
 
     private func loadProfiles() {

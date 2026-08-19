@@ -55,7 +55,8 @@ struct WorkflowView: View {
             if !name.isEmpty {
                 state.workflowSession = WorkflowSession(
                     profile: state.profilesConfig?.profiles[name],
-                    profileName: name
+                    profileName: name,
+                    gyroflowAvailable: state.gyroflowStatus.isInstalled
                 )
             }
         }
@@ -155,7 +156,8 @@ struct WorkflowView: View {
                         state.clearLog()
                         state.workflowSession = WorkflowSession(
                             profile: state.profilesConfig?.profiles[newValue],
-                            profileName: newValue
+                            profileName: newValue,
+                            gyroflowAvailable: state.gyroflowStatus.isInstalled
                         )
                     }
             }

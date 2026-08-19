@@ -43,6 +43,7 @@ struct ProfilesView: View {
             if editor != nil {
                 ProfileEditorView(
                     session: sessionBinding,
+                    gyroflowAvailable: state.gyroflowStatus.isInstalled,
                     onSave: { saveCurrentProfile() },
                     onCancel: {
                         if isDirty {
@@ -248,7 +249,9 @@ struct ProfilesView: View {
         state.profilesConfig?.profiles.removeValue(forKey: name)
         writeProfiles()
         if state.workflowSession.profileName == name {
-            state.workflowSession = WorkflowSession()
+            state.workflowSession = WorkflowSession(
+                gyroflowAvailable: state.gyroflowStatus.isInstalled
+            )
         }
         selectedProfile = nil
         editor = nil
@@ -288,6 +291,9 @@ struct ProfilesView: View {
 
 struct ProfileEditorView: View {
     @Binding var session: ProfileEditingSession
+    /// Gyroflow is optional and not bundled with Jetlag; without an install
+    /// the stabilization settings would have nothing to drive.
+    let gyroflowAvailable: Bool
     let onSave: () -> Void
     let onCancel: () -> Void
 
@@ -382,7 +388,7 @@ struct ProfileEditorView: View {
                     )
                 }
 
-                if session.profile.type != .photo {
+                if session.profile.type != .photo && gyroflowAvailable {
                     Divider().gridCellUnsizedAxes(.horizontal)
 
                     GridRow {

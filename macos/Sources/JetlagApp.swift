@@ -15,6 +15,7 @@ struct JetlagApp: App {
                 .frame(minWidth: 600, minHeight: 800)
 //                .frame(width: 600)
                 .onAppear { loadProfiles() }
+                .task { await state.refreshGyroflowStatus() }
         }
 //        .defaultSize(width: 600, height: 800)
 //        .windowResizability(.contentSize)

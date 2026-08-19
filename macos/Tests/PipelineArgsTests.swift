@@ -28,7 +28,9 @@ final class PipelineArgsTests: XCTestCase {
             gyroflowEnabled: true,
             fileExtensions: [".mp4"]
         )
-        let session = WorkflowSession(profile: profile, profileName: "test-profile")
+        let session = WorkflowSession(
+            profile: profile, profileName: "test-profile", gyroflowAvailable: true
+        )
         session.enabledSteps = Set(session.availableSteps)
         return session
     }
@@ -41,7 +43,9 @@ final class PipelineArgsTests: XCTestCase {
             gyroflowEnabled: true,
             fileExtensions: [".mp4"]
         )
-        let session = WorkflowSession(profile: profile, profileName: "test-profile")
+        let session = WorkflowSession(
+            profile: profile, profileName: "test-profile", gyroflowAvailable: true
+        )
         let (script, args) = session.buildPipelineArgs()
 
         XCTAssertEqual(script, "media-pipeline.sh")

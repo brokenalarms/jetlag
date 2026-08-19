@@ -175,6 +175,8 @@ What happens to source files after processing:
             defaultValue: "Sidecar files generated alongside the main video — e.g. .thm (thumbnail), .lrv (low-res proxy), .srt (subtitle/telemetry). Imported together with the main file unless skipped.")
         static let gyroflowHelp = String(localized: "profiles.gyroflow.help",
             defaultValue: "Generate Gyroflow stabilization project files during pipeline processing. Requires the camera to record gyroscope data (e.g. GoPro, Insta360).")
+        static let gyroflowUnavailable = String(localized: "profiles.gyroflow.unavailable",
+            defaultValue: "Install Gyroflow in Settings to enable stabilization.")
         static let fileExtensionsHelp = String(localized: "profiles.fileExtensions.help",
             defaultValue: "File types this profile processes (e.g. .mp4, .mov, .insv)")
         static let tagsHelp = String(localized: "profiles.tags.help",
@@ -219,6 +221,19 @@ What happens to source files after processing:
         static let activatingButton = String(localized: "settings.activating.button", defaultValue: "Activating…")
         static let buyProButton = String(localized: "settings.buyPro.button", defaultValue: "Buy Jetlag Pro")
         static let debugUnlockToggle = String(localized: "settings.debugUnlock.toggle", defaultValue: "Unlock Pro (debug builds only)")
+
+        static let gyroflowSection = String(localized: "settings.gyroflow.section", defaultValue: "Stabilization (Gyroflow)")
+        static let gyroflowInstalled = String(localized: "settings.gyroflow.installed", defaultValue: "Gyroflow installed")
+        static let gyroflowMissing = String(localized: "settings.gyroflow.missing",
+            defaultValue: "Gyroflow is not installed — stabilization options are hidden")
+        static let gyroflowInstallButton = String(localized: "settings.gyroflow.install.button", defaultValue: "Install Gyroflow")
+        static let gyroflowInstallingButton = String(localized: "settings.gyroflow.installing.button", defaultValue: "Installing…")
+        static let gyroflowDownloadNote = String(localized: "settings.gyroflow.downloadNote",
+            defaultValue: "Downloads Gyroflow (about 200 MB) and installs it alongside Jetlag.")
+        static let gyroflowSourceApplications = String(localized: "settings.gyroflow.source.applications", defaultValue: "/Applications")
+        static let gyroflowSourceJetlag = String(localized: "settings.gyroflow.source.jetlag", defaultValue: "installed by Jetlag")
+        static let gyroflowSourcePath = String(localized: "settings.gyroflow.source.path", defaultValue: "found on PATH")
+        static let gyroflowSourceLabel = String(localized: "settings.gyroflow.source.label", defaultValue: "Location")
 
         static func freePlan(fileLimit: Int) -> String {
             String(localized: "settings.freePlan",
