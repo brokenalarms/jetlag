@@ -199,6 +199,47 @@ class TestGetExistingExifCamera:
         assert data.get("Model") == "HERO12 Black"
 
 
+class TestExifReadSharedWithTimestampSource:
+    """get_existing_exif_camera() must share the per-file EXIF read used by the
+    fix-timestamp step (lib.timestamp_source.read_exif_data), not spawn its own
+    independent exiftool subprocess."""
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.test_video = os.path.join(self.temp_dir, "test.mp4")
+        create_test_video(self.test_video, Make="GoPro", Model="HERO12 Black")
+        tm.clear_exif_cache()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        tm.clear_exif_cache()
+
+    def test_camera_read_reuses_timestamp_source_cache(self, monkeypatch):
+        """A file already read via read_exif_data() (the fix-timestamp step's
+        per-file exiftool call) must not trigger a second exiftool subprocess
+        when get_existing_exif_camera() is asked for the same file."""
+        from lib.metadata import metadata_service
+
+        real_read_tags = metadata_service.read_tags
+        call_count = {"n": 0}
+
+        def counting_read_tags(*args, **kwargs):
+            call_count["n"] += 1
+            return real_read_tags(*args, **kwargs)
+
+        monkeypatch.setattr(metadata_service, "read_tags", counting_read_tags)
+
+        # Simulate the fix-timestamp step reading this file first.
+        tm.read_exif_data(self.test_video)
+        assert call_count["n"] == 1
+
+        data = tm.get_existing_exif_camera(self.test_video)
+
+        assert call_count["n"] == 1  # no independent subprocess for tag-media
+        assert data.get("Make") == "GoPro"
+        assert data.get("Model") == "HERO12 Black"
+
+
 class TestAddCameraToExif:
     """Test add_camera_to_exif function - focus on return values"""
 
