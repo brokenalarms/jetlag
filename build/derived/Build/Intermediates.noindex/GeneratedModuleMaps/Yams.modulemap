@@ -1,4 +1,0 @@
-module Yams {
-header "Yams-Swift.h"
-export *
-}

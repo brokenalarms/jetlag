@@ -1,4 +1,0 @@
-humanize
-PyYAML
-pytest
-pyrefly
