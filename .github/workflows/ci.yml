@@ -25,23 +25,14 @@ jobs:
           cache: pip
           cache-dependency-path: scripts/requirements.txt
 
-      - name: Cache apt packages
-        uses: actions/cache@v4
-        id: cache-apt
-        with:
-          path: ~/apt-cache
-          key: apt-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
-
       - name: Install system tools
         timeout-minutes: 5
         run: |
-          if [ -d ~/apt-cache ]; then
-            sudo cp ~/apt-cache/*.deb /var/cache/apt/archives/ 2>/dev/null || true
-          fi
-          sudo apt-get update
+          # azure.archive.ubuntu.com is flaky and apt retries it until the step
+          # times out; drop it so apt goes straight to archive.ubuntu.com
+          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15
           sudo apt-get install -y ffmpeg libimage-exiftool-perl
-          mkdir -p ~/apt-cache
-          sudo cp /var/cache/apt/archives/*.deb ~/apt-cache/ 2>/dev/null || true
 
       - name: Install Python deps
         run: pip install -r scripts/requirements.txt
