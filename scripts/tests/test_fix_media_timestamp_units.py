@@ -335,6 +335,20 @@ class TestGetAllTimestampData:
         assert data["datetime_original"].minute == 30
         assert data["datetime_original"].utcoffset() == timedelta(hours=9)
 
+    def test_bare_creationdate_without_timezone_adds_flag_timezone(self):
+        """A bare Keys:CreationDate (no zone suffix, no Z) ranks as a naive source at
+        the same tier as bare DateTimeOriginal, and uses --timezone like it does."""
+        video = self._create_video("test.mp4", ["-Keys:CreationDate#=2025:06:18 07:25:21"])
+
+        data = fmt.get_all_timestamp_data(video, timezone_spec="+08:00")
+
+        assert data["timestamp_source"] == "CreationDate"
+        assert data["datetime_original"] is not None
+        assert data["datetime_original"].hour == 7
+        assert data["datetime_original"].minute == 25
+        assert data["datetime_original"].utcoffset() == timedelta(hours=8)
+        assert "--timezone flag" in data["timezone_source"]
+
     def test_creationdate_utc_with_timezone_flag(self):
         """CreationDate with Z (UTC) needs --timezone to convert to local time"""
         video = self._create_video("test.mp4", ["-Keys:CreationDate=2025:06:17 23:25:21Z"])

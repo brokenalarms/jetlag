@@ -70,7 +70,7 @@ The filename side of the subtraction is always local wall clock — the check wo
 | 3 | `DateTimeOriginal` with zone — inline, **or** completed by `OffsetTimeOriginal` | no (self-contained); declared zone converts it, gated by `--force-timezone` |
 | 4 | `Keys:CreationDate` with zone | no — same |
 | 5 | filename digits (camera patterns) | yes — digits are naive |
-| 6 | `DateTimeOriginal` bare **and** no `OffsetTimeOriginal`; bare `Keys:CreationDate` belongs here too (currently ignored entirely — see TODO) | yes |
+| 6 | `DateTimeOriginal` bare **and** no `OffsetTimeOriginal`; bare `Keys:CreationDate` ranks here too | yes |
 | 7 | QuickTime date, unproven | yes |
 | 8 | file birth / mtime | yes |
 
