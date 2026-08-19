@@ -184,3 +184,70 @@ final class TimezoneConflictTests: XCTestCase {
         XCTAssertNil(state.workflowSession.timezoneConflictFileTimezones)
     }
 }
+
+/// A timezone is a claim about one batch of footage. These cover the guards that
+/// stop a zone declared for one import from silently labelling the next one:
+/// pointing the workflow at a different source folder wipes the declaration, and
+/// nothing carries a zone from one launch of the app to the next.
+final class TimezoneCarryOverTests: XCTestCase {
+
+    private func session() -> WorkflowSession {
+        WorkflowSession(profile: MediaProfile(), profileName: "trip")
+    }
+
+    /// Picking a new SD card or folder means a new batch, so the zone declared
+    /// for the previous one is dropped and the step blocks until it is redeclared.
+    func testChangingSourceFolderClearsTheDeclaredTimezone() {
+        let session = session()
+        session.enabledSteps.insert(.fixTimestamps)
+        session.sourceDir.value = "/tmp/import/netherlands"
+        session.timezone.value = "Europe/Amsterdam"
+        XCTAssertNil(session.validateTimezone())
+
+        session.sourceDir.value = "/tmp/import/korea"
+
+        XCTAssertTrue(session.timezone.current.isEmpty)
+        XCTAssertNil(session.timezoneOption)
+        XCTAssertNotNil(session.validateTimezone())
+        XCTAssertFalse(session.isStepReady(.fixTimestamps))
+    }
+
+    /// The zone must survive edits that leave the folder where it was, otherwise
+    /// re-picking the same card in the panel would wipe a correct declaration.
+    func testRewritingTheSameSourceFolderKeepsTheDeclaredTimezone() {
+        let session = session()
+        session.sourceDir.value = "/tmp/import/korea"
+        session.timezone.value = "Asia/Seoul"
+
+        session.sourceDir.value = "/tmp/import/korea"
+
+        XCTAssertEqual(session.timezone.current, "Asia/Seoul")
+        XCTAssertNil(session.validateTimezone())
+    }
+
+    /// Declaring a zone and running is the normal path and must still work: the
+    /// declaration reaches the pipeline as --timezone for the folder it was made for.
+    func testDeclaringAZoneForTheCurrentFolderStillReachesThePipeline() {
+        let session = session()
+        session.sourceDir.value = "/tmp/import/korea"
+        session.timezone.value = "Asia/Seoul"
+
+        let (_, args) = session.buildPipelineArgs()
+
+        guard let index = args.firstIndex(of: "--timezone") else {
+            return XCTFail("expected --timezone in \(args)")
+        }
+        XCTAssertEqual(args[index + 1], "Asia/Seoul")
+    }
+
+    /// Nothing persists the declared zone, so a later launch of the app cannot
+    /// inherit a zone the user picked for an earlier, unrelated import.
+    func testTimezoneIsNotPersistedAcrossAppStateInstances() {
+        let first = AppState()
+        first.workflowSession.timezone.value = "Europe/Amsterdam"
+
+        let second = AppState()
+
+        XCTAssertTrue(second.workflowSession.timezone.current.isEmpty)
+    }
+}

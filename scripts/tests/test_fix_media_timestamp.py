@@ -155,6 +155,30 @@ class TestFixMediaTimestamp:
         assert result.returncode == 1
         assert "--timezone is required" in result.stderr
 
+    def test_apply_without_timezone_writes_nothing_to_a_naive_file(self, test_video_no_timezone):
+        """A batch run with no --timezone must leave naive files completely alone,
+        rather than stamping them with whatever zone was last in play"""
+        def time_tags():
+            dump = subprocess.run([
+                "exiftool", "-s", "-time:all", "-XMP-exif:DateTimeOriginal",
+                test_video_no_timezone
+            ], capture_output=True, text=True, check=True)
+            return dump.stdout
+
+        before = time_tags()
+        before_mtime = os.stat(test_video_no_timezone).st_mtime
+        assert "+" not in before.split("DateTimeOriginal")[1].split("\n")[0]
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            test_video_no_timezone, "--apply"
+        ], capture_output=True, text=True)
+
+        assert time_tags() == before
+        assert os.stat(test_video_no_timezone).st_mtime == before_mtime
+        assert result.returncode == 1
+        assert "--timezone is required" in result.stderr
+
     def test_output_formatting(self, test_video):
         """Test that output follows data/presentation separation"""
         result = subprocess.run([

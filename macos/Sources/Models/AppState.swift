@@ -227,7 +227,15 @@ final class WorkflowSession {
     var profileName: String
     var workingProfile: MediaProfile
 
-    var sourceDir: Dirtyable<String>
+    /// A new source folder is a new batch of footage, so any zone declared for
+    /// the previous one is dropped: the declaration has to be made against the
+    /// files it will label, never inherited from an earlier, unrelated import.
+    var sourceDir: Dirtyable<String> {
+        didSet {
+            guard sourceDir.current != oldValue.current else { return }
+            timezone = Dirtyable("")
+        }
+    }
     var readyDir: Dirtyable<String>
     var tags: Dirtyable<[String]?>
     var timezone: Dirtyable<String>
