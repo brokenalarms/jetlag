@@ -187,6 +187,97 @@ class TestFixMediaTimestamp:
         assert "2025:06:17 23:25:21" in exif_result.stdout
 
 
+_IDEMPOTENCE_FIELDS = [
+    "-DateTimeOriginal", "-Keys:CreationDate",
+    "-QuickTime:CreateDate", "-QuickTime:MediaCreateDate",
+]
+
+# One case per source in the 6-tier ranking that --timezone can relabel. Each
+# tuple is (filename, exif tags written to the pristine fixture, CLI args
+# beyond the file path). --time-offset is excluded by design: it is a delta,
+# so applying it twice is expected to shift the instant twice, not converge.
+_RANKING_CASES = [
+    pytest.param(
+        "clip.mp4", {"DateTimeOriginal": "2025:06:18 07:25:21+08:00"},
+        ["--timezone", "+09:00", "--force-timezone", "--apply"],
+        id="datetimeoriginal-with-timezone",
+    ),
+    pytest.param(
+        "clip.mp4", {"Keys:CreationDate": "2025:06:18 07:25:21+08:00"},
+        ["--timezone", "+09:00", "--force-timezone", "--apply"],
+        id="creationdate-with-timezone",
+    ),
+    pytest.param(
+        "clip.mp4", {"Keys:CreationDate": "2025:06:18 07:25:21Z"},
+        ["--timezone", "+08:00", "--apply"],
+        id="creationdate-with-z-utc",
+    ),
+    pytest.param(
+        "VID_20260104_033532_00_001.mp4", {"QuickTime:MediaCreateDate": "2026:01:03 18:35:32"},
+        ["--timezone", "+13:00", "--apply"],
+        id="mediacreatedate-instant",
+    ),
+    pytest.param(
+        "VID_20250618_072521_00_001.mp4", {},
+        ["--timezone", "+08:00", "--apply"],
+        id="filename",
+    ),
+    pytest.param(
+        "clip.mp4", {"DateTimeOriginal": "2025:06:18 07:25:21"},
+        ["--timezone", "+08:00", "--apply"],
+        id="datetimeoriginal-naive",
+    ),
+    pytest.param(
+        "clip2.mp4", {"QuickTime:MediaCreateDate": "2025:06:18 07:25:21"},
+        ["--timezone", "+08:00", "--apply"],
+        id="mediacreatedate-no-crosscheck",
+    ),
+]
+
+
+class TestIdempotenceAcrossRanking:
+    """Reprocessing a corrected file must yield what processing a pristine copy
+    yields, for each source in the ranking that a declared --timezone relabels.
+    """
+
+    @pytest.fixture
+    def temp_dir(self):
+        tmpdir = tempfile.mkdtemp()
+        yield tmpdir
+        shutil.rmtree(tmpdir)
+
+    def _read_fields(self, path):
+        result = subprocess.run(
+            ["exiftool", "-s"] + _IDEMPOTENCE_FIELDS + [path],
+            capture_output=True, text=True, check=True,
+        )
+        return result.stdout
+
+    @pytest.mark.parametrize("filename, exif_tags, apply_args", _RANKING_CASES)
+    def test_reprocessing_matches_pristine_copy(self, temp_dir, filename, exif_tags, apply_args):
+        pristine = os.path.join(temp_dir, filename)
+        create_test_video(pristine, **exif_tags)
+
+        reprocessed = os.path.join(temp_dir, f"reprocessed_{filename}")
+        processed_once = os.path.join(temp_dir, f"once_{filename}")
+        shutil.copy2(pristine, reprocessed)
+        shutil.copy2(pristine, processed_once)
+
+        cmd = [sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py")]
+
+        first = subprocess.run(cmd + [reprocessed] + apply_args, capture_output=True, text=True)
+        assert first.returncode == 0, first.stderr
+
+        second = subprocess.run(cmd + [reprocessed] + apply_args, capture_output=True, text=True)
+        assert second.returncode == 0, second.stderr
+        assert "No change" in second.stderr, second.stderr
+
+        once = subprocess.run(cmd + [processed_once] + apply_args, capture_output=True, text=True)
+        assert once.returncode == 0, once.stderr
+
+        assert self._read_fields(reprocessed) == self._read_fields(processed_once)
+
+
 class TestFixMediaTimestampIntegration:
     """Integration tests for fix-media-timestamp.py with various file types"""
 
