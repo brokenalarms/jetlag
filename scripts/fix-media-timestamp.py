@@ -277,6 +277,24 @@ def write_keys_creationdate(file_path: str, datetime_original: datetime) -> bool
         print(f"Error writing Keys:CreationDate: {e}", file=sys.stderr)
         return False
 
+QUICKTIME_CLOCK_TAGS = ["CreateDate", "MediaCreateDate", "TrackCreateDate"]
+
+# The subset that only ever comes from a QuickTime container. Bare `CreateDate` is
+# also an EXIF stills tag holding local time, so a file's QuickTime-ness and the
+# staleness of its clock are judged on these two alone.
+QUICKTIME_TRACK_CLOCK_TAGS = ["MediaCreateDate", "TrackCreateDate"]
+
+
+def quicktime_createdate_args(utc_time: str) -> list:
+    """Write args setting every QuickTime clock atom to the same UTC instant.
+
+    CreateDate reaches the movie header (mvhd), MediaCreateDate the per-track mdhd
+    atoms and TrackCreateDate the per-track tkhd atoms. All three are written so a
+    correction is what any application reads, whichever atom it happens to consult.
+    """
+    return [f"-QuickTime:{tag}={utc_time}" for tag in QUICKTIME_CLOCK_TAGS]
+
+
 def write_quicktime_createdate(file_path: str, datetime_original: datetime) -> bool:
     """Write QuickTime CreateDate as UTC
 
@@ -296,10 +314,7 @@ def write_quicktime_createdate(file_path: str, datetime_original: datetime) -> b
         utc_dt = datetime_original.astimezone(timezone.utc)
         utc_time = utc_dt.strftime("%Y:%m:%d %H:%M:%S")
 
-        result = exiftool.write_tags(file_path, [
-            f"-QuickTime:CreateDate={utc_time}",
-            f"-QuickTime:MediaCreateDate={utc_time}",
-        ])
+        result = exiftool.write_tags(file_path, quicktime_createdate_args(utc_time))
         if file_path in _exif_cache:
             del _exif_cache[file_path]
         return result
@@ -474,23 +489,28 @@ def check_keys_creationdate_needs_update(file_path: str, datetime_original: date
 def check_quicktime_createdate_needs_update(file_path: str, datetime_original: datetime) -> bool:
     """Check if QuickTime CreateDate needs updating to match correct UTC"""
     exif_data = read_exif_data(file_path)
-    # Check MediaCreateDate as that's what we're actually writing
-    current_create_date = exif_data.get("MediaCreateDate", "")
+    present = [exif_data.get(tag, "") for tag in QUICKTIME_TRACK_CLOCK_TAGS if exif_data.get(tag, "")]
 
-    if not current_create_date:
+    if not present:
         return False  # Not a QuickTime file, skip this check
 
-    # Expected UTC from the datetime_original
     expected_utc = datetime_original.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
 
-    # Check if they match (allow 1 second tolerance for rounding)
+    # A stale value in any single atom is enough: the write sets them all, so
+    # leaving one behind is what left pre-correction times readable in the tracks.
+    return any(_createdate_is_stale(value, expected_utc) for value in present)
+
+
+def _createdate_is_stale(current_utc: str, expected_utc: str) -> bool:
+    """Whether a stored UTC clock value differs from the expected one.
+
+    A one second tolerance absorbs rounding; an unparseable value counts as stale.
+    """
     try:
-        current_dt = datetime.strptime(current_create_date, "%Y:%m:%d %H:%M:%S")
+        current_dt = datetime.strptime(current_utc, "%Y:%m:%d %H:%M:%S")
         expected_dt = datetime.strptime(expected_utc, "%Y:%m:%d %H:%M:%S")
-        diff = abs((current_dt - expected_dt).total_seconds())
-        return diff > 1
+        return abs((current_dt - expected_dt).total_seconds()) > 1
     except ValueError:
-        # Can't parse, assume needs update
         return True
 
 def determine_needed_changes(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False) -> dict:
@@ -963,8 +983,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
         correction_args.append(f"-Keys:CreationDate={keys_value}")
     if changes.get("quicktime_createdate"):
         utc_time = datetime_original.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
-        correction_args.append(f"-QuickTime:CreateDate={utc_time}")
-        correction_args.append(f"-QuickTime:MediaCreateDate={utc_time}")
+        correction_args.extend(quicktime_createdate_args(utc_time))
     field_args = provenance_args + correction_args
     if field_args:
         if not write_exif_fields(file_path, field_args):

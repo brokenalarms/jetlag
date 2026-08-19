@@ -127,10 +127,12 @@ Corrections are written to the standard fields so that any application reads the
 corrected time, not only this one. That includes every clock field — the movie header
 and the track atoms together.
 
-`write_quicktime_createdate()` currently sends `-QuickTime:CreateDate=` and
-`-QuickTime:MediaCreateDate=`, which reach only the movie header. Imported files
-therefore disagree with themselves: header `12:45:12`, tracks `05:45:12`. Track atoms
-must be written too.
+A QuickTime correction sends `-QuickTime:CreateDate=`, `-QuickTime:MediaCreateDate=` and
+`-QuickTime:TrackCreateDate=` in one call, reaching the `mvhd` header, the per-track
+`mdhd` atoms and the per-track `tkhd` atoms. A stale value in any one of them is enough
+to mark the file as needing a correction, so the atoms cannot drift apart across runs —
+which is what left imported files disagreeing with themselves: header `12:45:12`,
+tracks `05:45:12`.
 
 ### Provenance
 
@@ -205,8 +207,6 @@ now lives in `docs/timestamp-fields.md`.
 
 Each of these is separable, and none is needed for a correction to be right:
 
-- `fix-media-timestamp.py` — clock writes still reach only the movie header, not
-  the track atoms, which is what leaves imported files disagreeing with themselves.
 - `fix-media-timestamp.py` — a correction to a still loses its zone. `DateTimeOriginal`
   is written alone, and exiftool silently drops the zone from a value bound for binary
   EXIF rather than splitting it out (verified; see `timestamp-fields.md`). Stills need

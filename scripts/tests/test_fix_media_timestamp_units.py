@@ -159,6 +159,49 @@ class TestChangeDetection:
         # Should NOT need update if already correct
         assert needs_update is False
 
+    def test_check_quicktime_createdate_needs_update_stale_track_atom(self):
+        """A file whose movie header is already correct but whose per-track tkhd
+        atom still holds the pre-correction time must be reported as needing a fix,
+        so the track atoms any player may read get corrected too."""
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-QuickTime:CreateDate=2025:06:17 23:25:21",
+            "-QuickTime:MediaCreateDate=2025:06:17 23:25:21",
+            "-QuickTime:TrackCreateDate=2020:01:01 00:00:00",
+            self.test_video
+        ], capture_output=True, check=True)
+        fmt._exif_cache.clear()
+
+        assert fmt.check_quicktime_createdate_needs_update(self.test_video, dt) is True
+
+    def test_check_quicktime_createdate_needs_update_all_atoms_correct(self):
+        """Once every clock atom carries the corrected UTC instant, reprocessing the
+        file reports no needed change — the correction is idempotent."""
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-QuickTime:CreateDate=2025:06:17 23:25:21",
+            "-QuickTime:MediaCreateDate=2025:06:17 23:25:21",
+            "-QuickTime:TrackCreateDate=2025:06:17 23:25:21",
+            self.test_video
+        ], capture_output=True, check=True)
+        fmt._exif_cache.clear()
+
+        assert fmt.check_quicktime_createdate_needs_update(self.test_video, dt) is False
+
+    def test_check_quicktime_createdate_skips_stills(self):
+        """A still has no QuickTime container, so its EXIF CreateDate (local time,
+        not UTC) must never be mistaken for a stale movie clock and rewritten."""
+        photo = os.path.join(self.temp_dir, "still.jpg")
+        create_test_photo(photo, DateTimeOriginal="2025:06:18 07:25:21",
+                          CreateDate="2025:06:18 07:25:21")
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+
+        assert fmt.check_quicktime_createdate_needs_update(photo, dt) is False
+
     def test_determine_needed_changes(self):
         """Test determining all needed changes"""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
@@ -198,6 +241,26 @@ class TestWriteOperations:
         data = fmt.read_exif_data(self.test_video)
         assert "DateTimeOriginal" in data
         assert "2025:06:18 07:25:21" in data["DateTimeOriginal"]
+
+    def test_write_quicktime_createdate_reaches_track_atom(self):
+        """Healing a QuickTime clock writes the corrected UTC instant into the
+        per-track tkhd atom as well as the movie header, so no application reads
+        the pre-correction time back out of the track."""
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-QuickTime:TrackCreateDate=2020:01:01 00:00:00",
+            self.test_video
+        ], capture_output=True, check=True)
+        fmt._exif_cache.clear()
+
+        assert fmt.write_quicktime_createdate(self.test_video, dt) is True
+
+        fmt._exif_cache.clear()
+        data = fmt.read_exif_data(self.test_video)
+        assert data["TrackCreateDate"] == "2025:06:17 23:25:21"
+        assert data["MediaCreateDate"] == "2025:06:17 23:25:21"
 
     def test_write_keys_creationdate(self):
         """Test writing Keys:CreationDate"""
