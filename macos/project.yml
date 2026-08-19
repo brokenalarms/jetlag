@@ -46,9 +46,13 @@ targets:
           rm -rf "$DEST"
           cp -r "${SRCROOT}/../scripts/" "$DEST"
           # A checkout's .venv holds absolute paths into the checkout — the bundle
-          # imports from site-packages below instead.
-          rm -rf "$DEST/.venv"
+          # imports from site-packages below instead. Prune at any depth: a venv
+          # created from the wrong working directory nests one level down.
+          find "$DEST" -name .venv -type d -prune -exec rm -rf {} +
           find "$DEST" -name __pycache__ -type d -prune -exec rm -rf {} +
+          # Dev tooling (pytest, pyrefly) is never vendored — drop the manifest so
+          # nothing in the bundle can install from it.
+          rm -f "$DEST/requirements-dev.txt"
           # Vendor dependencies with the same interpreter the app runs them on
           # (lib/ensure-venv.sh resolves to /usr/bin/python3) — PyYAML ships a C
           # extension, so wheels built for another version fail to import.
@@ -64,6 +68,12 @@ targets:
           fi
           cp -R "$PIP_CACHE" "$DEST/site-packages"
           rm -f "$DEST/site-packages/.stamp"
+          for dev_pkg in pytest _pytest pyrefly; do
+            if [ -e "$DEST/site-packages/$dev_pkg" ]; then
+              echo "error: dev tooling '$dev_pkg' vendored into the bundle — move it from scripts/requirements.txt to scripts/requirements-dev.txt" >&2
+              exit 1
+            fi
+          done
 
           # Build jetlag-metadata Swift CLI and install into bundle
           METADATA_PKG="${SRCROOT}/Sources/Tools/jetlag-metadata"
