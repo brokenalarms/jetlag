@@ -27,6 +27,7 @@ from lib.timestamp_source import (
     is_zone_name,
     resolve_timezone_offset,
     resolve_file_timezone_offset,
+    camera_zone_offset_for_file,
     TimestampReport,
 )
 
@@ -356,6 +357,58 @@ class TestQuickTimeInstantVersusFilename:
 
         assert ts == "2026:01:03 18:35:32"
         assert source == "MediaCreateDate"
+
+
+class TestCameraZoneOffsetForFile:
+    """The camera's own zone setting at shoot time, read independently of
+    get_best_timestamp()'s priority chain — present whenever a filename timestamp and a
+    usable QuickTime date coexist with a legal zone delta, regardless of which source
+    the ranking picks.
+    """
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        clear_exif_cache()
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def _video(self, name, media_create_date=None):
+        path = os.path.join(self.temp_dir, name)
+        if media_create_date:
+            create_test_video(path, **{"QuickTime:MediaCreateDate": media_create_date})
+        else:
+            create_test_video(path)
+        return path
+
+    def test_present_when_the_quicktime_date_wins_the_priority_race(self):
+        """Camera left on Japan time while shooting in New Zealand — QuickTime wins."""
+        video = self._video("VID_20260104_033532_00_001.mp4", "2026:01:03 18:35:32")
+
+        assert camera_zone_offset_for_file(video) == "+09:00"
+
+    def test_present_when_the_filename_wins_the_priority_race(self):
+        """No --timezone declared, so the filename wins get_best_timestamp() outright —
+        the camera zone offset is still computable from the raw fields on disk."""
+        video = self._video("VID_20260104_033532_00_001.mp4", "2026:01:03 18:35:32")
+
+        assert camera_zone_offset_for_file(video) == "+09:00"
+
+    def test_absent_without_a_quicktime_date(self):
+        video = self._video("VID_20250505_130334_00_001.mp4")
+
+        assert camera_zone_offset_for_file(video) is None
+
+    def test_absent_without_a_filename_timestamp(self):
+        video = self._video("clip.mp4", "2026:01:03 18:35:32")
+
+        assert camera_zone_offset_for_file(video) is None
+
+    def test_absent_when_the_delta_is_not_a_legal_zone_offset(self):
+        """A battery-reset camera: years from any legal offset."""
+        video = self._video("VID_20250505_120334_00_029.mp4", "2018:11:24 17:03:34")
+
+        assert camera_zone_offset_for_file(video) is None
 
 
 class TestResolveTimezoneOffset:

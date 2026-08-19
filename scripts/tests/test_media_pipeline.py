@@ -899,6 +899,7 @@ class TestPipelineMachineOutput:
                 current["timezone"] = event.get("timezone")
                 current["correction_mode"] = event.get("correction_mode")
                 current["requires_force_timezone"] = event.get("requires_force_timezone")
+                current["camera_zone_offset"] = event.get("camera_zone_offset")
                 current["time_offset_seconds"] = event.get("time_offset_seconds")
                 current["time_offset_display"] = event.get("time_offset_display")
                 if event.get("error"):
@@ -1142,6 +1143,33 @@ class TestPipelineMachineOutput:
             f"Expected a would_fix preview, got: {f.get('timestamp_action')}"
         assert f.get("requires_force_timezone") is True, \
             f"Preview row should be flagged as needing --force-timezone, got: {f}"
+
+    def test_camera_zone_offset_forwarded_to_timestamp_result(self, temp_workspace, test_profile):
+        """The camera's own inferred zone offset reaches the timestamp_result event,
+        so the app diff table can show camera zone vs embedded label vs declared zone.
+
+        A camera left on Japan time while shooting in New Zealand: the filename
+        records local digits with no zone, and QuickTime:MediaCreateDate records the
+        instant in UTC. Their delta is a legal zone offset (+09:00) — the camera's
+        own setting — independent of the declared --timezone used to resolve the fix.
+        """
+        source = temp_workspace["source"]
+        video = source / "VID_20260104_033532_00_001.mp4"
+        _create_video_raw(video, MediaCreateDate="2026:01:03 18:35:32")
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+1300",
+            "--tasks", "fix-timestamp",
+        ])
+
+        assert result.returncode == 0
+
+        files = self._parse_events(result.stdout)
+        assert len(files) == 1
+        assert files[0].get("camera_zone_offset") == "+09:00", \
+            f"Expected the inferred camera zone in the preview row, got: {files[0]}"
 
     def test_tz_mismatch_blocks_apply_without_force(self, temp_workspace, test_profile):
         """Applying a timezone-mismatched batch without --force-timezone is refused.

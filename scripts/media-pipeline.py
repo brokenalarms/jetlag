@@ -336,6 +336,7 @@ def process_file(
             original_epoch=ts_result.original_epoch,
             corrected_epoch=ts_result.corrected_epoch,
             requires_force_timezone=bool(ts_result.requires_force_timezone),
+            camera_zone_offset=ts_result.camera_zone_offset,
         )
 
         if ts_result.timestamp_action == "error":

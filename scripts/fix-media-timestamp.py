@@ -43,6 +43,7 @@ from lib.timestamp_source import (
     is_utc_timestamp_source,
     resolve_timezone_offset,
     clear_exif_cache,
+    camera_zone_offset_for_file,
 )
 
 if sys.platform == "darwin":
@@ -76,6 +77,7 @@ class TimestampFixResult:
     original_epoch: Optional[float] = None
     corrected_epoch: Optional[float] = None
     requires_force_timezone: Optional[bool] = None
+    camera_zone_offset: Optional[str] = None
 
 
 def same_as_original(dt_with_tz: datetime) -> str:
@@ -339,6 +341,7 @@ def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, 
         "timestamp_source": "",
         "timezone_source": "",
         "timezone_offset": None,
+        "camera_zone_offset": camera_zone_offset_for_file(file_path),
     }
 
     if infer_from_filename:
@@ -909,6 +912,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
         original_epoch=datetime_before_offset.timestamp() if datetime_before_offset else None,
         corrected_epoch=datetime_original.timestamp() if datetime_original else None,
         requires_force_timezone=requires_force_timezone or None,
+        camera_zone_offset=current_data.get("camera_zone_offset"),
     )
 
     if dry_run and has_changes:
