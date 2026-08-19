@@ -97,6 +97,17 @@ struct WorkflowView: View {
         } message: {
             Text(timezoneConflictMessage)
         }
+        .alert(
+            Strings.Errors.commandLineToolsTitle,
+            isPresented: Binding(
+                get: { state.pythonRuntimeAlert != nil },
+                set: { if !$0 { state.pythonRuntimeAlert = nil } }
+            )
+        ) {
+            Button(Strings.Common.done) { state.pythonRuntimeAlert = nil }
+        } message: {
+            Text(state.pythonRuntimeAlert ?? "")
+        }
     }
 
     private var timezoneConflictMessage: String {
@@ -632,6 +643,8 @@ struct WorkflowView: View {
     }
 
     private func runWorkflow() {
+        guard state.canRunPipeline() else { return }
+
         let fileCount = countMediaFiles()
         if licenseStore.exceedsLimit(fileCount: fileCount) {
             upgradePrompt = UpgradePrompt(fileCount: fileCount)

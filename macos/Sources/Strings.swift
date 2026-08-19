@@ -327,6 +327,15 @@ What happens to source files after processing:
         static let pathIsFile = String(localized: "error.pathIsFile", defaultValue: "Path is a file, not a directory")
         static let licenseComingSoon = String(localized: "error.licenseComingSoon",
             defaultValue: "License activation coming soon — check back after launch")
+        static let commandLineToolsTitle = String(localized: "error.commandLineTools.title",
+            defaultValue: "Command Line Tools required")
+        static let commandLineToolsMissing = String(localized: "error.commandLineTools.message",
+            defaultValue: """
+            Jetlag runs its pipeline on the Python that ships with macOS, which needs the Xcode \
+            Command Line Tools. Install them by running this in Terminal:
+
+            xcode-select --install
+            """)
 
         static func scriptStartFailed(_ description: String) -> String {
             String(localized: "error.scriptStartFailed",

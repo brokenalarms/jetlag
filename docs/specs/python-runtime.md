@@ -80,5 +80,12 @@ necessarily for a clean install.
 
 Resolving it means either bundling a Python runtime in the app (bigger download,
 signing and notarization work) or porting the pipeline to Swift. Neither is
-scheduled. Until then the app should detect the stub and say what to install
-rather than failing with an opaque error.
+scheduled.
+
+Until then the app detects the stub instead of failing opaquely.
+`PythonRuntimeCheck` mirrors the resolution order above using only
+`xcode-select -p` and file-existence probes — it never executes an interpreter,
+because executing the stub is what raises the dialog. A missing developer
+directory with no `JETLAG_PYTHON` and no `python3` elsewhere on `PATH` means the
+only interpreter is the stub, so the run is refused with an alert naming the
+Command Line Tools and `xcode-select --install`.

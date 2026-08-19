@@ -472,6 +472,10 @@ final class AppState {
     var showInspector: Bool = false
     var showLogOutput: Bool = false
 
+    /// Message shown when a run was refused because the Python interpreter the
+    /// scripts resolve cannot be invoked.
+    var pythonRuntimeAlert: String?
+
     // Execution state
     var isRunning: Bool = false
     var logOutput: [LogLine] = []
@@ -639,6 +643,22 @@ final class AppState {
         }
         process.waitUntilExit()
         return GyroflowStatus.parse(presenceData.joined(separator: "\n"))
+    }
+
+    /// Gate the pipeline on the Python interpreter before launching it. The
+    /// scripts run on the Python macOS ships, and on a Mac with neither Xcode
+    /// nor the Command Line Tools `/usr/bin/python3` is a shim that opens the
+    /// developer-tools install dialog — so the run is refused with a message
+    /// naming what to install rather than started.
+    func canRunPipeline(check: PythonRuntimeCheck = .system) -> Bool {
+        switch check.status {
+        case .ready:
+            pythonRuntimeAlert = nil
+            return true
+        case .commandLineToolsMissing:
+            pythonRuntimeAlert = Strings.Errors.commandLineToolsMissing
+            return false
+        }
     }
 
     func cancelRunning() {
