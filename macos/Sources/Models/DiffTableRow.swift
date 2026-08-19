@@ -20,6 +20,10 @@ struct DiffTableRow: Identifiable {
     var originalEpoch: Double?
     var correctedEpoch: Double?
 
+    /// The file already carries a camera-set zone that the declared zone would
+    /// relabel; applying needs the user's explicit confirmation.
+    var requiresForceTimezone: Bool = false
+
     var completedStages: Set<String> = []
 
     mutating func markStageComplete(_ stage: String) {

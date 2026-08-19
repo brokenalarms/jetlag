@@ -120,7 +120,8 @@ enum PipelineEvent: Decodable {
                          timeOffsetDisplay: String?,
                          error: String?,
                          originalEpoch: Double?,
-                         correctedEpoch: Double?)
+                         correctedEpoch: Double?,
+                         requiresForceTimezone: Bool)
     case renameResult(file: String, renamedTo: String)
     case organizeResult(file: String, action: String, dest: String)
     case gyroflowResult(file: String, action: String, gyroflowPath: String,
@@ -143,6 +144,7 @@ enum PipelineEvent: Decodable {
         case timeOffsetDisplay = "time_offset_display"
         case originalEpoch = "original_epoch"
         case correctedEpoch = "corrected_epoch"
+        case requiresForceTimezone = "requires_force_timezone"
         case renamedTo = "renamed_to"
         case dest
         case gyroflowPath = "gyroflow_path"
@@ -183,7 +185,8 @@ enum PipelineEvent: Decodable {
                 timeOffsetDisplay: try container.decodeIfPresent(String.self, forKey: .timeOffsetDisplay),
                 error: try container.decodeIfPresent(String.self, forKey: .error),
                 originalEpoch: try container.decodeIfPresent(Double.self, forKey: .originalEpoch),
-                correctedEpoch: try container.decodeIfPresent(Double.self, forKey: .correctedEpoch))
+                correctedEpoch: try container.decodeIfPresent(Double.self, forKey: .correctedEpoch),
+                requiresForceTimezone: try container.decodeIfPresent(Bool.self, forKey: .requiresForceTimezone) ?? false)
         case "rename_result":
             self = .renameResult(
                 file: try container.decode(String.self, forKey: .file),
@@ -278,6 +281,28 @@ final class WorkflowSession {
 
     var availableSteps: [PipelineStep] {
         Self.computeAvailableSteps(profile: workingProfile, gyroflowAvailable: gyroflowAvailable)
+    }
+
+    /// Record the user's answer to the conflict the pipeline just refused on,
+    /// so the next run carries the override flag that unblocks it.
+    func grantTimezoneAssent() {
+        if timezoneConflictType == "mixed_timezones" {
+            allowMixedTimezones = true
+        } else {
+            forceTimezone = true
+        }
+        showTimezoneConflict = false
+    }
+
+    /// Assent covers the run it was given for. A run the user starts themselves
+    /// begins without it, so a later batch is never relabelled unasked.
+    func clearTimezoneAssent() {
+        forceTimezone = false
+        allowMixedTimezones = false
+        showTimezoneConflict = false
+        timezoneConflictType = nil
+        timezoneConflictProvidedTz = nil
+        timezoneConflictFileTimezones = nil
     }
 
     private static func computeAvailableSteps(
@@ -535,7 +560,8 @@ final class AppState {
         case .timestampResult(_, let action, let originalTime, let correctedTime,
                               let source, let timezone, let correctionMode,
                               _, let timeOffsetDisplay, let error,
-                              let originalEpoch, let correctedEpoch):
+                              let originalEpoch, let correctedEpoch,
+                              let requiresForceTimezone):
             currentDiffRow?.timestampAction = action
             currentDiffRow?.originalTime = originalTime
             currentDiffRow?.correctedTime = correctedTime
@@ -546,6 +572,7 @@ final class AppState {
             currentDiffRow?.timestampError = error
             currentDiffRow?.originalEpoch = originalEpoch
             currentDiffRow?.correctedEpoch = correctedEpoch
+            currentDiffRow?.requiresForceTimezone = requiresForceTimezone
             liveRow = currentDiffRow
 
         case .renameResult(_, let renamedTo):
@@ -568,7 +595,13 @@ final class AppState {
             workflowSession.timezoneConflictType = conflictType
             workflowSession.timezoneConflictProvidedTz = providedTz
             workflowSession.timezoneConflictFileTimezones = fileTimezones
-            workflowSession.showTimezoneConflict = true
+            // A dry run previews a provided-vs-embedded mismatch instead of
+            // refusing it, so the conflict is recorded as data and the flagged
+            // rows speak for themselves. Only a run the pipeline actually
+            // refuses — an apply, or a mixed-zone batch in either mode — asks
+            // the user to confirm.
+            workflowSession.showTimezoneConflict =
+                conflictType == "mixed_timezones" || workflowSession.applyMode
 
         case .pipelineError(let message):
             logOutput.append(LogLine(text: "ERROR: \(message)", stream: .stderr))

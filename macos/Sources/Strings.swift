@@ -290,6 +290,9 @@ What happens to source files after processing:
         static let fixedChange = String(localized: "diffTable.fixed.change", defaultValue: "Fixed")
         static let noChangeChange = String(localized: "diffTable.noChange.change", defaultValue: "No change")
         static let errorChange = String(localized: "diffTable.error.change", defaultValue: "Error")
+        static let requiresForceTimezoneHelp = String(
+            localized: "diffTable.requiresForceTimezone.help",
+            defaultValue: "This file already carries a timezone from the camera. Applying relabels it, and needs confirmation.")
         static let wouldFixAndMoveStatus = String(localized: "diffTable.wouldFixAndMove.status", defaultValue: "Would fix + move")
         static let fixedAndMovedStatus = String(localized: "diffTable.fixedAndMoved.status", defaultValue: "Fixed + moved")
 

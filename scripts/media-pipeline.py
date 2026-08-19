@@ -335,6 +335,7 @@ def process_file(
             time_offset_display=ts_result.time_offset_display,
             original_epoch=ts_result.original_epoch,
             corrected_epoch=ts_result.corrected_epoch,
+            requires_force_timezone=bool(ts_result.requires_force_timezone),
         )
 
         if ts_result.timestamp_action == "error":
@@ -723,13 +724,19 @@ def main():
                     print(f"   {tz}: {', '.join(fnames)}", file=sys.stderr)
                 print(file=sys.stderr)
                 print("The embedded timezone is usually correct (set by the camera).", file=sys.stderr)
-                print("Re-run with --force-timezone to override.", file=sys.stderr)
+                if args.apply:
+                    print("Re-run with --force-timezone to override.", file=sys.stderr)
+                else:
+                    print("Previewing anyway; applying requires --force-timezone.", file=sys.stderr)
                 emit_event("timezone_conflict",
                     conflict_type="provided_mismatch",
                     provided_tz=timezone_spec,
                     file_timezones={tz: fnames for tz, fnames in file_timezones.items()},
                 )
-                sys.exit(1)
+                # A dry run previews the relabel per file (each timestamp_result
+                # carries requires_force_timezone); only applying is refused.
+                if args.apply:
+                    sys.exit(1)
 
     # Pre-flight filename parseability check (defense-in-depth for CLI users)
     if args.infer_from_filename:
