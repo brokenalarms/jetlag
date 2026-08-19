@@ -10,6 +10,7 @@
 		03E263B765C4C53CE8B6FF7E /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 823EAC4F97C91F6A789E0415 /* MapKit.framework */; };
 		0D5AC61704A72A9FEF4D4DF3 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F559FB82EF7FBD0FD4101BE5 /* AppState.swift */; };
 		1D23F4385E3C9080D63F95C1 /* DiffTableRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A67A68A82CC97A0B42F497 /* DiffTableRow.swift */; };
+		49521EA7D50F8FD80CA4EDFD /* PythonRuntimeCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA47C3147490D4D7AABA5169 /* PythonRuntimeCheck.swift */; };
 		4FDCE64D99169FBCD837CF2B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C503D6DF395CB0F0EE8674D /* SettingsView.swift */; };
 		53E52584D7A0F04EBD764B7D /* LogOutputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93163EBEB8CD8B13330BAB7C /* LogOutputView.swift */; };
 		5B1E92778017F81FED24A526 /* GyroflowStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F37A77F3E04133102C3B9228 /* GyroflowStatus.swift */; };
@@ -26,6 +27,7 @@
 		8F979D129B6EF35BF9FA8BCB /* TimezoneCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 275EE4D58C8BFA72BF92B86F /* TimezoneCatalog.swift */; };
 		92BA1490C431AC89A5646C85 /* FilenamePatterns.swift in Sources */ = {isa = PBXBuildFile; fileRef = A668F7E7A4F545637B636567 /* FilenamePatterns.swift */; };
 		932EB3F57E4BF42DBFA0EBF9 /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */; };
+		A00FA545CCBD5C1CF868B312 /* PythonRuntimeCheckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33AF1E5DF4D368EB36EFB0EC /* PythonRuntimeCheckTests.swift */; };
 		A782F8A1159D170B5CEB4C7E /* LicenseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D2EC9D00CD4EE5A754D59E /* LicenseStore.swift */; };
 		A87A9F7C3870DC8D634B2510 /* MediaProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC0210C9EE3BEF29E07C9DE6 /* MediaProfile.swift */; };
 		AAC3E4FC571BCF92D2EBA219 /* ScriptRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5FD29C41D642C67671FBAF /* ScriptRunner.swift */; };
@@ -58,6 +60,7 @@
 		275EE4D58C8BFA72BF92B86F /* TimezoneCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimezoneCatalog.swift; sourceTree = "<group>"; };
 		27CF0E7DB6265D0EAF8055CE /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
 		2DB6E838E4C1827858BB004E /* DirtyableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirtyableTests.swift; sourceTree = "<group>"; };
+		33AF1E5DF4D368EB36EFB0EC /* PythonRuntimeCheckTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PythonRuntimeCheckTests.swift; sourceTree = "<group>"; };
 		3B7884EFEE29BD136A760320 /* FieldValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldValidation.swift; sourceTree = "<group>"; };
 		3CF7D354B21B95B1EB3A8984 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		5AFFC7653CEF9432BABAFE94 /* ProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileTests.swift; sourceTree = "<group>"; };
@@ -82,6 +85,7 @@
 		B68CD5F46C4AF7FAFE297AAE /* Jetlag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jetlag.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C4AF4B0A35CD716A34E2A275 /* ProfilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesView.swift; sourceTree = "<group>"; };
 		C76405E304A233D40E627ECD /* GyroflowStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroflowStatusTests.swift; sourceTree = "<group>"; };
+		CA47C3147490D4D7AABA5169 /* PythonRuntimeCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PythonRuntimeCheck.swift; sourceTree = "<group>"; };
 		CDF31C93574205EBA3F42FEC /* JetlagTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JetlagTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D08074CC6CCFCC6AFEC75C39 /* PipelineArgsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineArgsTests.swift; sourceTree = "<group>"; };
 		DC0210C9EE3BEF29E07C9DE6 /* MediaProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaProfile.swift; sourceTree = "<group>"; };
@@ -109,6 +113,7 @@
 			children = (
 				88D2EC9D00CD4EE5A754D59E /* LicenseStore.swift */,
 				6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */,
+				CA47C3147490D4D7AABA5169 /* PythonRuntimeCheck.swift */,
 				9C5FD29C41D642C67671FBAF /* ScriptRunner.swift */,
 			);
 			path = Services;
@@ -150,6 +155,7 @@
 				C76405E304A233D40E627ECD /* GyroflowStatusTests.swift */,
 				D08074CC6CCFCC6AFEC75C39 /* PipelineArgsTests.swift */,
 				5AFFC7653CEF9432BABAFE94 /* ProfileTests.swift */,
+				33AF1E5DF4D368EB36EFB0EC /* PythonRuntimeCheckTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -330,6 +336,7 @@
 				6A589A5C59B6E0ACF8DC960F /* ProfilePicker.swift in Sources */,
 				932EB3F57E4BF42DBFA0EBF9 /* ProfileService.swift in Sources */,
 				C0FF2D225A09C82E454CF5E2 /* ProfilesView.swift in Sources */,
+				49521EA7D50F8FD80CA4EDFD /* PythonRuntimeCheck.swift in Sources */,
 				7EB40F1EE336843C386D4474 /* SandboxView.swift in Sources */,
 				AAC3E4FC571BCF92D2EBA219 /* ScriptRunner.swift in Sources */,
 				4FDCE64D99169FBCD837CF2B /* SettingsView.swift in Sources */,
@@ -350,6 +357,7 @@
 				AF5DDC771125D006AA50AF71 /* GyroflowStatusTests.swift in Sources */,
 				67B98190D68F596BAC4EF2AE /* PipelineArgsTests.swift in Sources */,
 				C0578D87EB55FAED6B59A9C0 /* ProfileTests.swift in Sources */,
+				A00FA545CCBD5C1CF868B312 /* PythonRuntimeCheckTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
