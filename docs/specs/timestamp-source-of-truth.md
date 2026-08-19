@@ -218,9 +218,6 @@ Each of these is separable, and none is needed for a correction to be right:
   source and states filenames are never modified. The filename is the source of truth for
   wall-clock time only where no established instant contradicts it, and
   `--update-filename-dates` renames files to match corrections.
-- App and script disagree on when `--timezone` is required: the app demands it whenever
-  the step is enabled, the script only for `--infer-from-filename` and `--time-offset`.
-  One rule, mirrored.
 - The app could surface the winning source from the diff table's existing
   `timestamp_source` field. No new dialog is needed: the choice is always decidable.
 

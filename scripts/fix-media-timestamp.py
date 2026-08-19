@@ -989,12 +989,34 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
 
     return TimestampFixResult(**result_base, timestamp_action="fixed" if success else "error")
 
+VALUE_OPTIONS_ACCEPTING_NEGATIVES = ('--timezone', '--time-offset')
+
+def attach_negative_option_values(argv):
+    """Rewrite '--timezone -05:00' as '--timezone=-05:00'.
+
+    argparse before Python 3.13 reads any value starting with '-' that is not a
+    plain number as another flag, so western offsets are rejected outright.
+    """
+    normalized = []
+    argv = list(argv)
+    index = 0
+    while index < len(argv):
+        arg = argv[index]
+        value = argv[index + 1] if index + 1 < len(argv) else None
+        if arg in VALUE_OPTIONS_ACCEPTING_NEGATIVES and value is not None and value.startswith('-'):
+            normalized.append(f"{arg}={value}")
+            index += 2
+            continue
+        normalized.append(arg)
+        index += 1
+    return normalized
+
 def main():
     """Command line interface"""
     signal.signal(signal.SIGINT, signal_handler)
     parser = argparse.ArgumentParser(description='Fix media timestamps - ensures file system timestamps match EXIF data')
     parser.add_argument('file', help='Media file (photo or video) to process')
-    parser.add_argument('--timezone', help='Timezone offset (e.g. +09:00) - required when DateTimeOriginal lacks timezone info')
+    parser.add_argument('--timezone', help='Timezone offset (e.g. +09:00) - always required for this step (or pass --country to resolve one)')
     parser.add_argument('--country', help='Country code or name for automatic timezone lookup (e.g. JP, Taiwan)')
     parser.add_argument('--apply', action='store_true', help='Apply changes (default: dry run)')
     parser.add_argument('--infer-from-filename', action='store_true', help='Use filename timestamp as source of truth (requires --timezone)')
@@ -1002,7 +1024,7 @@ def main():
     parser.add_argument('--preserve-wallclock-time', action='store_true', help='Preserve literal wall-clock shooting time (10:30 stays 10:30) instead of converting to current timezone for display')
     parser.add_argument('--force-timezone', action='store_true', help='Confirm relabelling a file whose metadata already carries a timezone; without it such files are refused')
 
-    args = parser.parse_args()
+    args = parser.parse_args(attach_negative_option_values(sys.argv[1:]))
 
     # Convert file path to absolute path to ensure exiftool can find it
     file_path = os.path.abspath(args.file)
@@ -1027,6 +1049,10 @@ def main():
 
     if args.time_offset is not None and not timezone_spec:
         print("Error: --time-offset requires --timezone", file=sys.stderr)
+        return 1
+
+    if not timezone_spec:
+        print("Error: --timezone is required (or --country to resolve one)", file=sys.stderr)
         return 1
 
     result = fix_media_timestamps(

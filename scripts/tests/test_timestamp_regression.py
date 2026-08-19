@@ -116,6 +116,7 @@ class TestDateTimeOriginalPreservation:
         subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
+            "--timezone", "+08:00",
             "--apply"
         ], capture_output=True, check=True)
 
@@ -256,6 +257,7 @@ class TestTimezoneConversion:
         subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             video_path,
+            "--timezone", "+08:00",
             "--apply"
         ], capture_output=True, check=True)
 
@@ -391,7 +393,7 @@ class TestExtractMetadataTimezone:
 
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            video_path
+            video_path, "--timezone", "+08:00"
         ], capture_output=True, text=True)
 
         assert "@@timezone=+08:00" in result.stdout
@@ -403,7 +405,7 @@ class TestExtractMetadataTimezone:
 
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            video_path
+            video_path, "--timezone", "+09:00"
         ], capture_output=True, text=True)
 
         assert "@@timezone=" not in result.stdout

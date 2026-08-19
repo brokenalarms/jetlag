@@ -49,7 +49,7 @@ class TestFixMediaTimestamp:
 
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            test_video
+            test_video, "--timezone", "+08:00"
         ], capture_output=True, text=True)
 
         assert result.returncode == 0
@@ -61,7 +61,7 @@ class TestFixMediaTimestamp:
         """Test that running twice doesn't change anything the second time"""
         result1 = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            test_video, "--apply"
+            test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
         assert result1.returncode == 0
@@ -75,7 +75,7 @@ class TestFixMediaTimestamp:
         # Second run should report "No change"
         result2 = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            test_video, "--apply"
+            test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
         assert result2.returncode == 0
@@ -107,7 +107,7 @@ class TestFixMediaTimestamp:
         # Run with --apply
         subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            test_video, "--apply"
+            test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, check=True)
 
         # Read Keys:CreationDate
@@ -136,21 +136,30 @@ class TestFixMediaTimestamp:
         assert "2025-06-18" in result.stderr or "2025:06:18" in result.stderr
 
     def test_missing_timezone_error(self, test_video_no_timezone):
-        """Test that missing timezone is reported correctly"""
+        """--timezone is required even for a naive source with a usable DateTimeOriginal"""
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
             test_video_no_timezone
         ], capture_output=True, text=True)
 
-        # Should succeed if DateTimeOriginal exists, even without timezone
-        # Or should prompt for timezone depending on implementation
-        assert result.returncode in [0, 1]  # May fail or succeed depending on data
+        assert result.returncode == 1
+        assert "--timezone is required" in result.stderr
+
+    def test_missing_timezone_error_even_when_source_already_zoned(self, test_video):
+        """--timezone is required for the step even when DateTimeOriginal already carries a zone"""
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            test_video
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 1
+        assert "--timezone is required" in result.stderr
 
     def test_output_formatting(self, test_video):
         """Test that output follows data/presentation separation"""
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            test_video
+            test_video, "--timezone", "+08:00"
         ], capture_output=True, text=True)
 
         assert result.returncode == 0
@@ -172,7 +181,7 @@ class TestFixMediaTimestamp:
         # Run fix
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            test_video, "--apply"
+            test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
         assert result.returncode == 0
@@ -300,7 +309,7 @@ class TestFixMediaTimestampIntegration:
         for video in videos:
             result = subprocess.run([
                 sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-                video, "--apply"
+                video, "--timezone", "+08:00", "--apply"
             ], capture_output=True, text=True)
             results.append(result)
 
@@ -344,7 +353,7 @@ class TestFixMediaTimestampMachineOutput:
         create_test_video(video, DateTimeOriginal="2025:06:18 07:25:21+08:00")
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--timezone", "+08:00"
         ], capture_output=True, text=True)
 
         at_lines = self._parse_at_lines(result.stdout)
@@ -366,12 +375,12 @@ class TestFixMediaTimestampMachineOutput:
 
         # First apply
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--apply"
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
         # Second run - should be no_change
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--apply"
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
         at_lines = self._parse_at_lines(result.stdout)
@@ -387,7 +396,7 @@ class TestFixMediaTimestampMachineOutput:
         create_test_video(video, DateTimeOriginal="2025:06:18 07:25:21+08:00")
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--apply"
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
         at_lines = self._parse_at_lines(result.stdout)
