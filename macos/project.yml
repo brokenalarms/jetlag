@@ -79,11 +79,6 @@ targets:
               exit 1
             fi
           done
-          # Gyroflow is optional: the pipeline skips stabilization gracefully when
-          # absent, and the app gates gyroflow features on its presence.
-          if [ ! -f "$DEST/tools/gyroflow" ]; then
-            echo "note: scripts/tools/gyroflow not bundled — gyroflow features disabled in this build" >&2
-          fi
   JetlagTests:
     type: bundle.unit-test
     platform: macOS

@@ -12,7 +12,9 @@ import shlex
 import subprocess
 import sys
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Optional
 
 import pytest
 import yaml
@@ -20,6 +22,7 @@ import yaml
 SCRIPT_DIR = Path(__file__).parent.parent
 GENERATE_GYROFLOW = SCRIPT_DIR / "generate-gyroflow.sh"
 PROFILES_FILE = SCRIPT_DIR / "media-profiles.yaml"
+DOWNLOAD_GYROFLOW = SCRIPT_DIR / "tools" / "download-gyroflow.sh"
 
 
 def _load_generate_gyroflow():
@@ -220,80 +223,255 @@ class TestMissingBinary:
 
 
 class TestBinaryResolution:
-    """Tests for resolve_gyroflow_binary — bundled binary takes priority over
-    configured path and system PATH, so the app can ship self-contained."""
+    """Tests for resolve_gyroflow_binary. Gyroflow is not bundled inside the
+    signed Jetlag app: a bare CLI binary copied out of Gyroflow.app has an
+    invalid signature and is missing its mdk/Qt frameworks. Resolution instead
+    walks real installs in a fixed order — /Applications, the Jetlag-managed
+    Application Support tools dir, $PATH, then the configured path."""
 
-    def test_bundled_binary_preferred_over_configured(self):
-        """A bundled gyroflow in scripts/tools/ should be used even when a
-        configured path also exists — bundled tools are the preferred source
-        for the macOS app bundle."""
+    @staticmethod
+    def _make_app(root: Path) -> Path:
+        """Build a synthetic Gyroflow.app under root and return its CLI binary."""
+        binary = root / "Gyroflow.app" / "Contents" / "MacOS" / "gyroflow"
+        binary.parent.mkdir(parents=True)
+        binary.write_text("#!/bin/bash\necho gyroflow")
+        binary.chmod(0o755)
+        return binary
+
+    @staticmethod
+    def _make_path_binary(root: Path) -> Path:
+        binary = root / "gyroflow"
+        binary.write_text("#!/bin/bash\necho gyroflow")
+        binary.chmod(0o755)
+        return binary
+
+    @contextmanager
+    def _isolated(self, applications: Path, tools: Path, path_dir: Optional[Path] = None):
+        """Point resolution at synthetic directories instead of the real machine."""
+        saved = {k: os.environ.get(k) for k in ("JETLAG_APPLICATIONS_DIR", "JETLAG_TOOLS_DIR", "PATH")}
+        try:
+            os.environ["JETLAG_APPLICATIONS_DIR"] = str(applications)
+            os.environ["JETLAG_TOOLS_DIR"] = str(tools)
+            os.environ["PATH"] = str(path_dir) if path_dir else "/nonexistent"
+            yield
+        finally:
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+    def test_applications_install_wins_over_every_other_source(self):
+        """A user's own /Applications/Gyroflow.app is the first choice, ahead of
+        a Jetlag-installed copy, a $PATH binary, and a configured path."""
         mod = _load_generate_gyroflow()
         with tempfile.TemporaryDirectory() as tmpdir:
-            fake_scripts = Path(tmpdir) / "scripts"
-            fake_tools = fake_scripts / "tools"
-            fake_tools.mkdir(parents=True)
-            bundled = fake_tools / "gyroflow"
-            bundled.write_text("#!/bin/bash\necho bundled")
-            bundled.chmod(0o755)
+            root = Path(tmpdir)
+            applications = root / "Applications"
+            tools = root / "tools"
+            path_dir = root / "bin"
+            for d in (applications, tools, path_dir):
+                d.mkdir()
+            expected = self._make_app(applications)
+            self._make_app(tools)
+            self._make_path_binary(path_dir)
+            configured = self._make_path_binary(root)
 
-            configured = Path(tmpdir) / "configured" / "gyroflow"
-            configured.parent.mkdir()
-            configured.write_text("#!/bin/bash\necho configured")
-            configured.chmod(0o755)
+            with self._isolated(applications, tools, path_dir):
+                assert mod.resolve_gyroflow_binary(str(configured)) == str(expected)
 
-            original_dir = mod.SCRIPT_DIR
-            try:
-                mod.SCRIPT_DIR = fake_scripts
-                result = mod.resolve_gyroflow_binary(str(configured))
-                assert result == str(bundled), (
-                    f"Bundled binary should be preferred, got {result}"
-                )
-            finally:
-                mod.SCRIPT_DIR = original_dir
-
-    def test_configured_path_used_when_no_bundled(self):
-        """When no bundled binary exists, the configured path from
-        media-profiles.yaml should be used."""
+    def test_jetlag_tools_install_used_when_applications_empty(self):
+        """The copy download-gyroflow.sh installs into Application Support is
+        used when the user has no /Applications install."""
         mod = _load_generate_gyroflow()
         with tempfile.TemporaryDirectory() as tmpdir:
-            fake_scripts = Path(tmpdir) / "scripts"
-            fake_tools = fake_scripts / "tools"
-            fake_tools.mkdir(parents=True)
+            root = Path(tmpdir)
+            applications = root / "Applications"
+            tools = root / "tools"
+            path_dir = root / "bin"
+            for d in (applications, tools, path_dir):
+                d.mkdir()
+            expected = self._make_app(tools)
+            self._make_path_binary(path_dir)
+            configured = self._make_path_binary(root)
 
-            configured = Path(tmpdir) / "configured" / "gyroflow"
-            configured.parent.mkdir()
-            configured.write_text("#!/bin/bash\necho configured")
-            configured.chmod(0o755)
+            with self._isolated(applications, tools, path_dir):
+                assert mod.resolve_gyroflow_binary(str(configured)) == str(expected)
 
-            original_dir = mod.SCRIPT_DIR
-            try:
-                mod.SCRIPT_DIR = fake_scripts
-                result = mod.resolve_gyroflow_binary(str(configured))
-                assert result == str(configured), (
-                    f"Configured path should be used when no bundle, got {result}"
-                )
-            finally:
-                mod.SCRIPT_DIR = original_dir
+    def test_path_binary_used_when_no_app_bundle_installed(self):
+        """A gyroflow on $PATH (e.g. a Homebrew install) is used when neither
+        app-bundle location has one."""
+        mod = _load_generate_gyroflow()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            applications = root / "Applications"
+            tools = root / "tools"
+            path_dir = root / "bin"
+            for d in (applications, tools, path_dir):
+                d.mkdir()
+            expected = self._make_path_binary(path_dir)
+            configured = self._make_path_binary(root)
+
+            with self._isolated(applications, tools, path_dir):
+                assert mod.resolve_gyroflow_binary(str(configured)) == str(expected)
+
+    def test_configured_path_is_the_last_resort(self):
+        """The media-profiles.yaml binary path is used only when no install is
+        found in either app location or on $PATH."""
+        mod = _load_generate_gyroflow()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            applications = root / "Applications"
+            tools = root / "tools"
+            for d in (applications, tools):
+                d.mkdir()
+            configured = self._make_path_binary(root)
+
+            with self._isolated(applications, tools):
+                assert mod.resolve_gyroflow_binary(str(configured)) == str(configured)
 
     def test_returns_none_when_nothing_found(self):
-        """When no bundled, configured, or PATH binary exists, returns None
-        so the caller can skip gracefully."""
+        """When no install exists anywhere, returns None so the caller can skip
+        gracefully instead of crashing the pipeline."""
         mod = _load_generate_gyroflow()
         with tempfile.TemporaryDirectory() as tmpdir:
-            fake_scripts = Path(tmpdir) / "scripts"
-            fake_tools = fake_scripts / "tools"
-            fake_tools.mkdir(parents=True)
+            root = Path(tmpdir)
+            applications = root / "Applications"
+            tools = root / "tools"
+            for d in (applications, tools):
+                d.mkdir()
 
-            original_dir = mod.SCRIPT_DIR
-            original_path = os.environ.get("PATH", "")
-            try:
-                mod.SCRIPT_DIR = fake_scripts
-                os.environ["PATH"] = "/nonexistent"
-                result = mod.resolve_gyroflow_binary("/no/such/binary")
-                assert result is None, "Should return None when nothing found"
-            finally:
-                mod.SCRIPT_DIR = original_dir
-                os.environ["PATH"] = original_path
+            with self._isolated(applications, tools):
+                assert mod.resolve_gyroflow_binary("/no/such/binary") is None
+
+
+class TestDownloadGyroflowCheck:
+    """Tests for scripts/tools/download-gyroflow.sh --check, the presence probe
+    the app polls to decide whether to show gyroflow features at all. It reports
+    machine-readable presence data and must never download or write anything."""
+
+    @staticmethod
+    def _parse(stdout: str) -> dict[str, str]:
+        return dict(
+            line[2:].split("=", 1)
+            for line in stdout.splitlines()
+            if line.startswith("@@") and "=" in line
+        )
+
+    @staticmethod
+    def _make_app(root: Path) -> Path:
+        binary = root / "Gyroflow.app" / "Contents" / "MacOS" / "gyroflow"
+        binary.parent.mkdir(parents=True)
+        binary.write_text("#!/bin/bash\necho gyroflow")
+        binary.chmod(0o755)
+        return binary
+
+    def _run_check(self, applications: Path, tools: Path, path_dir: Optional[Path] = None,
+                   extra_args: Optional[list[str]] = None) -> subprocess.CompletedProcess:
+        env = os.environ.copy()
+        env["JETLAG_APPLICATIONS_DIR"] = str(applications)
+        env["JETLAG_TOOLS_DIR"] = str(tools)
+        env["PATH"] = f"{path_dir}:/usr/bin:/bin" if path_dir else "/usr/bin:/bin"
+        return subprocess.run(
+            [str(DOWNLOAD_GYROFLOW), "--check"] + (extra_args or []),
+            capture_output=True, text=True, env=env,
+        )
+
+    def test_check_reports_absence_without_downloading(self):
+        """With no install anywhere, --check reports @@present=false and leaves
+        the tools directory untouched — the app must be able to poll cheaply
+        without triggering a multi-hundred-MB download."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            applications = root / "Applications"
+            tools = root / "tools"
+            for d in (applications, tools):
+                d.mkdir()
+
+            result = self._run_check(applications, tools)
+
+            assert result.returncode == 0, result.stderr
+            assert self._parse(result.stdout)["present"] == "false"
+            assert list(tools.iterdir()) == [], "--check must not install anything"
+
+    def test_check_reports_existing_applications_install(self):
+        """An existing /Applications install is reported, not re-downloaded."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            applications = root / "Applications"
+            tools = root / "tools"
+            for d in (applications, tools):
+                d.mkdir()
+            expected = self._make_app(applications)
+
+            fields = self._parse(self._run_check(applications, tools).stdout)
+
+            assert fields["present"] == "true"
+            assert fields["path"] == str(expected)
+            assert fields["source"] == "applications"
+
+    def test_check_reports_jetlag_managed_install(self):
+        """A copy previously installed into Application Support is reported with
+        its own source, so the app can tell it apart from a user install."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            applications = root / "Applications"
+            tools = root / "tools"
+            for d in (applications, tools):
+                d.mkdir()
+            expected = self._make_app(tools)
+
+            fields = self._parse(self._run_check(applications, tools).stdout)
+
+            assert fields["present"] == "true"
+            assert fields["path"] == str(expected)
+            assert fields["source"] == "jetlag-tools"
+
+    def test_check_reports_path_install(self):
+        """A gyroflow on $PATH counts as present."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            applications = root / "Applications"
+            tools = root / "tools"
+            path_dir = root / "bin"
+            for d in (applications, tools, path_dir):
+                d.mkdir()
+            expected = path_dir / "gyroflow"
+            expected.write_text("#!/bin/bash\necho gyroflow")
+            expected.chmod(0o755)
+
+            fields = self._parse(self._run_check(applications, tools, path_dir).stdout)
+
+            assert fields["present"] == "true"
+            assert fields["path"] == str(expected)
+            assert fields["source"] == "path"
+
+    def test_check_reports_configured_path_last(self):
+        """An explicitly configured binary is the final fallback."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            applications = root / "Applications"
+            tools = root / "tools"
+            for d in (applications, tools):
+                d.mkdir()
+            configured = root / "gyroflow"
+            configured.write_text("#!/bin/bash\necho gyroflow")
+            configured.chmod(0o755)
+
+            fields = self._parse(self._run_check(
+                applications, tools, extra_args=["--configured", str(configured)]
+            ).stdout)
+
+            assert fields["present"] == "true"
+            assert fields["path"] == str(configured)
+            assert fields["source"] == "configured"
+
+    def test_install_target_is_never_inside_the_app_bundle(self):
+        """The installer writes to Application Support, never into the signed
+        Jetlag.app — writing there would break its code signature."""
+        body = DOWNLOAD_GYROFLOW.read_text()
+        assert "Application Support/Jetlag/tools" in body
+        assert "Contents/Resources" not in body
 
 
 class TestPreset:

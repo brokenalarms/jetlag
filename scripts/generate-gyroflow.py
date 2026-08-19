@@ -75,24 +75,49 @@ def has_motion_data(file_path: Path) -> Optional[bool]:
     return False
 
 
+def gyroflow_search_locations() -> tuple[Path, Path]:
+    """The two directories that may hold a Gyroflow.app, in resolution order.
+
+    Overridable via JETLAG_APPLICATIONS_DIR / JETLAG_TOOLS_DIR so the app and
+    the tests can point resolution at somewhere other than the real machine.
+    """
+    applications = Path(os.environ.get("JETLAG_APPLICATIONS_DIR", "/Applications"))
+    tools = Path(
+        os.environ.get("JETLAG_TOOLS_DIR")
+        or Path.home() / "Library" / "Application Support" / "Jetlag" / "tools"
+    )
+    return applications, tools
+
+
+def gyroflow_app_binary(containing_dir: Path) -> Optional[str]:
+    """The CLI inside a Gyroflow.app under containing_dir, if it is runnable.
+
+    Gyroflow ships as a full .app: the CLI only works from inside the bundle,
+    where its code signature is valid and the mdk/Qt frameworks it links
+    against are on hand.
+    """
+    binary = containing_dir / "Gyroflow.app" / "Contents" / "MacOS" / "gyroflow"
+    if binary.is_file() and os.access(binary, os.X_OK):
+        return str(binary)
+    return None
+
+
 def resolve_gyroflow_binary(configured_path: Optional[str] = None) -> Optional[str]:
-    """Find the gyroflow binary: bundled → configured → PATH.
+    """Find the gyroflow CLI: /Applications -> Jetlag tools dir -> PATH -> configured.
 
     Returns the resolved path, or None if not found anywhere.
     """
-    # 1. Bundled binary in scripts/tools/
-    bundled = SCRIPT_DIR / "tools" / "gyroflow"
-    if bundled.is_file() and os.access(bundled, os.X_OK):
-        return str(bundled)
+    for containing_dir in gyroflow_search_locations():
+        found = gyroflow_app_binary(containing_dir)
+        if found:
+            return found
 
-    # 2. Configured path from media-profiles.yaml
-    if configured_path and os.path.isfile(configured_path):
-        return configured_path
-
-    # 3. System PATH (e.g. Homebrew install, Gyroflow.app symlink)
     path_binary = shutil.which("gyroflow")
     if path_binary:
         return path_binary
+
+    if configured_path and os.path.isfile(configured_path):
+        return configured_path
 
     return None
 
@@ -156,7 +181,7 @@ def generate_gyroflow_project(
     resolved = resolve_gyroflow_binary(binary)
     if not resolved:
         configured = binary or "(not set)"
-        print(f"Warning: Gyroflow not found — checked bundled tools/, configured path ({configured}), and $PATH", file=sys.stderr)
+        print(f"Warning: Gyroflow not found — checked /Applications, the Jetlag tools directory, $PATH, and the configured path ({configured})", file=sys.stderr)
         print("Run scripts/tools/download-gyroflow.sh or install Gyroflow", file=sys.stderr)
         return GyroflowResult(
             gyroflow_path=gyroflow_path,

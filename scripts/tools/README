@@ -19,10 +19,13 @@ ffprobe    Stream inspection tool from the FFmpeg project (ffmpeg.org).
              cp $(brew --prefix)/bin/ffprobe scripts/tools/ffprobe
            The binary is gitignored — each developer downloads locally.
 
-gyroflow   Gyroflow CLI (gyroflow.xyz), used for .gyroflow project generation.
-           The Gyroflow app binary doubles as a CLI (accepts --export-project).
-           Download or extract from an existing install:
+gyroflow   Gyroflow (gyroflow.xyz), used for .gyroflow project generation.
+           Not vendored here: the CLI inside Gyroflow.app only runs from inside
+           that bundle, so the whole app is installed alongside Jetlag rather
+           than copied into it:
              scripts/tools/download-gyroflow.sh
-           The script checks /Applications/Gyroflow.app, Homebrew, then
-           downloads from GitHub releases.
-           The binary is gitignored — each developer downloads locally.
+           It reports an existing install (/Applications/Gyroflow.app, the
+           Application Support tools directory, or $PATH) instead of
+           downloading, and otherwise installs Gyroflow.app into
+           ~/Library/Application Support/Jetlag/tools/. Pass --check to report
+           presence without downloading.
