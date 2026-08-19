@@ -196,9 +196,33 @@ class TestFixMediaTimestamp:
         assert "2025:06:17 23:25:21" in exif_result.stdout
 
 
+    def test_quicktime_track_atom_healed(self, test_video):
+        """A correction reaches the per-track tkhd atom, not just the movie header,
+        so a player reading TrackCreateDate sees the corrected time too."""
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-QuickTime:TrackCreateDate=2020:01:01 00:00:00",
+            test_video
+        ], capture_output=True, check=True)
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            test_video, "--timezone", "+08:00", "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode == 0, result.stderr
+
+        exif_result = subprocess.run([
+            "exiftool", "-s", "-QuickTime:TrackCreateDate", test_video
+        ], capture_output=True, text=True, check=True)
+
+        assert "2025:06:17 23:25:21" in exif_result.stdout
+
+
 _IDEMPOTENCE_FIELDS = [
     "-DateTimeOriginal", "-Keys:CreationDate",
     "-QuickTime:CreateDate", "-QuickTime:MediaCreateDate",
+    "-QuickTime:TrackCreateDate",
 ]
 
 # One case per source in the 6-tier ranking that --timezone can relabel. Each
