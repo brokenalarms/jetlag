@@ -12,10 +12,11 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import pytest
 
-from conftest import create_test_video
+from conftest import create_test_photo, create_test_video
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from lib.metadata import metadata_service as exiftool
 from lib.timestamp_source import (
     parse_filename_timestamp,
     build_filename,
@@ -481,3 +482,103 @@ class TestResolveFileTimezoneOffset:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestOffsetTimeOriginalCompletesBareDateTimeOriginal:
+    """Binary EXIF DateTimeOriginal is exactly 19 characters, so OffsetTimeOriginal is the
+    only place a still camera can record the zone its digits belong to. A still carrying
+    both must therefore rank as a zoned source, not as a naive bare-DTO."""
+
+    def setup_method(self):
+        self.tmpdir = tempfile.mkdtemp()
+        clear_exif_cache()
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+        clear_exif_cache()
+
+    def test_bare_dto_plus_offset_reads_back_as_a_zoned_value(self):
+        """A still whose zone lives in OffsetTimeOriginal presents one zoned
+        DateTimeOriginal to every consumer of the shared EXIF read."""
+        photo = os.path.join(self.tmpdir, "IMG_0001.jpg")
+        create_test_photo(photo,
+                          DateTimeOriginal="2025:06:18 07:25:21",
+                          OffsetTimeOriginal="+08:00")
+
+        assert read_exif_data(photo)["DateTimeOriginal"] == "2025:06:18 07:25:21+08:00"
+
+    def test_completed_dto_wins_priority_one_as_a_zoned_source(self):
+        """The completed value ranks at the zoned-DateTimeOriginal tier, beating the
+        filename digits that would otherwise have won for this name."""
+        photo = os.path.join(self.tmpdir, "IMG_20250101_010101.jpg")
+        create_test_photo(photo,
+                          DateTimeOriginal="2025:06:18 07:25:21",
+                          OffsetTimeOriginal="+08:00")
+
+        timestamp, source = get_best_timestamp(photo)
+        assert source == "DateTimeOriginal with timezone"
+        assert timestamp == "2025:06:18 07:25:21"
+
+    def test_offset_time_original_supplies_the_metadata_timezone(self):
+        """The zone a still recorded separately is the zone jetlag reports for it."""
+        photo = os.path.join(self.tmpdir, "IMG_0002.jpg")
+        create_test_photo(photo,
+                          DateTimeOriginal="2025:06:18 07:25:21",
+                          OffsetTimeOriginal="-05:00")
+
+        assert extract_metadata_timezone(photo) == "-05:00"
+
+    def test_bare_dto_without_offset_stays_naive(self):
+        """Behaviour is unchanged for a still that never recorded a zone: it still
+        ranks at the naive bare-DateTimeOriginal tier."""
+        photo = os.path.join(self.tmpdir, "IMG_0003.jpg")
+        create_test_photo(photo, DateTimeOriginal="2025:06:18 07:25:21")
+
+        assert read_exif_data(photo)["DateTimeOriginal"] == "2025:06:18 07:25:21"
+        timestamp, source = get_best_timestamp(photo)
+        assert source == "DateTimeOriginal"
+        assert timestamp == "2025:06:18 07:25:21"
+        assert extract_metadata_timezone(photo) is None
+
+    def test_malformed_offset_is_ignored(self):
+        """A zone that is not a legal offset cannot silently corrupt the timestamp —
+        the file falls back to ranking naive."""
+        photo = os.path.join(self.tmpdir, "IMG_0004.jpg")
+        create_test_photo(photo, DateTimeOriginal="2025:06:18 07:25:21")
+        exiftool.write_tags(photo, ["-EXIF:OffsetTimeOriginal=garbage"])
+        clear_exif_cache()
+
+        assert read_exif_data(photo)["DateTimeOriginal"] == "2025:06:18 07:25:21"
+        assert get_best_timestamp(photo)[1] == "DateTimeOriginal"
+
+    def test_already_zoned_dto_is_left_untouched(self):
+        """A value that already carries its own zone is never rewritten."""
+        video = os.path.join(self.tmpdir, "VID_0005.mp4")
+        create_test_video(video, DateTimeOriginal="2025:06:18 07:25:21+08:00")
+
+        assert read_exif_data(video)["DateTimeOriginal"] == "2025:06:18 07:25:21+08:00"
+
+
+class TestExiftoolStillWritePathForZonedDateTimeOriginal:
+    """Pins the documented write-path fact in docs/timestamp-fields.md: exiftool does NOT
+    split a zoned DateTimeOriginal into OffsetTimeOriginal when the target is a still —
+    the 19-char binary EXIF field takes the digits and the zone is silently discarded."""
+
+    def setup_method(self):
+        self.tmpdir = tempfile.mkdtemp()
+        clear_exif_cache()
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+        clear_exif_cache()
+
+    def test_writing_a_zoned_dto_to_a_still_drops_the_zone(self):
+        photo = os.path.join(self.tmpdir, "IMG_0006.jpg")
+        create_test_photo(photo)
+
+        exiftool.write_tags(photo, ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
+
+        raw = exiftool.read_tags(photo, ["EXIF:DateTimeOriginal",
+                                         "EXIF:OffsetTimeOriginal"])
+        assert raw.get("DateTimeOriginal") == "2025:06:18 07:25:21"
+        assert "OffsetTimeOriginal" not in raw
