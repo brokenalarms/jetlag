@@ -66,7 +66,7 @@ Before a release, run the suite on the floor interpreter itself:
 
 ```bash
 /usr/bin/python3 -m venv /tmp/venv39
-/tmp/venv39/bin/pip install -r scripts/requirements.txt
+/tmp/venv39/bin/pip install -r scripts/requirements.txt -r scripts/requirements-dev.txt
 cd scripts && /tmp/venv39/bin/python3 -m pytest -q
 ```
 
