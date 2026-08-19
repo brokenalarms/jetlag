@@ -146,7 +146,7 @@ class TestFileTimestamps:
         """Test that apply mode updates birth time"""
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            self.test_video, "--apply"
+            self.test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
         assert result.returncode == 0
@@ -161,7 +161,7 @@ class TestFileTimestamps:
 
         subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            self.test_video, "--apply"
+            self.test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, check=True)
 
         new_mtime = os.stat(self.test_video).st_mtime
@@ -171,7 +171,7 @@ class TestFileTimestamps:
         """Verify that file birth time is set correctly for video editor import screen"""
         subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
-            self.test_video, "--apply"
+            self.test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, check=True)
 
         birth_time = os.stat(self.test_video).st_birthtime
