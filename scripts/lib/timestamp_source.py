@@ -477,6 +477,15 @@ def get_best_timestamp(
             datetime_original)
         return timestamp, "DateTimeOriginal"
 
+    # Priority 5.5: CreationDate without timezone and without a Z marker — a naive
+    # source, same tier as bare DateTimeOriginal. No device is known to write this
+    # shape bare (see docs/timestamp-fields.md ranking row 6).
+    if creation_date and not creation_date.endswith('Z') and re.search(r'[0-9]', creation_date):
+        timestamp = re.sub(
+            r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1',
+            creation_date)
+        return timestamp, "CreationDate"
+
     # Priority 6: MediaCreateDate with nothing to cross-check it against
     if media_timestamp:
         return media_timestamp, "MediaCreateDate"

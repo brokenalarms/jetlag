@@ -581,6 +581,10 @@ def format_original_timestamps(current_data: dict) -> str:
         datetime_original = current_data["exif"].get("DateTimeOriginal", "")
         if datetime_original:
             parts.append(f"{format_exif_timestamp_display(datetime_original)} (DateTimeOriginal)")
+    elif source == "CreationDate":
+        creation_date = current_data["exif"].get("CreationDate", "")
+        if creation_date:
+            parts.append(f"{format_exif_timestamp_display(creation_date)} (Keys:CreationDate)")
     elif source == "MediaCreateDate":
         media_create = current_data["exif"].get("MediaCreateDate", "")
         birth_ts = current_data["file_system"].get("birth", "")

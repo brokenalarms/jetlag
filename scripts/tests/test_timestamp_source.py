@@ -239,6 +239,37 @@ class TestGetBestTimestamp:
         assert ts == "2025:06:18 07:25:21"
         assert "filename" in source
 
+    def test_bare_creationdate_ranks_with_bare_datetimeoriginal(self):
+        """A Keys:CreationDate with no zone suffix and no Z is a naive source, ranked
+        at the same tier as a bare DateTimeOriginal — not ignored.
+
+        Written via the raw '#' form: exiftool's CreationDate PrintConvInv otherwise
+        auto-appends the writing machine's local timezone to a bare value, which
+        would defeat the point of this fixture.
+        """
+        video = os.path.join(self.temp_dir, "test.mp4")
+        create_test_video(video, **{"Keys:CreationDate#": "2025:06:18 07:25:21"})
+
+        ts, source = get_best_timestamp(video, timezone_offset="+08:00")
+        assert ts == "2025:06:18 07:25:21"
+        assert source == "CreationDate"
+
+    def test_bare_creationdate_loses_to_zoned_datetimeoriginal(self):
+        """A higher-ranked source (zoned DateTimeOriginal, priority 1) still wins over
+        a bare Keys:CreationDate present on the same file."""
+        video = os.path.join(self.temp_dir, "test.mp4")
+        create_test_video(
+            video,
+            **{
+                "DateTimeOriginal": "2025:06:18 09:25:21+08:00",
+                "Keys:CreationDate#": "2025:06:18 07:00:00",
+            },
+        )
+
+        ts, source = get_best_timestamp(video, timezone_offset="+08:00")
+        assert ts == "2025:06:18 09:25:21"
+        assert source == "DateTimeOriginal with timezone"
+
 
 class TestQuickTimeInstantVersusFilename:
     """A camera filename records the digits the camera displayed, with no zone. A
