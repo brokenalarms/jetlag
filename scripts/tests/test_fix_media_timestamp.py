@@ -209,7 +209,7 @@ class TestFixMediaTimestamp:
         ], capture_output=True, text=True)
 
         assert result.returncode == 0
-        assert "QuickTime CreateDate" in result.stderr
+        assert "QuickTime:CreateDate" in result.stderr
 
         # Verify QuickTime CreateDate is now correct (in UTC)
         exif_result = subprocess.run([
@@ -235,12 +235,58 @@ class TestFixMediaTimestamp:
         ], capture_output=True, text=True)
 
         assert result.returncode == 0, result.stderr
+        assert "QuickTime:TrackCreateDate" in result.stderr
 
         exif_result = subprocess.run([
             "exiftool", "-s", "-QuickTime:TrackCreateDate", test_video
         ], capture_output=True, text=True, check=True)
 
         assert "2025:06:17 23:25:21" in exif_result.stdout
+
+    def test_stale_movie_header_is_corrected_when_tracks_are_already_right(self, temp_dir):
+        """The Korea import case: DateTimeOriginal and both track atoms already carry
+        the corrected instant while the mvhd movie header is 8 hours off. The run must
+        report a change, heal the header to the same instant as the track atoms, and
+        leave the correct DateTimeOriginal alone."""
+        video = os.path.join(temp_dir, "stale_header.mp4")
+        create_test_video(video, DateTimeOriginal="2025:08:15 15:07:42+09:00")
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-QuickTime:CreateDate=2025:08:15 14:07:42",
+            "-QuickTime:MediaCreateDate=2025:08:15 06:07:42",
+            "-QuickTime:TrackCreateDate=2025:08:15 06:07:42",
+            video
+        ], capture_output=True, check=True)
+
+        dry = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video, "--timezone", "+09:00", "--force-timezone"
+        ], capture_output=True, text=True)
+        assert dry.returncode == 0, dry.stderr
+        assert "QuickTime:CreateDate" in dry.stderr
+        assert "No change" not in dry.stderr
+
+        applied = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video, "--timezone", "+09:00", "--force-timezone", "--apply"
+        ], capture_output=True, text=True)
+        assert applied.returncode == 0, applied.stderr
+
+        after = subprocess.run([
+            "exiftool", "-s",
+            "-QuickTime:CreateDate", "-QuickTime:MediaCreateDate",
+            "-QuickTime:TrackCreateDate", "-XMP-exif:DateTimeOriginal",
+            video
+        ], capture_output=True, text=True, check=True).stdout
+
+        values = dict(
+            (line.split(":", 1)[0].strip(), line.split(":", 1)[1].strip())
+            for line in after.strip().splitlines()
+        )
+        assert values["CreateDate"] == "2025:08:15 06:07:42"
+        assert values["MediaCreateDate"] == "2025:08:15 06:07:42"
+        assert values["TrackCreateDate"] == "2025:08:15 06:07:42"
+        assert values["DateTimeOriginal"] == "2025:08:15 15:07:42+09:00"
 
 
 _IDEMPOTENCE_FIELDS = [
