@@ -159,11 +159,19 @@ def normalize_timezone_format(value: str) -> str:
     return re.sub(r'([+-]\d{2}):(\d{2})$', r'\1\2', value)
 
 
-_UTC_TIMESTAMP_SOURCES = {"CreationDate with Z (UTC)", "MediaCreateDate"}
+# Source labels for the QuickTime clock. The digits are UTC by specification either
+# way; the label records whether the file itself corroborated that (see
+# docs/timestamp-fields.md, "A UTC-specified field is corroborated UTC only when the file shows it").
+SOURCE_UTC_CORROBORATED = "MediaCreateDate (corroborated UTC)"
+SOURCE_UTC_BY_SPEC = "MediaCreateDate (UTC by spec)"
+
+_UTC_TIMESTAMP_SOURCES = {
+    "CreationDate with Z (UTC)", SOURCE_UTC_CORROBORATED, SOURCE_UTC_BY_SPEC,
+}
 
 
 def is_utc_timestamp_source(source: str) -> bool:
-    """True when a source's timestamp is UTC rather than local wall-clock time."""
+    """True when a source's digits are UTC rather than local wall-clock time."""
     return source in _UTC_TIMESTAMP_SOURCES
 
 
@@ -389,14 +397,14 @@ def camera_zone_offset(
     return _format_zone_offset(delta)
 
 
-def _quicktime_is_instant(quicktime_timestamp: str, filename_timestamp: Optional[str]) -> bool:
-    """Whether a QuickTime date and a filename describe one instant in some zone.
+def _is_corroborated_utc(utc_timestamp: str, filename_timestamp: Optional[str]) -> bool:
+    """Whether the file corroborates that a UTC-specified field really holds UTC.
 
-    QuickTime dates are UTC by specification, but not every device honours that and a
-    camera clock can simply be wrong. The filename is the camera's own local reading, so
-    a legal zone offset between the two is what shows the QuickTime date to be an instant.
+    The field is UTC by specification, but not every device honours that and a camera
+    clock can simply be wrong. The filename is the camera's own local reading, so a
+    legal zone offset between the two is the corroboration.
     """
-    return camera_zone_offset(quicktime_timestamp, filename_timestamp) is not None
+    return camera_zone_offset(utc_timestamp, filename_timestamp) is not None
 
 
 def _media_create_date_timestamp(exif_data: Dict[str, str]) -> str:
@@ -460,39 +468,41 @@ def get_best_timestamp(
 
     ts, _ = parse_filename_timestamp(file_path)
 
-    # Priority 3: a QuickTime date the filename shows to be an instant. A camera left on
-    # the previous country's time writes a filename that is wrong for where it was shot;
-    # the instant survives that, so it wins where the two contradict each other. Without
-    # a declared timezone there is nothing to convert the instant into.
-    if timezone_offset and _quicktime_is_instant(media_timestamp, ts):
-        return media_timestamp, "MediaCreateDate"
+    # Priority 3: a UTC clock value the filename corroborates. A camera left on the
+    # previous country's time writes a filename that is wrong for where it was shot;
+    # the UTC value survives that, so it wins where the two contradict each other.
+    # Without a declared timezone there is nothing to convert UTC into.
+    if timezone_offset and _is_corroborated_utc(media_timestamp, ts):
+        return media_timestamp, SOURCE_UTC_CORROBORATED
 
     # Priority 4: Filename for VID/IMG/LRV/DJI
     if ts and (re.match(r'^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6}', base) or
                re.match(r'^DJI_[0-9]{14}_', base)):
         return ts, "filename"
 
-    # Priority 5: DateTimeOriginal without timezone
+    # Priority 5: a UTC-specified clock value with nothing to corroborate it. Still
+    # ranks above the bare tags below: those are naive by definition, whereas this
+    # field at least has a specification saying what its digits mean.
+    if media_timestamp:
+        return media_timestamp, SOURCE_UTC_BY_SPEC
+
+    # Priority 6: DateTimeOriginal without timezone
     if datetime_original and re.search(r'[0-9]', datetime_original):
         timestamp = re.sub(
             r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1',
             datetime_original)
         return timestamp, "DateTimeOriginal"
 
-    # Priority 5.5: CreationDate without timezone and without a Z marker — a naive
+    # Priority 6.5: CreationDate without timezone and without a Z marker — a naive
     # source, same tier as bare DateTimeOriginal. No device is known to write this
-    # shape bare (see docs/timestamp-fields.md ranking row 6).
+    # shape bare (see docs/timestamp-fields.md ranking row 7).
     if creation_date and not creation_date.endswith('Z') and re.search(r'[0-9]', creation_date):
         timestamp = re.sub(
             r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1',
             creation_date)
         return timestamp, "CreationDate"
 
-    # Priority 6: MediaCreateDate with nothing to cross-check it against
-    if media_timestamp:
-        return media_timestamp, "MediaCreateDate"
-
-    # Priority 6: File timestamps
+    # Priority 7: File timestamps
     try:
         st = os.stat(file_path)
         try:
