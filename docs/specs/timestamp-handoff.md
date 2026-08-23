@@ -64,10 +64,6 @@ flag are refused, and the per-field truth table now lives in `docs/timestamp-fie
 
 ## Test debt
 
-- `test_fix_media_timestamp.py:60` is the only idempotence test. Its fixture already
-  carries a zoned `DateTimeOriginal` and it runs with no declared timezone, so it
-  exercises the one path that cannot regress. The assertion that would have caught this
-  bug is that reprocessing a corrected file yields what processing a pristine copy yields.
 - Fixtures cannot express a metadata/filename conflict unless a QuickTime date is written
   explicitly — the ffmpeg-generated template carries `0000:00:00`. See
   `TestQuickTimeInstantVersusFilename` for the pattern.
