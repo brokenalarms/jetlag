@@ -246,17 +246,19 @@ could express a conflict between metadata and filename.
 written on the first correction, byte-identical after a later forced relabel, absent
 after a dry run, and omitting the fields a file never carried.
 
-Not yet covered, and worth adding alongside the work above:
+`test_zoned_datetimeoriginal_converts_into_declared_zone` in
+`tests/test_fix_media_timestamp_units.py` covers an offset-bearing `DateTimeOriginal`
+converting into the declared zone rather than passing through unchanged.
 
-- An offset-bearing `DateTimeOriginal` converts into the declared zone rather than being
-  passed through unchanged.
-- After any correction, the movie header and the track atoms agree.
-- A correction's `original_epoch` equals its `corrected_epoch` unless `--time-offset` was
-  supplied.
-- Reprocessing a corrected file yields what processing a pristine copy yields, for each
-  source in the ranking. The one existing idempotence test, `test_fix_media_timestamp.py`,
-  runs a file that already carries a zoned `DateTimeOriginal` with no declared timezone,
-  so it exercises only the pass-through path.
+`test_stale_movie_header_is_corrected_when_tracks_are_already_right` in
+`tests/test_fix_media_timestamp.py` covers the movie header and the track atoms
+agreeing after a correction.
+
+`TestIdempotenceAcrossRanking` in `tests/test_fix_media_timestamp.py` covers, for each
+source in the ranking: `original_epoch` equalling `corrected_epoch` unless
+`--time-offset` was supplied (and, when it is, the corrected epoch landing exactly the
+offset away), and reprocessing a corrected file yielding what processing a pristine
+copy yields.
 
 ## Out of scope
 

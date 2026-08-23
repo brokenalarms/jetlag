@@ -19,6 +19,18 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 SCRIPT_DIR = Path(__file__).parent.parent
 
 
+def _parse_at_lines(stdout: str) -> dict:
+    """Parse @@key=value lines from stdout."""
+    result = {}
+    for line in stdout.strip().split("\n"):
+        if line.startswith("@@"):
+            key_value = line[2:]
+            if "=" in key_value:
+                key, value = key_value.split("=", 1)
+                result[key] = value
+    return result
+
+
 class TestFixMediaTimestamp:
     """Test suite for fix-media-timestamp.py"""
 
@@ -380,6 +392,51 @@ class TestIdempotenceAcrossRanking:
 
         assert self._read_fields(reprocessed) == self._read_fields(processed_once)
 
+    @pytest.mark.parametrize("filename, exif_tags, apply_args", _RANKING_CASES)
+    def test_original_epoch_equals_corrected_epoch(self, temp_dir, filename, exif_tags, apply_args):
+        """A --timezone relabel must preserve the instant: the epoch read off the
+        source before correction must equal the epoch written after it, for every
+        source in the ranking. A dry run is enough — the @@ lines are emitted either way."""
+        video = os.path.join(temp_dir, filename)
+        create_test_video(video, **exif_tags)
+
+        dry_args = [arg for arg in apply_args if arg != "--apply"]
+        cmd = [sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video] + dry_args
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+
+        at_lines = _parse_at_lines(result.stdout)
+        original_epoch = float(at_lines["original_epoch"])
+        corrected_epoch = float(at_lines["corrected_epoch"])
+        assert original_epoch == corrected_epoch, (
+            f"Actual: original_epoch={original_epoch}, corrected_epoch={corrected_epoch}, "
+            f"Expected: equal (a declared --timezone relabels, it does not move the instant)"
+        )
+
+    def test_time_offset_shifts_corrected_epoch_only(self, temp_dir):
+        """--time-offset is the only thing that moves the instant: on a proven
+        MediaCreateDate instant, corrected_epoch must land exactly the offset
+        away from original_epoch."""
+        filename = "VID_20260104_033532_00_001.mp4"
+        video = os.path.join(temp_dir, filename)
+        create_test_video(video, **{"QuickTime:MediaCreateDate": "2026:01:03 18:35:32"})
+
+        cmd = [
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            video, "--timezone", "+13:00", "--time-offset", "-7200",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+
+        at_lines = _parse_at_lines(result.stdout)
+        original_epoch = float(at_lines["original_epoch"])
+        corrected_epoch = float(at_lines["corrected_epoch"])
+        assert corrected_epoch == original_epoch - 7200, (
+            f"Actual: corrected_epoch={corrected_epoch}, original_epoch={original_epoch}, "
+            f"Expected: corrected_epoch == original_epoch - 7200"
+        )
+
 
 class TestFixMediaTimestampIntegration:
     """Integration tests for fix-media-timestamp.py with various file types"""
@@ -426,17 +483,6 @@ class TestFixMediaTimestampMachineOutput:
         yield tmpdir
         shutil.rmtree(tmpdir)
 
-    def _parse_at_lines(self, stdout: str) -> dict:
-        """Parse @@key=value lines from stdout."""
-        result = {}
-        for line in stdout.strip().split("\n"):
-            if line.startswith("@@"):
-                key_value = line[2:]
-                if "=" in key_value:
-                    key, value = key_value.split("=", 1)
-                    result[key] = value
-        return result
-
     def test_dry_run_emits_would_fix(self, temp_dir):
         """Dry run on file needing fixes emits @@timestamp_action=would_fix
 
@@ -450,7 +496,7 @@ class TestFixMediaTimestampMachineOutput:
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--timezone", "+08:00"
         ], capture_output=True, text=True)
 
-        at_lines = self._parse_at_lines(result.stdout)
+        at_lines = _parse_at_lines(result.stdout)
         assert at_lines.get("file") == "test.mp4", f"Actual: @@file={at_lines.get('file')}, Expected: test.mp4"
         assert at_lines.get("timestamp_action") == "would_fix", f"Actual: @@timestamp_action={at_lines.get('timestamp_action')}, Expected: would_fix"
         assert at_lines.get("timestamp_source") == "datetimeoriginal", f"Actual: @@timestamp_source={at_lines.get('timestamp_source')}, Expected: datetimeoriginal"
@@ -477,7 +523,7 @@ class TestFixMediaTimestampMachineOutput:
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
-        at_lines = self._parse_at_lines(result.stdout)
+        at_lines = _parse_at_lines(result.stdout)
         assert at_lines.get("timestamp_action") == "no_change", f"Actual: @@timestamp_action={at_lines.get('timestamp_action')}, Expected: no_change"
 
     def test_apply_emits_fixed(self, temp_dir):
@@ -493,7 +539,7 @@ class TestFixMediaTimestampMachineOutput:
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
-        at_lines = self._parse_at_lines(result.stdout)
+        at_lines = _parse_at_lines(result.stdout)
         assert at_lines.get("timestamp_action") == "fixed", f"Actual: @@timestamp_action={at_lines.get('timestamp_action')}, Expected: fixed"
 
     def test_filename_source_detected(self, temp_dir):
@@ -510,7 +556,7 @@ class TestFixMediaTimestampMachineOutput:
             "--timezone", "+0800"
         ], capture_output=True, text=True)
 
-        at_lines = self._parse_at_lines(result.stdout)
+        at_lines = _parse_at_lines(result.stdout)
         assert at_lines.get("timestamp_source") == "filename", f"Actual: @@timestamp_source={at_lines.get('timestamp_source')}, Expected: filename"
 
     def test_camera_zone_offset_present_when_quicktime_wins(self, temp_dir):
@@ -529,7 +575,7 @@ class TestFixMediaTimestampMachineOutput:
             "--timezone", "+13:00"
         ], capture_output=True, text=True)
 
-        at_lines = self._parse_at_lines(result.stdout)
+        at_lines = _parse_at_lines(result.stdout)
         assert at_lines.get("timestamp_source") == "mediacreatedate"
         assert at_lines.get("camera_zone_offset") == "+09:00", f"Actual: @@camera_zone_offset={at_lines.get('camera_zone_offset')}, Expected: +09:00"
 
@@ -551,7 +597,7 @@ class TestFixMediaTimestampMachineOutput:
             "--timezone", "+13:00"
         ], capture_output=True, text=True)
 
-        at_lines = self._parse_at_lines(result.stdout)
+        at_lines = _parse_at_lines(result.stdout)
         assert at_lines.get("timestamp_source") == "datetimeoriginal", f"Actual: @@timestamp_source={at_lines.get('timestamp_source')}, Expected: datetimeoriginal"
         assert at_lines.get("camera_zone_offset") == "+09:00", f"Actual: @@camera_zone_offset={at_lines.get('camera_zone_offset')}, Expected: +09:00"
 
@@ -570,7 +616,7 @@ class TestFixMediaTimestampMachineOutput:
             "--timezone", "+0800"
         ], capture_output=True, text=True)
 
-        at_lines = self._parse_at_lines(result.stdout)
+        at_lines = _parse_at_lines(result.stdout)
         assert "camera_zone_offset" not in at_lines, f"Actual: @@camera_zone_offset={at_lines.get('camera_zone_offset')}, Expected: absent"
 
     def test_stdout_only_has_at_lines(self, temp_dir):
