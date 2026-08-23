@@ -35,6 +35,9 @@ targets:
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         GENERATE_INFOPLIST_FILE: YES
+        # Suppress xcodegen's Info.plist auto-detection, which otherwise picks up
+        # the jetlag-metadata dSYM build artifact under Sources/Tools/.build.
+        INFOPLIST_FILE: ""
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.video
         INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 Daniel Lawrence"
         CODE_SIGN_ENTITLEMENTS: Sources/App.entitlements
