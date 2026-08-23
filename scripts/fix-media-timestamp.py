@@ -277,12 +277,95 @@ def write_keys_creationdate(file_path: str, datetime_original: datetime) -> bool
         print(f"Error writing Keys:CreationDate: {e}", file=sys.stderr)
         return False
 
-QUICKTIME_CLOCK_TAGS = ["CreateDate", "MediaCreateDate", "TrackCreateDate"]
+@dataclass(frozen=True)
+class ClockField:
+    """A metadata clock field a correction owns.
 
-# The subset that only ever comes from a QuickTime container. Bare `CreateDate` is
-# also an EXIF stills tag holding local time, so a file's QuickTime-ness and the
-# staleness of its clock are judged on these two alone.
-QUICKTIME_TRACK_CLOCK_TAGS = ["MediaCreateDate", "TrackCreateDate"]
+    write_tag is what exiftool is given; read_key is what the value comes back
+    under in read_exif_data(). quicktime fields hold a raw UTC instant and exist
+    only in a QuickTime container; the rest hold zoned local time.
+    proves_container marks the fields whose presence identifies the file as a
+    QuickTime container — bare `CreateDate` is also an EXIF stills tag holding
+    local time, so it can never be the evidence.
+    """
+    write_tag: str
+    read_key: str
+    quicktime: bool
+    proves_container: bool = False
+
+
+# Every metadata clock field a correction owns, per the "jetlag writes" column of
+# docs/timestamp-fields.md. This one table drives both the comparison against a
+# file's stored values and the write, so a correction can never write a subset:
+# a stale movie header cannot survive a run that found the track atoms correct.
+CLOCK_FIELDS = [
+    ClockField("DateTimeOriginal", "DateTimeOriginal", quicktime=False),
+    ClockField("Keys:CreationDate", "CreationDate", quicktime=False),
+    ClockField("QuickTime:CreateDate", "CreateDate", quicktime=True),
+    ClockField("QuickTime:MediaCreateDate", "MediaCreateDate", quicktime=True, proves_container=True),
+    ClockField("QuickTime:TrackCreateDate", "TrackCreateDate", quicktime=True, proves_container=True),
+]
+
+QUICKTIME_CLOCK_TAGS = [field.read_key for field in CLOCK_FIELDS if field.quicktime]
+
+
+def is_quicktime_container(exif: Dict[str, str]) -> bool:
+    """Whether a file's clock fields come from a QuickTime container."""
+    return any(exif.get(field.read_key) for field in CLOCK_FIELDS if field.proves_container)
+
+
+def clock_field_targets(exif: Dict[str, str], datetime_original: datetime,
+                        write_datetime_original: bool = False) -> Dict[str, str]:
+    """The value every clock field a correction owns must end up holding.
+
+    Zoned local time for DateTimeOriginal and Keys:CreationDate; the same instant
+    as raw UTC for the QuickTime atoms. Stills get no QuickTime entries.
+    DateTimeOriginal is owned only when the caller has decided to write it — an
+    existing tag is otherwise the source, not a target.
+    """
+    zoned = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
+    zoned = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', zoned)
+    utc = datetime_original.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
+    container = is_quicktime_container(exif)
+
+    targets = {}
+    for field in CLOCK_FIELDS:
+        if field.quicktime and not container:
+            continue
+        if field.write_tag == "DateTimeOriginal" and not write_datetime_original:
+            continue
+        targets[field.write_tag] = utc if field.quicktime else zoned
+    return targets
+
+
+def _utc_clock_differs(current: str, target: str) -> bool:
+    """Whether a stored UTC clock value differs from the expected one.
+
+    A one second tolerance absorbs rounding; an unparseable value counts as stale.
+    """
+    try:
+        current_dt = datetime.strptime(current, "%Y:%m:%d %H:%M:%S")
+        target_dt = datetime.strptime(target, "%Y:%m:%d %H:%M:%S")
+        return abs((current_dt - target_dt).total_seconds()) > 1
+    except ValueError:
+        return True
+
+
+def stale_clock_fields(exif: Dict[str, str], targets: Dict[str, str]) -> list:
+    """The write tags in targets whose stored value is missing or differs."""
+    stale = []
+    for field in CLOCK_FIELDS:
+        if field.write_tag not in targets:
+            continue
+        current = exif.get(field.read_key, "")
+        target = targets[field.write_tag]
+        if field.quicktime:
+            differs = _utc_clock_differs(current, target)
+        else:
+            differs = normalize_exif_value(current) != normalize_exif_value(target)
+        if differs:
+            stale.append(field.write_tag)
+    return stale
 
 
 def quicktime_createdate_args(utc_time: str) -> list:
@@ -458,89 +541,31 @@ def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, 
 
     return data
 
-def check_keys_creationdate_needs_update(file_path: str, datetime_original: datetime) -> bool:
-    """Check if Keys:CreationDate needs updating
-
-    Args:
-        file_path: Path to the media file
-        datetime_original: datetime object with timezone info
-
-    Returns:
-        True if Keys:CreationDate needs updating, False otherwise
-    """
-    exif_data = read_exif_data(file_path)
-    current_creation_date = exif_data.get("CreationDate", "")
-
-    if not current_creation_date:
-        # Missing, needs to be written
-        return True
-
-    # Expected: DateTimeOriginal with its original timezone
-    expected_value = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
-    # Format timezone with colon
-    expected_value = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', expected_value)
-
-    # Normalize both values for comparison (handle timezone format differences)
-    current_norm = normalize_exif_value(current_creation_date)
-    expected_norm = normalize_exif_value(expected_value)
-
-    return current_norm != expected_norm
-
-def check_quicktime_createdate_needs_update(file_path: str, datetime_original: datetime) -> bool:
-    """Check if QuickTime CreateDate needs updating to match correct UTC"""
-    exif_data = read_exif_data(file_path)
-    present = [exif_data.get(tag, "") for tag in QUICKTIME_TRACK_CLOCK_TAGS if exif_data.get(tag, "")]
-
-    if not present:
-        return False  # Not a QuickTime file, skip this check
-
-    expected_utc = datetime_original.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
-
-    # A stale value in any single atom is enough: the write sets them all, so
-    # leaving one behind is what left pre-correction times readable in the tracks.
-    return any(_createdate_is_stale(value, expected_utc) for value in present)
-
-
-def _createdate_is_stale(current_utc: str, expected_utc: str) -> bool:
-    """Whether a stored UTC clock value differs from the expected one.
-
-    A one second tolerance absorbs rounding; an unparseable value counts as stale.
-    """
-    try:
-        current_dt = datetime.strptime(current_utc, "%Y:%m:%d %H:%M:%S")
-        expected_dt = datetime.strptime(expected_utc, "%Y:%m:%d %H:%M:%S")
-        return abs((current_dt - expected_dt).total_seconds()) > 1
-    except ValueError:
-        return True
-
-def determine_needed_changes(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False) -> dict:
+def determine_needed_changes(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False,
+                             write_datetime_original: bool = False) -> dict:
     """Determine what changes are needed
 
     Args:
         file_path: Path to the media file
         datetime_original: datetime object with timezone info
         preserve_wallclock: If True, preserve wall-clock shooting time for birth time
+        write_datetime_original: If True, DateTimeOriginal is a field this correction owns
 
     Returns:
-        Dictionary with boolean flags for needed changes
+        Dict with the correction's target value per clock field, the write tags
+        whose stored value does not already match, and the file system flag.
     """
-    changes = {
-        "keys_creationdate": False,
-        "file_timestamps": False,
-        "quicktime_createdate": False
+    exif = read_exif_data(file_path)
+    targets = clock_field_targets(exif, datetime_original, write_datetime_original)
+
+    return {
+        "clock_targets": targets,
+        "stale_clock_fields": stale_clock_fields(exif, targets),
+        "file_timestamps": (
+            check_file_system_timestamps_need_update(file_path, datetime_original, preserve_wallclock)
+            if sys.platform == "darwin" else False
+        ),
     }
-
-    # Check if Keys:CreationDate needs updating (always uses original timezone)
-    changes["keys_creationdate"] = check_keys_creationdate_needs_update(file_path, datetime_original)
-
-    # Check if file system timestamps need updating (macOS only)
-    if sys.platform == "darwin":
-        changes["file_timestamps"] = check_file_system_timestamps_need_update(file_path, datetime_original, preserve_wallclock)
-
-    # Check if QuickTime CreateDate needs updating
-    changes["quicktime_createdate"] = check_quicktime_createdate_needs_update(file_path, datetime_original)
-
-    return changes
 
 
 def _get_raw_original_time(current_data: dict) -> str:
@@ -682,13 +707,19 @@ def format_time_delta(seconds: float) -> str:
 def format_change_description(changes: dict, timestamp_data: Optional[dict] = None, current_data: Optional[dict] = None, preserve_wallclock: bool = False, datetime_original: Optional[datetime] = None) -> str:
     """Format change description from changes data"""
     parts = []
+    stale = changes.get("stale_clock_fields", [])
+    targets = changes.get("clock_targets", {})
+    exif = current_data.get("exif", {}) if current_data else {}
 
-    # Check if DateTimeOriginal needs to be written
-    needs_datetime_original = current_data and not current_data.get("exif", {}).get("DateTimeOriginal")
-    if needs_datetime_original:
-        parts.append("DateTimeOriginal (missing)")
+    if "DateTimeOriginal" in stale:
+        current_dto = exif.get("DateTimeOriginal", "")
+        if current_dto:
+            parts.append(f"DateTimeOriginal ({format_exif_timestamp_display(current_dto)}"
+                         f" → {format_exif_timestamp_display(targets['DateTimeOriginal'])})")
+        else:
+            parts.append("DateTimeOriginal (missing)")
 
-    if changes.get("keys_creationdate"):
+    if "Keys:CreationDate" in stale:
         # Show helpful context for Keys:CreationDate change
         if current_data and datetime_original:
             creation_date = current_data.get("exif", {}).get("CreationDate", "")
@@ -756,19 +787,15 @@ def format_change_description(changes: dict, timestamp_data: Optional[dict] = No
         else:
             parts.append("Birth time")
 
-    if changes.get("quicktime_createdate"):
-        # Show what the current and expected QuickTime CreateDate values are
-        if current_data and datetime_original:
-            media_create = current_data.get("exif", {}).get("MediaCreateDate", "")
-            # Expected is UTC
-            expected_utc = datetime_original.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
-
-            if media_create:
-                parts.append(f"QuickTime CreateDate ({format_exif_timestamp_display(media_create)} → {format_exif_timestamp_display(expected_utc)} UTC)")
-            else:
-                parts.append(f"QuickTime CreateDate (missing → {format_exif_timestamp_display(expected_utc)} UTC)")
+    for field in CLOCK_FIELDS:
+        if not field.quicktime or field.write_tag not in stale:
+            continue
+        current = exif.get(field.read_key, "")
+        target_display = f"{format_exif_timestamp_display(targets[field.write_tag])} UTC"
+        if current:
+            parts.append(f"{field.write_tag} ({format_exif_timestamp_display(current)} → {target_display})")
         else:
-            parts.append("QuickTime CreateDate")
+            parts.append(f"{field.write_tag} (missing → {target_display})")
 
     return ", ".join(parts) if parts else "No change"
 
@@ -880,8 +907,22 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
         current_data["datetime_original"] = datetime_original
         current_data["datetime_original_str"] = datetime_original_str
 
+    # DateTimeOriginal is a field this correction owns when:
+    # 1. It's missing and we have timezone info, OR
+    # 2. infer_from_filename is set (filename is the source of truth, DTO may be wrong/missing)
+    # 3. force_timezone is set (the confirmed relabel must reach the stored tag)
+    should_write_datetime_original = bool(
+        (not current_data["exif"].get("DateTimeOriginal") and current_data["datetime_original_str"]) or
+        (infer_from_filename and current_data["datetime_original_str"]) or
+        (force_timezone and current_data["datetime_original_str"])
+    )
+
     # Determine needed changes
-    changes = determine_needed_changes(file_path, datetime_original, preserve_wallclock=preserve_wallclock)
+    changes = determine_needed_changes(
+        file_path, datetime_original,
+        preserve_wallclock=preserve_wallclock,
+        write_datetime_original=should_write_datetime_original,
+    )
 
     # Format and display timestamps
     original_display = format_original_timestamps(current_data)
@@ -920,7 +961,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
 
     # Display changes
     change_desc = format_change_description(changes, timestamp_data, current_data, preserve_wallclock, datetime_original)
-    has_changes = changes.get("keys_creationdate", False) or changes["file_timestamps"] or changes.get("quicktime_createdate", False)
+    has_changes = bool(changes["stale_clock_fields"]) or changes["file_timestamps"]
 
     # Build common result fields
     correction_mode = "time" if (time_offset_seconds is not None and time_offset_seconds != 0) else "timezone"
@@ -958,45 +999,25 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
     # correction below.
     provenance_args = provenance_field_args(file_path, current_data["exif"])
 
-    # Write DateTimeOriginal if:
-    # 1. It's missing and we have timezone info, OR
-    # 2. infer_from_filename is set (filename is the source of truth, DTO may be wrong/missing)
-    # 3. force_timezone is set (the confirmed relabel must reach the stored tag)
-    should_write_datetime_original = (
-        (not current_data["exif"].get("DateTimeOriginal") and current_data["datetime_original_str"]) or
-        (infer_from_filename and current_data["datetime_original_str"]) or
-        (force_timezone and current_data["datetime_original_str"])
-    )
-
     if should_write_datetime_original and infer_from_filename and current_data["exif"].get("DateTimeOriginal"):
         print("   ⚠️  Overwriting existing DateTimeOriginal (--infer-from-filename flag)", file=sys.stderr)
     elif should_write_datetime_original and force_timezone and current_data["exif"].get("DateTimeOriginal"):
         print("   ⚠️  Overwriting existing DateTimeOriginal timezone (--force-timezone flag)", file=sys.stderr)
 
-    # Build all EXIF writes and apply in one exiftool call
-    correction_args = []
-    if should_write_datetime_original:
-        correction_args.append(f"-DateTimeOriginal={current_data['datetime_original_str']}")
-    if changes.get("keys_creationdate"):
-        keys_value = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
-        keys_value = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', keys_value)
-        correction_args.append(f"-Keys:CreationDate={keys_value}")
-    if changes.get("quicktime_createdate"):
-        utc_time = datetime_original.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
-        correction_args.extend(quicktime_createdate_args(utc_time))
+    # A correction owns the whole clock-field table, so one stale field rewrites
+    # them all: a subset write is what let a stale movie header outlive a run that
+    # found the track atoms correct.
+    correction_args = [
+        f"-{tag}={value}" for tag, value in changes["clock_targets"].items()
+    ] if changes["stale_clock_fields"] else []
+
     field_args = provenance_args + correction_args
     if field_args:
         if not write_exif_fields(file_path, field_args):
             if provenance_args:
                 print("   ⚠️  Failed to record original timestamps for recovery", file=sys.stderr)
-            if should_write_datetime_original:
-                print("   ❌ Failed to write DateTimeOriginal", file=sys.stderr)
-            if changes.get("keys_creationdate"):
-                print("   ❌ Failed to write Keys:CreationDate", file=sys.stderr)
-            if changes.get("quicktime_createdate"):
-                print("   ❌ Failed to heal QuickTime CreateDate", file=sys.stderr)
-            # A lost recovery record does not invalidate the correction.
             if correction_args:
+                print(f"   ❌ Failed to write clock fields: {', '.join(changes['clock_targets'])}", file=sys.stderr)
                 success = False
 
     # Update file system timestamps if needed

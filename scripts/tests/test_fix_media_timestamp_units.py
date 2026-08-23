@@ -127,72 +127,81 @@ class TestChangeDetection:
         shutil.rmtree(self.temp_dir)
         fmt._exif_cache.clear()
 
-    def test_check_keys_creationdate_needs_update_missing(self):
-        """Test detecting missing Keys:CreationDate"""
-        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
-
-        needs_update = fmt.check_keys_creationdate_needs_update(
-            self.test_video, dt
+    def _set_tags(self, path, *tag_args):
+        subprocess.run(
+            ["exiftool", "-P", "-overwrite_original", *tag_args, path],
+            capture_output=True, check=True,
         )
-
-        # Should need update if Keys:CreationDate is missing
-        assert needs_update is True
-
-    def test_check_keys_creationdate_needs_update_correct(self):
-        """Test detecting correct Keys:CreationDate"""
-        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
-
-        # Set Keys:CreationDate
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-Keys:CreationDate=2025:06:18 07:25:21+08:00",
-            self.test_video
-        ], capture_output=True, check=True)
-
-        # Clear cache to force re-read
         fmt._exif_cache.clear()
 
-        needs_update = fmt.check_keys_creationdate_needs_update(
-            self.test_video, dt
+    def test_missing_keys_creationdate_is_reported_stale(self):
+        """A file with no Keys:CreationDate must be reported as needing that field
+        written, so FCP reads the corrected time rather than nothing."""
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+
+        changes = fmt.determine_needed_changes(self.test_video, dt)
+
+        assert "Keys:CreationDate" in changes["stale_clock_fields"]
+
+    def test_correct_keys_creationdate_is_not_reported_stale(self):
+        """A Keys:CreationDate already holding the corrected zoned time is left
+        alone, so reprocessing converges instead of rewriting the same value."""
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+        self._set_tags(self.test_video, "-Keys:CreationDate=2025:06:18 07:25:21+08:00")
+
+        changes = fmt.determine_needed_changes(self.test_video, dt)
+
+        assert "Keys:CreationDate" not in changes["stale_clock_fields"]
+
+    def test_stale_movie_header_alone_is_reported(self):
+        """A file whose per-track atoms already carry the corrected instant but
+        whose mvhd movie header is hours off must still be reported as needing a
+        fix — the header is what most applications read first."""
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+        self._set_tags(
+            self.test_video,
+            "-QuickTime:CreateDate=2025:06:17 15:25:21",
+            "-QuickTime:MediaCreateDate=2025:06:17 23:25:21",
+            "-QuickTime:TrackCreateDate=2025:06:17 23:25:21",
         )
 
-        # Should NOT need update if already correct
-        assert needs_update is False
+        changes = fmt.determine_needed_changes(self.test_video, dt)
 
-    def test_check_quicktime_createdate_needs_update_stale_track_atom(self):
+        assert "QuickTime:CreateDate" in changes["stale_clock_fields"]
+
+    def test_stale_track_atom_is_reported(self):
         """A file whose movie header is already correct but whose per-track tkhd
         atom still holds the pre-correction time must be reported as needing a fix,
         so the track atoms any player may read get corrected too."""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
-
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
+        self._set_tags(
+            self.test_video,
             "-QuickTime:CreateDate=2025:06:17 23:25:21",
             "-QuickTime:MediaCreateDate=2025:06:17 23:25:21",
             "-QuickTime:TrackCreateDate=2020:01:01 00:00:00",
-            self.test_video
-        ], capture_output=True, check=True)
-        fmt._exif_cache.clear()
+        )
 
-        assert fmt.check_quicktime_createdate_needs_update(self.test_video, dt) is True
+        changes = fmt.determine_needed_changes(self.test_video, dt)
 
-    def test_check_quicktime_createdate_needs_update_all_atoms_correct(self):
-        """Once every clock atom carries the corrected UTC instant, reprocessing the
-        file reports no needed change — the correction is idempotent."""
+        assert "QuickTime:TrackCreateDate" in changes["stale_clock_fields"]
+
+    def test_all_clock_fields_correct_needs_no_write(self):
+        """Once every clock field carries its corrected value, reprocessing the
+        file reports nothing to write — the correction is idempotent."""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
-
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
+        self._set_tags(
+            self.test_video,
+            "-Keys:CreationDate=2025:06:18 07:25:21+08:00",
             "-QuickTime:CreateDate=2025:06:17 23:25:21",
             "-QuickTime:MediaCreateDate=2025:06:17 23:25:21",
             "-QuickTime:TrackCreateDate=2025:06:17 23:25:21",
-            self.test_video
-        ], capture_output=True, check=True)
-        fmt._exif_cache.clear()
+        )
 
-        assert fmt.check_quicktime_createdate_needs_update(self.test_video, dt) is False
+        changes = fmt.determine_needed_changes(self.test_video, dt)
 
-    def test_check_quicktime_createdate_skips_stills(self):
+        assert changes["stale_clock_fields"] == []
+
+    def test_still_gets_no_quicktime_targets(self):
         """A still has no QuickTime container, so its EXIF CreateDate (local time,
         not UTC) must never be mistaken for a stale movie clock and rewritten."""
         photo = os.path.join(self.temp_dir, "still.jpg")
@@ -200,20 +209,23 @@ class TestChangeDetection:
                           CreateDate="2025:06:18 07:25:21")
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
 
-        assert fmt.check_quicktime_createdate_needs_update(photo, dt) is False
+        changes = fmt.determine_needed_changes(photo, dt)
 
-    def test_determine_needed_changes(self):
-        """Test determining all needed changes"""
+        assert not [tag for tag in changes["clock_targets"] if tag.startswith("QuickTime:")]
+        assert not [tag for tag in changes["stale_clock_fields"] if tag.startswith("QuickTime:")]
+
+    def test_quicktime_targets_share_one_utc_instant(self):
+        """Every QuickTime atom targets the same UTC instant as DateTimeOriginal's
+        zoned local time, so no atom disagrees with another after a correction."""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
 
-        changes = fmt.determine_needed_changes(self.test_video, dt, preserve_wallclock=False)
+        changes = fmt.determine_needed_changes(self.test_video, dt)
+        targets = changes["clock_targets"]
 
-        assert isinstance(changes, dict)
-        assert "keys_creationdate" in changes
-        assert "file_timestamps" in changes
-        assert "quicktime_createdate" in changes
-        # All should be boolean
-        assert isinstance(changes["keys_creationdate"], bool)
+        assert targets["QuickTime:CreateDate"] == "2025:06:17 23:25:21"
+        assert targets["QuickTime:MediaCreateDate"] == "2025:06:17 23:25:21"
+        assert targets["QuickTime:TrackCreateDate"] == "2025:06:17 23:25:21"
+        assert targets["Keys:CreationDate"] == "2025:06:18 07:25:21+08:00"
 
 
 class TestWriteOperations:
@@ -870,21 +882,34 @@ class TestDetermineNeededChanges:
         shutil.rmtree(self.temp_dir)
         fmt._exif_cache.clear()
 
-    def test_returns_all_required_keys(self):
-        """Test that all required change keys are returned"""
+    def test_returns_targets_stale_fields_and_file_flag(self):
+        """The one comparison reports what each clock field should hold, which of
+        those are not already correct, and whether the file system needs touching."""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
         changes = fmt.determine_needed_changes(self.test_video, dt)
 
-        assert "keys_creationdate" in changes
+        assert "clock_targets" in changes
+        assert "stale_clock_fields" in changes
         assert "file_timestamps" in changes
-        assert "quicktime_createdate" in changes
+        assert isinstance(changes["file_timestamps"], bool)
 
     def test_fresh_file_needs_keys_creationdate(self):
         """Test that a fresh file needs Keys:CreationDate"""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
         changes = fmt.determine_needed_changes(self.test_video, dt)
 
-        assert changes["keys_creationdate"] is True
+        assert "Keys:CreationDate" in changes["stale_clock_fields"]
+
+    def test_datetime_original_is_owned_only_when_the_caller_writes_it(self):
+        """An existing DateTimeOriginal is the correction's source, not its target:
+        it is only compared and written when the caller has decided to write it
+        (missing tag, --infer-from-filename or a confirmed --force-timezone)."""
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+
+        assert "DateTimeOriginal" not in fmt.determine_needed_changes(
+            self.test_video, dt)["clock_targets"]
+        assert "DateTimeOriginal" in fmt.determine_needed_changes(
+            self.test_video, dt, write_datetime_original=True)["clock_targets"]
 
 
 class TestTimestampFixResult:
@@ -1010,6 +1035,77 @@ class TestProvenanceRecord:
         record = json.loads(fmt.read_provenance_record(bare))
         assert record["filename"] == "VID_20250618_072521_bare.mp4"
         assert "DateTimeOriginal" not in record
+
+
+class TestCorrectionWritesTheWholeClockTable:
+    """A correction owns one table of clock fields: when any of them is wrong the
+    write carries all of them, and when none is wrong nothing is written at all.
+    """
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        fmt._exif_cache.clear()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    def _spy_on_writes(self, monkeypatch):
+        """Record the args of every exiftool write without touching the file."""
+        calls = []
+
+        def spy(file_path, tag_args):
+            calls.append(list(tag_args))
+            return True
+
+        monkeypatch.setattr(fmt.exiftool, "write_tags", spy)
+        return calls
+
+    def test_video_write_carries_every_clock_field(self, monkeypatch):
+        """One stale clock field rewrites the whole table in a single exiftool call,
+        so a correct-looking atom can never keep a pre-correction value."""
+        video = os.path.join(self.temp_dir, "VID_20250618_072521.mp4")
+        create_test_video(video)
+        fmt._exif_cache.clear()
+
+        calls = self._spy_on_writes(monkeypatch)
+        result = fmt.fix_media_timestamps(video, timezone_spec="+08:00")
+
+        assert result.timestamp_action == "fixed"
+        written = [arg.split("=", 1)[0].lstrip("-") for call in calls for arg in call]
+        for tag in ["DateTimeOriginal", "Keys:CreationDate", "QuickTime:CreateDate",
+                    "QuickTime:MediaCreateDate", "QuickTime:TrackCreateDate"]:
+            assert tag in written, f"{tag} missing from write args {written}"
+
+    def test_still_gets_no_quicktime_args(self, monkeypatch):
+        """A still has no QuickTime container: writing movie-clock atoms to it would
+        stamp UTC into EXIF fields that hold local time."""
+        photo = os.path.join(self.temp_dir, "IMG_20250618_072521.jpg")
+        create_test_photo(photo)
+        fmt._exif_cache.clear()
+
+        calls = self._spy_on_writes(monkeypatch)
+        fmt.fix_media_timestamps(photo, timezone_spec="+08:00")
+
+        quicktime_args = [arg for call in calls for arg in call if arg.startswith("-QuickTime:")]
+        assert quicktime_args == []
+
+    def test_already_correct_file_is_never_written(self, monkeypatch):
+        """When every clock field already equals its target the run reports no
+        change and issues no exiftool write — not even an empty one."""
+        video = os.path.join(self.temp_dir, "VID_20250618_072521.mp4")
+        create_test_video(video)
+        fmt._exif_cache.clear()
+
+        first = fmt.fix_media_timestamps(video, timezone_spec="+08:00")
+        assert first.timestamp_action == "fixed"
+        fmt._exif_cache.clear()
+
+        calls = self._spy_on_writes(monkeypatch)
+        second = fmt.fix_media_timestamps(video, timezone_spec="+08:00")
+
+        assert second.timestamp_action == "no_change"
+        assert calls == []
 
 
 if __name__ == "__main__":
