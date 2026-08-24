@@ -44,18 +44,24 @@ computed UTC in Python — exiftool then treated that UTC value as local and shi
 a second time. It was removed again. All conversions happen in our code; strings at
 the exiftool boundary are raw field contents.
 
-### A QuickTime date is UTC only when the file proves it
+### A UTC-specified field is corroborated UTC only when the file shows it
 
-We never assume, and we never try to detect local-in-a-UTC-field directly — we accept
-UTC only on affirmative evidence, and treat everything unproven as naive:
+The QuickTime clock atoms are UTC by specification, but a device may write local
+digits into them and a clock may simply be wrong. We never try to detect that
+directly; the file's own wall clock — the filename — either corroborates the field
+or it doesn't:
 
 | Evidence | Conclusion |
 |---|---|
-| a zoned tag's *instant* matches the QuickTime date | true UTC |
-| a zoned tag's *wall clock* matches the QuickTime date | local time in a UTC field — naive |
-| no zoned tag; `filename − QuickTime` is a legal, nonzero zone offset | consistent with true UTC — and the difference **is the camera's zone setting** at shoot time |
-| `filename − QuickTime` is zero | camera at UTC+0 and local-in-UTC-field look identical — undecidable, naive |
-| `filename − QuickTime` is not a legal offset | broken clock (e.g. battery reset); the date is unusable |
+| `filename − clock` is a legal, nonzero zone offset | **corroborated UTC** — and the difference **is the camera's zone setting** at shoot time |
+| `filename − clock` is zero | camera at UTC+0 and local-in-UTC-field look identical — uncorroborated |
+| `filename − clock` is not a legal offset | broken clock (e.g. battery reset); the filename wins |
+| no filename digits | uncorroborated — the field keeps its specified meaning, UTC, but nothing in the file backs it |
+
+A zoned tag is never used to corroborate the clock: a camera-written zoned tag comes
+from the same clock plus the zone setting, so the two always agree, and where they
+disagree the zoned tag was written by something other than the camera. Zoned tags
+simply rank above the clock.
 
 The filename side of the subtraction is always local wall clock — the check works
 *because* the filename is never UTC. A legal zone offset is −12:00 to +14:00 in
@@ -65,24 +71,26 @@ The filename side of the subtraction is always local wall clock — the check wo
 
 | # | Source | Needs declared `--timezone`? |
 |---|---|---|
-| 1 | `Keys:CreationDate` ending `Z` | yes — an instant can't be labelled without one |
-| 2 | QuickTime date proven an instant | yes — same |
-| 3 | `DateTimeOriginal` with zone — inline, **or** completed by `OffsetTimeOriginal` | no (self-contained); declared zone converts it, gated by `--force-timezone` |
-| 4 | `Keys:CreationDate` with zone | no — same |
+| 1 | `DateTimeOriginal` with zone — inline, **or** completed by `OffsetTimeOriginal` | no (self-contained); declared zone converts it, gated by `--force-timezone` |
+| 2 | `Keys:CreationDate` with zone | no — same |
+| 3 | `Keys:CreationDate` ending `Z` | yes — UTC can't be labelled without one |
+| 4 | clock (`MediaCreateDate`), corroborated UTC | yes — same |
 | 5 | filename digits (camera patterns) | yes — digits are naive |
-| 6 | `DateTimeOriginal` bare **and** no `OffsetTimeOriginal`; bare `Keys:CreationDate` ranks here too | yes |
-| 7 | QuickTime date, unproven | yes |
+| 6 | clock (`MediaCreateDate`), uncorroborated — UTC by specification only | yes |
+| 7 | `DateTimeOriginal` bare **and** no `OffsetTimeOriginal`; bare `Keys:CreationDate` ranks here too | yes |
 | 8 | file birth / mtime | yes |
 
-Self-evidencing sources (both time and zone, or proven instants) outrank sources that
-need the declared-zone assumption. Read priority is separate from what other apps
+Zoned tags rank first: they carry both the digits and their zone. UTC sources need the
+declared zone to be labelled, and the clock ranks below the filename only where the
+filename fails to corroborate it. An uncorroborated clock still outranks the bare
+tags: its specification says what its digits mean, a bare tag's does not. Read priority is separate from what other apps
 consume: corrections rewrite **all** clock fields, so FCP reads a corrected
 `Keys:CreationDate` no matter which source won.
 
 ### `--timezone`, `--force-timezone`, `--time-offset`
 
-- `--timezone` declares where the footage was shot. For instants (rows 1–2) it is the
-  display zone; for naive sources (rows 5–8) it is the zone the digits are assumed to
+- `--timezone` declares where the footage was shot. For UTC sources (rows 3, 4, 6) it is the
+  display zone; for naive sources (rows 5, 7, 8) it is the zone the digits are assumed to
   belong to.
 - A file whose winning source already carries a zone is never relabelled to a
   different declared zone without `--force-timezone`. Dry runs always preview the
@@ -97,8 +105,8 @@ consume: corrections rewrite **all** clock fields, so FCP reads a corrected
 A still's `DateTimeOriginal` can never carry an inline zone — binary EXIF gives it
 exactly 19 characters — so `OffsetTimeOriginal` is the only zone it can have. On read,
 a bare `DateTimeOriginal` plus a legal `±HH:MM` `OffsetTimeOriginal` are joined into
-one zoned value, which lifts the file from row 6 to row 3. A bare `DateTimeOriginal`
-with no `OffsetTimeOriginal`, or with an unparseable one, stays at row 6.
+one zoned value, which lifts the file from row 7 to row 1. A bare `DateTimeOriginal`
+with no `OffsetTimeOriginal`, or with an unparseable one, stays at row 7.
 
 ### Writing a zoned `DateTimeOriginal` to a still silently drops the zone
 

@@ -23,6 +23,8 @@ from lib.timestamp_source import (
     read_timestamp_sources,
     extract_metadata_timezone,
     get_best_timestamp,
+    SOURCE_UTC_BY_SPEC,
+    SOURCE_UTC_CORROBORATED,
     read_exif_data,
     clear_exif_cache,
     is_zone_name,
@@ -300,7 +302,7 @@ class TestQuickTimeInstantVersusFilename:
         ts, source = get_best_timestamp(video, timezone_offset="+13:00")
 
         assert ts == "2026:01:03 18:35:32"
-        assert source == "MediaCreateDate"
+        assert source == SOURCE_UTC_CORROBORATED
 
     def test_filename_wins_without_a_declared_timezone(self):
         """An instant cannot be labelled without a zone to label it in."""
@@ -341,7 +343,7 @@ class TestQuickTimeInstantVersusFilename:
 
         _, source = get_best_timestamp(video, timezone_offset="+14:00")
 
-        assert source == "MediaCreateDate"
+        assert source == SOURCE_UTC_CORROBORATED
 
     def test_offset_beyond_the_legal_maximum_is_not(self):
         video = self._video("VID_20250618_150000_00_001.mp4", "2025:06:18 00:00:00")
@@ -356,7 +358,7 @@ class TestQuickTimeInstantVersusFilename:
 
         _, source = get_best_timestamp(video, timezone_offset="-12:00")
 
-        assert source == "MediaCreateDate"
+        assert source == SOURCE_UTC_CORROBORATED
 
     def test_offset_beyond_the_legal_minimum_is_not(self):
         video = self._video("VID_20250617_110000_00_001.mp4", "2025:06:18 00:00:00")
@@ -371,7 +373,7 @@ class TestQuickTimeInstantVersusFilename:
 
         _, source = get_best_timestamp(video, timezone_offset="+05:45")
 
-        assert source == "MediaCreateDate"
+        assert source == SOURCE_UTC_CORROBORATED
 
     def test_offset_off_the_quarter_hour_is_not(self):
         """9h07m is not an offset any zone uses."""
@@ -382,13 +384,26 @@ class TestQuickTimeInstantVersusFilename:
         assert source == "filename"
 
     def test_a_file_with_no_filename_date_still_uses_the_quicktime_date(self):
-        """Nothing to cross-check against, and nothing else to fall back to."""
+        """Nothing to corroborate against, and nothing else to fall back to."""
         video = self._video("clip.mp4", "2026:01:03 18:35:32")
 
         ts, source = get_best_timestamp(video, timezone_offset="+13:00")
 
         assert ts == "2026:01:03 18:35:32"
-        assert source == "MediaCreateDate"
+        assert source == SOURCE_UTC_BY_SPEC
+
+    def test_uncorroborated_utc_outranks_bare_datetimeoriginal(self):
+        """A field specified as UTC says what its digits mean; a bare tag says nothing."""
+        video = os.path.join(self.temp_dir, "clip.mp4")
+        create_test_video(video, **{
+            "QuickTime:MediaCreateDate": "2026:01:03 18:35:32",
+            "DateTimeOriginal": "2026:01:04 07:35:32",
+        })
+
+        ts, source = get_best_timestamp(video, timezone_offset="+13:00")
+
+        assert ts == "2026:01:03 18:35:32"
+        assert source == SOURCE_UTC_BY_SPEC
 
 
 class TestCameraZoneOffsetForFile:

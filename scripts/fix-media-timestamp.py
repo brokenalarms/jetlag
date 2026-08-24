@@ -518,7 +518,7 @@ def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, 
                 data["datetime_original_str"] = datetime_with_tz
                 data["datetime_original"] = parse_datetime_original(datetime_with_tz)
                 data["timezone_source"] = f"--timezone flag ({timezone_offset})"
-        elif source == "MediaCreateDate" and timezone_offset:
+        elif source.startswith("MediaCreateDate") and timezone_offset:
             utc_dt = datetime.strptime(best_timestamp, "%Y:%m:%d %H:%M:%S").replace(tzinfo=timezone.utc)
             tz_match = re.match(r'([+-])(\d{2}):?(\d{2})', timezone_offset)
             if tz_match:
@@ -630,7 +630,7 @@ def format_original_timestamps(current_data: dict) -> str:
         creation_date = current_data["exif"].get("CreationDate", "")
         if creation_date:
             parts.append(f"{format_exif_timestamp_display(creation_date)} (Keys:CreationDate)")
-    elif source == "MediaCreateDate":
+    elif source.startswith("MediaCreateDate"):
         media_create = current_data["exif"].get("MediaCreateDate", "")
         birth_ts = current_data["file_system"].get("birth", "")
         if media_create:

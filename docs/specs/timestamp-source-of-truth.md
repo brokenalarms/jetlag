@@ -56,18 +56,21 @@ some write local time into fields defined as UTC. The hierarchy exists because o
 variation and is kept. What a device wrote is established per file, from evidence in the
 file, never assumed from the model.
 
-## Establishing whether a QuickTime date is an instant
+## Corroborating a UTC-specified field
 
-A QuickTime date only outranks a naive source when the file itself shows it to be an
-instant:
+The clock atoms are UTC by specification. The filename — the camera's own wall clock —
+either corroborates that or it does not:
 
 | Evidence | Conclusion |
 |---|---|
-| a zoned tag exists and its instant matches the QuickTime date | true UTC |
-| a zoned tag exists and its **wall clock** matches the QuickTime date | local time in a UTC field — treat as naive |
-| no zoned tag, and `filename − QuickTime` is a legal zone offset | consistent with true UTC |
-| no zoned tag, and `filename − QuickTime` is zero | undecidable — treat as naive |
-| `filename − QuickTime` is not a legal offset | the clock is broken; the date is unusable |
+| `filename − clock` is a legal zone offset | corroborated UTC; the difference is the camera's zone setting |
+| `filename − clock` is zero | undecidable — uncorroborated |
+| `filename − clock` is not a legal offset | the clock is broken; the filename wins |
+| no filename digits | uncorroborated — still UTC by specification |
+
+A zoned tag never takes part: a camera-written zoned tag comes from the same clock plus
+the zone setting, so the two always agree; where they disagree the zoned tag was written
+by something other than the camera. Zoned tags simply rank above the clock.
 
 A legal zone offset runs from **−12:00 to +14:00** in 15-minute steps. That is the range
 of a single zone's offset from UTC, which is the quantity being tested here; the 26-hour
@@ -91,22 +94,23 @@ from any legal offset, and the reason its filename must keep winning.
 
 First match wins:
 
-1. `CreationDate` ending `Z` — requires a declared timezone
-2. QuickTime date established as an instant — requires a declared timezone
-3. `DateTimeOriginal` with offset
-4. `CreationDate` with offset
+1. `DateTimeOriginal` with offset
+2. `CreationDate` with offset
+3. `CreationDate` ending `Z` — requires a declared timezone
+4. clock (`MediaCreateDate`) corroborated as UTC by the filename — requires a declared timezone
 5. filename timestamp
-6. `DateTimeOriginal` without offset
-7. QuickTime date not established as an instant
+6. clock (`MediaCreateDate`) uncorroborated — UTC by specification only
+7. `DateTimeOriginal` without offset
 8. file birth/modify time
 
-Rows 1 and 2 need a declared timezone because an instant cannot be labelled without one;
-with no timezone they are skipped and the highest-ranked label wins instead.
+Rows 3 and 4 need a declared timezone because UTC cannot be labelled without one; with
+no timezone they are skipped and the highest-ranked label wins instead.
 
-A QuickTime date that has earned instant-status outranks the offset-bearing tags because
-those offsets come from a timezone setting that survives a flight, while the instant
-comes from a clock that does not care where it is. Where they agree the ranking is
-immaterial; where they disagree, the offset is the part that went stale.
+Zoned tags outrank everything: they carry both the digits and their zone, so nothing is
+assumed. The corroborated clock outranks the filename because a camera left on the
+previous country's time writes a filename that is wrong for where it was shot while the
+clock is not. The uncorroborated clock ranks below the filename but above the bare tags:
+its specification says what its digits mean, a bare tag's says nothing.
 
 ### Instant preservation
 
@@ -116,7 +120,7 @@ When the winning source is an instant, the corrected time is that instant expres
 the declared zone. The file's clock fields are then rewritten with a value they already
 held, so the correction is a no-op there.
 
-When the winning source is naive — rows 5, 6, 7, 8 — there is no instant to preserve.
+When the winning source is naive — rows 5, 7, 8 — there is no instant to preserve.
 Its digits are taken as local time in the declared zone, which is correct exactly when
 the camera's clock was set to that zone, and the clock fields are rewritten to the
 instant that implies.
@@ -154,7 +158,7 @@ string no camera writes and no correction reads, which is the whole requirement.
 ### `--timezone`
 
 Always required for the fix-timestamps step: it declares where the footage was shot,
-which rows 1–2 need to label an instant and rows 5–8 need to build one. The app mirrors
+which rows 3, 4 and 6 need to label UTC and rows 5, 7 and 8 need to build an instant. The app mirrors
 this single rule rather than deriving its own.
 
 ### `--force-timezone`
@@ -189,7 +193,7 @@ relabel.**
 
 ## Done
 
-`lib/timestamp_source.py` — `get_best_timestamp()` gains `_quicktime_is_instant()`, the
+`lib/timestamp_source.py` — `get_best_timestamp()` gains `_is_corroborated_utc()`, the
 legal offset guard, and the reordering. Nothing else changed: the conversion the fix
 relies on already existed in `get_all_timestamp_data()`, and the destructive QuickTime
 rewrite stops on its own, because a preserved instant leaves that field already correct.
@@ -216,7 +220,7 @@ Each of these is separable, and none is needed for a correction to be right:
   dry-run plus explicit apply is the safety gate.
 - `scripts/AGENTS.md` — the hierarchy still lists the filename as the highest-priority
   source and states filenames are never modified. The filename is the source of truth for
-  wall-clock time only where no established instant contradicts it, and
+  wall-clock time only where no corroborated UTC clock contradicts it, and
   `--update-filename-dates` renames files to match corrections.
 - The app could surface the winning source from the diff table's existing
   `timestamp_source` field. No new dialog is needed: the choice is always decidable.
@@ -227,7 +231,7 @@ Covered by `TestQuickTimeInstantVersusFilename` in `tests/test_timestamp_source.
 `test_camera_filename_with_quicktime_instant_converts` in
 `tests/test_fix_media_timestamp_units.py`:
 
-- A file with an established QuickTime instant and a contradicting camera filename
+- A file with a filename-corroborated UTC clock and a contradicting camera filename
   corrects from the instant, converted into the declared zone.
 - A file whose QuickTime date is years from its filename keeps the filename.
 - A file with a zeroed QuickTime date keeps the filename.

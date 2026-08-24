@@ -44,8 +44,9 @@ UTC, the full ranking, and the `--timezone`/`--force-timezone`/`--time-offset` r
 lives in `/docs/timestamp-fields.md`. Required reading before touching timestamp code.
 Summary only:
 
-- Self-evidencing sources (zoned tags, proven instants) outrank sources that need the
-  declared `--timezone` assumption (filename, bare tags, unproven QuickTime dates).
+- Zoned tags rank first, then UTC sources (a `Z` tag, a filename-corroborated clock),
+  then the filename, then an uncorroborated clock, then bare tags — see the ranking
+  table in `docs/timestamp-fields.md`.
 - The filename is the first truth for local wall-clock time in the absence of
   disconfirming metadata; `--update-filename-dates` renames files to match corrections.
 - QuickTime dates are trusted as UTC per file, on evidence, never globally — and never

@@ -27,6 +27,7 @@ spec = importlib.util.spec_from_file_location(
 )
 fmt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fmt)
+from lib.timestamp_source import SOURCE_UTC_BY_SPEC, SOURCE_UTC_CORROBORATED
 
 
 class TestTimestampParsing:
@@ -443,7 +444,7 @@ class TestGetAllTimestampData:
 
         data = fmt.get_all_timestamp_data(video, timezone_spec="+08:00")
 
-        assert data["timestamp_source"] == "MediaCreateDate"
+        assert data["timestamp_source"] == SOURCE_UTC_BY_SPEC
         assert data["datetime_original"] is not None
         # UTC 23:25:21 + 8 hours = 07:25:21 next day
         assert data["datetime_original"].hour == 7
@@ -459,7 +460,7 @@ class TestGetAllTimestampData:
 
         data = fmt.get_all_timestamp_data(video, timezone_spec="+13:00")
 
-        assert data["timestamp_source"] == "MediaCreateDate"
+        assert data["timestamp_source"] == SOURCE_UTC_CORROBORATED
         assert data["datetime_original"] is not None
         assert data["datetime_original"].day == 4
         assert data["datetime_original"].hour == 7
