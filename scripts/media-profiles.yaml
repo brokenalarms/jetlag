@@ -5,18 +5,12 @@ gyroflow:
       max_zoom: 105.0
       adaptive_zoom_window: 15.0
       adaptive_zoom_method: 1
-backup_config:
-  local_base_path: /Volumes/
-  remote_base_path: /volume1/Backup/ChronoSync/
 profiles:
   TEST-sony-a7v-video:
     type: video
     source_dir: /Users/daniellawrence/Movies/2025-08-16
-    backup_enabled: true
     gyroflow_enabled: true
     ready_dir: /Users/daniellawrence/Movies/2025-08-16/processed
-    backup_dir: /Volumes/Samsung 990/Videos/Source Video/Sony A7V/Ready
-    backup_exclude_subdirs: []
     tags:
     - sony-a7v
     exif:
@@ -33,11 +27,7 @@ profiles:
     type: video
     source_dir: /Volumes/Untitled/DCIM
     ready_dir: /Volumes/Samsung 990/Videos/Source Video/Insta360/Ready
-    backup_enabled: true
     gyroflow_enabled: false
-    backup_dir: /Volumes/Samsung 990/Videos/Source Video/Insta360
-    backup_exclude_subdirs:
-    - Exports
     tags:
     - insta-360-x4
     exif:
@@ -54,10 +44,7 @@ profiles:
     type: video
     source_dir: /Volumes/Untitled/DCIM
     ready_dir: /Volumes/Samsung 990/Videos/Source Video/GoPro/Ready
-    backup_enabled: true
     gyroflow_enabled: true
-    backup_dir: /Volumes/Samsung 990/Videos/Source Video/GoPro/Ready
-    backup_exclude_subdirs: []
     tags:
     - gopro-hero-12
     exif:
@@ -73,10 +60,7 @@ profiles:
     type: video
     source_dir: /Volumes/Untitled/DCIM
     ready_dir: /Volumes/Samsung 990/Videos/Source Video/DJI/Ready
-    backup_enabled: true
     gyroflow_enabled: false
-    backup_dir: /Volumes/Samsung 990/Videos/Source Video/DJI/Ready
-    backup_exclude_subdirs: []
     tags:
     - dji-mini-4-pro
     exif:
@@ -93,9 +77,6 @@ profiles:
     type: photo
     source_dir: /Volumes/Untitled/DCIM
     ready_dir: /Volumes/Samsung 990/Photos/Import
-    backup_enabled: true
-    backup_dir: /Volumes/Samsung 990/Photos/Originals
-    backup_exclude_subdirs: []
     tags:
     - dji-mini-4-pro
     exif:
@@ -109,10 +90,6 @@ profiles:
     type: photo
     source_dir: /Volumes/Untitled/DCIM
     ready_dir: /Volumes/Samsung 990/Photos/Import
-    backup_enabled: true
-    backup_dir: /Volumes/Samsung 990/Photos/Originals
-    backup_exclude_subdirs:
-    - Import
     tags:
     - sony-a7iv
     exif:
@@ -128,11 +105,8 @@ profiles:
   sony-a7iv-video:
     type: video
     source_dir: /Volumes/Untitled/PRIVATE
-    backup_enabled: true
     gyroflow_enabled: true
     ready_dir: /Volumes/Samsung 990/Videos/Source Video/Sony A7IV/Ready
-    backup_dir: /Volumes/Samsung 990/Videos/Source Video/Sony A7IV/Ready
-    backup_exclude_subdirs: []
     tags:
     - sony-a7iv
     exif:
@@ -149,10 +123,6 @@ profiles:
     type: photo
     source_dir: /Volumes/Untitled/DCIM
     ready_dir: /Volumes/Samsung 990/Photos/Import
-    backup_enabled: true
-    backup_dir: /Volumes/Samsung 990/Photos/Originals
-    backup_exclude_subdirs:
-    - Import
     tags:
     - sony-a7v
     exif:
@@ -168,11 +138,8 @@ profiles:
   sony-a7v-video:
     type: video
     source_dir: /Volumes/Untitled/PRIVATE
-    backup_enabled: true
     gyroflow_enabled: true
     ready_dir: /Volumes/Samsung 990/Videos/Source Video/Sony A7V/Ready
-    backup_dir: /Volumes/Samsung 990/Videos/Source Video/Sony A7V/Ready
-    backup_exclude_subdirs: []
     tags:
     - sony-a7v
     exif:
@@ -189,10 +156,7 @@ profiles:
     type: video
     source_dir: /Volumes/Untitled/DCIM
     ready_dir: /Volumes/Samsung 990/Videos/Source Video/iPhone/Ready
-    backup_enabled: false
     gyroflow_enabled: false
-    backup_dir: /Volumes/Samsung 990/Videos/Source Video/iPhone
-    backup_exclude_subdirs: []
     tags:
     - iphone-16-pro
     exif:

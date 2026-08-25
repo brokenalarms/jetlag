@@ -2,12 +2,10 @@ import Foundation
 
 struct ProfilesConfig: Codable {
     var gyroflow: GyroflowConfig?
-    var backupConfig: BackupConfig?
     var profiles: [String: MediaProfile]
 
     enum CodingKeys: String, CodingKey {
         case gyroflow, profiles
-        case backupConfig = "backup_config"
     }
 
     func normalized() -> ProfilesConfig {
@@ -28,16 +26,6 @@ struct ProfilesConfig: Codable {
             result.profiles[name] = p
         }
         return result
-    }
-}
-
-struct BackupConfig: Codable {
-    var localBasePath: String?
-    var remoteBasePath: String?
-
-    enum CodingKeys: String, CodingKey {
-        case localBasePath = "local_base_path"
-        case remoteBasePath = "remote_base_path"
     }
 }
 
@@ -103,9 +91,6 @@ struct MediaProfile: Codable, Equatable {
     var type: MediaType?
     var sourceDir: String?
     var readyDir: String?
-    var backupEnabled: Bool?
-    var backupDir: String?
-    var backupExcludeSubdirs: [String]?
     var gyroflowEnabled: Bool?
     var gyroflowSettings: StabilizationSettings?
     var tags: [String]?
@@ -117,9 +102,6 @@ struct MediaProfile: Codable, Equatable {
         case type
         case sourceDir = "source_dir"
         case readyDir = "ready_dir"
-        case backupEnabled = "backup_enabled"
-        case backupDir = "backup_dir"
-        case backupExcludeSubdirs = "backup_exclude_subdirs"
         case gyroflowEnabled = "gyroflow_enabled"
         case gyroflowSettings = "gyroflow_settings"
         case tags, exif
