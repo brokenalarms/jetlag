@@ -1134,25 +1134,25 @@ class TestMachineOriginalTimeCarriesZoneSemantics:
         return path
 
     def test_quicktime_clock_original_is_emitted_as_utc(self):
-        """A MediaCreateDate original is a UTC instant: emitted with +00:00 so the
-        corrected local time reads as a relabel, not a shift."""
+        """A MediaCreateDate original is a UTC instant: emitted with a trailing Z so
+        it is never mistaken for a +00:00 local-zone offset."""
         video = self._video("test.mp4",
                             **{"QuickTime:MediaCreateDate": "2025:06:17 23:25:21"})
 
         result = fmt.fix_media_timestamps(video, dry_run=True, timezone_spec="+08:00")
 
-        assert result.original_time == "2025:06:17 23:25:21+00:00"
+        assert result.original_time == "2025:06:17 23:25:21Z"
         assert result.corrected_time == "2025:06:18 07:25:21+08:00"
 
     def test_creationdate_with_z_original_is_emitted_as_utc(self):
-        """Keys:CreationDate with a Z marker is UTC too; the Z is replaced with the
-        same ±HH:MM shape corrected_time uses, so both sides parse the same way."""
+        """Keys:CreationDate with a Z marker is UTC too; the Z is kept as-is rather
+        than converted to a ±HH:MM offset, which would be a different claim."""
         video = self._video("test.mp4",
                             **{"Keys:CreationDate": "2025:06:17 23:25:21Z"})
 
         result = fmt.fix_media_timestamps(video, dry_run=True, timezone_spec="+08:00")
 
-        assert result.original_time == "2025:06:17 23:25:21+00:00"
+        assert result.original_time == "2025:06:17 23:25:21Z"
 
     def test_naive_datetimeoriginal_original_stays_bare(self):
         """A bare DateTimeOriginal has no zone of its own — claiming one would be a
@@ -1177,7 +1177,7 @@ class TestMachineOriginalTimeCarriesZoneSemantics:
 
         result = fmt.fix_media_timestamps(video, dry_run=True, timezone_spec="+08:00")
 
-        assert "+00:00" not in (result.original_time or "")
+        assert "Z" not in (result.original_time or "")
 
 
 class TestStaleFieldsNamesWhatWouldBeWritten:

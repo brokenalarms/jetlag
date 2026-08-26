@@ -30,10 +30,10 @@ final class TimestampSourceTests: XCTestCase {
     }
 
     /// The QuickTime clock stores a UTC instant, so its original reads as UTC —
-    /// the word, not a +00:00 offset a reader has to decode.
+    /// the word, not a trailing Z a reader has to decode.
     func testUTCSourceOriginalIsLabelledUTC() {
         let display = TimestampSource.mediaCreateDate
-            .originalDisplay("2025:08:30 09:00:00+00:00")
+            .originalDisplay("2025:08:30 09:00:00Z")
 
         XCTAssertEqual(display, "2025:08:30 09:00:00 UTC")
     }

@@ -568,12 +568,13 @@ class TestFixMediaTimestampMachineOutput:
         at_lines = _parse_at_lines(result.stdout)
         assert at_lines.get("timestamp_source") == "filename", f"Actual: @@timestamp_source={at_lines.get('timestamp_source')}, Expected: filename"
 
-    def test_utc_clock_original_is_emitted_with_an_explicit_zero_offset(self, temp_dir):
-        """@@original_time states the zone of a UTC source, so a consumer can tell a
-        relabel from a shift without knowing which field won the ranking.
+    def test_utc_clock_original_is_emitted_with_a_z_marker(self, temp_dir):
+        """@@original_time marks a UTC source with a trailing Z, so a consumer can
+        tell a relabel from a shift without knowing which field won the ranking.
 
-        Actual: @@original_time=2025:06:17 23:25:21+00:00
-        Expected: the same +/-HH:MM shape @@corrected_time uses.
+        Actual: @@original_time=2025:06:17 23:25:21Z
+        Expected: Z, not +00:00 - "these digits are UTC", not "local time in a
+        zero-offset zone".
         """
         video = os.path.join(temp_dir, "test.mp4")
         create_test_video(video, **{"QuickTime:MediaCreateDate": "2025:06:17 23:25:21"})
@@ -585,7 +586,7 @@ class TestFixMediaTimestampMachineOutput:
 
         at_lines = _parse_at_lines(result.stdout)
         assert at_lines.get("timestamp_source") == "mediacreatedate"
-        assert at_lines.get("original_time") == "2025:06:17 23:25:21+00:00"
+        assert at_lines.get("original_time") == "2025:06:17 23:25:21Z"
         assert at_lines.get("corrected_time") == "2025:06:18 07:25:21+08:00"
 
     def test_naive_original_is_emitted_without_a_zone(self, temp_dir):
