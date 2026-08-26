@@ -10,7 +10,6 @@ struct WorkflowView: View {
         var id: Int { fileCount }
     }
 
-    let defaultColumnWidth = 600.00
     private let optionLabelWidth: CGFloat = 52
 
     private var companionExtensions: String {
@@ -60,7 +59,7 @@ struct WorkflowView: View {
                 )
             }
         }
-        .frame(minWidth: 340, idealWidth: defaultColumnWidth, maxWidth: defaultColumnWidth)
+        .frame(width: SplitViewLayout.formContentWidth)
         .navigationTitle(Strings.Nav.workflow)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

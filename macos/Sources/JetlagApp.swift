@@ -12,13 +12,12 @@ struct JetlagApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(state: state)
-                .frame(minWidth: 600, minHeight: 800)
-//                .frame(width: 600)
                 .onAppear { loadProfiles() }
                 .task { await state.refreshGyroflowStatus() }
         }
-//        .defaultSize(width: 600, height: 800)
-//        .windowResizability(.contentSize)
+        // ContentView declares the minimum width every visible column needs; this is what
+        // makes AppKit grow the window to satisfy it rather than overlap the columns.
+        .windowResizability(.contentMinSize)
         .commands {
             // Single-window utility — no New Window or Open Recent
             CommandGroup(replacing: .newItem) {}
