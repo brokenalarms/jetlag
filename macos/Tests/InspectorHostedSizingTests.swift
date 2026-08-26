@@ -56,6 +56,21 @@ final class InspectorHostedSizingTests: XCTestCase {
         func resetPriorityWrites() { priorityWrites = 0 }
     }
 
+    /// Counts every write to `scrollerStyle`, including writes of a value the scroll
+    /// view already has — those are exactly what `configureHorizontalScroller`'s
+    /// compare-before-assign must avoid on a repeat call.
+    private final class ScrollerStyleCountingScrollView: NSScrollView {
+        private(set) var scrollerStyleWrites = 0
+
+        override var scrollerStyle: NSScroller.Style {
+            get { super.scrollerStyle }
+            set {
+                scrollerStyleWrites += 1
+                super.scrollerStyle = newValue
+            }
+        }
+    }
+
     private func makeTable(
         minWidths: [CGFloat] = [10, 10]
     ) -> (NSTableView, [WidthCountingTableColumn]) {
@@ -235,5 +250,77 @@ final class InspectorHostedSizingTests: XCTestCase {
         XCTAssertEqual(
             scrollView.priorityWrites, 0,
             "already-detached view must not be written to again")
+    }
+
+    // MARK: - Always-visible horizontal scrollers
+
+    /// macOS overlay scrollers only appear during a scroll gesture, hiding the fact that
+    /// a table or log is wider than the panel. Both hosted scroll views must opt into the
+    /// legacy style so a scroller is drawn whenever content overflows.
+    func testLogScrollViewUsesLegacyScrollerStyle() {
+        let scrollView = LogTextView.makeScrollView()
+
+        XCTAssertEqual(scrollView.scrollerStyle, .legacy)
+        XCTAssertTrue(scrollView.hasHorizontalScroller)
+        XCTAssertTrue(scrollView.autohidesScrollers)
+    }
+
+    /// The Korea dry run (288 rows, #167) computes a `File`/`Timeline`/`Original`/
+    /// `Corrected` column width that overflows a narrow panel, leaving `Timestamp`/
+    /// `Destination`/`Status` clipped off to the right with no way to discover them.
+    /// Proves that once `configureHorizontalScroller` has switched a table's scroll
+    /// view to the legacy style, AppKit itself shows a horizontal scroller as soon as
+    /// the columns are wider than the scroll view.
+    func testHorizontalScrollerIsVisibleWhenColumnsOverflowTheScrollViewWidth() {
+        let tableView = NSTableView(frame: NSRect(x: 0, y: 0, width: 1200, height: 400))
+        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("wide"))
+        column.width = 1200
+        tableView.addTableColumn(column)
+
+        let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 400))
+        scrollView.documentView = tableView
+        TableColumnSizing.configureHorizontalScroller(for: scrollView)
+        scrollView.tile()
+
+        XCTAssertEqual(scrollView.scrollerStyle, .legacy)
+        XCTAssertEqual(scrollView.horizontalScroller?.isHidden, false)
+    }
+
+    /// The same scroll view with columns narrower than its width never overflows, so
+    /// the horizontal scroller stays hidden.
+    func testHorizontalScrollerStaysHiddenWhenColumnsFitTheScrollViewWidth() {
+        let tableView = NSTableView(frame: NSRect(x: 0, y: 0, width: 200, height: 400))
+        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("narrow"))
+        column.width = 100
+        tableView.addTableColumn(column)
+
+        let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 400))
+        scrollView.documentView = tableView
+        TableColumnSizing.configureHorizontalScroller(for: scrollView)
+        scrollView.tile()
+
+        XCTAssertEqual(scrollView.scrollerStyle, .legacy)
+        XCTAssertEqual(scrollView.horizontalScroller?.isHidden, true)
+    }
+
+    /// `configureHorizontalScroller` runs on every `updateNSView` call, same as
+    /// `applyWidths`. Proves a repeat call on an already-configured scroll view writes
+    /// nothing, so it cannot itself re-invalidate layout (jetlag-m9a).
+    func testConfigureHorizontalScrollerIsInertWhenRepeated() {
+        let scrollView = ScrollerStyleCountingScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 400))
+        XCTAssertEqual(scrollView.scrollerStyle, .overlay, "baseline: AppKit defaults to overlay scrollers")
+
+        TableColumnSizing.configureHorizontalScroller(for: scrollView)
+
+        XCTAssertEqual(scrollView.scrollerStyle, .legacy)
+        XCTAssertTrue(scrollView.hasHorizontalScroller)
+        XCTAssertTrue(scrollView.autohidesScrollers)
+        XCTAssertEqual(scrollView.scrollerStyleWrites, 1)
+
+        TableColumnSizing.configureHorizontalScroller(for: scrollView)
+
+        XCTAssertEqual(
+            scrollView.scrollerStyleWrites, 1,
+            "an already-legacy scroll view must not be rewritten")
     }
 }
