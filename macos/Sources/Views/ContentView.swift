@@ -25,11 +25,13 @@ struct ContentView: View {
 ///
 /// The form is a fixed-width column of controls and the panel is the only thing that
 /// flexes, so a plain `HStack` is the whole layout: the form gets exactly the width it
-/// declares and the panel takes every remaining point. The stack's minimum is derived
-/// from its children — the form's width plus the panel's minimum when the panel is open
-/// — which is what `windowResizability(.contentMinSize)` turns into a wider window when
-/// the panel opens. A split view would add a draggable divider, but the form cannot
-/// resize, so there is nothing for one to do; it would also report no minimum of its own.
+/// declares and the panel takes every remaining point. The stack's size range is derived
+/// from its children — exactly the form's width with the panel closed; the form plus the
+/// panel's minimum, and no maximum, with it open — which is what
+/// `windowResizability(.contentSize)` turns into a window that fits the form and grows
+/// to the right when the panel opens. A split view would add a draggable divider, but the
+/// form cannot resize, so there is nothing for one to do; it would also report no minimum
+/// of its own.
 struct WorkflowDetail: View {
     @Bindable var state: AppState
 
