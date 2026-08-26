@@ -370,6 +370,24 @@ enum TableColumnSizing {
         }
         return resized
     }
+
+    /// macOS overlay scrollers only appear during a scroll gesture, hiding the fact
+    /// that the table is wider than the panel. The legacy style draws a scroller
+    /// whenever content overflows and none otherwise (`autohidesScrollers`), so this
+    /// switches the table's scroll view over to it. Each flag is compared before
+    /// assignment for the same reason as `applyWidths`: this runs on every update, and
+    /// an unconditional write would re-invalidate the scroll view's layout every pass.
+    static func configureHorizontalScroller(for scrollView: NSScrollView) {
+        if scrollView.scrollerStyle != .legacy {
+            scrollView.scrollerStyle = .legacy
+        }
+        if !scrollView.hasHorizontalScroller {
+            scrollView.hasHorizontalScroller = true
+        }
+        if !scrollView.autohidesScrollers {
+            scrollView.autohidesScrollers = true
+        }
+    }
 }
 
 
@@ -421,6 +439,10 @@ private struct ColumnAutoSizer: NSViewRepresentable {
                 gesture.numberOfClicksRequired = 2
                 headerView.addGestureRecognizer(gesture)
                 coordinator.gestureInstalled = true
+            }
+
+            if let scrollView = tableView.enclosingScrollView {
+                TableColumnSizing.configureHorizontalScroller(for: scrollView)
             }
         }
     }

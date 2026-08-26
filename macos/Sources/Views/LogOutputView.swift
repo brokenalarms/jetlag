@@ -66,6 +66,7 @@ struct LogTextView: NSViewRepresentable {
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
+        scrollView.scrollerStyle = .legacy
         scrollView.drawsBackground = false
         scrollView.detachSizeFromContent()
 
