@@ -21,19 +21,40 @@ struct ContentView: View {
                 Label(tab.label, systemImage: tab.systemImage)
                     .tag(tab)
             }
-            .navigationSplitViewColumnWidth(min: 140, ideal: 160)
+            .navigationSplitViewColumnWidth(
+                min: SplitViewLayout.sidebarMinWidth,
+                ideal: SplitViewLayout.sidebarIdealWidth
+            )
         } detail: {
-            switch state.selectedTab {
-            case .workflow:
-                WorkflowView(state: state)
-            case .profiles:
-                ProfilesView(state: state)
+            Group {
+                switch state.selectedTab {
+                case .workflow:
+                    WorkflowView(state: state)
+                case .profiles:
+                    ProfilesView(state: state)
+                }
             }
+            // Min and ideal are the same and there is no maximum: the detail column
+            // needs exactly enough room for the form, so the split view has one answer
+            // to settle on and the inspector takes everything left over.
+            .navigationSplitViewColumnWidth(
+                min: SplitViewLayout.detailMinWidth,
+                ideal: SplitViewLayout.detailMinWidth
+            )
         }
         .inspector(isPresented: inspectorPresented) {
             InspectorPanel(state: state)
-                .inspectorColumnWidth(min: 480, ideal: 600)
+                .inspectorColumnWidth(
+                    min: SplitViewLayout.inspectorMinWidth,
+                    ideal: SplitViewLayout.inspectorIdealWidth
+                )
         }
-//        .toolbar(removing: .sidebarToggle)
+        // The window's minimum tracks what is actually on screen, so opening the
+        // inspector pushes the window's right edge out instead of stealing width from
+        // the sidebar and form. `windowResizability(.contentMinSize)` is what acts on it.
+        .frame(
+            minWidth: SplitViewLayout.windowMinWidth(inspectorVisible: inspectorPresented.wrappedValue),
+            minHeight: SplitViewLayout.windowMinHeight
+        )
     }
 }
