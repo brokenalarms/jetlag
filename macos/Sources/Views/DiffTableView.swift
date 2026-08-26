@@ -5,6 +5,7 @@ struct DiffTableView: View {
 
     private static let cellPadding: CGFloat = 20
     private static let iconWidth: CGFloat = 18
+    private static let timelineColumnWidth: CGFloat = 120
     private static let monoFont = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
     private static let systemFont = NSFont.systemFont(ofSize: 11)
 
@@ -61,18 +62,22 @@ struct DiffTableView: View {
         }
     }
 
+    /// One width per table column, in the order the columns are declared: a
+    /// mismatch here resizes the wrong column.
     private var columnWidths: [CGFloat] {
         [
             Self.idealWidth(for: rows.map(\.file), font: Self.monoFont),
-            Self.idealWidth(for: rows.compactMap(\.originalTime), font: Self.monoFont),
+            Self.timelineColumnWidth,
+            Self.idealWidth(for: rows.compactMap(\.originalTimeDisplay), font: Self.monoFont),
             Self.idealWidth(for: rows.compactMap(\.correctedTime), font: Self.monoFont),
-            120,
-            Self.idealWidth(for: rows.map { changeBadgeText($0) }, font: Self.systemFont),
+            Self.idealWidth(
+                for: rows.flatMap { [changeBadgeText($0), $0.timestampSource?.label ?? ""] },
+                font: Self.systemFont),
             Self.idealWidth(
                 for: rows.compactMap(\.dest).map { ($0 as NSString).lastPathComponent },
                 font: Self.monoFont),
             Self.idealWidth(
-                for: rows.map { statusText($0) },
+                for: rows.flatMap { [statusText($0), staleFieldsText($0) ?? ""] },
                 font: Self.systemFont,
                 extraWidth: Self.iconWidth),
         ]
@@ -111,7 +116,7 @@ struct DiffTableView: View {
                 .width(min: 50, ideal: 80)
 
                 TableColumn(Strings.DiffTable.originalColumn) { row in
-                    Text(row.originalTime ?? "—")
+                    Text(row.originalTimeDisplay ?? "—")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(row.originalTime != nil ? .primary : .tertiary)
                 }
@@ -125,7 +130,7 @@ struct DiffTableView: View {
                 .width(min: 130)
 
                 TableColumn(Strings.DiffTable.timestampColumn) { row in
-                    changeBadge(row)
+                    timestampCell(row)
                 }
                 .width(min: 70)
 
@@ -145,7 +150,16 @@ struct DiffTableView: View {
                 .width(min: 80)
 
                 TableColumn(Strings.DiffTable.statusColumn) { row in
-                    statusBadge(row)
+                    VStack(alignment: .leading, spacing: 1) {
+                        statusBadge(row)
+                        if let fields = staleFieldsText(row) {
+                            Text(Strings.DiffTable.wouldWrite(fields))
+                                .font(.system(size: 9))
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                        }
+                    }
+                    .help(rowExplanation(row))
                 }
                 .width(min: 80)
             }
@@ -226,6 +240,39 @@ struct DiffTableView: View {
         case "error": return row.timestampError ?? Strings.DiffTable.errorChange
         default: return "—"
         }
+    }
+
+    /// The fields a correction would write, for the rows that would write any.
+    private func staleFieldsText(_ row: DiffTableRow) -> String? {
+        row.staleFields.isEmpty ? nil : row.staleFields.joined(separator: ", ")
+    }
+
+    /// Why a row says what it says: which field the correction read, and which
+    /// fields it would write. A row whose original and corrected times are the
+    /// same string has nothing else to go on.
+    private func rowExplanation(_ row: DiffTableRow) -> String {
+        var parts: [String] = []
+        if let label = row.timestampSource?.label {
+            parts.append(Strings.DiffTable.sourceHelp(label))
+        }
+        if let fields = staleFieldsText(row) {
+            parts.append(Strings.DiffTable.wouldWrite(fields))
+        }
+        return parts.joined(separator: "\n")
+    }
+
+    @ViewBuilder
+    private func timestampCell(_ row: DiffTableRow) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            changeBadge(row)
+            if let label = row.timestampSource?.label {
+                Text(label)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+        }
+        .help(rowExplanation(row))
     }
 
     @ViewBuilder

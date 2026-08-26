@@ -291,6 +291,21 @@ What happens to source files after processing:
         static let fixedStatus = String(localized: "diffTable.fixed.status", defaultValue: "Fixed")
         static let movedStatus = String(localized: "diffTable.moved.status", defaultValue: "Moved")
 
+        static let sourceDateTimeOriginal = String(localized: "diffTable.source.dateTimeOriginal", defaultValue: "DateTimeOriginal")
+        static let sourceCreationDate = String(localized: "diffTable.source.creationDate", defaultValue: "Keys:CreationDate")
+        static let sourceClockUTC = String(localized: "diffTable.source.clockUTC", defaultValue: "clock (UTC)")
+        static let sourceFilename = String(localized: "diffTable.source.filename", defaultValue: "filename")
+        static let sourceFileTime = String(localized: "diffTable.source.fileTime", defaultValue: "file time")
+        static let utcSuffix = String(localized: "diffTable.utc.suffix", defaultValue: "UTC")
+
+        static func sourceHelp(_ label: String) -> String {
+            String(localized: "diffTable.source.help", defaultValue: "Source: \(label)")
+        }
+
+        static func wouldWrite(_ fields: String) -> String {
+            String(localized: "diffTable.wouldWrite", defaultValue: "Writes \(fields)")
+        }
+
         static let wouldFixChange = String(localized: "diffTable.wouldFix.change", defaultValue: "Would fix")
         static let fixedChange = String(localized: "diffTable.fixed.change", defaultValue: "Fixed")
         static let noChangeChange = String(localized: "diffTable.noChange.change", defaultValue: "No change")

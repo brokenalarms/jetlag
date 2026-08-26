@@ -900,6 +900,7 @@ class TestPipelineMachineOutput:
                 current["correction_mode"] = event.get("correction_mode")
                 current["requires_force_timezone"] = event.get("requires_force_timezone")
                 current["camera_zone_offset"] = event.get("camera_zone_offset")
+                current["stale_fields"] = event.get("stale_fields")
                 current["time_offset_seconds"] = event.get("time_offset_seconds")
                 current["time_offset_display"] = event.get("time_offset_display")
                 if event.get("error"):
@@ -1170,6 +1171,36 @@ class TestPipelineMachineOutput:
         assert len(files) == 1
         assert files[0].get("camera_zone_offset") == "+09:00", \
             f"Expected the inferred camera zone in the preview row, got: {files[0]}"
+
+    def test_stale_fields_forwarded_to_timestamp_result(self, temp_workspace, test_profile):
+        """The write tags a correction would touch reach the timestamp_result event,
+        so a diff-table row can say what it will write even when its original and
+        corrected times are the same string.
+
+        The fixture's DateTimeOriginal and track atoms are already right for +08:00;
+        only the movie header is eight hours out and Keys:CreationDate is missing.
+        """
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        _create_video_raw(
+            video,
+            DateTimeOriginal="2025:06:18 07:25:21+08:00",
+            **{"QuickTime:CreateDate": "2025:06:18 07:25:21",
+               "QuickTime:MediaCreateDate": "2025:06:17 23:25:21",
+               "QuickTime:TrackCreateDate": "2025:06:17 23:25:21"},
+        )
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0800",
+            "--tasks", "fix-timestamp",
+        ])
+
+        files = self._parse_events(result.stdout)
+        assert len(files) == 1
+        assert files[0].get("stale_fields") == ["Keys:CreationDate", "QuickTime:CreateDate"], \
+            f"Expected the write tags that differ in the preview row, got: {files[0]}"
 
     def test_tz_mismatch_blocks_apply_without_force(self, temp_workspace, test_profile):
         """Applying a timezone-mismatched batch without --force-timezone is refused.

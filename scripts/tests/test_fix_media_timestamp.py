@@ -568,6 +568,77 @@ class TestFixMediaTimestampMachineOutput:
         at_lines = _parse_at_lines(result.stdout)
         assert at_lines.get("timestamp_source") == "filename", f"Actual: @@timestamp_source={at_lines.get('timestamp_source')}, Expected: filename"
 
+    def test_utc_clock_original_is_emitted_with_an_explicit_zero_offset(self, temp_dir):
+        """@@original_time states the zone of a UTC source, so a consumer can tell a
+        relabel from a shift without knowing which field won the ranking.
+
+        Actual: @@original_time=2025:06:17 23:25:21+00:00
+        Expected: the same +/-HH:MM shape @@corrected_time uses.
+        """
+        video = os.path.join(temp_dir, "test.mp4")
+        create_test_video(video, **{"QuickTime:MediaCreateDate": "2025:06:17 23:25:21"})
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            "--timezone", "+08:00"
+        ], capture_output=True, text=True)
+
+        at_lines = _parse_at_lines(result.stdout)
+        assert at_lines.get("timestamp_source") == "mediacreatedate"
+        assert at_lines.get("original_time") == "2025:06:17 23:25:21+00:00"
+        assert at_lines.get("corrected_time") == "2025:06:18 07:25:21+08:00"
+
+    def test_naive_original_is_emitted_without_a_zone(self, temp_dir):
+        """A bare DateTimeOriginal has no zone; @@original_time does not invent one.
+
+        Actual: @@original_time=2025:06:18 07:25:21
+        Expected: unchanged from the stored value.
+        """
+        video = os.path.join(temp_dir, "test.mp4")
+        create_test_video(video, DateTimeOriginal="2025:06:18 07:25:21")
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            "--timezone", "+08:00"
+        ], capture_output=True, text=True)
+
+        at_lines = _parse_at_lines(result.stdout)
+        assert at_lines.get("original_time") == "2025:06:18 07:25:21"
+
+    def test_stale_fields_names_the_write_tags_that_would_change(self, temp_dir):
+        """@@stale_fields is what makes would_fix explicable on a row whose original
+        and corrected times are identical: it names the fields the write would touch,
+        and is empty once they all match.
+
+        Actual: @@stale_fields=Keys:CreationDate,QuickTime:CreateDate then @@stale_fields=
+        Expected: only the missing Keys:CreationDate and the stale movie header, then nothing.
+        """
+        video = os.path.join(temp_dir, "test.mp4")
+        create_test_video(
+            video,
+            DateTimeOriginal="2025:06:18 07:25:21+08:00",
+            **{"QuickTime:CreateDate": "2025:06:18 07:25:21",
+               "QuickTime:MediaCreateDate": "2025:06:17 23:25:21",
+               "QuickTime:TrackCreateDate": "2025:06:17 23:25:21"},
+        )
+
+        first = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            "--timezone", "+08:00", "--apply"
+        ], capture_output=True, text=True)
+
+        assert _parse_at_lines(first.stdout).get("stale_fields") == \
+            "Keys:CreationDate,QuickTime:CreateDate"
+
+        second = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            "--timezone", "+08:00", "--apply"
+        ], capture_output=True, text=True)
+
+        at_lines = _parse_at_lines(second.stdout)
+        assert at_lines.get("timestamp_action") == "no_change"
+        assert at_lines.get("stale_fields") == ""
+
     def test_camera_zone_offset_present_when_quicktime_wins(self, temp_dir):
         """@@camera_zone_offset is emitted when a declared --timezone lets the
         QuickTime date win the ranking — camera was on Japan time in New Zealand.

@@ -104,6 +104,62 @@ final class TimezoneConflictTests: XCTestCase {
         XCTAssertFalse(state.diffTableRows[0].requiresForceTimezone)
     }
 
+    /// The winning source and the fields a correction would write reach the row, so
+    /// the table can explain a "Would fix" whose original and corrected times are the
+    /// same string — here a stale movie header with no Keys:CreationDate.
+    func testSourceAndStaleFieldsReachTheDiffTableRow() {
+        let state = AppState()
+
+        feed(state, #"{"event": "pipeline_file", "file": "test.mp4"}"#)
+        feed(state, """
+        {"event": "timestamp_result", "file": "test.mp4", "action": "would_fix", \
+        "original_time": "2025:08:15 14:08:51+09:00", "corrected_time": "2025:08:15 14:08:51+09:00", \
+        "source": "datetimeoriginal", \
+        "stale_fields": ["Keys:CreationDate", "QuickTime:CreateDate"]}
+        """)
+        feed(state, #"{"event": "pipeline_result", "file": "test.mp4", "result": "would_change"}"#)
+
+        XCTAssertEqual(state.diffTableRows.count, 1)
+        XCTAssertEqual(state.diffTableRows[0].timestampSource, .dateTimeOriginal)
+        XCTAssertEqual(state.diffTableRows[0].staleFields,
+                       ["Keys:CreationDate", "QuickTime:CreateDate"])
+    }
+
+    /// A result that names no fields leaves the row's list empty rather than absent,
+    /// and an unrecognised source token leaves the row without one.
+    func testMissingSourceAndStaleFieldsLeaveTheRowEmpty() {
+        let state = AppState()
+
+        feed(state, #"{"event": "pipeline_file", "file": "test.mp4"}"#)
+        feed(state, """
+        {"event": "timestamp_result", "file": "test.mp4", "action": "no_change", \
+        "original_time": "2025:08:15 14:08:51+09:00", "corrected_time": "2025:08:15 14:08:51+09:00"}
+        """)
+        feed(state, #"{"event": "pipeline_result", "file": "test.mp4", "result": "unchanged"}"#)
+
+        XCTAssertEqual(state.diffTableRows.count, 1)
+        XCTAssertNil(state.diffTableRows[0].timestampSource)
+        XCTAssertEqual(state.diffTableRows[0].staleFields, [])
+    }
+
+    /// A UTC-clock row shows its original as UTC while its corrected time keeps the
+    /// declared zone — the nine-hour gap between the two columns is a relabel, and
+    /// the row now says so.
+    func testUTCClockRowRendersItsOriginalAsUTC() {
+        let state = AppState()
+
+        feed(state, #"{"event": "pipeline_file", "file": "test.mp4"}"#)
+        feed(state, """
+        {"event": "timestamp_result", "file": "test.mp4", "action": "would_fix", \
+        "original_time": "2025:08:30 09:00:00+00:00", "corrected_time": "2025:08:30 18:00:00+09:00", \
+        "source": "mediacreatedate", "stale_fields": ["Keys:CreationDate"]}
+        """)
+        feed(state, #"{"event": "pipeline_result", "file": "test.mp4", "result": "would_change"}"#)
+
+        XCTAssertEqual(state.diffTableRows[0].originalTimeDisplay, "2025:08:30 09:00:00 UTC")
+        XCTAssertEqual(state.diffTableRows[0].correctedTime, "2025:08:30 18:00:00+09:00")
+    }
+
     /// A dry-run preview must not be interrupted by a modal: the conflict is
     /// data the user reads in the table, not a question they answer yet.
     func testDryRunProvidedMismatchDoesNotInterruptThePreview() {
