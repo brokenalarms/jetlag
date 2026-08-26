@@ -113,7 +113,6 @@ final class ProfileTests: XCTestCase {
 
         let original = ProfilesConfig(
             gyroflow: nil,
-            backupConfig: nil,
             profiles: [
                 "test-cam": MediaProfile(
                     type: .video,
@@ -141,7 +140,7 @@ final class ProfileTests: XCTestCase {
         XCTAssertEqual(profile.fileExtensions, [".mp4", ".mov"])
     }
 
-    func testRoundTripPreservesGyroflowAndBackupConfig() throws {
+    func testRoundTripPreservesGyroflow() throws {
         let yaml = """
         gyroflow:
           binary: /usr/local/bin/gyroflow
@@ -149,9 +148,6 @@ final class ProfileTests: XCTestCase {
             stabilization:
               max_zoom: 105.0
               adaptive_zoom_window: 15.0
-        backup_config:
-          local_base_path: /Volumes/
-          remote_base_path: /backup/
         profiles:
           cam:
             type: video
@@ -164,14 +160,11 @@ final class ProfileTests: XCTestCase {
 
         XCTAssertEqual(config.gyroflow?.binary, "/usr/local/bin/gyroflow")
         XCTAssertEqual(config.gyroflow?.preset?.stabilization?.maxZoom, 105.0)
-        XCTAssertEqual(config.backupConfig?.localBasePath, "/Volumes/")
-        XCTAssertEqual(config.backupConfig?.remoteBasePath, "/backup/")
 
         try ProfileService.write(config, to: path)
         let reloaded = try ProfileService.load(from: path)
 
         XCTAssertEqual(reloaded.gyroflow?.binary, "/usr/local/bin/gyroflow")
-        XCTAssertEqual(reloaded.backupConfig?.localBasePath, "/Volumes/")
         XCTAssertEqual(reloaded.profiles.count, 1)
     }
 
@@ -255,7 +248,6 @@ final class ProfileTests: XCTestCase {
 
         let original = ProfilesConfig(
             gyroflow: nil,
-            backupConfig: nil,
             profiles: [
                 "gopro": MediaProfile(
                     type: .video,
@@ -304,7 +296,6 @@ final class ProfileTests: XCTestCase {
                     )
                 )
             ),
-            backupConfig: nil,
             profiles: [
                 "gopro": MediaProfile(type: .video, gyroflowEnabled: true, fileExtensions: [".mp4"])
             ]
@@ -329,7 +320,6 @@ final class ProfileTests: XCTestCase {
                     )
                 )
             ),
-            backupConfig: nil,
             profiles: [
                 "gopro": MediaProfile(
                     type: .video,
@@ -359,7 +349,6 @@ final class ProfileTests: XCTestCase {
                     )
                 )
             ),
-            backupConfig: nil,
             profiles: [
                 "gopro": MediaProfile(
                     type: .video,
@@ -389,7 +378,6 @@ final class ProfileTests: XCTestCase {
                     stabilization: StabilizationSettings(maxZoom: 105.0)
                 )
             ),
-            backupConfig: nil,
             profiles: [
                 "sony": MediaProfile(type: .photo, fileExtensions: [".arw"])
             ]
@@ -403,7 +391,6 @@ final class ProfileTests: XCTestCase {
     func testNormalizedWithNoGlobalConfig() {
         let config = ProfilesConfig(
             gyroflow: nil,
-            backupConfig: nil,
             profiles: [
                 "gopro": MediaProfile(type: .video, gyroflowEnabled: true, fileExtensions: [".mp4"])
             ]
@@ -423,7 +410,6 @@ final class ProfileTests: XCTestCase {
         let state = AppState()
         state.profilesConfig = ProfilesConfig(
             gyroflow: nil,
-            backupConfig: nil,
             profiles: [
                 "gopro": MediaProfile(type: .video),
                 "sony": MediaProfile(type: .photo)
