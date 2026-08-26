@@ -19,7 +19,7 @@ struct LogOutputView: View {
                         .foregroundStyle(.tertiary)
                 }
                 Button {
-                    let text = lines.map(\.text).joined(separator: "\n")
+                    let text = LogTextView.displayText(for: lines)
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(text, forType: .string)
                 } label: {
@@ -64,9 +64,8 @@ struct LogTextView: NSViewRepresentable {
         let scrollView = ContentAgnosticScrollView()
         scrollView.borderType = .noBorder
         scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = true
+        scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
-        scrollView.scrollerStyle = .legacy
         scrollView.drawsBackground = false
         scrollView.detachSizeFromContent()
 
@@ -76,10 +75,10 @@ struct LogTextView: NSViewRepresentable {
             width: CGFloat.greatestFiniteMagnitude,
             height: CGFloat.greatestFiniteMagnitude)
         textView.isVerticallyResizable = true
-        textView.isHorizontallyResizable = true
-        textView.textContainer?.widthTracksTextView = false
+        textView.isHorizontallyResizable = false
+        textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.containerSize = NSSize(
-            width: CGFloat.greatestFiniteMagnitude,
+            width: scrollView.contentSize.width,
             height: CGFloat.greatestFiniteMagnitude)
 
         textView.isEditable = false
@@ -94,12 +93,18 @@ struct LogTextView: NSViewRepresentable {
         return scrollView
     }
 
+    /// Joins the lines' ANSI-stripped text for display or copying, so escape codes the
+    /// scripts write for terminal-coloured stderr never reach the log panel or clipboard.
+    static func displayText(for lines: [LogLine]) -> String {
+        lines.map(\.strippedText).joined(separator: "\n")
+    }
+
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else {
             return
         }
 
-        let newText = lines.map(\.text).joined(separator: "\n")
+        let newText = Self.displayText(for: lines)
 
         // Only update if text has changed
         if textView.string != newText {

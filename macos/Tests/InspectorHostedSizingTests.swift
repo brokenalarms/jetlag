@@ -167,37 +167,52 @@ final class InspectorHostedSizingTests: XCTestCase {
         XCTAssertEqual(afterStreaming.height, NSView.noIntrinsicMetric)
     }
 
-    /// A long log line (a path, exiftool output) must never wrap: proves the text view
-    /// grows past the scroll view's content width instead of wrapping, a horizontal
-    /// scroller is offered, and — matching
-    /// `testLogScrollViewReportsNoIntrinsicSizeAsTextGrows` above — the scroll view still
-    /// reports no intrinsic size, so the inspector's negotiated width is unaffected.
-    func testLogScrollViewNeverWrapsALongLineAndOffersHorizontalScrolling() throws {
+    /// The log is a terminal transcript: a long log line (a path, exiftool output) must
+    /// wrap to the panel width like a terminal wraps as you resize, never overflow with a
+    /// horizontal scroller. Proves the text view's frame stays pinned to the scroll view's
+    /// content width and the line lays out across more than one visual line.
+    func testLogScrollViewWrapsALongLine() throws {
         let scrollView = LogTextView.makeScrollView()
         scrollView.frame = NSRect(x: 0, y: 0, width: 480, height: 200)
         let textView = try XCTUnwrap(scrollView.documentView as? NSTextView)
-
         let textContainer = try XCTUnwrap(textView.textContainer)
-
-        textView.string = "short line"
-        textView.layoutManager?.ensureLayout(for: textContainer)
-        textView.sizeToFit()
-        let shortLineIntrinsicSize = scrollView.intrinsicContentSize
-        let shortLineWidth = textView.frame.width
+        let layoutManager = try XCTUnwrap(textView.layoutManager)
 
         textView.string = String(repeating: "x", count: 2000)
-        textView.layoutManager?.ensureLayout(for: textContainer)
-        textView.sizeToFit()
-        let longLineIntrinsicSize = scrollView.intrinsicContentSize
+        scrollView.layoutSubtreeIfNeeded()
+        layoutManager.ensureLayout(for: textContainer)
 
-        XCTAssertTrue(scrollView.hasHorizontalScroller)
-        XCTAssertGreaterThan(
-            textView.frame.width, scrollView.contentSize.width,
-            "a long line must extend past the panel rather than wrap")
-        XCTAssertGreaterThan(textView.frame.width, shortLineWidth)
+        XCTAssertFalse(scrollView.hasHorizontalScroller)
         XCTAssertEqual(
-            shortLineIntrinsicSize, longLineIntrinsicSize,
-            "a long line must not change what the scroll view asks of the inspector")
+            textView.frame.width, scrollView.contentSize.width,
+            "the text view's frame must track the scroll view's content width, not the text")
+
+        let glyphRange = layoutManager.glyphRange(for: textContainer)
+        var visualLineCount = 0
+        var glyphIndex = glyphRange.location
+        while glyphIndex < NSMaxRange(glyphRange) {
+            var lineRange = NSRange()
+            layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: &lineRange)
+            visualLineCount += 1
+            glyphIndex = NSMaxRange(lineRange)
+        }
+        XCTAssertGreaterThan(
+            visualLineCount, 1,
+            "a 2000-character line must wrap across more than one visual line")
+    }
+
+    /// The scripts write ANSI SGR colour codes for terminal-coloured stderr (e.g.
+    /// `\u{1B}[36m…\u{1B}[0m`). Proves the log's displayed text never carries them, even
+    /// though the underlying `LogLine.text` still holds the raw bytes.
+    func testDisplayTextStripsANSIEscapeSequences() {
+        let line = LogLine(
+            text: "\u{1B}[36m🔍 VID_20250815_173854_00_014.insv\u{1B}[0m",
+            stream: .stderr)
+
+        let displayText = LogTextView.displayText(for: [line])
+
+        XCTAssertEqual(displayText, "🔍 VID_20250815_173854_00_014.insv")
+        XCTAssertFalse(displayText.contains("\u{1B}"))
     }
 
     /// A no-intrinsic-size scroll view still argues for space through its hugging and
@@ -253,17 +268,6 @@ final class InspectorHostedSizingTests: XCTestCase {
     }
 
     // MARK: - Always-visible horizontal scrollers
-
-    /// macOS overlay scrollers only appear during a scroll gesture, hiding the fact that
-    /// a table or log is wider than the panel. Both hosted scroll views must opt into the
-    /// legacy style so a scroller is drawn whenever content overflows.
-    func testLogScrollViewUsesLegacyScrollerStyle() {
-        let scrollView = LogTextView.makeScrollView()
-
-        XCTAssertEqual(scrollView.scrollerStyle, .legacy)
-        XCTAssertTrue(scrollView.hasHorizontalScroller)
-        XCTAssertTrue(scrollView.autohidesScrollers)
-    }
 
     /// The Korea dry run (288 rows, #167) computes a `File`/`Timeline`/`Original`/
     /// `Corrected` column width that overflows a narrow panel, leaving `Timestamp`/
