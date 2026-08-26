@@ -10,6 +10,12 @@ struct WorkflowView: View {
         var id: Int { fileCount }
     }
 
+    /// The form's one design width. Its controls are text fields, which have no
+    /// intrinsic width, so the form cannot be sized from its content; everything around
+    /// it — the panel's share, the window's minimum — is derived from this by the layout
+    /// system rather than declared again.
+    static let formWidth: CGFloat = 600
+
     private let optionLabelWidth: CGFloat = 52
 
     private var companionExtensions: String {
@@ -59,7 +65,7 @@ struct WorkflowView: View {
                 )
             }
         }
-        .frame(width: SplitViewLayout.formContentWidth)
+        .frame(width: Self.formWidth)
         .navigationTitle(Strings.Nav.workflow)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

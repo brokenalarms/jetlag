@@ -15,8 +15,9 @@ struct JetlagApp: App {
                 .onAppear { state.loadProfiles() }
                 .task { await state.refreshGyroflowStatus() }
         }
-        // ContentView declares the minimum width every visible column needs; this is what
-        // makes AppKit grow the window to satisfy it rather than overlap the columns.
+        // The window's minimum is whatever the content's minimum resolves to — the sidebar,
+        // the form and (when open) the panel — so opening the panel grows the window and
+        // AppKit keeps the result on screen. No width is declared anywhere for this.
         .windowResizability(.contentMinSize)
         .commands {
             // Single-window utility — no New Window or Open Recent
