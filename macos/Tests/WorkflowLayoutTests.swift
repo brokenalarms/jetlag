@@ -67,6 +67,25 @@ final class WorkflowLayoutTests: XCTestCase {
         }
     }
 
+    /// The whole window content — sidebar, form, panel — has a derived size range and no
+    /// declared window width: closed, it resolves to sidebar + form however much it is
+    /// offered, which is what lets `windowResizability(.contentSize)` shrink-wrap the
+    /// window; open, its minimum rises by the panel's minimum.
+    func testWindowContentSizesToItsChildren() {
+        func resolvedWidth(panelOpen: Bool, offered: CGFloat) -> CGFloat {
+            let controller = NSHostingController(rootView: ContentView(state: workflowState(panelOpen: panelOpen)))
+            return controller.sizeThatFits(in: NSSize(width: offered, height: 900)).width
+        }
+        let closedNarrow = resolvedWidth(panelOpen: false, offered: 0)
+        let closedWide = resolvedWidth(panelOpen: false, offered: 1900)
+        XCTAssertEqual(closedNarrow, closedWide, accuracy: 1, "closed, the content has one width")
+        XCTAssertEqual(closedWide, ContentView.sidebarWidth + WorkflowView.formWidth, accuracy: 2)
+
+        let openMinimum = resolvedWidth(panelOpen: true, offered: 0)
+        XCTAssertEqual(openMinimum - closedNarrow, InspectorPanel.minWidth, accuracy: 2)
+        XCTAssertEqual(resolvedWidth(panelOpen: true, offered: 1900), 1900, accuracy: 1, "open, the content fills what it is offered")
+    }
+
     /// Opening the panel raises the content's minimum by the panel's own minimum — that
     /// growth is what `windowResizability(.contentMinSize)` turns into a wider window,
     /// rather than a narrower form.
