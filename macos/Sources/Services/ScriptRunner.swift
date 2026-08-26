@@ -4,7 +4,8 @@ struct ScriptRunner {
     static func run(
         script: String,
         args: [String],
-        workingDir: String
+        workingDir: String,
+        profilesPath: String
     ) -> (process: Process, stream: AsyncStream<LogLine>) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
@@ -17,6 +18,9 @@ struct ScriptRunner {
         let toolsDir = (workingDir as NSString).appendingPathComponent("tools")
         let existingPath = env["PATH"] ?? "/usr/bin:/bin"
         env["PATH"] = toolsDir + ":" + existingPath
+        // Without this the scripts fall back to <scripts>/media-profiles.yaml —
+        // the read-only copy in the bundle, not the file the app writes.
+        env[ProfilesLocation.environmentKey] = profilesPath
         process.environment = env
 
         let stdoutPipe = Pipe()

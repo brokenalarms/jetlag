@@ -213,8 +213,13 @@ What happens to source files after processing:
         static let proActivated = String(localized: "settings.pro.activated", defaultValue: "Jetlag Pro — Activated")
         static let planLabel = String(localized: "settings.plan.label", defaultValue: "Plan")
         static let scriptsDirLabel = String(localized: "settings.scriptsDir.label", defaultValue: "Scripts directory")
-        static let profilesFilePlaceholder = String(localized: "settings.profilesFile.placeholder",
-            defaultValue: "Profiles file (default: scripts_dir/media-profiles.yaml)")
+        static let profilesFileLabel = String(localized: "settings.profilesFile.label", defaultValue: "Profiles file")
+        static func profilesFilePlaceholder(defaultPath: String) -> String {
+            String(localized: "settings.profilesFile.placeholder",
+                   defaultValue: "Default: \(defaultPath)")
+        }
+        static let profilesFileHelp = String(localized: "settings.profilesFile.help",
+            defaultValue: "Leave empty to use the file above. Set it to point the app at another profiles file, such as a repository checkout.")
         static let reloadProfilesButton = String(localized: "settings.reloadProfiles.button", defaultValue: "Reload Profiles")
         static let licenseKeyPlaceholder = String(localized: "settings.licenseKey.placeholder", defaultValue: "License key")
         static let activateButton = String(localized: "settings.activate.button", defaultValue: "Activate")
@@ -323,6 +328,7 @@ What happens to source files after processing:
         static let profilesInvalidYAML = String(localized: "error.profilesInvalidYAML", defaultValue: "Invalid YAML structure")
         static let profilesParseFailed = String(localized: "error.profilesParseFailed", defaultValue: "Failed to parse YAML")
         static let profilesWriteFailed = String(localized: "error.profilesWriteFailed", defaultValue: "Failed to write profiles")
+        static let profilesSeedFailed = String(localized: "error.profilesSeedFailed", defaultValue: "Could not create the profiles file")
         static let directoryNotFound = String(localized: "error.directoryNotFound", defaultValue: "Directory not found")
         static let pathIsFile = String(localized: "error.pathIsFile", defaultValue: "Path is a file, not a directory")
         static let licenseComingSoon = String(localized: "error.licenseComingSoon",

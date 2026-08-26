@@ -7,7 +7,7 @@
 ├── scripts/              ← Python/shell scripts (work standalone, no knowledge of app)
 │   ├── *.py / *.sh
 │   ├── lib/              ← shared Python utilities
-│   ├── media-profiles.yaml  ← shared config (used by both scripts and app)
+│   ├── media-profiles.yaml  ← shared config (scripts' own default; the app's shipped seed)
 │   └── tests/            ← script test suite (belongs with the scripts)
 ├── macos/                ← macOS SwiftUI app (sibling to scripts/, not nested inside)
 │   ├── Sources/          ← Swift source files
@@ -49,6 +49,16 @@ profiles:
 ```
 
 This dict-key-as-name constraint is shared between the Swift model and the Python scripts. Neither side should add a `name` field inside the profile — the key is the name.
+
+### Where the file lives
+
+The live file the app reads and writes is `~/Library/Application Support/Jetlag/media-profiles.yaml`. It is created on first launch by copying `scripts/media-profiles.yaml` out of the app bundle, and is the user's from then on — a later launch never overwrites it.
+
+The copy inside the bundle (`Contents/Resources/scripts/media-profiles.yaml`) is the shipped default and is only ever read. The `Bundle scripts` build phase replaces it on every build, so an edit written there would be discarded on the next build; an installed, signed app cannot write into its own bundle at all.
+
+Settings has a profiles-file override, empty by default. Set it to point the app at another file — typically a repository checkout's `scripts/media-profiles.yaml` during development. A non-empty override wins over the Application Support path, and nothing is ever seeded into the location it names.
+
+Standalone scripts resolve their own path (`scripts/lib/profiles.py`): `JETLAG_PROFILES_FILE` if set, otherwise `scripts/media-profiles.yaml` beside them. The app therefore exports `JETLAG_PROFILES_FILE` into every script it launches, so the pipeline reads the same file the app writes rather than the bundled default.
 
 ---
 

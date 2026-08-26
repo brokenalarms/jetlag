@@ -659,7 +659,8 @@ struct WorkflowView: View {
         let (process, stream) = ScriptRunner.run(
             script: script,
             args: args,
-            workingDir: state.scriptsDirectory
+            workingDir: state.scriptsDirectory,
+            profilesPath: state.resolvedProfilesPath
         )
         state.currentProcess = process
 

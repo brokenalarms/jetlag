@@ -19,8 +19,10 @@
 		5F7869F0BEBB4DFB2BC2735F /* HostedViewSizing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3FDFFFE053527F6DAFF2443 /* HostedViewSizing.swift */; };
 		6565530211ECEF491334BDD9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DCC75F647AA2A41BF2B17B9 /* ContentView.swift */; };
 		67B98190D68F596BAC4EF2AE /* PipelineArgsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D08074CC6CCFCC6AFEC75C39 /* PipelineArgsTests.swift */; };
+		6996FE5603F77EE4D4B0CAA9 /* ProfilesLocationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB6F9D30A0BFC9DEA56F289 /* ProfilesLocationTests.swift */; };
 		6A589A5C59B6E0ACF8DC960F /* ProfilePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 824A528222BFA2E5BFFCDF48 /* ProfilePicker.swift */; };
 		6A87F1ECCD552C95D40ED1AA /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27CF0E7DB6265D0EAF8055CE /* AppStateTests.swift */; };
+		732357FDE1D04D46AB41B1FC /* ProfilesLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61A5900D18DD3679842E737D /* ProfilesLocation.swift */; };
 		7C0A6314355CC7D586AFA208 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 155795936E0AF78F19DDB808 /* Assets.xcassets */; };
 		7EB40F1EE336843C386D4474 /* SandboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6989D9C650B0383E7ABA46E2 /* SandboxView.swift */; };
 		865E2EFF836809F57BC1AFC2 /* SplitViewLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35254B954C0EC9324A9C523C /* SplitViewLayoutTests.swift */; };
@@ -70,6 +72,7 @@
 		3CF7D354B21B95B1EB3A8984 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		5AFFC7653CEF9432BABAFE94 /* ProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileTests.swift; sourceTree = "<group>"; };
 		5DCC75F647AA2A41BF2B17B9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		61A5900D18DD3679842E737D /* ProfilesLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesLocation.swift; sourceTree = "<group>"; };
 		689D9A69FF07CCA892429C0A /* PillField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PillField.swift; sourceTree = "<group>"; };
 		6989D9C650B0383E7ABA46E2 /* SandboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SandboxView.swift; sourceTree = "<group>"; };
 		6AC02EFEC0D85CEB6F137381 /* WorkflowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowView.swift; sourceTree = "<group>"; };
@@ -77,6 +80,7 @@
 		6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileService.swift; sourceTree = "<group>"; };
 		73A67A68A82CC97A0B42F497 /* DiffTableRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffTableRow.swift; sourceTree = "<group>"; };
 		77B8B3DD35481A9315181466 /* SplitViewLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitViewLayout.swift; sourceTree = "<group>"; };
+		7CB6F9D30A0BFC9DEA56F289 /* ProfilesLocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesLocationTests.swift; sourceTree = "<group>"; };
 		823EAC4F97C91F6A789E0415 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
 		824A528222BFA2E5BFFCDF48 /* ProfilePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilePicker.swift; sourceTree = "<group>"; };
 		886F8C8992B2C0546F301A05 /* Strings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings.swift; sourceTree = "<group>"; };
@@ -121,6 +125,7 @@
 			children = (
 				88D2EC9D00CD4EE5A754D59E /* LicenseStore.swift */,
 				6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */,
+				61A5900D18DD3679842E737D /* ProfilesLocation.swift */,
 				CA47C3147490D4D7AABA5169 /* PythonRuntimeCheck.swift */,
 				9C5FD29C41D642C67671FBAF /* ScriptRunner.swift */,
 			);
@@ -163,6 +168,7 @@
 				C76405E304A233D40E627ECD /* GyroflowStatusTests.swift */,
 				C698B76B04834D4379CADAA4 /* InspectorHostedSizingTests.swift */,
 				D08074CC6CCFCC6AFEC75C39 /* PipelineArgsTests.swift */,
+				7CB6F9D30A0BFC9DEA56F289 /* ProfilesLocationTests.swift */,
 				5AFFC7653CEF9432BABAFE94 /* ProfileTests.swift */,
 				33AF1E5DF4D368EB36EFB0EC /* PythonRuntimeCheckTests.swift */,
 				35254B954C0EC9324A9C523C /* SplitViewLayoutTests.swift */,
@@ -348,6 +354,7 @@
 				ED7D0C891E4F99927C96CD9D /* PillField.swift in Sources */,
 				6A589A5C59B6E0ACF8DC960F /* ProfilePicker.swift in Sources */,
 				932EB3F57E4BF42DBFA0EBF9 /* ProfileService.swift in Sources */,
+				732357FDE1D04D46AB41B1FC /* ProfilesLocation.swift in Sources */,
 				C0FF2D225A09C82E454CF5E2 /* ProfilesView.swift in Sources */,
 				49521EA7D50F8FD80CA4EDFD /* PythonRuntimeCheck.swift in Sources */,
 				7EB40F1EE336843C386D4474 /* SandboxView.swift in Sources */,
@@ -372,6 +379,7 @@
 				54BF807828E4B1BF2A402E9F /* InspectorHostedSizingTests.swift in Sources */,
 				67B98190D68F596BAC4EF2AE /* PipelineArgsTests.swift in Sources */,
 				C0578D87EB55FAED6B59A9C0 /* ProfileTests.swift in Sources */,
+				6996FE5603F77EE4D4B0CAA9 /* ProfilesLocationTests.swift in Sources */,
 				A00FA545CCBD5C1CF868B312 /* PythonRuntimeCheckTests.swift in Sources */,
 				865E2EFF836809F57BC1AFC2 /* SplitViewLayoutTests.swift in Sources */,
 			);
