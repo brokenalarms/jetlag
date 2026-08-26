@@ -1109,6 +1109,123 @@ class TestCorrectionWritesTheWholeClockTable:
         assert calls == []
 
 
+class TestMachineOriginalTimeCarriesZoneSemantics:
+    """The diff table has to be able to explain a row from the machine output alone.
+
+    A UTC clock's digits are UTC, but the raw field carries no zone, so a row read
+    "2025:06:17 23:25:21 → 2025:06:18 07:25:21+08:00" as an eight-hour shift that
+    never happened. The emitted original states the zone it is in whenever the
+    winning source's digits are UTC; a naive source has no zone to state and stays
+    bare, which is the honest answer.
+    """
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        fmt._exif_cache.clear()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    def _video(self, filename, **tags):
+        path = os.path.join(self.temp_dir, filename)
+        create_test_video(path, **tags)
+        fmt._exif_cache.clear()
+        return path
+
+    def test_quicktime_clock_original_is_emitted_as_utc(self):
+        """A MediaCreateDate original is a UTC instant: emitted with +00:00 so the
+        corrected local time reads as a relabel, not a shift."""
+        video = self._video("test.mp4",
+                            **{"QuickTime:MediaCreateDate": "2025:06:17 23:25:21"})
+
+        result = fmt.fix_media_timestamps(video, dry_run=True, timezone_spec="+08:00")
+
+        assert result.original_time == "2025:06:17 23:25:21+00:00"
+        assert result.corrected_time == "2025:06:18 07:25:21+08:00"
+
+    def test_creationdate_with_z_original_is_emitted_as_utc(self):
+        """Keys:CreationDate with a Z marker is UTC too; the Z is replaced with the
+        same ±HH:MM shape corrected_time uses, so both sides parse the same way."""
+        video = self._video("test.mp4",
+                            **{"Keys:CreationDate": "2025:06:17 23:25:21Z"})
+
+        result = fmt.fix_media_timestamps(video, dry_run=True, timezone_spec="+08:00")
+
+        assert result.original_time == "2025:06:17 23:25:21+00:00"
+
+    def test_naive_datetimeoriginal_original_stays_bare(self):
+        """A bare DateTimeOriginal has no zone of its own — claiming one would be a
+        lie, so the original is emitted exactly as stored."""
+        video = self._video("test.mp4", DateTimeOriginal="2025:06:18 07:25:21")
+
+        result = fmt.fix_media_timestamps(video, dry_run=True, timezone_spec="+08:00")
+
+        assert result.original_time == "2025:06:18 07:25:21"
+
+    def test_zoned_datetimeoriginal_keeps_its_own_offset(self):
+        """A zoned source already states its zone and is passed through untouched."""
+        video = self._video("test.mp4", DateTimeOriginal="2025:06:18 07:25:21+08:00")
+
+        result = fmt.fix_media_timestamps(video, dry_run=True, timezone_spec="+08:00")
+
+        assert result.original_time == "2025:06:18 07:25:21+08:00"
+
+    def test_filename_source_original_claims_no_zone(self):
+        """A filename timestamp is wall-clock digits with no zone at all."""
+        video = self._video("VID_20250618_072521.mp4")
+
+        result = fmt.fix_media_timestamps(video, dry_run=True, timezone_spec="+08:00")
+
+        assert "+00:00" not in (result.original_time or "")
+
+
+class TestStaleFieldsNamesWhatWouldBeWritten:
+    """"Would fix" on a row whose original and corrected times are identical is only
+    explicable if the result says which fields it would write. stale_fields is the
+    machine form of the human "Change:" line: the write tags whose stored value
+    differs from the correction's target, and nothing when they all already match.
+    """
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        fmt._exif_cache.clear()
+        # Zoned DateTimeOriginal and track atoms already correct for +08:00; only the
+        # movie header is eight hours out and Keys:CreationDate is missing entirely.
+        self.video = os.path.join(self.temp_dir, "test.mp4")
+        create_test_video(
+            self.video,
+            DateTimeOriginal="2025:06:18 07:25:21+08:00",
+            **{"QuickTime:CreateDate": "2025:06:18 07:25:21",
+               "QuickTime:MediaCreateDate": "2025:06:17 23:25:21",
+               "QuickTime:TrackCreateDate": "2025:06:17 23:25:21"},
+        )
+        fmt._exif_cache.clear()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    def test_lists_exactly_the_write_tags_that_differ(self):
+        """The correct track atoms are not listed; the missing Keys:CreationDate and
+        the stale movie header are."""
+        result = fmt.fix_media_timestamps(self.video, dry_run=True, timezone_spec="+08:00")
+
+        assert result.timestamp_action == "would_fix"
+        assert result.stale_fields == ["Keys:CreationDate", "QuickTime:CreateDate"]
+
+    def test_empty_once_the_correction_has_landed(self):
+        """After applying, nothing differs from its target, so the list is empty and
+        the row has nothing left to justify a change."""
+        fmt.fix_media_timestamps(self.video, timezone_spec="+08:00")
+        fmt._exif_cache.clear()
+
+        second = fmt.fix_media_timestamps(self.video, dry_run=True, timezone_spec="+08:00")
+
+        assert second.timestamp_action == "no_change"
+        assert second.stale_fields == []
+
+
 if __name__ == "__main__":
     # Run with pytest
     import pytest

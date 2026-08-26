@@ -12,7 +12,7 @@ import re
 import signal
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, Optional
@@ -78,6 +78,7 @@ class TimestampFixResult:
     corrected_epoch: Optional[float] = None
     requires_force_timezone: Optional[bool] = None
     camera_zone_offset: Optional[str] = None
+    stale_fields: list = field(default_factory=list)
 
 
 def same_as_original(dt_with_tz: datetime) -> str:
@@ -568,11 +569,31 @@ def determine_needed_changes(file_path: str, datetime_original: datetime, preser
     }
 
 
-def _get_raw_original_time(current_data: dict) -> str:
-    """Get the raw original timestamp from the actual source field for machine output.
+def _machine_original_time(current_data: dict) -> str:
+    """The winning source's stored timestamp, carrying the zone it is expressed in.
 
-    Returns the EXIF field value that was used as the timestamp source,
-    falling back through common fields if the source-specific field is empty.
+    A UTC clock stores bare digits, so the value alone cannot be told apart from a
+    naive local one: a consumer comparing it against the zoned corrected_time reads
+    a relabel as a shift. UTC sources are therefore emitted with an explicit +00:00,
+    the same +/-HH:MM shape corrected_time uses. Naive sources - a filename, a bare
+    tag - have no zone, and stay bare rather than claiming one.
+    """
+    return _apply_source_zone(_stored_original_time(current_data),
+                              current_data.get("timestamp_source", ""))
+
+
+def _apply_source_zone(value: str, source: str) -> str:
+    """State a UTC source's zone on its stored value; leave any other source alone."""
+    if not value or not is_utc_timestamp_source(source):
+        return value
+    value = value[:-1].strip() if value.endswith("Z") else value
+    return value if re.search(r'[+-]\d{2}:?\d{2}$', value) else f"{value}+00:00"
+
+
+def _stored_original_time(current_data: dict) -> str:
+    """The EXIF field value the timestamp source was read from.
+
+    Falls back through the common fields when the source-specific one is empty.
     """
     exif = current_data.get("exif", {})
     source = current_data.get("timestamp_source", "")
@@ -870,7 +891,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
                     return TimestampFixResult(
                         file=filename,
                         timestamp_action="error",
-                        original_time=_get_raw_original_time(current_data),
+                        original_time=_machine_original_time(current_data),
                         timezone=detected_tz,
                         requires_force_timezone=True,
                     )
@@ -967,8 +988,9 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
     correction_mode = "time" if (time_offset_seconds is not None and time_offset_seconds != 0) else "timezone"
     result_base = dict(
         file=filename,
-        original_time=_get_raw_original_time(current_data),
+        original_time=_machine_original_time(current_data),
         corrected_time=datetime_original_str,
+        stale_fields=changes["stale_clock_fields"],
         timestamp_source=_source_to_machine_token(timestamp_source),
         correction_mode=correction_mode,
         timezone=detected_tz,

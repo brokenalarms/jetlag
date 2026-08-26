@@ -222,8 +222,12 @@ Each of these is separable, and none is needed for a correction to be right:
   source and states filenames are never modified. The filename is the source of truth for
   wall-clock time only where no corroborated UTC clock contradicts it, and
   `--update-filename-dates` renames files to match corrections.
-- The app could surface the winning source from the diff table's existing
-  `timestamp_source` field. No new dialog is needed: the choice is always decidable.
+- The app surfaces the winning source in the diff table: `timestamp_source` decodes
+  into `TimestampSource`, which owns the display label shown under each row's action
+  and whether the original's digits are UTC. `stale_fields` names the write tags a
+  correction would change, shown as the row's tooltip and under its status, so a row
+  whose original and corrected times are identical still says what it will write.
+  No dialog is needed: the choice is always decidable.
 
 ## Verification
 

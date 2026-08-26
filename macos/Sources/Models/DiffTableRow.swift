@@ -7,7 +7,7 @@ struct DiffTableRow: Identifiable {
     var tagsAdded: String?
     var originalTime: String?
     var correctedTime: String?
-    var timestampSource: String?
+    var timestampSource: TimestampSource?
     var timestampAction: String?
     var timezone: String?
     var correctionMode: String?
@@ -20,9 +20,21 @@ struct DiffTableRow: Identifiable {
     var originalEpoch: Double?
     var correctedEpoch: Double?
 
+    /// The write tags whose stored value differs from what the correction would
+    /// give them. A row whose original and corrected times are the same string is
+    /// only explicable by this list — it is what "Would fix" would actually write.
+    var staleFields: [String] = []
+
     /// The file already carries a camera-set zone that the declared zone would
     /// relabel; applying needs the user's explicit confirmation.
     var requiresForceTimezone: Bool = false
+
+    /// The original timestamp as the table shows it. A UTC clock's stored digits
+    /// carry no zone of their own, so the source decides how the value reads.
+    var originalTimeDisplay: String? {
+        guard let originalTime else { return nil }
+        return timestampSource?.originalDisplay(originalTime) ?? originalTime
+    }
 
     var completedStages: Set<String> = []
 
