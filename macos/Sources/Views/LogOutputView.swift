@@ -64,7 +64,7 @@ struct LogTextView: NSViewRepresentable {
         let scrollView = ContentAgnosticScrollView()
         scrollView.borderType = .noBorder
         scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
+        scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
         scrollView.drawsBackground = false
         scrollView.detachSizeFromContent()
@@ -75,10 +75,10 @@ struct LogTextView: NSViewRepresentable {
             width: CGFloat.greatestFiniteMagnitude,
             height: CGFloat.greatestFiniteMagnitude)
         textView.isVerticallyResizable = true
-        textView.isHorizontallyResizable = false
-        textView.textContainer?.widthTracksTextView = true
+        textView.isHorizontallyResizable = true
+        textView.textContainer?.widthTracksTextView = false
         textView.textContainer?.containerSize = NSSize(
-            width: scrollView.contentSize.width,
+            width: CGFloat.greatestFiniteMagnitude,
             height: CGFloat.greatestFiniteMagnitude)
 
         textView.isEditable = false

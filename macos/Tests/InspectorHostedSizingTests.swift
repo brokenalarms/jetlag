@@ -152,6 +152,39 @@ final class InspectorHostedSizingTests: XCTestCase {
         XCTAssertEqual(afterStreaming.height, NSView.noIntrinsicMetric)
     }
 
+    /// A long log line (a path, exiftool output) must never wrap: proves the text view
+    /// grows past the scroll view's content width instead of wrapping, a horizontal
+    /// scroller is offered, and — matching
+    /// `testLogScrollViewReportsNoIntrinsicSizeAsTextGrows` above — the scroll view still
+    /// reports no intrinsic size, so the inspector's negotiated width is unaffected.
+    func testLogScrollViewNeverWrapsALongLineAndOffersHorizontalScrolling() throws {
+        let scrollView = LogTextView.makeScrollView()
+        scrollView.frame = NSRect(x: 0, y: 0, width: 480, height: 200)
+        let textView = try XCTUnwrap(scrollView.documentView as? NSTextView)
+
+        let textContainer = try XCTUnwrap(textView.textContainer)
+
+        textView.string = "short line"
+        textView.layoutManager?.ensureLayout(for: textContainer)
+        textView.sizeToFit()
+        let shortLineIntrinsicSize = scrollView.intrinsicContentSize
+        let shortLineWidth = textView.frame.width
+
+        textView.string = String(repeating: "x", count: 2000)
+        textView.layoutManager?.ensureLayout(for: textContainer)
+        textView.sizeToFit()
+        let longLineIntrinsicSize = scrollView.intrinsicContentSize
+
+        XCTAssertTrue(scrollView.hasHorizontalScroller)
+        XCTAssertGreaterThan(
+            textView.frame.width, scrollView.contentSize.width,
+            "a long line must extend past the panel rather than wrap")
+        XCTAssertGreaterThan(textView.frame.width, shortLineWidth)
+        XCTAssertEqual(
+            shortLineIntrinsicSize, longLineIntrinsicSize,
+            "a long line must not change what the scroll view asks of the inspector")
+    }
+
     /// A no-intrinsic-size scroll view still argues for space through its hugging and
     /// compression-resistance priorities. Proves both are below `.defaultLow` on both
     /// axes, so the inspector's configured width — not the log's content — wins.
