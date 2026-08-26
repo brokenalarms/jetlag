@@ -171,10 +171,13 @@ class TestFixMediaTimestamp:
         """A batch run with no --timezone must leave naive files completely alone,
         rather than stamping them with whatever zone was last in play"""
         def time_tags():
-            dump = subprocess.run([
-                "exiftool", "-s", "-time:all", "-XMP-exif:DateTimeOriginal",
-                test_video_no_timezone
-            ], capture_output=True, text=True, check=True)
+            # -time:all also dumps FileAccessDate/FileInodeChangeDate, which the OS
+            # updates on every read (including this dump's own read) regardless of
+            # what the script writes — list the writable clock fields explicitly.
+            dump = subprocess.run(
+                ["exiftool", "-s"] + _CLOCK_FIELDS + [test_video_no_timezone],
+                capture_output=True, text=True, check=True,
+            )
             return dump.stdout
 
         before = time_tags()
@@ -300,6 +303,12 @@ class TestFixMediaTimestamp:
         assert values["TrackCreateDate"] == "2025:08:15 06:07:42"
         assert values["DateTimeOriginal"] == "2025:08:15 15:07:42+09:00"
 
+
+_CLOCK_FIELDS = [
+    "-DateTimeOriginal", "-XMP-exif:DateTimeOriginal", "-Keys:CreationDate",
+    "-QuickTime:CreateDate", "-QuickTime:MediaCreateDate",
+    "-QuickTime:TrackCreateDate", "-XMP-xmpDM:LogComment", "-FileModifyDate",
+]
 
 _IDEMPOTENCE_FIELDS = [
     "-DateTimeOriginal", "-Keys:CreationDate",
