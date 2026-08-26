@@ -53,8 +53,33 @@ struct LogTextView: NSViewRepresentable {
     let lines: [LogLine]
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSTextView.scrollableTextView()
-        let textView = scrollView.documentView as! NSTextView
+        Self.makeScrollView()
+    }
+
+    /// Built by hand rather than with `NSTextView.scrollableTextView()` so the scroll
+    /// view is a `ContentAgnosticScrollView`: log text grows line by line while a run
+    /// streams, and a scroll view that sized itself from its document would report a
+    /// new min size to the inspector on every appended line.
+    static func makeScrollView() -> NSScrollView {
+        let scrollView = ContentAgnosticScrollView()
+        scrollView.borderType = .noBorder
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
+        scrollView.detachSizeFromContent()
+
+        let textView = NSTextView(frame: NSRect(origin: .zero, size: scrollView.contentSize))
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(
+            width: scrollView.contentSize.width,
+            height: CGFloat.greatestFiniteMagnitude)
 
         textView.isEditable = false
         textView.isSelectable = true
@@ -64,6 +89,7 @@ struct LogTextView: NSViewRepresentable {
         textView.textContainerInset = NSSize(width: 10, height: 6)
         textView.autoresizingMask = [.width]
 
+        scrollView.documentView = textView
         return scrollView
     }
 

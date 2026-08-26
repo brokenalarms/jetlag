@@ -303,6 +303,29 @@ struct DiffTableView: View {
 
 // MARK: - NSTableView introspection
 
+/// Assigning a column width invalidates the table's layout, and `updateNSView` fires
+/// once per row appended during a streaming run. Writing a width that has not changed
+/// would therefore keep the window's update-constraints pass alive for as long as rows
+/// keep arriving, which AppKit eventually aborts as a constraint loop.
+enum TableColumnSizing {
+    /// Assigns each width only where it differs from what the column already resolves
+    /// to. The comparison uses the width clamped to the column's own min/max, since
+    /// that — not the requested value — is what the column will end up reporting.
+    @discardableResult
+    static func applyWidths(_ widths: [CGFloat], to tableView: NSTableView) -> [Int] {
+        var resized: [Int] = []
+        for (index, width) in widths.enumerated() where index < tableView.tableColumns.count {
+            let column = tableView.tableColumns[index]
+            let target = min(max(width, column.minWidth), column.maxWidth)
+            guard column.width != target else { continue }
+            column.width = target
+            resized.append(index)
+        }
+        return resized
+    }
+}
+
+
 private struct ColumnAutoSizer: NSViewRepresentable {
     let columnWidths: [CGFloat]
 
@@ -341,10 +364,8 @@ private struct ColumnAutoSizer: NSViewRepresentable {
         }
 
         if let tableView = coordinator.tableView {
-            for (i, width) in columnWidths.enumerated()
-                where i < tableView.tableColumns.count {
-                tableView.tableColumns[i].width = width
-            }
+            TableColumnSizing.applyWidths(columnWidths, to: tableView)
+            tableView.enclosingScrollView?.detachSizeFromContent()
 
             if !coordinator.gestureInstalled, let headerView = tableView.headerView {
                 let gesture = NSClickGestureRecognizer(

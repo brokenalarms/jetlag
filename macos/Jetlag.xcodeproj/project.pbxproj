@@ -13,8 +13,10 @@
 		49521EA7D50F8FD80CA4EDFD /* PythonRuntimeCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA47C3147490D4D7AABA5169 /* PythonRuntimeCheck.swift */; };
 		4FDCE64D99169FBCD837CF2B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C503D6DF395CB0F0EE8674D /* SettingsView.swift */; };
 		53E52584D7A0F04EBD764B7D /* LogOutputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93163EBEB8CD8B13330BAB7C /* LogOutputView.swift */; };
+		54BF807828E4B1BF2A402E9F /* InspectorHostedSizingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C698B76B04834D4379CADAA4 /* InspectorHostedSizingTests.swift */; };
 		5B1E92778017F81FED24A526 /* GyroflowStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F37A77F3E04133102C3B9228 /* GyroflowStatus.swift */; };
 		5C37852483245BC294545B2B /* WorkflowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC02EFEC0D85CEB6F137381 /* WorkflowView.swift */; };
+		5F7869F0BEBB4DFB2BC2735F /* HostedViewSizing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3FDFFFE053527F6DAFF2443 /* HostedViewSizing.swift */; };
 		6565530211ECEF491334BDD9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DCC75F647AA2A41BF2B17B9 /* ContentView.swift */; };
 		67B98190D68F596BAC4EF2AE /* PipelineArgsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D08074CC6CCFCC6AFEC75C39 /* PipelineArgsTests.swift */; };
 		6A589A5C59B6E0ACF8DC960F /* ProfilePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 824A528222BFA2E5BFFCDF48 /* ProfilePicker.swift */; };
@@ -84,11 +86,13 @@
 		A668F7E7A4F545637B636567 /* FilenamePatterns.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenamePatterns.swift; sourceTree = "<group>"; };
 		B68CD5F46C4AF7FAFE297AAE /* Jetlag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jetlag.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C4AF4B0A35CD716A34E2A275 /* ProfilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesView.swift; sourceTree = "<group>"; };
+		C698B76B04834D4379CADAA4 /* InspectorHostedSizingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorHostedSizingTests.swift; sourceTree = "<group>"; };
 		C76405E304A233D40E627ECD /* GyroflowStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroflowStatusTests.swift; sourceTree = "<group>"; };
 		CA47C3147490D4D7AABA5169 /* PythonRuntimeCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PythonRuntimeCheck.swift; sourceTree = "<group>"; };
 		CDF31C93574205EBA3F42FEC /* JetlagTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JetlagTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D08074CC6CCFCC6AFEC75C39 /* PipelineArgsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineArgsTests.swift; sourceTree = "<group>"; };
 		DC0210C9EE3BEF29E07C9DE6 /* MediaProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaProfile.swift; sourceTree = "<group>"; };
+		E3FDFFFE053527F6DAFF2443 /* HostedViewSizing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostedViewSizing.swift; sourceTree = "<group>"; };
 		F37A77F3E04133102C3B9228 /* GyroflowStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroflowStatus.swift; sourceTree = "<group>"; };
 		F559FB82EF7FBD0FD4101BE5 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		FEA322FB3423ED25C28C0860 /* UpgradeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpgradeView.swift; sourceTree = "<group>"; };
@@ -153,6 +157,7 @@
 				27CF0E7DB6265D0EAF8055CE /* AppStateTests.swift */,
 				2DB6E838E4C1827858BB004E /* DirtyableTests.swift */,
 				C76405E304A233D40E627ECD /* GyroflowStatusTests.swift */,
+				C698B76B04834D4379CADAA4 /* InspectorHostedSizingTests.swift */,
 				D08074CC6CCFCC6AFEC75C39 /* PipelineArgsTests.swift */,
 				5AFFC7653CEF9432BABAFE94 /* ProfileTests.swift */,
 				33AF1E5DF4D368EB36EFB0EC /* PythonRuntimeCheckTests.swift */,
@@ -180,6 +185,7 @@
 				5DCC75F647AA2A41BF2B17B9 /* ContentView.swift */,
 				A142786B3A2C61DF018E00D1 /* DiffTableView.swift */,
 				3B7884EFEE29BD136A760320 /* FieldValidation.swift */,
+				E3FDFFFE053527F6DAFF2443 /* HostedViewSizing.swift */,
 				8DBCBF55CE9225F7CC1BE2FA /* InspectorPanel.swift */,
 				93163EBEB8CD8B13330BAB7C /* LogOutputView.swift */,
 				689D9A69FF07CCA892429C0A /* PillField.swift */,
@@ -327,6 +333,7 @@
 				E6DEE560FAFDCFE9F48B205B /* FieldValidation.swift in Sources */,
 				92BA1490C431AC89A5646C85 /* FilenamePatterns.swift in Sources */,
 				5B1E92778017F81FED24A526 /* GyroflowStatus.swift in Sources */,
+				5F7869F0BEBB4DFB2BC2735F /* HostedViewSizing.swift in Sources */,
 				8D73DAA303CE63DEDF874F35 /* InspectorPanel.swift in Sources */,
 				8D5AEC4A3D748ADF6853E7C1 /* JetlagApp.swift in Sources */,
 				A782F8A1159D170B5CEB4C7E /* LicenseStore.swift in Sources */,
@@ -355,6 +362,7 @@
 				6A87F1ECCD552C95D40ED1AA /* AppStateTests.swift in Sources */,
 				AF4D4132C54C04CF1A1ADDB7 /* DirtyableTests.swift in Sources */,
 				AF5DDC771125D006AA50AF71 /* GyroflowStatusTests.swift in Sources */,
+				54BF807828E4B1BF2A402E9F /* InspectorHostedSizingTests.swift in Sources */,
 				67B98190D68F596BAC4EF2AE /* PipelineArgsTests.swift in Sources */,
 				C0578D87EB55FAED6B59A9C0 /* ProfileTests.swift in Sources */,
 				A00FA545CCBD5C1CF868B312 /* PythonRuntimeCheckTests.swift in Sources */,
