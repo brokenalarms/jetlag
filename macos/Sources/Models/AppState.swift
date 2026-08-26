@@ -124,7 +124,7 @@ enum PipelineEvent: Decodable {
                          requiresForceTimezone: Bool,
                          staleFields: [String])
     case renameResult(file: String, renamedTo: String)
-    case organizeResult(file: String, action: String, dest: String)
+    case organizeResult(file: String, action: String, dest: String, reason: String?)
     case gyroflowResult(file: String, action: String, gyroflowPath: String,
                         error: String?)
     case pipelineResult(file: String, result: String)
@@ -148,7 +148,7 @@ enum PipelineEvent: Decodable {
         case requiresForceTimezone = "requires_force_timezone"
         case staleFields = "stale_fields"
         case renamedTo = "renamed_to"
-        case dest
+        case dest, reason
         case gyroflowPath = "gyroflow_path"
         case error, result, message
         case conflictType = "conflict_type"
@@ -198,7 +198,8 @@ enum PipelineEvent: Decodable {
             self = .organizeResult(
                 file: try container.decode(String.self, forKey: .file),
                 action: try container.decode(String.self, forKey: .action),
-                dest: try container.decode(String.self, forKey: .dest))
+                dest: try container.decode(String.self, forKey: .dest),
+                reason: try container.decodeIfPresent(String.self, forKey: .reason))
         case "gyroflow_result":
             self = .gyroflowResult(
                 file: try container.decode(String.self, forKey: .file),
@@ -626,9 +627,10 @@ final class AppState {
             currentDiffRow?.renamedTo = renamedTo
             liveRow = currentDiffRow
 
-        case .organizeResult(_, let action, let dest):
+        case .organizeResult(_, let action, let dest, let reason):
             currentDiffRow?.organizeAction = action
             currentDiffRow?.dest = dest
+            currentDiffRow?.organizeReason = reason
             liveRow = currentDiffRow
 
         case .gyroflowResult:

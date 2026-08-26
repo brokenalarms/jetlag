@@ -6,12 +6,27 @@
 #
 # The macOS app parses these events via JSONDecoder into PipelineEvent structs.
 # Standalone scripts still use @@key=value via lib/results.emit_result() for CLI output.
+#
+# This file is the one place a token is defined. The script decides an outcome and
+# emits it as an enumerated token; the app renders the token and never re-derives
+# an outcome from whether some other field happens to be populated. Both sides are
+# pinned to this file by contract tests — scripts/tests/test_pipeline_schema.py
+# validates every event the suite emits, and PipelineSchemaContractTests decodes the
+# examples below and requires a status label for every organize_result token. Adding
+# a token here without handling it in the app, or in the app without declaring it
+# here, fails a test.
+#
+# Each event carries an `example`: a complete, valid instance used verbatim as a
+# decoding fixture on the Swift side.
 
 events:
   pipeline_file:
     description: "Emitted at the start of processing each file"
     fields:
       file: { type: string, description: "Basename of the file being processed" }
+    example:
+      event: pipeline_file
+      file: DJI_20250815_101112_0001.MP4
 
   stage_complete:
     description: "Emitted after each pipeline stage completes for a file"
@@ -19,6 +34,9 @@ events:
       stage:
         type: string
         enum: [ingest, tag, fix-timestamp, output, gyroflow, archive-source]
+    example:
+      event: stage_complete
+      stage: output
 
   tag_result:
     description: "Result of the tag-media stage"
@@ -30,6 +48,13 @@ events:
       tags_added: { type: "list[string]" }
       exif_make: { type: string }
       exif_model: { type: string }
+    example:
+      event: tag_result
+      file: DJI_20250815_101112_0001.MP4
+      action: tagged
+      tags_added: [Korea]
+      exif_make: DJI
+      exif_model: Osmo Action 4
 
   timestamp_result:
     description: "Result of the fix-media-timestamp stage"
@@ -47,12 +72,36 @@ events:
       time_offset_display: { type: string, optional: true }
       original_epoch: { type: number, optional: true }
       corrected_epoch: { type: number, optional: true }
+      requires_force_timezone: { type: boolean, optional: true }
+      camera_zone_offset: { type: string, optional: true }
+      stale_fields: { type: "list[string]", optional: true }
+      error: { type: string, optional: true }
+    example:
+      event: timestamp_result
+      file: DJI_20250815_101112_0001.MP4
+      action: would_fix
+      original_time: "2025:08:15 10:11:12Z"
+      corrected_time: "2025:08:15 19:11:12+09:00"
+      source: mediacreatedate
+      timezone: "+09:00"
+      correction_mode: timezone
+      time_offset_seconds: 32400
+      time_offset_display: "+9h"
+      original_epoch: 1755252672.0
+      corrected_epoch: 1755252672.0
+      requires_force_timezone: false
+      camera_zone_offset: "+08:00"
+      stale_fields: [DateTimeOriginal, CreateDate]
 
   rename_result:
     description: "Emitted when --update-filename-dates renames a file"
     fields:
       file: { type: string, description: "Original filename" }
       renamed_to: { type: string }
+    example:
+      event: rename_result
+      file: DJI_20250815_101112_0001.MP4
+      renamed_to: DJI_20250815_191112_0001.MP4
 
   organize_result:
     description: "Result of the organize-by-date (output) stage"
@@ -61,7 +110,25 @@ events:
       action:
         type: string
         enum: [copied, moved, skipped, overwrote, would_copy, would_move, would_overwrite, error]
-      dest: { type: string }
+      dest:
+        type: string
+        description: >-
+          Where the file would live under the target. Present for every non-error
+          outcome, including skips — a destination is not evidence that anything moved.
+      reason:
+        type: string
+        optional: true
+        enum: [identical, exists_differs, user_choice]
+        description: >-
+          Why a skipped file was not moved. user_choice is set only after an answer
+          was read back from a terminal; a dry run or a no-tty apply reports
+          exists_differs instead.
+    example:
+      event: organize_result
+      file: DJI_20250815_101112_0001.MP4
+      action: skipped
+      dest: /Volumes/Media/Ready/2025/2025-08-15/DJI_20250815_101112_0001.MP4
+      reason: exists_differs
 
   gyroflow_result:
     description: "Result of the generate-gyroflow stage"
@@ -70,8 +137,38 @@ events:
       action:
         type: string
         enum: [generated, skipped, would_generate]
-      gyroflow_path: { type: string }
+      gyroflow_path: { type: string, optional: true }
       error: { type: string, optional: true }
+    example:
+      event: gyroflow_result
+      file: DJI_20250815_101112_0001.MP4
+      action: would_generate
+      gyroflow_path: /Volumes/Media/Ready/2025/2025-08-15/DJI_20250815_101112_0001.gyroflow
+
+  timezone_conflict:
+    description: "Emitted when the declared timezone cannot be reconciled with the files"
+    fields:
+      conflict_type:
+        type: string
+        enum: [mixed_timezones, provided_mismatch]
+      provided_tz: { type: string, optional: true }
+      file_timezones:
+        type: "map[string, list[string]]"
+        description: "Embedded timezone offset → the filenames carrying it"
+    example:
+      event: timezone_conflict
+      conflict_type: provided_mismatch
+      provided_tz: "+09:00"
+      file_timezones:
+        "+08:00": [DJI_20250815_101112_0001.MP4]
+
+  pipeline_error:
+    description: "Emitted when the run aborts before or during file processing"
+    fields:
+      message: { type: string }
+    example:
+      event: pipeline_error
+      message: "Profile 'korea' not found"
 
   pipeline_result:
     description: "Final result for each file, always the last event per file"
@@ -80,3 +177,7 @@ events:
       result:
         type: string
         enum: [changed, would_change, unchanged, failed]
+    example:
+      event: pipeline_result
+      file: DJI_20250815_101112_0001.MP4
+      result: would_change

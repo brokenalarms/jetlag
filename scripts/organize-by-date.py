@@ -22,8 +22,15 @@ from lib.results import emit_result
 
 @dataclass
 class OrganizeResult:
+    """What the organize step did, as tokens the caller renders verbatim.
+
+    `reason` explains a skip and is set only when the file was not moved. Its
+    tokens are enumerated in pipeline-schema.yaml alongside `action`; nothing
+    downstream may re-derive either from the presence of `dest`.
+    """
     dest: str
-    action: str  # "copied" | "moved" | "skipped" | "overwrote" | "would_copy" | "would_move" | "would_overwrite"
+    action: str
+    reason: Optional[str] = None
 
 MONTH_ABBREVS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -93,19 +100,38 @@ def expand_path_template(template: str, file_date: str) -> str:
     return expanded
 
 
+SKIP_IDENTICAL = "identical"
+SKIP_EXISTS_DIFFERS = "exists_differs"
+SKIP_USER_CHOICE = "user_choice"
+
+
+def _skip_explanation(reason: Optional[str], src_size: int, dst_size: int) -> str:
+    """Human phrasing for a skip token. The token is the data; this is display."""
+    if reason == SKIP_IDENTICAL:
+        return f"identical, {src_size / 1048576:.1f} MB"
+    if reason == SKIP_USER_CHOICE:
+        return "user choice"
+    return f"exists at destination, different size: src {src_size} bytes, dst {dst_size} bytes"
+
+
 def _handle_existing_target(file_path, target_file, target_path, abs_target,
                             base, organized_path, copy_mode, overwrite, apply):
     """Handle case where target file already exists."""
     src_size = os.path.getsize(file_path)
     dst_size = os.path.getsize(target_file)
 
+    skip_reason = None
+
     if overwrite:
         action = "overwrite"
     elif src_size == dst_size:
         action = "skip"
+        skip_reason = SKIP_IDENTICAL
     elif apply:
         print(f"\u26a0\ufe0f  File exists: {base}", file=sys.stderr)
         print(f"   Source: {src_size} bytes, Dest: {dst_size} bytes", file=sys.stderr)
+        action = "skip"
+        skip_reason = SKIP_EXISTS_DIFFERS
         # Prompt only when a real terminal is attached. Reading /dev/tty from a
         # background process group does not raise \u2014 the kernel SIGTTIN-stops the
         # entire group, freezing any non-interactive runner (tests, the app, a
@@ -117,38 +143,32 @@ def _handle_existing_target(file_path, target_file, target_path, abs_target,
                 sys.stderr.flush()
                 with open('/dev/tty') as tty:
                     choice = tty.readline().strip()
+                # An answer was read back, so the outcome is now the user's,
+                # whichever way it went.
                 action = "overwrite" if choice.lower().startswith('o') else "skip"
+                skip_reason = SKIP_USER_CHOICE
             except (OSError, EOFError):
-                action = "skip"
+                pass
         else:
             print("   No terminal attached \u2014 skipping (use --overwrite to replace)", file=sys.stderr)
-            action = "skip"
     else:
         action = "skip"
+        skip_reason = SKIP_EXISTS_DIFFERS
 
     if action == "overwrite":
         if apply:
             os.makedirs(target_path, exist_ok=True)
-            if copy_mode:
-                shutil.copy2(file_path, target_file)
-                print(f"\u267b\ufe0f  Overwrote: {base} \u2192 {organized_path}/", file=sys.stderr)
-                return OrganizeResult(dest=abs_target, action="overwrote")
-            else:
-                shutil.move(file_path, target_file)
-                print(f"\u267b\ufe0f  Overwrote: {base} \u2192 {organized_path}/", file=sys.stderr)
-                return OrganizeResult(dest=abs_target, action="overwrote")
-        else:
-            print(f"[DRY RUN] Would overwrite: {file_path} \u2192 {abs_target}", file=sys.stderr)
-            return OrganizeResult(dest=abs_target, action="would_overwrite")
+            transfer = shutil.copy2 if copy_mode else shutil.move
+            transfer(file_path, target_file)
+            print(f"\u267b\ufe0f  Overwrote: {base} \u2192 {organized_path}/", file=sys.stderr)
+            return OrganizeResult(dest=abs_target, action="overwrote")
+        print(f"[DRY RUN] Would overwrite: {file_path} \u2192 {abs_target}", file=sys.stderr)
+        return OrganizeResult(dest=abs_target, action="would_overwrite")
 
-    # Skip
-    size_mb = src_size / 1048576
-    if src_size == dst_size:
-        print(f"\u23ed\ufe0f  Skipped (identical, {size_mb:.1f} MB): {base}", file=sys.stderr)
-    else:
-        print(f"\u23ed\ufe0f  Skipped (user choice): {base}", file=sys.stderr)
+    print(f"\u23ed\ufe0f  Skipped ({_skip_explanation(skip_reason, src_size, dst_size)}): {base}",
+          file=sys.stderr)
 
-    return OrganizeResult(dest=abs_target, action="skipped")
+    return OrganizeResult(dest=abs_target, action="skipped", reason=skip_reason)
 
 
 def process_file(file_path: str, target_dir: str, template: str,

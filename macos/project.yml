@@ -99,6 +99,9 @@ targets:
       - Tests
     dependencies:
       - target: Jetlag
+      # PipelineSchemaContractTests reads scripts/pipeline-schema.yaml directly —
+      # the schema is the fixture source, not a copy kept in the test bundle.
+      - package: Yams
     settings:
       base:
         SWIFT_VERSION: "5.9"

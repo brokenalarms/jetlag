@@ -393,6 +393,7 @@ def process_file(
         file=active_file.name,
         action=org_result.action,
         dest=org_result.dest,
+        reason=org_result.reason,
     )
 
     if org_result.action == "error":

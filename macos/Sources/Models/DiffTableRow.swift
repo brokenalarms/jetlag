@@ -16,6 +16,7 @@ struct DiffTableRow: Identifiable {
     var renamedTo: String?
     var dest: String?
     var organizeAction: String?
+    var organizeReason: String?
     var pipelineResult: String?
     var originalEpoch: Double?
     var correctedEpoch: Double?
@@ -28,6 +29,18 @@ struct DiffTableRow: Identifiable {
     /// The file already carries a camera-set zone that the declared zone would
     /// relabel; applying needs the user's explicit confirmation.
     var requiresForceTimezone: Bool = false
+
+    /// What the pipeline reported doing to this file, as tokens. The status the
+    /// table shows is a function of these — never of whether `dest` is populated.
+    var outcome: RowOutcome {
+        RowOutcome(timestampAction: timestampAction, organizeAction: organizeAction)
+    }
+
+    /// Why the organize step left the file where it was, when it did.
+    var skipReason: RowOutcome.SkipReason? {
+        guard outcome.movement == .skipped else { return nil }
+        return organizeReason.flatMap(RowOutcome.SkipReason.init(rawValue:))
+    }
 
     /// The original timestamp as the table shows it. A UTC clock's stored digits
     /// carry no zone of their own, so the source decides how the value reads.

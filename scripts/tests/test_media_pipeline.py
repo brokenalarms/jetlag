@@ -22,6 +22,8 @@ from typing import Optional
 import pytest
 import yaml
 
+from pipeline_schema import validate_event
+
 SCRIPT_DIR = Path(__file__).parent.parent
 MEDIA_PIPELINE = SCRIPT_DIR / "media-pipeline.sh"
 
@@ -872,13 +874,19 @@ class TestPipelineMachineOutput:
     """Test JSONL machine-readable output from media-pipeline."""
 
     def _parse_events(self, stdout: str) -> list[dict]:
-        """Parse JSONL events from pipeline stdout, grouping by pipeline_file."""
+        """Parse JSONL events from pipeline stdout, grouping by pipeline_file.
+
+        Every event is checked against pipeline-schema.yaml on the way through, so
+        each scenario in this class doubles as a contract test: a field or token the
+        schema does not declare fails here rather than reaching the app undecodable.
+        """
         files: list[dict] = []
         current: dict = {}
         for line in stdout.strip().split("\n"):
             if not line.strip():
                 continue
             event = json.loads(line)
+            validate_event(event)
             etype = event["event"]
             if etype == "pipeline_file":
                 if current:
@@ -910,6 +918,7 @@ class TestPipelineMachineOutput:
             elif etype == "organize_result":
                 current["organize_action"] = event["action"]
                 current["dest"] = event["dest"]
+                current["organize_reason"] = event.get("reason")
             elif etype == "gyroflow_result":
                 current["gyroflow_action"] = event["action"]
                 current["gyroflow_path"] = event.get("gyroflow_path")

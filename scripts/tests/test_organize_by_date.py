@@ -4,8 +4,11 @@ Tests for organize-by-date.sh
 Validates file organization, template substitution, and idempotency
 """
 
+import importlib.util
+import io
 import os
 import subprocess
+import sys
 import tempfile
 import shutil
 from pathlib import Path
@@ -15,6 +18,12 @@ from conftest import create_test_video
 
 
 SCRIPT_DIR = Path(__file__).parent.parent
+sys.path.insert(0, str(SCRIPT_DIR))
+
+_spec = importlib.util.spec_from_file_location(
+    "organize_by_date", str(SCRIPT_DIR / "organize-by-date.py"))
+organize = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(organize)
 
 
 class TestOrganizeByDate:
@@ -570,6 +579,114 @@ class TestOverwriteMode:
 
         assert result.returncode == 0
         assert "@@action=overwrote" in result.stdout
+
+
+class TestSkipReasonIsData:
+    """The reason a file was not moved is emitted as a token, not guessed from size.
+
+    Every skip used to be logged as "user choice" unless the sizes matched, so a
+    dry run — which never prompts — claimed the user had chosen to skip. The app
+    reads @@reason/organize_result.reason to explain the skip, so the token has
+    to name what actually happened.
+    """
+
+    @pytest.fixture
+    def temp_dir(self):
+        tmpdir = tempfile.mkdtemp()
+        yield tmpdir
+        shutil.rmtree(tmpdir)
+
+    def _create_video(self, path):
+        create_test_video(path, DateTimeOriginal="2025:06:18 07:25:21+08:00")
+
+    def _organize(self, source, target_dir, *extra):
+        return subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"),
+            source, "--target", target_dir,
+            "--template", "{{YYYY}}-{{MM}}-{{DD}}",
+            "--copy", *extra,
+        ], capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=60)
+
+    def _seed_destination_of_different_size(self, temp_dir):
+        """Place a copy at the destination, then grow it so the sizes differ."""
+        source = os.path.join(temp_dir, "source", "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+        self._organize(source, target_dir, "--apply")
+        dest = next(Path(target_dir).rglob("test.mp4"))
+        with open(dest, "ab") as f:
+            f.write(b"x" * 100)
+        return source, target_dir, dest
+
+    def test_dry_run_against_differing_destination_reports_the_size_conflict(self, temp_dir):
+        """A dry run never prompts, so it must not claim the user chose to skip.
+
+        Reproduces the Korea dry run: the destination already held a copy of a
+        different size, and the skip was reported as "user choice".
+        """
+        source, target_dir, dest = self._seed_destination_of_different_size(temp_dir)
+
+        result = self._organize(source, target_dir)
+
+        assert "@@action=skipped" in result.stdout
+        assert "@@reason=exists_differs" in result.stdout, \
+            f"Actual: {result.stdout!r}, Expected: @@reason=exists_differs"
+        assert "user choice" not in result.stderr, \
+            f"Actual stderr claims a choice was made: {result.stderr!r}"
+
+    def test_apply_without_a_terminal_reports_the_size_conflict(self, temp_dir):
+        """No terminal means no prompt was answered, so the reason is the conflict."""
+        source, target_dir, dest = self._seed_destination_of_different_size(temp_dir)
+        dest_size = os.path.getsize(dest)
+
+        result = self._organize(source, target_dir, "--apply")
+
+        assert "@@action=skipped" in result.stdout
+        assert "@@reason=exists_differs" in result.stdout, \
+            f"Actual: {result.stdout!r}, Expected: @@reason=exists_differs"
+        assert "user choice" not in result.stderr, \
+            f"Actual stderr claims a choice was made: {result.stderr!r}"
+        assert os.path.getsize(dest) == dest_size, "existing target must be untouched"
+
+    def test_identical_destination_reports_the_identical_reason(self, temp_dir):
+        """A same-size destination is a distinct, already-correct outcome."""
+        source = os.path.join(temp_dir, "source", "test.mp4")
+        target_dir = os.path.join(temp_dir, "target")
+        self._create_video(source)
+        self._organize(source, target_dir, "--apply")
+
+        result = self._organize(source, target_dir, "--apply")
+
+        assert "@@action=skipped" in result.stdout
+        assert "@@reason=identical" in result.stdout, \
+            f"Actual: {result.stdout!r}, Expected: @@reason=identical"
+
+    def test_user_choice_reason_only_after_a_terminal_answer_is_read(self, temp_dir, monkeypatch):
+        """"user choice" is earned: it requires an answer read back from the tty.
+
+        Driven in-process because the reason hinges on a real terminal being
+        attached, which a subprocess under pytest never has.
+        """
+        source = os.path.join(temp_dir, "source", "test.mp4")
+        dest_dir = os.path.join(temp_dir, "target", "2025-06-18")
+        dest = os.path.join(dest_dir, "test.mp4")
+        self._create_video(source)
+        os.makedirs(dest_dir, exist_ok=True)
+        shutil.copy2(source, dest)
+        with open(dest, "ab") as f:
+            f.write(b"x" * 100)
+
+        monkeypatch.setattr(organize.sys.stderr, "isatty", lambda: True, raising=False)
+        monkeypatch.setattr(organize, "open", lambda *a, **k: io.StringIO("s\n"), raising=False)
+
+        result = organize.process_file(
+            source, os.path.join(temp_dir, "target"), "{{YYYY}}-{{MM}}-{{DD}}",
+            copy_mode=True, overwrite=False, apply=True, verbose=False,
+        )
+
+        assert result.action == "skipped"
+        assert result.reason == "user_choice", \
+            f"Actual: reason={result.reason!r}, Expected: 'user_choice'"
 
 
 class TestSourceDirectoryPreservedAfterMove:
