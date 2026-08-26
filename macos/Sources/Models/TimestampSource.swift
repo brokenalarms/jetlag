@@ -41,12 +41,7 @@ enum TimestampSource: String {
     /// a zoned source keeps its own ±HH:MM, and a naive one stays bare digits.
     func originalDisplay(_ stored: String) -> String {
         guard isUTC else { return stored }
-        let digits = stored.hasSuffix(Self.utcOffset)
-            ? String(stored.dropLast(Self.utcOffset.count))
-            : stored
+        let digits = stored.hasSuffix("Z") ? String(stored.dropLast()) : stored
         return "\(digits) \(Strings.DiffTable.utcSuffix)"
     }
-
-    /// The offset a UTC source's original arrives with, which the `UTC` word replaces.
-    private static let utcOffset = "+00:00"
 }

@@ -570,12 +570,13 @@ def determine_needed_changes(file_path: str, datetime_original: datetime, preser
 
 
 def _machine_original_time(current_data: dict) -> str:
-    """The winning source's stored timestamp, carrying the zone it is expressed in.
+    """The winning source's stored timestamp, carrying whether it is UTC.
 
     A UTC clock stores bare digits, so the value alone cannot be told apart from a
     naive local one: a consumer comparing it against the zoned corrected_time reads
-    a relabel as a shift. UTC sources are therefore emitted with an explicit +00:00,
-    the same +/-HH:MM shape corrected_time uses. Naive sources - a filename, a bare
+    a relabel as a shift. UTC sources are therefore emitted with a trailing Z -
+    "these digits are UTC" - which is a different claim from a +00:00 offset
+    ("local time in a zero-offset zone"). Naive sources - a filename, a bare
     tag - have no zone, and stay bare rather than claiming one.
     """
     return _apply_source_zone(_stored_original_time(current_data),
@@ -583,11 +584,12 @@ def _machine_original_time(current_data: dict) -> str:
 
 
 def _apply_source_zone(value: str, source: str) -> str:
-    """State a UTC source's zone on its stored value; leave any other source alone."""
+    """Mark a UTC source's stored value as UTC; leave any other source alone."""
     if not value or not is_utc_timestamp_source(source):
         return value
-    value = value[:-1].strip() if value.endswith("Z") else value
-    return value if re.search(r'[+-]\d{2}:?\d{2}$', value) else f"{value}+00:00"
+    if value.endswith("Z") or re.search(r'[+-]\d{2}:?\d{2}$', value):
+        return value
+    return f"{value}Z"
 
 
 def _stored_original_time(current_data: dict) -> str:
