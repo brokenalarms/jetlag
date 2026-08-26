@@ -50,13 +50,17 @@ struct DiffTableView: View {
         TimelineScale(rows: rows)
     }
 
+    /// The row's status: what the pipeline said it did, composed from the emitted
+    /// action tokens. `dest` never contributes — a skipped file carries one too.
     private func statusText(_ row: DiffTableRow) -> String {
         switch row.pipelineResult {
-        case "changed": return changedLabel(row)
+        case "changed":
+            return row.outcome.statusLabel ?? Strings.DiffTable.changedStatus
+        case "would_change":
+            return row.outcome.statusLabel ?? Strings.DiffTable.wouldChangeStatus
         case "unchanged": return Strings.DiffTable.noChangeStatus
         case "failed":
             return Strings.DiffTable.failedStatus
-        case "would_change": return wouldChangeLabel(row)
         case nil: return row.lastCompletedStageLabel ?? ""
         default: return row.pipelineResult ?? ""
         }
@@ -73,9 +77,13 @@ struct DiffTableView: View {
             Self.idealWidth(
                 for: rows.flatMap { [changeBadgeText($0), $0.timestampSource?.label ?? ""] },
                 font: Self.systemFont),
-            Self.idealWidth(
-                for: rows.compactMap(\.dest).map { ($0 as NSString).lastPathComponent },
-                font: Self.monoFont),
+            max(
+                Self.idealWidth(
+                    for: rows.compactMap(\.dest).map { ($0 as NSString).lastPathComponent },
+                    font: Self.monoFont),
+                Self.idealWidth(
+                    for: rows.compactMap(\.skipReason).map(\.explanation),
+                    font: Self.systemFont)),
             Self.idealWidth(
                 for: rows.flatMap { [statusText($0), staleFieldsText($0) ?? ""] },
                 font: Self.systemFont,
@@ -135,17 +143,7 @@ struct DiffTableView: View {
                 .width(min: 70)
 
                 TableColumn(Strings.DiffTable.destinationColumn) { row in
-                    if let dest = row.dest {
-                        Text((dest as NSString).lastPathComponent)
-                            .font(.system(size: 11, design: .monospaced))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .help(dest)
-                    } else {
-                        Text("—")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.tertiary)
-                    }
+                    destinationCell(row)
                 }
                 .width(min: 80)
 
@@ -210,24 +208,6 @@ struct DiffTableView: View {
         }
     }
 
-    private func wouldChangeLabel(_ row: DiffTableRow) -> String {
-        if row.timestampAction == "would_fix" && row.dest != nil {
-            return Strings.DiffTable.wouldFixAndMoveStatus
-        }
-        if row.timestampAction == "would_fix" { return Strings.DiffTable.wouldFixStatus }
-        if row.dest != nil { return Strings.DiffTable.wouldMoveStatus }
-        return Strings.DiffTable.wouldChangeStatus
-    }
-
-    private func changedLabel(_ row: DiffTableRow) -> String {
-        if row.timestampAction == "fixed" && row.dest != nil {
-            return Strings.DiffTable.fixedAndMovedStatus
-        }
-        if row.timestampAction == "fixed" { return Strings.DiffTable.fixedStatus }
-        if row.dest != nil { return Strings.DiffTable.movedStatus }
-        return Strings.DiffTable.changedStatus
-    }
-
     private func changeBadgeText(_ row: DiffTableRow) -> String {
         switch row.timestampAction {
         case "would_fix", "fixed":
@@ -247,9 +227,10 @@ struct DiffTableView: View {
         row.staleFields.isEmpty ? nil : row.staleFields.joined(separator: ", ")
     }
 
-    /// Why a row says what it says: which field the correction read, and which
-    /// fields it would write. A row whose original and corrected times are the
-    /// same string has nothing else to go on.
+    /// Why a row says what it says: which field the correction read, which fields
+    /// it would write, and — for a file the organize step left alone — the reason
+    /// it gave. A row whose original and corrected times are the same string has
+    /// nothing else to go on.
     private func rowExplanation(_ row: DiffTableRow) -> String {
         var parts: [String] = []
         if let label = row.timestampSource?.label {
@@ -258,7 +239,38 @@ struct DiffTableView: View {
         if let fields = staleFieldsText(row) {
             parts.append(Strings.DiffTable.wouldWrite(fields))
         }
+        if let reason = row.skipReason {
+            parts.append(reason.explanation)
+        }
+        if let dest = row.dest {
+            parts.append(dest)
+        }
         return parts.joined(separator: "\n")
+    }
+
+    /// The destination a row would use, and — when the file was not moved there —
+    /// the reason the pipeline gave, so the path is never read as a move.
+    @ViewBuilder
+    private func destinationCell(_ row: DiffTableRow) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            if let dest = row.dest {
+                Text((dest as NSString).lastPathComponent)
+                    .font(.system(size: 11, design: .monospaced))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            } else {
+                Text("—")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+            }
+            if let reason = row.skipReason {
+                Text(reason.explanation)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+        }
+        .help(rowExplanation(row))
     }
 
     @ViewBuilder
@@ -315,7 +327,7 @@ struct DiffTableView: View {
     private func statusBadge(_ row: DiffTableRow) -> some View {
         switch row.pipelineResult {
         case "changed":
-            Label(changedLabel(row), systemImage: "checkmark.circle.fill")
+            Label(statusText(row), systemImage: "checkmark.circle.fill")
                 .font(.system(size: 11))
                 .foregroundStyle(Color("NeonCyan"))
         case "unchanged":
@@ -327,7 +339,7 @@ struct DiffTableView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.red)
         case "would_change":
-            Label(wouldChangeLabel(row), systemImage: "arrow.triangle.2.circlepath.circle.fill")
+            Label(statusText(row), systemImage: "arrow.triangle.2.circlepath.circle.fill")
                 .font(.system(size: 11))
                 .foregroundStyle(Color("NeonCyan").opacity(0.7))
         case nil:

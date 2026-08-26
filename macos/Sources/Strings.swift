@@ -290,6 +290,28 @@ What happens to source files after processing:
         static let wouldMoveStatus = String(localized: "diffTable.wouldMove.status", defaultValue: "Would move")
         static let fixedStatus = String(localized: "diffTable.fixed.status", defaultValue: "Fixed")
         static let movedStatus = String(localized: "diffTable.moved.status", defaultValue: "Moved")
+        static let moveSkippedStatus = String(localized: "diffTable.moveSkipped.status", defaultValue: "Move skipped")
+        static let moveFailedStatus = String(localized: "diffTable.moveFailed.status", defaultValue: "Move failed")
+
+        // The same outcomes phrased to follow a correction, as in "Would fix + move".
+        static let wouldMoveStatusAfterFix = String(localized: "diffTable.wouldMove.afterFix", defaultValue: "move")
+        static let movedStatusAfterFix = String(localized: "diffTable.moved.afterFix", defaultValue: "moved")
+        static let moveSkippedStatusAfterFix = String(localized: "diffTable.moveSkipped.afterFix", defaultValue: "move skipped")
+        static let moveFailedStatusAfterFix = String(localized: "diffTable.moveFailed.afterFix", defaultValue: "move failed")
+
+        static func combinedStatus(_ correction: String, _ movement: String) -> String {
+            String(localized: "diffTable.combined.status", defaultValue: "\(correction) + \(movement)")
+        }
+
+        static let skipIdenticalHelp = String(
+            localized: "diffTable.skip.identical.help",
+            defaultValue: "An identical copy is already at the destination.")
+        static let skipExistsDiffersHelp = String(
+            localized: "diffTable.skip.existsDiffers.help",
+            defaultValue: "A different file of the same name is already at the destination. Nothing was moved.")
+        static let skipUserChoiceHelp = String(
+            localized: "diffTable.skip.userChoice.help",
+            defaultValue: "You chose to keep the file already at the destination.")
 
         static let sourceDateTimeOriginal = String(localized: "diffTable.source.dateTimeOriginal", defaultValue: "DateTimeOriginal")
         static let sourceCreationDate = String(localized: "diffTable.source.creationDate", defaultValue: "Keys:CreationDate")
@@ -313,8 +335,6 @@ What happens to source files after processing:
         static let requiresForceTimezoneHelp = String(
             localized: "diffTable.requiresForceTimezone.help",
             defaultValue: "This file already carries a timezone from the camera. Applying relabels it, and needs confirmation.")
-        static let wouldFixAndMoveStatus = String(localized: "diffTable.wouldFixAndMove.status", defaultValue: "Would fix + move")
-        static let fixedAndMovedStatus = String(localized: "diffTable.fixedAndMoved.status", defaultValue: "Fixed + moved")
 
         static func fileCount(_ count: Int) -> String {
             String(localized: "diffTable.fileCount",
