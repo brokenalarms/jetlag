@@ -3,6 +3,11 @@ import SwiftUI
 struct InspectorPanel: View {
     @Bindable var state: AppState
 
+    /// The narrowest the files table is still readable at. Declaring it here is what makes
+    /// opening the panel widen the window: the window's minimum grows by this amount, so
+    /// AppKit extends the right edge instead of squeezing the form.
+    static let minWidth: CGFloat = 480
+
     var body: some View {
         VStack(spacing: 0) {
             if state.isRunning && state.visibleRows.isEmpty {
@@ -23,6 +28,7 @@ struct InspectorPanel: View {
 
             bottomBar
         }
+        .frame(minWidth: Self.minWidth)
     }
 
     /// Scanning a card takes a while before the first file lands in the table.
