@@ -89,13 +89,32 @@ struct SettingsView: View {
                         .textSelection(.enabled)
                 }
 
-                HStack {
-                    TextField(
-                        Strings.Settings.profilesFilePlaceholder,
-                        text: $state.profilesFilePath
-                    )
-                    .textFieldStyle(.roundedBorder)
-                    Button(Strings.Common.browse) { pickFile() }
+                LabeledContent(Strings.Settings.profilesFileLabel) {
+                    HStack(spacing: 8) {
+                        Text(state.resolvedProfilesPath)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .truncationMode(.middle)
+                            .lineLimit(1)
+                        Button(Strings.Common.revealInFinder) { revealProfilesFile() }
+                            .buttonStyle(.link)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        TextField(
+                            Strings.Settings.profilesFilePlaceholder(
+                                defaultPath: (state.profilesLocation.path as NSString)
+                                    .abbreviatingWithTildeInPath),
+                            text: $state.profilesFilePath
+                        )
+                        .textFieldStyle(.roundedBorder)
+                        Button(Strings.Common.browse) { pickFile() }
+                    }
+                    Text(Strings.Settings.profilesFileHelp)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -125,13 +144,12 @@ struct SettingsView: View {
     }
 
     private func loadProfiles() {
-        do {
-            state.profilesConfig = try ProfileService.load(from: state.resolvedProfilesPath).normalized()
-            state.profileLoadError = nil
-        } catch {
-            state.profilesConfig = nil
-            state.profileLoadError = error
-        }
+        state.loadProfiles()
+    }
+
+    private func revealProfilesFile() {
+        NSWorkspace.shared.activateFileViewerSelecting(
+            [URL(fileURLWithPath: state.resolvedProfilesPath)])
     }
 
     private func pickFile() {

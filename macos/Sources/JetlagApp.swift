@@ -12,7 +12,7 @@ struct JetlagApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(state: state)
-                .onAppear { loadProfiles() }
+                .onAppear { state.loadProfiles() }
                 .task { await state.refreshGyroflowStatus() }
         }
         // ContentView declares the minimum width every visible column needs; this is what
@@ -29,17 +29,7 @@ struct JetlagApp: App {
 
         Settings {
             SettingsView(state: state)
-                .onDisappear { loadProfiles() }
-        }
-    }
-
-    private func loadProfiles() {
-        do {
-            state.profilesConfig = try ProfileService.load(from: state.resolvedProfilesPath).normalized()
-            state.profileLoadError = nil
-        } catch {
-            state.profilesConfig = nil
-            state.profileLoadError = error
+                .onDisappear { state.loadProfiles() }
         }
     }
 }

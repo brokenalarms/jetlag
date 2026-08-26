@@ -456,6 +456,12 @@ final class AppState {
     }
 
     let scriptsDirectory: String
+
+    /// The user-owned profiles file, and the bundled copy it is seeded from.
+    let profilesLocation: ProfilesLocation
+
+    /// Settings override pointing the app at another profiles file — how a
+    /// development build is aimed at the repo's checked-in copy.
     var profilesFilePath: String {
         didSet { UserDefaults.standard.set(profilesFilePath, forKey: "profilesFilePath") }
     }
@@ -507,16 +513,41 @@ final class AppState {
     }
 
     init() {
-        self.scriptsDirectory = (Bundle.main.resourcePath! as NSString)
+        let scriptsDirectory = (Bundle.main.resourcePath! as NSString)
             .appendingPathComponent("scripts")
+        self.scriptsDirectory = scriptsDirectory
+        self.profilesLocation = ProfilesLocation.userDomain(scriptsDirectory: scriptsDirectory)
         self.profilesFilePath = UserDefaults.standard.string(forKey: "profilesFilePath") ?? ""
     }
 
     var resolvedProfilesPath: String {
+        profilesFilePath.isEmpty ? profilesLocation.path : profilesFilePath
+    }
+
+    /// Seed the user's profiles file from the bundled defaults when it is not
+    /// there yet, then load it. An override points somewhere the user chose, so
+    /// nothing is ever written there on its behalf.
+    func loadProfiles() {
         if profilesFilePath.isEmpty {
-            return (scriptsDirectory as NSString).appendingPathComponent("media-profiles.yaml")
+            do {
+                try profilesLocation.seedIfNeeded()
+            } catch {
+                profilesConfig = nil
+                profileLoadError = ProfileLoadError(
+                    message: Strings.Errors.profilesSeedFailed,
+                    filePath: profilesLocation.path,
+                    detail: error.localizedDescription
+                )
+                return
+            }
         }
-        return profilesFilePath
+        do {
+            profilesConfig = try ProfileService.load(from: resolvedProfilesPath).normalized()
+            profileLoadError = nil
+        } catch {
+            profilesConfig = nil
+            profileLoadError = error
+        }
     }
 
     var activeProfile: MediaProfile? {
@@ -638,7 +669,8 @@ final class AppState {
         let (process, stream) = ScriptRunner.run(
             script: "tools/download-gyroflow.sh",
             args: args,
-            workingDir: scriptsDirectory
+            workingDir: scriptsDirectory,
+            profilesPath: resolvedProfilesPath
         )
         var presenceData: [String] = []
         for await line in stream {
