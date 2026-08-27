@@ -38,21 +38,21 @@ struct WorkflowView: View {
                 }
             }
             .padding(.horizontal, 16)
-            ScrollView {
-                VStack(spacing: 16) {
-                    if !session.profileName.isEmpty {
-                        stepsPipeline
-                    }
-                }
-                .padding(16)
-            }
-            .safeAreaInset(edge: .bottom) {
+            // No scroll view: the form is a fixed column of controls, and its height —
+            // like its width — is its content's. Declaring it lets the window follow
+            // (`windowResizability(.contentSize)`) when a step expands, instead of the
+            // form scrolling inside a window that stayed put.
+            VStack(spacing: 16) {
                 if !session.profileName.isEmpty {
-                    executionBar
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(.bar)
+                    stepsPipeline
                 }
+            }
+            .padding(16)
+            if !session.profileName.isEmpty {
+                executionBar
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.bar)
             }
         }
         .onAppear {
