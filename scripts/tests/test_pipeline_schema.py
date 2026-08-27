@@ -73,7 +73,7 @@ class TestEmittedEventsMatchSchema:
             f"Actual: {sorted({e['event'] for e in events})}, Expected: the core per-file events"
 
     def test_apply_events_all_validate(self, temp_workspace, test_profile):
-        """Applying emits a different token set (fixed/moved/changed) — also schema-clean."""
+        """Applying emits a different token set (fixed/copied/changed) — also schema-clean."""
         create_test_video(temp_workspace["source"] / "test.mp4",
                           media_create_date="2025:10:05 01:00:00")
 
@@ -81,8 +81,8 @@ class TestEmittedEventsMatchSchema:
 
         events = validate_events(_events(result.stdout))
         organize = next(e for e in events if e["event"] == "organize_result")
-        assert organize["action"] == "moved", \
-            f"Actual: organize_result.action={organize['action']!r}, Expected: 'moved'"
+        assert organize["action"] == "copied", \
+            f"Actual: organize_result.action={organize['action']!r}, Expected: 'copied'"
 
     def test_skip_against_existing_destination_carries_a_declared_reason(self, temp_workspace, test_profile):
         """The Korea dry run: destination holds a different-sized copy already.

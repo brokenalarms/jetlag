@@ -163,6 +163,23 @@ def run_organize_by_date(
     )
 
 
+# Organize is handed the working copy on an apply and the source file in a dry
+# run, so it reports the staging hop: "moved"/"would_move". Neither is the user's
+# outcome — the source directory is a read-only input that only archive-source
+# ever touches, and what the destination gains is a new file. overwrote and
+# would_overwrite describe the destination, not the source, so they carry over.
+_STAGED_ORGANIZE_ACTION = {"moved": "copied", "would_move": "would_copy"}
+
+
+def staged_organize_action(action: str) -> str:
+    """Name organize's outcome relative to the user's source file.
+
+    A dry run and the apply it previews go through this together, so both report
+    the same outcome for the same file.
+    """
+    return _STAGED_ORGANIZE_ACTION.get(action, action)
+
+
 def run_ingest_media(
     file_path: Path,
     working_dir: str,
@@ -395,7 +412,7 @@ def process_file(
                                       overwrite=overwrite)
     emit_event("organize_result",
         file=active_file.name,
-        action=org_result.action,
+        action=staged_organize_action(org_result.action),
         dest=org_result.dest,
         reason=org_result.reason,
     )

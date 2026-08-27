@@ -110,6 +110,16 @@ events:
       action:
         type: string
         enum: [copied, moved, skipped, overwrote, would_copy, would_move, would_overwrite, error]
+        description: >-
+          What happened to the file, stated relative to the source file the user
+          handed the pipeline. copied means a new file now exists at the
+          destination and the source is untouched — the pipeline stages every
+          file through the working directory, so this is what a run reports;
+          the source is only ever archived or deleted by the separate
+          archive-source step, which reports that separately. moved means the
+          source itself changed location, which only a pipeline that processes
+          in place can report. overwrote and would_overwrite describe the
+          destination: a file already there was replaced.
       dest:
         type: string
         description: >-
