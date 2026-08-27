@@ -243,17 +243,20 @@ struct DiffTableView: View {
         }
     }
 
-    private func changeBadgeText(_ row: DiffTableRow) -> String {
-        switch row.timestampAction {
-        case "would_fix", "fixed":
+    /// The switch has no default: a token added to `RowOutcome.Correction` without a
+    /// badge text stops compiling, and one added to the schema alone fails
+    /// `PipelineSchemaContractTests.testEveryTimestampActionTokenIsAKnownCorrection`.
+    func changeBadgeText(_ row: DiffTableRow) -> String {
+        switch row.outcome.correction {
+        case .wouldFix, .fixed:
             if row.correctionMode == "time", let offset = row.timeOffsetDisplay {
                 return offset
             }
-            return row.timestampAction == "would_fix"
+            return row.outcome.correction == .wouldFix
                 ? Strings.DiffTable.wouldFixChange : Strings.DiffTable.fixedChange
-        case "no_change": return Strings.DiffTable.noChangeChange
-        case "error": return row.timestampError ?? Strings.DiffTable.errorChange
-        default: return "—"
+        case .noChange: return Strings.DiffTable.noChangeChange
+        case .error: return row.timestampError ?? Strings.DiffTable.errorChange
+        case nil: return "—"
         }
     }
 
@@ -325,8 +328,8 @@ struct DiffTableView: View {
     @ViewBuilder
     private func changeBadge(_ row: DiffTableRow) -> some View {
         let text = changeBadgeText(row)
-        switch row.timestampAction {
-        case "would_fix":
+        switch row.outcome.correction {
+        case .wouldFix:
             HStack(spacing: 4) {
                 if row.requiresForceTimezone {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -338,20 +341,20 @@ struct DiffTableView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Color("NeonCyan").opacity(0.7))
             }
-        case "fixed":
+        case .fixed:
             Text(text)
                 .font(.system(size: 11))
                 .foregroundStyle(Color("NeonCyan"))
-        case "no_change":
+        case .noChange:
             Text(text)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-        case "error":
+        case .error:
             Text(text)
                 .font(.system(size: 11))
                 .foregroundStyle(.red)
                 .help(row.timestampError ?? "")
-        default:
+        case nil:
             Text("—")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
