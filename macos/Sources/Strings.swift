@@ -173,6 +173,20 @@ What happens to source files after processing:
                          defaultValue: "\(count) files already exist at the destination with different contents. Overwrite them?")
         }
 
+        // Unpreviewed apply dialog
+        static let dryRunStaleTitle = String(localized: "workflow.dryRunStale.title",
+            defaultValue: "Settings Changed Since the Last Dry Run")
+        static let noDryRunTitle = String(localized: "workflow.noDryRun.title",
+            defaultValue: "No Dry Run Yet")
+        static let dryRunStaleMessage = String(localized: "workflow.dryRunStale.message",
+            defaultValue: "The table is a preview of different settings. Applying now moves and replaces files against a plan you have not seen.")
+        static let noDryRunMessage = String(localized: "workflow.noDryRun.message",
+            defaultValue: "Nothing has been previewed. Applying now moves and replaces files against a plan you have not seen.")
+        static let dryRunFirstButton = String(localized: "workflow.dryRunFirst.button",
+            defaultValue: "Dry Run First")
+        static let applyAnywayButton = String(localized: "workflow.applyAnyway.button",
+            defaultValue: "Apply Anyway")
+
         static func mixedTimezonesMessage(groups: String) -> String {
             String(localized: "workflow.mixedTimezones.message",
                    defaultValue: "Files have different embedded timezones. Consider processing each group separately.\n\n\(groups)")

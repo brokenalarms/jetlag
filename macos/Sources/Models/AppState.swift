@@ -278,6 +278,23 @@ final class WorkflowSession {
     var showOverwriteConflict: Bool = false
     var overwriteDestination: Bool = false
 
+    /// Why the apply about to start was never previewed, which is the whole of
+    /// what the question asks.
+    enum DryRunStaleReason {
+        case noDryRun
+        case settingsChanged
+    }
+
+    /// The settings the last completed dry run previewed. A run that was
+    /// cancelled never becomes one: it stopped partway through the files, so
+    /// the table it left is not a preview of the whole batch.
+    private var lastDryRunArgs: [String]?
+    private var runningDryRunArgs: [String]?
+
+    var dryRunStaleReason: DryRunStaleReason?
+    var showDryRunStale: Bool = false
+    var applyWithoutDryRun: Bool = false
+
     var enabledSteps: Set<PipelineStep> = [] {
         didSet {
             if !enabledSteps.contains(.archiveSource) {
@@ -341,6 +358,59 @@ final class WorkflowSession {
         showOverwriteConflict = false
     }
 
+    /// The settings a run would carry, with the answers given for this click
+    /// taken out: an override the user just granted is not a setting they
+    /// changed, so it never makes the preview they read look stale.
+    func comparableArgs() -> [String] {
+        buildPipelineArgs().args.filter { !Self.assentFlags.contains($0) }
+    }
+
+    /// Whether the apply has to stop and ask first: an apply moves and replaces
+    /// real files, so the only thing that makes it safe is a preview of this
+    /// exact run. Returns true when the question was raised and the run must
+    /// not start.
+    func requestDryRunAssentIfNeeded() -> Bool {
+        guard applyMode, !applyWithoutDryRun else { return false }
+        guard let previewed = lastDryRunArgs else {
+            dryRunStaleReason = .noDryRun
+            showDryRunStale = true
+            return true
+        }
+        guard previewed != comparableArgs() else { return false }
+        dryRunStaleReason = .settingsChanged
+        showDryRunStale = true
+        return true
+    }
+
+    /// Record the user's answer, so the apply they insisted on goes ahead.
+    func grantDryRunStaleAssent() {
+        applyWithoutDryRun = true
+        showDryRunStale = false
+    }
+
+    /// The offered alternative: preview these settings instead of applying them.
+    func startDryRunInstead() {
+        applyMode = false
+        showDryRunStale = false
+    }
+
+    /// A dry run counts as the preview only once it has been through every
+    /// file, so what it previewed is held until it finishes.
+    func noteRunStarted() {
+        runningDryRunArgs = applyMode ? nil : comparableArgs()
+    }
+
+    func noteRunFinished() {
+        if let previewed = runningDryRunArgs {
+            lastDryRunArgs = previewed
+        }
+        runningDryRunArgs = nil
+    }
+
+    func noteRunCancelled() {
+        runningDryRunArgs = nil
+    }
+
     /// Assent covers the run it was given for. A run the user starts themselves
     /// begins without it, so a later batch is never relabelled or replaced unasked.
     func clearRunAssent() {
@@ -352,6 +422,9 @@ final class WorkflowSession {
         timezoneConflictFileTimezones = nil
         overwriteDestination = false
         showOverwriteConflict = false
+        applyWithoutDryRun = false
+        showDryRunStale = false
+        dryRunStaleReason = nil
     }
 
     /// The conflict report describes the rows of the run that produced it, so it
@@ -401,6 +474,17 @@ final class WorkflowSession {
         let active = availableSteps.filter { $0.isAlwaysOn || enabledSteps.contains($0) }
         return active.allSatisfy { isStepReady($0) }
     }
+
+    static let forceTimezoneFlag = "--force-timezone"
+    static let allowMixedTimezonesFlag = "--allow-mixed-timezones"
+    static let overwriteFlag = "--overwrite"
+    static let applyFlag = "--apply"
+
+    /// What the run carries because of an answer given for one click, rather
+    /// than a setting the user chose — the same state `clearRunAssent()` drops.
+    private static let assentFlags = [
+        forceTimezoneFlag, allowMixedTimezonesFlag, overwriteFlag, applyFlag,
+    ]
 
     func buildPipelineArgs() -> (script: String, args: [String]) {
         var args: [String] = []
@@ -457,16 +541,16 @@ final class WorkflowSession {
             args.append("--update-filename-dates")
         }
         if forceTimezone {
-            args.append("--force-timezone")
+            args.append(Self.forceTimezoneFlag)
         }
         if allowMixedTimezones {
-            args.append("--allow-mixed-timezones")
+            args.append(Self.allowMixedTimezonesFlag)
         }
         if overwriteDestination {
-            args.append("--overwrite")
+            args.append(Self.overwriteFlag)
         }
         if applyMode {
-            args.append("--apply")
+            args.append(Self.applyFlag)
         }
 
         if enabledSteps.contains(.gyroflow), let settings = workingProfile.gyroflowSettings {
@@ -764,6 +848,7 @@ final class AppState {
     }
 
     func cancelRunning() {
+        workflowSession.noteRunCancelled()
         currentRunTask?.cancel()
         currentRunTask = nil
         currentProcess?.terminate()

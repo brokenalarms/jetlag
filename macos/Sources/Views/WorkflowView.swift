@@ -118,6 +118,29 @@ struct WorkflowView: View {
                 count: state.workflowSession.organizeConflictCount))
         }
         .alert(
+            state.workflowSession.dryRunStaleReason == .settingsChanged
+                ? Strings.Workflow.dryRunStaleTitle
+                : Strings.Workflow.noDryRunTitle,
+            isPresented: $state.workflowSession.showDryRunStale
+        ) {
+            Button(Strings.Workflow.dryRunFirstButton) {
+                state.workflowSession.startDryRunInstead()
+                runWorkflow()
+            }
+            .keyboardShortcut(.defaultAction)
+            Button(Strings.Workflow.applyAnywayButton, role: .destructive) {
+                state.workflowSession.grantDryRunStaleAssent()
+                runWorkflow()
+            }
+            Button(Strings.Common.cancel, role: .cancel) {
+                state.workflowSession.showDryRunStale = false
+            }
+        } message: {
+            Text(state.workflowSession.dryRunStaleReason == .settingsChanged
+                 ? Strings.Workflow.dryRunStaleMessage
+                 : Strings.Workflow.noDryRunMessage)
+        }
+        .alert(
             Strings.Errors.commandLineToolsTitle,
             isPresented: Binding(
                 get: { state.pythonRuntimeAlert != nil },
@@ -671,8 +694,10 @@ struct WorkflowView: View {
     private func runWorkflow() {
         guard state.canRunPipeline() else { return }
 
-        // Applying over the files the last run reported blocked destroys them,
-        // so the answer is taken before anything runs — cancelling runs nothing.
+        // An apply the user never previewed, and applying over the files the last
+        // run reported blocked, both destroy files: the answers are taken before
+        // anything runs — cancelling runs nothing.
+        if state.workflowSession.requestDryRunAssentIfNeeded() { return }
         if state.workflowSession.requestOverwriteAssentIfNeeded() { return }
 
         let fileCount = countMediaFiles()
@@ -686,6 +711,7 @@ struct WorkflowView: View {
         state.isRunning = true
 
         let (script, args) = state.workflowSession.buildPipelineArgs()
+        state.workflowSession.noteRunStarted()
 
         let (process, stream) = ScriptRunner.run(
             script: script,
@@ -702,6 +728,7 @@ struct WorkflowView: View {
             }
             guard !Task.isCancelled else { return }
             await MainActor.run {
+                state.workflowSession.noteRunFinished()
                 state.isRunning = false
                 state.currentProcess = nil
                 state.currentRunTask = nil
