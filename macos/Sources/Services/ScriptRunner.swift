@@ -6,13 +6,11 @@ struct ScriptRunner {
         args: [String],
         workingDir: String,
         profilesPath: String
-    ) -> (process: Process, stream: AsyncStream<LogLine>) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = [
-            (workingDir as NSString).appendingPathComponent(script)
+    ) -> (process: ScriptProcess, stream: AsyncStream<LogLine>) {
+        let arguments = [
+            "/bin/bash",
+            (workingDir as NSString).appendingPathComponent(script),
         ] + args
-        process.currentDirectoryURL = URL(fileURLWithPath: workingDir)
 
         var env = ProcessInfo.processInfo.environment
         let toolsDir = (workingDir as NSString).appendingPathComponent("tools")
@@ -21,13 +19,11 @@ struct ScriptRunner {
         // Without this the scripts fall back to <scripts>/media-profiles.yaml —
         // the read-only copy in the bundle, not the file the app writes.
         env[ProfilesLocation.environmentKey] = profilesPath
-        process.environment = env
 
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
 
+        var spawned: ScriptProcess?
         let stream = AsyncStream<LogLine> { continuation in
             let group = DispatchGroup()
 
@@ -72,15 +68,84 @@ struct ScriptRunner {
             }
 
             do {
-                try process.run()
+                spawned = try spawnProcessGroupLeader(
+                    arguments: arguments,
+                    environment: env,
+                    workingDir: workingDir,
+                    stdout: stdoutPipe.fileHandleForWriting,
+                    stderr: stderrPipe.fileHandleForWriting
+                )
             } catch {
                 stdoutPipe.fileHandleForReading.readabilityHandler = nil
                 stderrPipe.fileHandleForReading.readabilityHandler = nil
                 continuation.yield(LogLine(text: Strings.Errors.scriptStartFailed(error.localizedDescription), stream: .stderr))
                 continuation.finish()
             }
+            // The child owns the write ends now; holding them open here would keep
+            // the reads from ever seeing EOF, so the stream would never finish.
+            try? stdoutPipe.fileHandleForWriting.close()
+            try? stderrPipe.fileHandleForWriting.close()
         }
 
-        return (process, stream)
+        return (spawned ?? ScriptProcess(processIdentifier: -1), stream)
+    }
+
+    /// Spawn the script as the leader of a fresh process group.
+    ///
+    /// `Process` offers no way to do this, and it is what makes cancel able to
+    /// reach the pipeline's descendants — jetlag-metadata and the persistent
+    /// exiftool it owns — instead of only the script itself.
+    private static func spawnProcessGroupLeader(
+        arguments: [String],
+        environment: [String: String],
+        workingDir: String,
+        stdout: FileHandle,
+        stderr: FileHandle
+    ) throws -> ScriptProcess {
+        var fileActions: posix_spawn_file_actions_t?
+        posix_spawn_file_actions_init(&fileActions)
+        defer { posix_spawn_file_actions_destroy(&fileActions) }
+        posix_spawn_file_actions_addopen(&fileActions, STDIN_FILENO, "/dev/null", O_RDONLY, 0)
+        posix_spawn_file_actions_adddup2(&fileActions, stdout.fileDescriptor, STDOUT_FILENO)
+        posix_spawn_file_actions_adddup2(&fileActions, stderr.fileDescriptor, STDERR_FILENO)
+        posix_spawn_file_actions_addchdir_np(&fileActions, workingDir)
+
+        var attributes: posix_spawnattr_t?
+        posix_spawnattr_init(&attributes)
+        defer { posix_spawnattr_destroy(&attributes) }
+        // pgroup 0 means "a new group led by the child". CLOEXEC_DEFAULT drops every
+        // descriptor except the three set up above: the child would otherwise also
+        // inherit the pipes' write ends by their original numbers, and anything it
+        // backgrounds would hold them open long past its own exit — no EOF, so the
+        // log stream would never finish.
+        posix_spawnattr_setpgroup(&attributes, 0)
+        posix_spawnattr_setflags(
+            &attributes, Int16(POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT))
+
+        let envStrings = environment.map { "\($0.key)=\($0.value)" }
+        var pid: pid_t = 0
+        let result = withCStringArray(arguments) { argv in
+            withCStringArray(envStrings) { envp in
+                posix_spawn(&pid, arguments[0], &fileActions, &attributes, argv, envp)
+            }
+        }
+        guard result == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(result), userInfo: [
+                NSLocalizedDescriptionKey: String(cString: strerror(result)),
+            ])
+        }
+        return ScriptProcess(processIdentifier: pid)
+    }
+
+    /// Call `body` with a NULL-terminated `char *[]` view of `values`, valid only
+    /// for the duration of the call.
+    private static func withCStringArray<R>(
+        _ values: [String],
+        _ body: (UnsafePointer<UnsafeMutablePointer<CChar>?>) -> R
+    ) -> R {
+        var pointers = values.map { strdup($0) }
+        pointers.append(nil)
+        defer { pointers.forEach { free($0) } }
+        return body(&pointers)
     }
 }

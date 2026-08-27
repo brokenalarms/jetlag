@@ -112,8 +112,15 @@ class ExifTool:
         return match is not None and int(match.group(1)) > 0
 
     def close(self):
-        """Shut down the persistent process."""
-        with self._lock:
+        """Shut down the persistent process.
+
+        The lock is taken opportunistically: a signal handler runs on the same
+        thread that may already hold it inside :meth:`execute`, so blocking here
+        would deadlock the shutdown and leave exiftool running. Tearing down
+        without it is safe — no further commands are sent either way.
+        """
+        acquired = self._lock.acquire(blocking=False)
+        try:
             if self._process is None or self._process.poll() is not None:
                 self._process = None
                 return
@@ -125,6 +132,9 @@ class ExifTool:
                 self._process.kill()
                 self._process.wait()
             self._process = None
+        finally:
+            if acquired:
+                self._lock.release()
 
 
 exiftool = ExifTool()

@@ -96,7 +96,14 @@ class _SwiftBackend:
         return result.get("updated", False)
 
     def close(self):
-        with self._lock:
+        """Close jetlag-metadata's stdin so it shuts its own exiftool down.
+
+        The lock is taken opportunistically: a signal handler runs on the same
+        thread that may already hold it inside :meth:`_call`, so blocking here
+        would deadlock the shutdown and leave the whole chain running.
+        """
+        acquired = self._lock.acquire(blocking=False)
+        try:
             if self._process is None or self._process.poll() is not None:
                 self._process = None
                 return
@@ -107,6 +114,9 @@ class _SwiftBackend:
                 self._process.kill()
                 self._process.wait()
             self._process = None
+        finally:
+            if acquired:
+                self._lock.release()
 
 
 def _create_service():

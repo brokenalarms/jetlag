@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		02C6933E6FD17468C99480B6 /* ScriptProcessGroupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA13B0A4EE78E6DBC6958CF4 /* ScriptProcessGroupTests.swift */; };
 		03E263B765C4C53CE8B6FF7E /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 823EAC4F97C91F6A789E0415 /* MapKit.framework */; };
 		0AFA7495BED7A4348018401D /* RowFileLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F713CD33E597A06A26576EC6 /* RowFileLocation.swift */; };
 		0C5F26D4F582B5EECA31A039 /* WindowEdgeGrowthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5122F4BA350F64B8CB33F83 /* WindowEdgeGrowthTests.swift */; };
@@ -61,6 +62,7 @@
 		D6A581C2985C5F5655494088 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C1D644A22201A7866455A04 /* CoreLocation.framework */; };
 		E429D831BA4132A2CC9027AF /* DiffTableScrollerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72241C254A690C5715578E66 /* DiffTableScrollerTests.swift */; };
 		E6DEE560FAFDCFE9F48B205B /* FieldValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7884EFEE29BD136A760320 /* FieldValidation.swift */; };
+		EC9C4EE81EE7C19796A6899F /* ScriptProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAE7B2C33B83AA615CCA0EF3 /* ScriptProcess.swift */; };
 		ECD882A773FA55605426D2FC /* PipelineSchemaContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7844419398942BFFCBA70AA /* PipelineSchemaContractTests.swift */; };
 		ED7D0C891E4F99927C96CD9D /* PillField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689D9A69FF07CCA892429C0A /* PillField.swift */; };
 		F141198EED92BFBB91AE339E /* WorkflowLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A92519F526948204A6F4D6 /* WorkflowLayoutTests.swift */; };
@@ -118,6 +120,7 @@
 		B098EAB2712A13202064D6F1 /* RowFileLocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowFileLocationTests.swift; sourceTree = "<group>"; };
 		B41D624A325EEBAC2CBD65CA /* WorktreeBundleIdentityGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeBundleIdentityGuardTests.swift; sourceTree = "<group>"; };
 		B68CD5F46C4AF7FAFE297AAE /* Jetlag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jetlag.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BA13B0A4EE78E6DBC6958CF4 /* ScriptProcessGroupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptProcessGroupTests.swift; sourceTree = "<group>"; };
 		C3CAB3FB148CDC0E0E19191A /* FixTimestampPreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixTimestampPreviewTests.swift; sourceTree = "<group>"; };
 		C4AF4B0A35CD716A34E2A275 /* ProfilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesView.swift; sourceTree = "<group>"; };
 		C698B76B04834D4379CADAA4 /* InspectorHostedSizingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorHostedSizingTests.swift; sourceTree = "<group>"; };
@@ -131,6 +134,7 @@
 		DC0210C9EE3BEF29E07C9DE6 /* MediaProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaProfile.swift; sourceTree = "<group>"; };
 		E1F442622CEF248F5E277A97 /* ColumnFitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColumnFitTests.swift; sourceTree = "<group>"; };
 		E3FDFFFE053527F6DAFF2443 /* HostedViewSizing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostedViewSizing.swift; sourceTree = "<group>"; };
+		EAE7B2C33B83AA615CCA0EF3 /* ScriptProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptProcess.swift; sourceTree = "<group>"; };
 		F37A77F3E04133102C3B9228 /* GyroflowStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroflowStatus.swift; sourceTree = "<group>"; };
 		F5122F4BA350F64B8CB33F83 /* WindowEdgeGrowthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowEdgeGrowthTests.swift; sourceTree = "<group>"; };
 		F559FB82EF7FBD0FD4101BE5 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -169,6 +173,7 @@
 				6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */,
 				61A5900D18DD3679842E737D /* ProfilesLocation.swift */,
 				CA47C3147490D4D7AABA5169 /* PythonRuntimeCheck.swift */,
+				EAE7B2C33B83AA615CCA0EF3 /* ScriptProcess.swift */,
 				9C5FD29C41D642C67671FBAF /* ScriptRunner.swift */,
 			);
 			path = Services;
@@ -222,6 +227,7 @@
 				5AFFC7653CEF9432BABAFE94 /* ProfileTests.swift */,
 				33AF1E5DF4D368EB36EFB0EC /* PythonRuntimeCheckTests.swift */,
 				B098EAB2712A13202064D6F1 /* RowFileLocationTests.swift */,
+				BA13B0A4EE78E6DBC6958CF4 /* ScriptProcessGroupTests.swift */,
 				A14C553F637C9236439B7A97 /* StreamingPerformanceTests.swift */,
 				31610BDF5B254E8176367A1D /* TimestampSourceTests.swift */,
 				F5122F4BA350F64B8CB33F83 /* WindowEdgeGrowthTests.swift */,
@@ -440,6 +446,7 @@
 				0AFA7495BED7A4348018401D /* RowFileLocation.swift in Sources */,
 				58A801CA7BC6ACB325248DA3 /* RowOutcome.swift in Sources */,
 				7EB40F1EE336843C386D4474 /* SandboxView.swift in Sources */,
+				EC9C4EE81EE7C19796A6899F /* ScriptProcess.swift in Sources */,
 				AAC3E4FC571BCF92D2EBA219 /* ScriptRunner.swift in Sources */,
 				4FDCE64D99169FBCD837CF2B /* SettingsView.swift in Sources */,
 				CF708EB9D2E1C9376806BA71 /* Strings.swift in Sources */,
@@ -472,6 +479,7 @@
 				6996FE5603F77EE4D4B0CAA9 /* ProfilesLocationTests.swift in Sources */,
 				A00FA545CCBD5C1CF868B312 /* PythonRuntimeCheckTests.swift in Sources */,
 				BCBAB853A58D0989258EE4F5 /* RowFileLocationTests.swift in Sources */,
+				02C6933E6FD17468C99480B6 /* ScriptProcessGroupTests.swift in Sources */,
 				8BBB95FCC3F74AD66393C134 /* StreamingPerformanceTests.swift in Sources */,
 				3E3C0BD8BAD159DA18D47303 /* TimestampSourceTests.swift in Sources */,
 				0C5F26D4F582B5EECA31A039 /* WindowEdgeGrowthTests.swift in Sources */,
