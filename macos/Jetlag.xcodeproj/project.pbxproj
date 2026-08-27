@@ -57,6 +57,7 @@
 		CF708EB9D2E1C9376806BA71 /* Strings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 886F8C8992B2C0546F301A05 /* Strings.swift */; };
 		D4148DE34CA1305FAAEB74E7 /* DiffTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A142786B3A2C61DF018E00D1 /* DiffTableView.swift */; };
 		D6A581C2985C5F5655494088 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C1D644A22201A7866455A04 /* CoreLocation.framework */; };
+		E429D831BA4132A2CC9027AF /* DiffTableScrollerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72241C254A690C5715578E66 /* DiffTableScrollerTests.swift */; };
 		E6DEE560FAFDCFE9F48B205B /* FieldValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7884EFEE29BD136A760320 /* FieldValidation.swift */; };
 		ECD882A773FA55605426D2FC /* PipelineSchemaContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7844419398942BFFCBA70AA /* PipelineSchemaContractTests.swift */; };
 		ED7D0C891E4F99927C96CD9D /* PillField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689D9A69FF07CCA892429C0A /* PillField.swift */; };
@@ -95,6 +96,7 @@
 		6C503D6DF395CB0F0EE8674D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileService.swift; sourceTree = "<group>"; };
 		704A9D197F05079199FB21C9 /* OrganizeConflictTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizeConflictTests.swift; sourceTree = "<group>"; };
+		72241C254A690C5715578E66 /* DiffTableScrollerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffTableScrollerTests.swift; sourceTree = "<group>"; };
 		73A67A68A82CC97A0B42F497 /* DiffTableRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffTableRow.swift; sourceTree = "<group>"; };
 		7CB6F9D30A0BFC9DEA56F289 /* ProfilesLocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesLocationTests.swift; sourceTree = "<group>"; };
 		823EAC4F97C91F6A789E0415 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
@@ -201,6 +203,7 @@
 			isa = PBXGroup;
 			children = (
 				27CF0E7DB6265D0EAF8055CE /* AppStateTests.swift */,
+				72241C254A690C5715578E66 /* DiffTableScrollerTests.swift */,
 				14C2F2F2C7D5476AAC832E64 /* DiffTableViewLabelTests.swift */,
 				2DB6E838E4C1827858BB004E /* DirtyableTests.swift */,
 				C3CAB3FB148CDC0E0E19191A /* FixTimestampPreviewTests.swift */,
@@ -448,6 +451,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				6A87F1ECCD552C95D40ED1AA /* AppStateTests.swift in Sources */,
+				E429D831BA4132A2CC9027AF /* DiffTableScrollerTests.swift in Sources */,
 				BA110B4DD7D4A54646FFDBF0 /* DiffTableViewLabelTests.swift in Sources */,
 				AF4D4132C54C04CF1A1ADDB7 /* DirtyableTests.swift in Sources */,
 				11DAC29BADCD9CB0EF3EB4F0 /* FixTimestampPreviewTests.swift in Sources */,
