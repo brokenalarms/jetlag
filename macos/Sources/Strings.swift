@@ -338,14 +338,28 @@ What happens to source files after processing:
         static let moveSkippedStatus = String(localized: "diffTable.moveSkipped.status", defaultValue: "Move skipped")
         static let moveFailedStatus = String(localized: "diffTable.moveFailed.status", defaultValue: "Move failed")
 
+        /// A dry run's conflicting file, standalone: what Apply will actually do — prompt,
+        /// then move and replace — not what "skipped" would suggest on its own.
+        static let wouldReplaceStatus = String(
+            localized: "diffTable.wouldReplace.status", defaultValue: "Would replace at destination (asks first)")
+
         // The same outcomes phrased to follow a correction, as in "Would fix + move".
         static let wouldMoveStatusAfterFix = String(localized: "diffTable.wouldMove.afterFix", defaultValue: "move")
         static let movedStatusAfterFix = String(localized: "diffTable.moved.afterFix", defaultValue: "moved")
         static let moveSkippedStatusAfterFix = String(localized: "diffTable.moveSkipped.afterFix", defaultValue: "move skipped")
         static let moveFailedStatusAfterFix = String(localized: "diffTable.moveFailed.afterFix", defaultValue: "move failed")
+        static let wouldReplaceStatusAfterFix = String(
+            localized: "diffTable.wouldReplace.afterFix", defaultValue: "replace at destination (asks first)")
 
         static func combinedStatus(_ correction: String, _ movement: String) -> String {
             String(localized: "diffTable.combined.status", defaultValue: "\(correction) + \(movement)")
+        }
+
+        /// A dry run's identical-file conflict: nothing to apply, so it reads as a fact
+        /// rather than a pending action — "·" instead of "+" marks that difference.
+        static func wouldFixIdenticalStatus(_ correction: String) -> String {
+            String(localized: "diffTable.wouldFixIdentical.status",
+                   defaultValue: "\(correction) · destination already has it")
         }
 
         static let skipIdenticalHelp = String(
