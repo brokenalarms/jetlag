@@ -56,16 +56,64 @@ final class WorkflowLayoutTests: XCTestCase {
         }
     }
 
-    /// Every point the window has beyond the form goes to the panel.
-    func testPanelTakesTheRemainder() {
-        for width: CGFloat in [1400, 1900] {
+    /// Every point the window has beyond the form goes to the panel, up to the panel's
+    /// cap (twice the width of everything beside it).
+    func testPanelTakesTheRemainderUpToItsCap() {
+        for width: CGFloat in [1200, 1900, 3000] {
             guard let panel = panelWidth(at: width) else {
                 XCTFail("the panel's log view was not hosted at \(width)pt")
                 continue
             }
-            XCTAssertEqual(panel, width - WorkflowView.formWidth, accuracy: 2, "panel at \(width)pt")
+            let expected = min(width - WorkflowView.formWidth, WorkflowDetail.panelMaxWidth)
+            XCTAssertEqual(panel, expected, accuracy: 2, "panel at \(width)pt")
         }
     }
+
+    /// The whole window content — sidebar, form, panel — has a derived size range and no
+    /// declared window width: closed, it resolves to sidebar + form however much it is
+    /// offered, which is what lets `windowResizability(.contentSize)` shrink-wrap the
+    /// window; open, its minimum rises by the panel's minimum.
+    func testWindowContentSizesToItsChildren() {
+        func resolvedWidth(panelOpen: Bool, offered: CGFloat) -> CGFloat {
+            let controller = NSHostingController(rootView: ContentView(state: workflowState(panelOpen: panelOpen)))
+            return controller.sizeThatFits(in: NSSize(width: offered, height: 900)).width
+        }
+        let closedNarrow = resolvedWidth(panelOpen: false, offered: 0)
+        let closedWide = resolvedWidth(panelOpen: false, offered: 1900)
+        XCTAssertEqual(closedNarrow, closedWide, accuracy: 1, "closed, the content has one width")
+        XCTAssertEqual(closedWide, ContentView.sidebarWidth + WorkflowView.formWidth, accuracy: 2)
+
+        let openMinimum = resolvedWidth(panelOpen: true, offered: 0)
+        XCTAssertEqual(openMinimum - closedNarrow, InspectorPanel.minWidth, accuracy: 2)
+        // Open, the panel takes what it is offered up to its cap: never wider than
+        // everything beside it, so the window at most doubles.
+        let cap = ContentView.sidebarWidth + WorkflowView.formWidth + WorkflowDetail.panelMaxWidth
+        XCTAssertEqual(resolvedWidth(panelOpen: true, offered: 1900), 1900, accuracy: 2, "open, the content fills what it is offered between its minimum and the cap")
+        XCTAssertEqual(resolvedWidth(panelOpen: true, offered: 4000), cap, accuracy: 2, "open, the content stops at the cap")
+    }
+
+    /// Columns are pinned to the top: a short form (no profile chosen yet) sits at the
+    /// top of the window, not floating in the middle of it.
+    func testFormIsPinnedToTheTopOfTheWindow() {
+        let state = AppState()
+        state.selectedTab = .workflow
+        state.showInspector = false
+        let host = NSHostingView(rootView: ContentView(state: state))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1400, height: 900),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.contentView = host
+        host.frame = NSRect(x: 0, y: 0, width: 1400, height: 900)
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+
+        guard let picker = firstView(of: NSPopUpButton.self, in: host) else {
+            return XCTFail("the profile picker was not hosted")
+        }
+        let top = picker.convert(picker.bounds, to: nil).maxY
+        XCTAssertGreaterThan(top, 900 - 120, "the profile picker must sit within the top of the window, not mid-height")
+    }
+
+
 
     /// Opening the panel raises the content's minimum by the panel's own minimum — that
     /// growth is what `windowResizability(.contentMinSize)` turns into a wider window,

@@ -12,13 +12,17 @@ enum WindowEdgeGrowth {
         previousIsRunning: Bool,
         isRunning: Bool,
         frame: CGRect,
-        screenEdge: CGFloat
+        screenEdge: CGFloat,
+        maxWidth: CGFloat = .infinity
     ) -> CGRect? {
         let panelJustOpened = !previousPanelOpen && panelOpen
         let runJustStarted = !previousIsRunning && isRunning
-        guard panelOpen, panelJustOpened || runJustStarted, frame.maxX < screenEdge else { return nil }
+        // The content's own maximum (the panel's cap) bounds the growth as the screen
+        // edge does: past it the window would only hold empty desktop.
+        let edge = min(screenEdge, frame.minX + maxWidth)
+        guard panelOpen, panelJustOpened || runJustStarted, frame.maxX < edge else { return nil }
         var target = frame
-        target.size.width = screenEdge - frame.minX
+        target.size.width = edge - frame.minX
         return target
     }
 }
@@ -55,7 +59,8 @@ struct WindowEdgeGrowthController: NSViewRepresentable {
             previousIsRunning: coordinator.previousIsRunning,
             isRunning: isRunning,
             frame: window.frame,
-            screenEdge: screen.visibleFrame.maxX
+            screenEdge: screen.visibleFrame.maxX,
+            maxWidth: ContentView.sidebarWidth + WorkflowView.formWidth + WorkflowDetail.panelMaxWidth
         ) else { return }
         window.setFrame(target, display: true, animate: true)
     }

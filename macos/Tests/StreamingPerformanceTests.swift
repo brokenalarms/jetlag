@@ -36,8 +36,10 @@ final class StreamingPerformanceTests: XCTestCase {
         let host = NSHostingView(rootView: ContentView(state: state))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1400, height: 800),
                               styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        // Laid out but never ordered on screen: a test host that appears over the
+        // user's desktop while the suite streams synthetic rows is a real window to
+        // the user. Layout runs the same without it.
         window.contentView = host
-        window.orderFront(nil)
         host.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
         return (host, window)
@@ -48,8 +50,7 @@ final class StreamingPerformanceTests: XCTestCase {
     /// halves.
     private func streamHalves(count: Int) -> (first: TimeInterval, second: TimeInterval) {
         let state = AppState()
-        let (host, window) = hostedWindow(state)
-        defer { window.orderOut(nil) }
+        let (host, _) = hostedWindow(state)
 
         func stream(_ range: Range<Int>) -> TimeInterval {
             let start = Date()
