@@ -12,17 +12,22 @@ struct DiffTableView: View {
     private static let cellPadding: CGFloat = 20
     private static let iconWidth: CGFloat = 18
     private static let timelineColumnWidth: CGFloat = 120
+    /// The one column with an upper bound: a camera filename can run to 40+
+    /// characters, and past this it is truncated in the middle rather than pushing
+    /// every other column off the panel. All other columns fit their content.
+    static let fileColumnMaxWidth: CGFloat = 320
     private static let monoFont = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
     private static let systemFont = NSFont.systemFont(ofSize: 11)
+    private static let detailFont = NSFont.systemFont(ofSize: 9)
 
     static func idealWidth(of cell: CellText) -> CGFloat {
         if let fixed = cell.fixedWidth { return fixed }
-        let attrs: [NSAttributedString.Key: Any] = [.font: cell.font]
-        let widest = cell.strings
-            .filter { !$0.isEmpty }
-            .map { ($0 as NSString).size(withAttributes: attrs).width }
+        let widest = cell.parts
+            .filter { !$0.text.isEmpty }
+            .map { ($0.text as NSString).size(withAttributes: [.font: $0.font]).width }
             .max() ?? 0
-        return widest == 0 ? 0 : widest + cell.extraWidth + cellPadding
+        guard widest > 0 else { return 0 }
+        return min(widest + cell.extraWidth + cellPadding, cell.maxWidth)
     }
 
     struct TimelineScale {
@@ -80,17 +85,19 @@ struct DiffTableView: View {
     /// what the cache avoids repeating for rows that have not changed.
     private func cellTexts(_ row: DiffTableRow) -> [CellText] {
         [
-            CellText(row.file, font: Self.monoFont),
-            CellText(nil, font: Self.monoFont, fixedWidth: Self.timelineColumnWidth),
-            CellText(row.originalTimeDisplay, font: Self.monoFont),
-            CellText(row.correctedTime, font: Self.monoFont),
-            CellText([changeBadgeText(row), row.timestampSource?.label ?? ""], font: Self.systemFont),
-            CellText(
-                [row.dest.map { ($0 as NSString).lastPathComponent } ?? "",
-                 row.skipReason?.explanation ?? ""],
-                font: row.skipReason == nil ? Self.monoFont : Self.systemFont,
-                extraWidth: row.hasDestinationConflict ? Self.iconWidth : 0),
-            CellText([statusText(row), staleFieldsText(row) ?? ""], font: Self.systemFont, extraWidth: Self.iconWidth),
+            CellText([(row.file, Self.monoFont)], maxWidth: Self.fileColumnMaxWidth),
+            CellText(fixedWidth: Self.timelineColumnWidth),
+            CellText([(row.originalTimeDisplay ?? "", Self.monoFont)]),
+            CellText([(row.correctedTime ?? "", Self.monoFont)]),
+            CellText([(changeBadgeText(row), Self.systemFont),
+                      (row.timestampSource?.label ?? "", Self.detailFont)],
+                     extraWidth: row.requiresForceTimezone ? Self.iconWidth : 0),
+            CellText([(row.dest.map { ($0 as NSString).lastPathComponent } ?? "", Self.monoFont),
+                      (row.skipReason?.explanation ?? "", Self.detailFont)],
+                     extraWidth: row.hasDestinationConflict ? Self.iconWidth : 0),
+            CellText([(statusText(row), Self.systemFont),
+                      (staleFieldsText(row).map(Strings.DiffTable.wouldWrite) ?? "", Self.detailFont)],
+                     extraWidth: Self.iconWidth),
         ]
     }
 
@@ -519,6 +526,14 @@ private struct ColumnAutoSizer: NSViewRepresentable {
         }
 
         if let tableView = coordinator.tableView {
+            // SwiftUI's Table leaves the NSTableView on uniform autoresizing, which
+            // re-fits every column to the panel's width the moment the widths we set
+            // overflow it — the columns end up proportionally squeezed, not sized to
+            // their content. With autoresizing off the widths stand and the table
+            // overflows into its horizontal scroller instead.
+            if tableView.columnAutoresizingStyle != .noColumnAutoresizing {
+                tableView.columnAutoresizingStyle = .noColumnAutoresizing
+            }
             let resized = TableColumnSizing.applyWidths(columnWidths, to: tableView)
             tableView.enclosingScrollView?.detachSizeFromContent()
 
@@ -559,22 +574,25 @@ private struct ColumnAutoSizer: NSViewRepresentable {
 
 // MARK: - Incremental measurement
 
-/// The text a table cell would draw, with what its measurement depends on.
+/// The text a table cell would draw, each part with the font it draws in, and what
+/// else its measurement depends on.
 struct CellText: Equatable {
-    let strings: [String]
-    let font: NSFont
-    let extraWidth: CGFloat
-    let fixedWidth: CGFloat?
-
-    init(_ string: String?, font: NSFont, extraWidth: CGFloat = 0, fixedWidth: CGFloat? = nil) {
-        self.init([string ?? ""], font: font, extraWidth: extraWidth, fixedWidth: fixedWidth)
+    struct Part: Equatable {
+        let text: String
+        let font: NSFont
     }
 
-    init(_ strings: [String], font: NSFont, extraWidth: CGFloat = 0, fixedWidth: CGFloat? = nil) {
-        self.strings = strings
-        self.font = font
+    let parts: [Part]
+    let extraWidth: CGFloat
+    let fixedWidth: CGFloat?
+    let maxWidth: CGFloat
+
+    init(_ parts: [(String, NSFont)] = [], extraWidth: CGFloat = 0,
+         fixedWidth: CGFloat? = nil, maxWidth: CGFloat = .infinity) {
+        self.parts = parts.map { Part(text: $0.0, font: $0.1) }
         self.extraWidth = extraWidth
         self.fixedWidth = fixedWidth
+        self.maxWidth = maxWidth
     }
 }
 
