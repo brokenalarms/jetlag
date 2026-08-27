@@ -13,7 +13,8 @@
 -if you cannot visually build and verify (eg XCode projects), include on the PR a test plan checklist that the reviewer may follow to visually verify the changes in the live app.
 
 - **Regression tests** — assert actual file state before and after, not just exit codes or stdout. Structured as "record before → run script → compare after" with human-readable expected vs actual diffs.
-- **Performance tests** — snapshot harness. Runs media-pipeline end-to-end (3 files, fix-timestamp + organize), measures median wall-clock time over 3 runs, compares to a saved baseline. Threshold: 5% slower than baseline = regression. Delete the baseline file to re-record after intentional perf improvements.
+- **Performance tests** — snapshot harness. Runs media-pipeline end-to-end (3 files, fix-timestamp + organize), measures median wall-clock time over 3 runs, compares to a saved baseline. Threshold: 5% slower than baseline = regression. Delete the baseline file to re-record after intentional perf improvements. The baseline is machine-specific and gitignored, so with none present the test only prints — it does not compare. In a worktree or before pushing, run `scripts/tests/perf-gate.sh`: it records the baseline from `origin/main` and compares, exactly as CI does.
+- **Streaming cost (app)** — `macos/Tests/StreamingPerformanceTests.swift` streams rows and log lines through the real window and asserts the second half of a run costs no more than the first. Any per-update work proportional to what is already shown fails it; the pipeline's own speed is measured by the Python harness above, and the two are independent.
 
 Testing rules:
 - Testing `returncode == 0` is not testing behavior — it only confirms the script didn't crash.

@@ -7,6 +7,7 @@ struct DiffTableView: View {
 
     @State private var selection: Set<DiffTableRow.ID> = []
     @State private var previewCoordinator = QuickLookCoordinator()
+    @State private var measurements = RowMeasurements()
 
     private static let cellPadding: CGFloat = 20
     private static let iconWidth: CGFloat = 18
@@ -15,34 +16,27 @@ struct DiffTableView: View {
     private static let systemFont = NSFont.systemFont(ofSize: 11)
 
     private static func idealWidth(
-        for strings: [String],
+        for string: String?,
         font: NSFont,
         extraWidth: CGFloat = 0
     ) -> CGFloat {
-        guard let longest = strings.max(by: { $0.count < $1.count }) else {
-            return 0
-        }
+        guard let string, !string.isEmpty else { return 0 }
         let attrs: [NSAttributedString.Key: Any] = [.font: font]
-        let textWidth = (longest as NSString).size(withAttributes: attrs).width
+        let textWidth = (string as NSString).size(withAttributes: attrs).width
         return textWidth + extraWidth + cellPadding
     }
 
-    private struct TimelineScale {
+    struct TimelineScale {
         let rangeStart: Double
         let rangeEnd: Double
         let duration: Double
 
-        init(rows: [DiffTableRow]) {
-            var epochs: [Double] = []
-            for row in rows {
-                if let e = row.originalEpoch { epochs.append(e) }
-                if let e = row.correctedEpoch { epochs.append(e) }
-            }
-            guard let lo = epochs.min(), let hi = epochs.max(), hi > lo else {
+        init(range: (lo: Double, hi: Double)?) {
+            guard let range, range.hi > range.lo else {
                 rangeStart = 0; rangeEnd = 1; duration = 1; return
             }
-            let pad = max((hi - lo) * 0.05, 60)
-            rangeStart = lo - pad; rangeEnd = hi + pad
+            let pad = max((range.hi - range.lo) * 0.05, 60)
+            rangeStart = range.lo - pad; rangeEnd = range.hi + pad
             duration = rangeEnd - rangeStart
         }
 
@@ -51,8 +45,10 @@ struct DiffTableView: View {
         }
     }
 
+    /// The scale is a function of every row's epochs, so it is computed once per
+    /// change to the rows rather than once per rendered cell.
     private var timelineScale: TimelineScale {
-        TimelineScale(rows: rows)
+        measurements.timelineScale(for: rows)
     }
 
     /// The row's status: what the pipeline said it did, composed from the emitted
@@ -72,28 +68,30 @@ struct DiffTableView: View {
     }
 
     /// One width per table column, in the order the columns are declared: a
-    /// mismatch here resizes the wrong column.
+    /// mismatch here resizes the wrong column. Measured incrementally: a run only
+    /// ever appends rows, so each row's cells are measured once and folded into the
+    /// running maximum, instead of every row being re-measured per appended row.
     private var columnWidths: [CGFloat] {
+        measurements.columnWidths(for: rows, measure: cellMeasurements)
+    }
+
+    /// The width each of a row's cells asks for, in column order.
+    private func cellMeasurements(_ row: DiffTableRow) -> [CGFloat] {
         [
-            Self.idealWidth(for: rows.map(\.file), font: Self.monoFont),
+            Self.idealWidth(for: row.file, font: Self.monoFont),
             Self.timelineColumnWidth,
-            Self.idealWidth(for: rows.compactMap(\.originalTimeDisplay), font: Self.monoFont),
-            Self.idealWidth(for: rows.compactMap(\.correctedTime), font: Self.monoFont),
-            Self.idealWidth(
-                for: rows.flatMap { [changeBadgeText($0), $0.timestampSource?.label ?? ""] },
-                font: Self.systemFont),
+            Self.idealWidth(for: row.originalTimeDisplay, font: Self.monoFont),
+            Self.idealWidth(for: row.correctedTime, font: Self.monoFont),
+            max(Self.idealWidth(for: changeBadgeText(row), font: Self.systemFont),
+                Self.idealWidth(for: row.timestampSource?.label, font: Self.systemFont)),
             max(
                 Self.idealWidth(
-                    for: rows.compactMap(\.dest).map { ($0 as NSString).lastPathComponent },
+                    for: row.dest.map { ($0 as NSString).lastPathComponent },
                     font: Self.monoFont,
-                    extraWidth: rows.contains(where: \.hasDestinationConflict) ? Self.iconWidth : 0),
-                Self.idealWidth(
-                    for: rows.compactMap(\.skipReason).map(\.explanation),
-                    font: Self.systemFont)),
-            Self.idealWidth(
-                for: rows.flatMap { [statusText($0), staleFieldsText($0) ?? ""] },
-                font: Self.systemFont,
-                extraWidth: Self.iconWidth),
+                    extraWidth: row.hasDestinationConflict ? Self.iconWidth : 0),
+                Self.idealWidth(for: row.skipReason?.explanation, font: Self.systemFont)),
+            max(Self.idealWidth(for: statusText(row), font: Self.systemFont, extraWidth: Self.iconWidth),
+                Self.idealWidth(for: staleFieldsText(row), font: Self.systemFont, extraWidth: Self.iconWidth)),
         ]
     }
 
@@ -547,5 +545,64 @@ private struct ColumnAutoSizer: NSViewRepresentable {
             }
         }
         return nil
+    }
+}
+
+
+// MARK: - Incremental measurement
+
+/// Per-run caches of the quantities that depend on every row. Rows only grow while a
+/// run streams, so both are folded forward from the rows added since the last call
+/// and recomputed only when the rows shrink (a cleared table). Without this each
+/// appended row re-measured every row before it, and the app fell behind the
+/// pipeline on a few hundred files.
+final class RowMeasurements {
+    private var measuredCount = 0
+    private var widths: [CGFloat] = []
+    private var epochRange: (lo: Double, hi: Double)?
+
+    func columnWidths(for rows: [DiffTableRow], measure: (DiffTableRow) -> [CGFloat]) -> [CGFloat] {
+        if rows.count < measuredCount {
+            reset()
+        }
+        for row in rows[measuredCount...] {
+            let cells = measure(row)
+            if widths.count < cells.count {
+                widths.append(contentsOf: repeatElement(0, count: cells.count - widths.count))
+            }
+            for (index, width) in cells.enumerated() where width > widths[index] {
+                widths[index] = width
+            }
+            fold(epochsOf: row)
+        }
+        measuredCount = rows.count
+        return widths
+    }
+
+    func timelineScale(for rows: [DiffTableRow]) -> DiffTableView.TimelineScale {
+        if rows.count < measuredCount {
+            reset()
+        }
+        if rows.count > measuredCount {
+            for row in rows[measuredCount...] { fold(epochsOf: row) }
+            // Widths for these rows are folded when the column pass sees them.
+        }
+        return DiffTableView.TimelineScale(range: epochRange)
+    }
+
+    private func fold(epochsOf row: DiffTableRow) {
+        for epoch in [row.originalEpoch, row.correctedEpoch].compactMap({ $0 }) {
+            if let range = epochRange {
+                epochRange = (min(range.lo, epoch), max(range.hi, epoch))
+            } else {
+                epochRange = (epoch, epoch)
+            }
+        }
+    }
+
+    private func reset() {
+        measuredCount = 0
+        widths = []
+        epochRange = nil
     }
 }

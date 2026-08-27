@@ -89,20 +89,25 @@ struct LogLine: Identifiable {
     let id = UUID()
     let text: String
     let stream: Stream
+    /// Text without the ANSI colour codes the scripts write for terminal use.
+    /// Computed once here: the log view renders every line exactly once, and a
+    /// transcript of thousands of lines must never be re-stripped per update.
+    let strippedText: String
 
     enum Stream {
         case stdout, stderr
     }
 
-    var isMachineReadable: Bool {
-        text.hasPrefix("{")
-    }
-
-    /// Text without the ANSI colour codes the scripts write for terminal use.
-    var strippedText: String {
-        text
+    init(text: String, stream: Stream) {
+        self.text = text
+        self.stream = stream
+        self.strippedText = text
             .replacingOccurrences(of: "\u{1B}\\[[0-9;]*m", with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespaces)
+    }
+
+    var isMachineReadable: Bool {
+        text.hasPrefix("{")
     }
 }
 
@@ -540,6 +545,10 @@ final class AppState {
     var isRunning: Bool = false
     var logOutput: [LogLine] = []
     var currentProcess: Process?
+    /// The task draining the process's output into the log. Cancelling the run must
+    /// cancel this too: the pipeline can be far ahead of the UI, and terminating the
+    /// process alone leaves every buffered line still to be appended.
+    var currentRunTask: Task<Void, Never>?
     var diffTableRows: [DiffTableRow] = []
     private var currentDiffRow: DiffTableRow?
     private(set) var liveRow: DiffTableRow?
@@ -755,6 +764,8 @@ final class AppState {
     }
 
     func cancelRunning() {
+        currentRunTask?.cancel()
+        currentRunTask = nil
         currentProcess?.terminate()
         currentProcess = nil
         isRunning = false
