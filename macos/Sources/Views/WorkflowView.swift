@@ -466,25 +466,31 @@ struct WorkflowView: View {
         }
     }
 
-    private var fixTimestampPreview: String? {
+    var fixTimestampPreview: String? {
         let session = state.workflowSession
         guard session.enabledSteps.contains(.fixTimestamps) else { return nil }
 
         var parts: [String] = []
         if session.inferFromFilenames {
-            parts.append("Use filename dates as timestamp source")
+            if let option = session.timezoneOption {
+                parts.append(option.offsets.count > 1
+                    ? Strings.Workflow.fixTimestampSourceFilenamesZoneMultiHint(city: option.city)
+                    : Strings.Workflow.fixTimestampSourceFilenamesZoneHint(city: option.city, offsetLabel: option.offsetLabel))
+            } else {
+                parts.append(Strings.Workflow.fixTimestampSourceFilenamesHint)
+            }
         }
         if let offset = session.timeOffsetSeconds, offset != 0 {
             let sign = offset > 0 ? "+" : ""
-            parts.append("Shift timestamps by \(sign)\(offset)s")
+            parts.append(Strings.Workflow.fixTimestampShiftHint(sign: sign, offset: offset))
         }
         if let option = session.timezoneOption, !session.inferFromFilenames {
             parts.append(option.offsets.count > 1
-                ? "Apply \(option.city) time, resolved per file"
-                : "Apply \(option.city) time (\(option.offsetLabel))")
+                ? Strings.Workflow.fixTimestampZoneMultiHint(city: option.city)
+                : Strings.Workflow.fixTimestampZoneHint(city: option.city, offsetLabel: option.offsetLabel))
         }
         if session.updateFilenameDates {
-            parts.append("Rename files to match corrected dates")
+            parts.append(Strings.Workflow.fixTimestampRenameHint)
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
