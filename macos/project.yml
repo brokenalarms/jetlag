@@ -21,6 +21,7 @@ targets:
       - package: Yams
       - sdk: MapKit.framework
       - sdk: CoreLocation.framework
+      - sdk: Quartz.framework
     scheme:
       testTargets:
         - JetlagTests
