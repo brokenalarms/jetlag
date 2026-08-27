@@ -42,6 +42,7 @@
 		AAC3E4FC571BCF92D2EBA219 /* ScriptRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5FD29C41D642C67671FBAF /* ScriptRunner.swift */; };
 		AF4D4132C54C04CF1A1ADDB7 /* DirtyableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DB6E838E4C1827858BB004E /* DirtyableTests.swift */; };
 		AF5DDC771125D006AA50AF71 /* GyroflowStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C76405E304A233D40E627ECD /* GyroflowStatusTests.swift */; };
+		BA110B4DD7D4A54646FFDBF0 /* DiffTableViewLabelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14C2F2F2C7D5476AAC832E64 /* DiffTableViewLabelTests.swift */; };
 		BCBAB853A58D0989258EE4F5 /* RowFileLocationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B098EAB2712A13202064D6F1 /* RowFileLocationTests.swift */; };
 		C0578D87EB55FAED6B59A9C0 /* ProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AFFC7653CEF9432BABAFE94 /* ProfileTests.swift */; };
 		C0FF2D225A09C82E454CF5E2 /* ProfilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4AF4B0A35CD716A34E2A275 /* ProfilesView.swift */; };
@@ -68,6 +69,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		14C2F2F2C7D5476AAC832E64 /* DiffTableViewLabelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffTableViewLabelTests.swift; sourceTree = "<group>"; };
 		155795936E0AF78F19DDB808 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1C1D644A22201A7866455A04 /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
 		275EE4D58C8BFA72BF92B86F /* TimezoneCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimezoneCatalog.swift; sourceTree = "<group>"; };
@@ -187,6 +189,7 @@
 			isa = PBXGroup;
 			children = (
 				27CF0E7DB6265D0EAF8055CE /* AppStateTests.swift */,
+				14C2F2F2C7D5476AAC832E64 /* DiffTableViewLabelTests.swift */,
 				2DB6E838E4C1827858BB004E /* DirtyableTests.swift */,
 				C76405E304A233D40E627ECD /* GyroflowStatusTests.swift */,
 				C698B76B04834D4379CADAA4 /* InspectorHostedSizingTests.swift */,
@@ -406,6 +409,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				6A87F1ECCD552C95D40ED1AA /* AppStateTests.swift in Sources */,
+				BA110B4DD7D4A54646FFDBF0 /* DiffTableViewLabelTests.swift in Sources */,
 				AF4D4132C54C04CF1A1ADDB7 /* DirtyableTests.swift in Sources */,
 				AF5DDC771125D006AA50AF71 /* GyroflowStatusTests.swift in Sources */,
 				54BF807828E4B1BF2A402E9F /* InspectorHostedSizingTests.swift in Sources */,
