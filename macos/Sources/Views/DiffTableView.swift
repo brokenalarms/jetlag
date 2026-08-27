@@ -454,27 +454,13 @@ enum TableColumnSizing {
         return resized
     }
 
-    /// macOS overlay scrollers only appear during a scroll gesture, hiding the fact
-    /// that the table is wider than the panel. Assigning `scrollerStyle = .legacy`
-    /// does not hold: AppKit re-syncs a scroll view's style to the system preference
-    /// after the fact (on window/appearance changes and, for SwiftUI's own scroll
-    /// view, on its updates), which is why the table kept losing its scroller. The
-    /// mechanism AppKit provides for a scroll view that must always draw scrollers is
-    /// a scroller class that declares itself incompatible with the overlay style —
-    /// the scroll view then resolves to legacy itself, every time. Installed once,
-    /// so this cannot re-invalidate layout on the updates it runs from (jetlag-m9a).
+    /// The table can be wider than the panel, so it needs a horizontal scroller.
+    /// Which style that scroller takes is the user's system preference, not the
+    /// app's: forcing the legacy style would override "Show scroll bars" for this one
+    /// view. Each flag is compared before assignment because this runs on every
+    /// update, and an unconditional write would re-invalidate the scroll view's
+    /// layout every pass (jetlag-m9a).
     static func configureHorizontalScroller(for scrollView: NSScrollView) {
-        if !(scrollView.horizontalScroller is AlwaysVisibleScroller) {
-            scrollView.horizontalScroller = AlwaysVisibleScroller()
-        }
-        if !(scrollView.verticalScroller is AlwaysVisibleScroller) {
-            scrollView.verticalScroller = AlwaysVisibleScroller()
-        }
-        // The class only governs what AppKit resolves to on its next re-sync; the
-        // style in effect right now still has to be set once.
-        if scrollView.scrollerStyle != .legacy {
-            scrollView.scrollerStyle = .legacy
-        }
         if !scrollView.hasHorizontalScroller {
             scrollView.hasHorizontalScroller = true
         }
@@ -482,12 +468,17 @@ enum TableColumnSizing {
             scrollView.autohidesScrollers = true
         }
     }
-}
 
-/// A scroller that opts its scroll view out of the overlay style, so scrollers are
-/// drawn whenever content overflows regardless of the system preference.
-final class AlwaysVisibleScroller: NSScroller {
-    override class var isCompatibleWithOverlayScrollers: Bool { false }
+    /// Overlay scrollers stay hidden until a scroll gesture, so a table that has just
+    /// grown past its panel gives no sign that columns lie off to the right. AppKit's
+    /// cue for exactly this is `flashScrollers()`, which reveals them briefly — what
+    /// Finder does when a view's content changes. Called only when a width actually
+    /// changed and the document now overflows, so idle updates never flash.
+    static func revealOverflow(in scrollView: NSScrollView, afterResizing resized: [Int]) {
+        guard !resized.isEmpty, let document = scrollView.documentView,
+              document.frame.width > scrollView.contentView.bounds.width else { return }
+        scrollView.flashScrollers()
+    }
 }
 
 
@@ -529,7 +520,7 @@ private struct ColumnAutoSizer: NSViewRepresentable {
         }
 
         if let tableView = coordinator.tableView {
-            TableColumnSizing.applyWidths(columnWidths, to: tableView)
+            let resized = TableColumnSizing.applyWidths(columnWidths, to: tableView)
             tableView.enclosingScrollView?.detachSizeFromContent()
 
             if !coordinator.gestureInstalled, let headerView = tableView.headerView {
@@ -543,6 +534,7 @@ private struct ColumnAutoSizer: NSViewRepresentable {
 
             if let scrollView = tableView.enclosingScrollView {
                 TableColumnSizing.configureHorizontalScroller(for: scrollView)
+                TableColumnSizing.revealOverflow(in: scrollView, afterResizing: resized)
             }
         }
     }

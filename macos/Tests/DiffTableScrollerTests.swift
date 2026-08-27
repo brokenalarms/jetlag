@@ -80,8 +80,8 @@ final class DiffTableScrollerTests: XCTestCase {
     }
 
     /// Columns wider than the panel: the scroll view fills the panel (it scrolls rather
-    /// than being clipped by the window), and a legacy horizontal scroller is visible
-    /// without any gesture.
+    /// than being clipped by the window) and offers a horizontal scroller in the user's
+    /// preferred style.
     func testHorizontalScrollerIsVisibleWhenColumnsExceedThePanel() throws {
         let (host, tableView, scrollView) = try hostPanel(rows: wideRows(12), width: 1400)
 
@@ -91,9 +91,8 @@ final class DiffTableScrollerTests: XCTestCase {
                                  "the scroll view must not extend past the window")
         XCTAssertGreaterThan(tableView.frame.width, scrollView.contentView.bounds.width,
                              "the computed columns should overflow the panel")
-        XCTAssertEqual(scrollView.scrollerStyle, .legacy)
-        XCTAssertTrue(scrollView.horizontalScroller is AlwaysVisibleScroller,
-                      "the scroller class is what keeps the style legacy across AppKit re-syncs")
+        XCTAssertEqual(scrollView.scrollerStyle, NSScroller.preferredScrollerStyle,
+                       "the scroller style is the user's system preference, never overridden per view")
         XCTAssertTrue(scrollView.hasHorizontalScroller)
         XCTAssertEqual(scrollView.horizontalScroller?.isHidden, false, "the horizontal scroller must be visible")
     }
