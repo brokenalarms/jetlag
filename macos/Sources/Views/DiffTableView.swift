@@ -15,15 +15,14 @@ struct DiffTableView: View {
     private static let monoFont = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
     private static let systemFont = NSFont.systemFont(ofSize: 11)
 
-    private static func idealWidth(
-        for string: String?,
-        font: NSFont,
-        extraWidth: CGFloat = 0
-    ) -> CGFloat {
-        guard let string, !string.isEmpty else { return 0 }
-        let attrs: [NSAttributedString.Key: Any] = [.font: font]
-        let textWidth = (string as NSString).size(withAttributes: attrs).width
-        return textWidth + extraWidth + cellPadding
+    static func idealWidth(of cell: CellText) -> CGFloat {
+        if let fixed = cell.fixedWidth { return fixed }
+        let attrs: [NSAttributedString.Key: Any] = [.font: cell.font]
+        let widest = cell.strings
+            .filter { !$0.isEmpty }
+            .map { ($0 as NSString).size(withAttributes: attrs).width }
+            .max() ?? 0
+        return widest == 0 ? 0 : widest + cell.extraWidth + cellPadding
     }
 
     struct TimelineScale {
@@ -68,30 +67,30 @@ struct DiffTableView: View {
     }
 
     /// One width per table column, in the order the columns are declared: a
-    /// mismatch here resizes the wrong column. Measured incrementally: a run only
-    /// ever appends rows, so each row's cells are measured once and folded into the
-    /// running maximum, instead of every row being re-measured per appended row.
+    /// mismatch here resizes the wrong column. Measured incrementally: a row's cells
+    /// are measured when they first appear and again only when their text changes
+    /// (a live row fills in as its events arrive), and the widths are folded into a
+    /// running maximum instead of every row being re-measured per update.
     private var columnWidths: [CGFloat] {
-        measurements.columnWidths(for: rows, measure: cellMeasurements)
+        measurements.columnWidths(for: rows, texts: cellTexts)
     }
 
-    /// The width each of a row's cells asks for, in column order.
-    private func cellMeasurements(_ row: DiffTableRow) -> [CGFloat] {
+    /// What each of a row's cells would draw, in column order: the text, its font
+    /// and any icon allowance. Building this is string work only; measuring it is
+    /// what the cache avoids repeating for rows that have not changed.
+    private func cellTexts(_ row: DiffTableRow) -> [CellText] {
         [
-            Self.idealWidth(for: row.file, font: Self.monoFont),
-            Self.timelineColumnWidth,
-            Self.idealWidth(for: row.originalTimeDisplay, font: Self.monoFont),
-            Self.idealWidth(for: row.correctedTime, font: Self.monoFont),
-            max(Self.idealWidth(for: changeBadgeText(row), font: Self.systemFont),
-                Self.idealWidth(for: row.timestampSource?.label, font: Self.systemFont)),
-            max(
-                Self.idealWidth(
-                    for: row.dest.map { ($0 as NSString).lastPathComponent },
-                    font: Self.monoFont,
-                    extraWidth: row.hasDestinationConflict ? Self.iconWidth : 0),
-                Self.idealWidth(for: row.skipReason?.explanation, font: Self.systemFont)),
-            max(Self.idealWidth(for: statusText(row), font: Self.systemFont, extraWidth: Self.iconWidth),
-                Self.idealWidth(for: staleFieldsText(row), font: Self.systemFont, extraWidth: Self.iconWidth)),
+            CellText(row.file, font: Self.monoFont),
+            CellText(nil, font: Self.monoFont, fixedWidth: Self.timelineColumnWidth),
+            CellText(row.originalTimeDisplay, font: Self.monoFont),
+            CellText(row.correctedTime, font: Self.monoFont),
+            CellText([changeBadgeText(row), row.timestampSource?.label ?? ""], font: Self.systemFont),
+            CellText(
+                [row.dest.map { ($0 as NSString).lastPathComponent } ?? "",
+                 row.skipReason?.explanation ?? ""],
+                font: row.skipReason == nil ? Self.monoFont : Self.systemFont,
+                extraWidth: row.hasDestinationConflict ? Self.iconWidth : 0),
+            CellText([statusText(row), staleFieldsText(row) ?? ""], font: Self.systemFont, extraWidth: Self.iconWidth),
         ]
     }
 
@@ -560,58 +559,102 @@ private struct ColumnAutoSizer: NSViewRepresentable {
 
 // MARK: - Incremental measurement
 
-/// Per-run caches of the quantities that depend on every row. Rows only grow while a
-/// run streams, so both are folded forward from the rows added since the last call
-/// and recomputed only when the rows shrink (a cleared table). Without this each
-/// appended row re-measured every row before it, and the app fell behind the
-/// pipeline on a few hundred files.
+/// The text a table cell would draw, with what its measurement depends on.
+struct CellText: Equatable {
+    let strings: [String]
+    let font: NSFont
+    let extraWidth: CGFloat
+    let fixedWidth: CGFloat?
+
+    init(_ string: String?, font: NSFont, extraWidth: CGFloat = 0, fixedWidth: CGFloat? = nil) {
+        self.init([string ?? ""], font: font, extraWidth: extraWidth, fixedWidth: fixedWidth)
+    }
+
+    init(_ strings: [String], font: NSFont, extraWidth: CGFloat = 0, fixedWidth: CGFloat? = nil) {
+        self.strings = strings
+        self.font = font
+        self.extraWidth = extraWidth
+        self.fixedWidth = fixedWidth
+    }
+}
+
+/// Per-run caches of the quantities that depend on every row. Text measurement is
+/// the expensive part, so each row's cells are measured when the row first appears
+/// and again only when their text changes — a run's live row fills in as its events
+/// arrive and is then replaced by the finalised row at the same index — and the
+/// column widths are the running maxima. Comparing a row's cell text to what was
+/// measured is string work only. Without this each update re-measured every row,
+/// and the app fell behind the pipeline on a few hundred files.
 final class RowMeasurements {
-    private var measuredCount = 0
+    private struct Measured {
+        let texts: [CellText]
+        let widths: [CGFloat]
+    }
+
+    private var measured: [DiffTableRow.ID: Measured] = [:]
     private var widths: [CGFloat] = []
     private var epochRange: (lo: Double, hi: Double)?
+    private var foldedEpochs: [DiffTableRow.ID: (Double?, Double?)] = [:]
+    /// How many rows have had their text measured, for tests that pin the cache.
+    private(set) var measurementCount = 0
 
-    func columnWidths(for rows: [DiffTableRow], measure: (DiffTableRow) -> [CGFloat]) -> [CGFloat] {
-        if rows.count < measuredCount {
-            reset()
-        }
-        for row in rows[measuredCount...] {
-            let cells = measure(row)
-            if widths.count < cells.count {
-                widths.append(contentsOf: repeatElement(0, count: cells.count - widths.count))
+    func columnWidths(for rows: [DiffTableRow], texts: (DiffTableRow) -> [CellText]) -> [CGFloat] {
+        var seen = Set<DiffTableRow.ID>()
+        for row in rows {
+            seen.insert(row.id)
+            let cells = texts(row)
+            if let cached = measured[row.id], cached.texts == cells {
+                continue
             }
-            for (index, width) in cells.enumerated() where width > widths[index] {
+            let cellWidths = cells.map(DiffTableView.idealWidth(of:))
+            measurementCount += 1
+            measured[row.id] = Measured(texts: cells, widths: cellWidths)
+            if widths.count < cellWidths.count {
+                widths.append(contentsOf: repeatElement(0, count: cellWidths.count - widths.count))
+            }
+            for (index, width) in cellWidths.enumerated() where width > widths[index] {
                 widths[index] = width
             }
             fold(epochsOf: row)
         }
-        measuredCount = rows.count
+        if seen.count < measured.count {
+            // Rows were removed (a cleared table): drop what is no longer shown and
+            // rebuild the maxima from what remains.
+            measured = measured.filter { seen.contains($0.key) }
+            foldedEpochs = foldedEpochs.filter { seen.contains($0.key) }
+            widths = measured.values.reduce(into: [CGFloat]()) { acc, entry in
+                if acc.count < entry.widths.count {
+                    acc.append(contentsOf: repeatElement(0, count: entry.widths.count - acc.count))
+                }
+                for (index, width) in entry.widths.enumerated() where width > acc[index] {
+                    acc[index] = width
+                }
+            }
+            epochRange = nil
+            for (_, epochs) in foldedEpochs {
+                for epoch in [epochs.0, epochs.1].compactMap({ $0 }) { fold(epoch) }
+            }
+        }
         return widths
     }
 
     func timelineScale(for rows: [DiffTableRow]) -> DiffTableView.TimelineScale {
-        if rows.count < measuredCount {
-            reset()
-        }
-        if rows.count > measuredCount {
-            for row in rows[measuredCount...] { fold(epochsOf: row) }
-            // Widths for these rows are folded when the column pass sees them.
+        for row in rows where foldedEpochs[row.id]?.0 != row.originalEpoch || foldedEpochs[row.id]?.1 != row.correctedEpoch {
+            fold(epochsOf: row)
         }
         return DiffTableView.TimelineScale(range: epochRange)
     }
 
     private func fold(epochsOf row: DiffTableRow) {
-        for epoch in [row.originalEpoch, row.correctedEpoch].compactMap({ $0 }) {
-            if let range = epochRange {
-                epochRange = (min(range.lo, epoch), max(range.hi, epoch))
-            } else {
-                epochRange = (epoch, epoch)
-            }
-        }
+        foldedEpochs[row.id] = (row.originalEpoch, row.correctedEpoch)
+        for epoch in [row.originalEpoch, row.correctedEpoch].compactMap({ $0 }) { fold(epoch) }
     }
 
-    private func reset() {
-        measuredCount = 0
-        widths = []
-        epochRange = nil
+    private func fold(_ epoch: Double) {
+        if let range = epochRange {
+            epochRange = (min(range.lo, epoch), max(range.hi, epoch))
+        } else {
+            epochRange = (epoch, epoch)
+        }
     }
 }

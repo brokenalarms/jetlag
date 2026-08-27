@@ -165,4 +165,43 @@ final class StreamingPerformanceTests: XCTestCase {
             XCTAssertNil(state.currentRunTask)
         }
     }
+
+    // MARK: - Row measurement cache
+
+    private func texts(_ row: DiffTableRow) -> [CellText] {
+        [CellText(row.file, font: .monospacedSystemFont(ofSize: 11, weight: .regular)),
+         CellText(row.correctedTime, font: .monospacedSystemFont(ofSize: 11, weight: .regular))]
+    }
+
+    /// A run's live row is appended sparse and filled in as its events arrive, then
+    /// replaced by the finalised row at the same index. Measuring a row once by
+    /// position left the columns sized to the empty row; the cache must re-measure a
+    /// row whose text changed and leave the others alone.
+    func testRowFilledInAfterAppendIsReMeasuredAndUnchangedRowsAreNot() {
+        let cache = RowMeasurements()
+        var sparse = DiffTableRow(file: "a.mp4")
+        let narrow = cache.columnWidths(for: [sparse], texts: texts)
+        XCTAssertEqual(cache.measurementCount, 1)
+
+        sparse.correctedTime = "2025:08:15 17:38:54+09:00"
+        let filled = cache.columnWidths(for: [sparse], texts: texts)
+        XCTAssertEqual(cache.measurementCount, 2, "a row whose text changed is measured again")
+        XCTAssertGreaterThan(filled[1], narrow[1], "the column grows to the filled row")
+
+        let untouched = cache.columnWidths(for: [sparse, DiffTableRow(file: "b.mp4")], texts: texts)
+        XCTAssertEqual(cache.measurementCount, 3, "only the new row is measured; the unchanged one is not")
+        XCTAssertEqual(untouched[1], filled[1])
+
+        _ = cache.columnWidths(for: [sparse, DiffTableRow(file: "b.mp4")], texts: texts)
+    }
+
+    /// Clearing the table (fewer rows than measured) drops the stale maxima.
+    func testClearedTableRebuildsTheMaxima() {
+        let cache = RowMeasurements()
+        var wide = DiffTableRow(file: "a-very-long-file-name-that-widens-the-column.mp4")
+        wide.correctedTime = "2025:08:15 17:38:54+09:00"
+        let before = cache.columnWidths(for: [wide], texts: texts)
+        let after = cache.columnWidths(for: [DiffTableRow(file: "b.mp4")], texts: texts)
+        XCTAssertLessThan(after[0], before[0])
+    }
 }
