@@ -170,8 +170,8 @@ final class StreamingPerformanceTests: XCTestCase {
     // MARK: - Row measurement cache
 
     private func texts(_ row: DiffTableRow) -> [CellText] {
-        [CellText(row.file, font: .monospacedSystemFont(ofSize: 11, weight: .regular)),
-         CellText(row.correctedTime, font: .monospacedSystemFont(ofSize: 11, weight: .regular))]
+        let mono = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        return [CellText([(row.file, mono)]), CellText([(row.correctedTime ?? "", mono)])]
     }
 
     /// A run's live row is appended sparse and filled in as its events arrive, then
