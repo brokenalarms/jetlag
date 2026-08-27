@@ -48,6 +48,7 @@
 		C0FF2D225A09C82E454CF5E2 /* ProfilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4AF4B0A35CD716A34E2A275 /* ProfilesView.swift */; };
 		C5C6CFCF2DF5DBBAF6E4683D /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = 8C4D7F8D5FD775F5F3711F05 /* Yams */; };
 		C61A796CA3B728982C946AD4 /* TimezoneMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A54A1E7104B0356A474B3968 /* TimezoneMapView.swift */; };
+		C63FEE71B7ACCE008816844A /* OrganizeConflictTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 704A9D197F05079199FB21C9 /* OrganizeConflictTests.swift */; };
 		CF708EB9D2E1C9376806BA71 /* Strings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 886F8C8992B2C0546F301A05 /* Strings.swift */; };
 		D4148DE34CA1305FAAEB74E7 /* DiffTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A142786B3A2C61DF018E00D1 /* DiffTableView.swift */; };
 		D6A581C2985C5F5655494088 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C1D644A22201A7866455A04 /* CoreLocation.framework */; };
@@ -88,6 +89,7 @@
 		6AC02EFEC0D85CEB6F137381 /* WorkflowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowView.swift; sourceTree = "<group>"; };
 		6C503D6DF395CB0F0EE8674D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileService.swift; sourceTree = "<group>"; };
+		704A9D197F05079199FB21C9 /* OrganizeConflictTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrganizeConflictTests.swift; sourceTree = "<group>"; };
 		73A67A68A82CC97A0B42F497 /* DiffTableRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffTableRow.swift; sourceTree = "<group>"; };
 		7CB6F9D30A0BFC9DEA56F289 /* ProfilesLocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesLocationTests.swift; sourceTree = "<group>"; };
 		823EAC4F97C91F6A789E0415 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
@@ -193,6 +195,7 @@
 				2DB6E838E4C1827858BB004E /* DirtyableTests.swift */,
 				C76405E304A233D40E627ECD /* GyroflowStatusTests.swift */,
 				C698B76B04834D4379CADAA4 /* InspectorHostedSizingTests.swift */,
+				704A9D197F05079199FB21C9 /* OrganizeConflictTests.swift */,
 				D08074CC6CCFCC6AFEC75C39 /* PipelineArgsTests.swift */,
 				D7844419398942BFFCBA70AA /* PipelineSchemaContractTests.swift */,
 				7CB6F9D30A0BFC9DEA56F289 /* ProfilesLocationTests.swift */,
@@ -413,6 +416,7 @@
 				AF4D4132C54C04CF1A1ADDB7 /* DirtyableTests.swift in Sources */,
 				AF5DDC771125D006AA50AF71 /* GyroflowStatusTests.swift in Sources */,
 				54BF807828E4B1BF2A402E9F /* InspectorHostedSizingTests.swift in Sources */,
+				C63FEE71B7ACCE008816844A /* OrganizeConflictTests.swift in Sources */,
 				67B98190D68F596BAC4EF2AE /* PipelineArgsTests.swift in Sources */,
 				ECD882A773FA55605426D2FC /* PipelineSchemaContractTests.swift in Sources */,
 				C0578D87EB55FAED6B59A9C0 /* ProfileTests.swift in Sources */,

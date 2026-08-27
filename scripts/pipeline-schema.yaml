@@ -145,6 +145,22 @@ events:
       action: would_generate
       gyroflow_path: /Volumes/Media/Ready/2025/2025-08-15/DJI_20250815_101112_0001.gyroflow
 
+  organize_conflict:
+    description: >-
+      Emitted once after the batch when the organize step left files in place
+      because a different file already occupies their destination. Every listed
+      file also has its own organize_result with reason=exists_differs; this is
+      the batch-level summary the app prompts on before re-running with --overwrite.
+    fields:
+      count: { type: integer }
+      files:
+        type: "list[string]"
+        description: "Basenames of the files whose destination is already occupied"
+    example:
+      event: organize_conflict
+      count: 1
+      files: [DJI_20250815_101112_0001.MP4]
+
   timezone_conflict:
     description: "Emitted when the declared timezone cannot be reconciled with the files"
     fields:

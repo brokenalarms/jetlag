@@ -103,6 +103,21 @@ struct WorkflowView: View {
             Text(timezoneConflictMessage)
         }
         .alert(
+            Strings.Workflow.overwriteConflictTitle,
+            isPresented: $state.workflowSession.showOverwriteConflict
+        ) {
+            Button(Strings.Workflow.overwriteButton, role: .destructive) {
+                state.workflowSession.grantOverwriteAssent()
+                runWorkflow()
+            }
+            Button(Strings.Common.cancel, role: .cancel) {
+                state.workflowSession.showOverwriteConflict = false
+            }
+        } message: {
+            Text(Strings.Workflow.overwriteConflictMessage(
+                count: state.workflowSession.organizeConflictCount))
+        }
+        .alert(
             Strings.Errors.commandLineToolsTitle,
             isPresented: Binding(
                 get: { state.pythonRuntimeAlert != nil },
@@ -572,7 +587,7 @@ struct WorkflowView: View {
             .fixedSize()
 
             Button(state.isRunning ? Strings.Workflow.runningButton : Strings.Workflow.runButton) {
-                state.workflowSession.clearTimezoneAssent()
+                state.workflowSession.clearRunAssent()
                 runWorkflow()
             }
                 .disabled(state.isRunning || !session.allStepsReady)
@@ -649,6 +664,10 @@ struct WorkflowView: View {
 
     private func runWorkflow() {
         guard state.canRunPipeline() else { return }
+
+        // Applying over the files the last run reported blocked destroys them,
+        // so the answer is taken before anything runs — cancelling runs nothing.
+        if state.workflowSession.requestOverwriteAssentIfNeeded() { return }
 
         let fileCount = countMediaFiles()
         if licenseStore.exceedsLimit(fileCount: fileCount) {

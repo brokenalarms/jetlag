@@ -128,6 +128,20 @@ What happens to source files after processing:
         static let forceTimezoneButton = String(localized: "workflow.forceTimezone.button",
             defaultValue: "Override Timezone")
 
+        // Organize conflict dialog
+        static let overwriteConflictTitle = String(localized: "workflow.overwriteConflict.title",
+            defaultValue: "Files Already at Destination")
+        static let overwriteButton = String(localized: "workflow.overwrite.button",
+            defaultValue: "Overwrite")
+
+        static func overwriteConflictMessage(count: Int) -> String {
+            count == 1
+                ? String(localized: "workflow.overwriteConflict.message.one",
+                         defaultValue: "1 file already exists at the destination with different contents. Overwrite it?")
+                : String(localized: "workflow.overwriteConflict.message.many",
+                         defaultValue: "\(count) files already exist at the destination with different contents. Overwrite them?")
+        }
+
         static func mixedTimezonesMessage(groups: String) -> String {
             String(localized: "workflow.mixedTimezones.message",
                    defaultValue: "Files have different embedded timezones. Consider processing each group separately.\n\n\(groups)")

@@ -85,7 +85,8 @@ struct DiffTableView: View {
             max(
                 Self.idealWidth(
                     for: rows.compactMap(\.dest).map { ($0 as NSString).lastPathComponent },
-                    font: Self.monoFont),
+                    font: Self.monoFont,
+                    extraWidth: rows.contains(where: \.hasDestinationConflict) ? Self.iconWidth : 0),
                 Self.idealWidth(
                     for: rows.compactMap(\.skipReason).map(\.explanation),
                     font: Self.systemFont)),
@@ -287,19 +288,28 @@ struct DiffTableView: View {
     }
 
     /// The destination a row would use, and — when the file was not moved there —
-    /// the reason the pipeline gave, so the path is never read as a move.
+    /// the reason the pipeline gave, so the path is never read as a move. A row
+    /// blocked by a different file at that path is flagged: those are the rows
+    /// an apply would leave behind unless the user chooses to overwrite.
     @ViewBuilder
     private func destinationCell(_ row: DiffTableRow) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            if let dest = row.dest {
-                Text((dest as NSString).lastPathComponent)
-                    .font(.system(size: 11, design: .monospaced))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            } else {
-                Text("—")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.tertiary)
+            HStack(spacing: 3) {
+                if row.hasDestinationConflict {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.orange)
+                }
+                if let dest = row.dest {
+                    Text((dest as NSString).lastPathComponent)
+                        .font(.system(size: 11, design: .monospaced))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                } else {
+                    Text("—")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                }
             }
             if let reason = row.skipReason {
                 Text(reason.explanation)

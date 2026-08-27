@@ -231,7 +231,7 @@ final class TimezoneConflictTests: XCTestCase {
         feedConflict(state, type: "provided_mismatch")
         state.workflowSession.grantTimezoneAssent()
 
-        state.workflowSession.clearTimezoneAssent()
+        state.workflowSession.clearRunAssent()
 
         let (_, args) = state.workflowSession.buildPipelineArgs()
         XCTAssertFalse(args.contains("--force-timezone"))
