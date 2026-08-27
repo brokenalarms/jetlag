@@ -8,7 +8,6 @@ import Foundation
 /// from that copy once and then belongs to the user.
 struct ProfilesLocation {
     static let fileName = "media-profiles.yaml"
-    static let applicationSupportFolderName = "Jetlag"
 
     /// The variable `scripts/lib/profiles.py` reads in preference to its own
     /// `<scripts>/media-profiles.yaml` default, so scripts launched by the app
@@ -27,21 +26,42 @@ struct ProfilesLocation {
 
     static func userDomain(
         scriptsDirectory: String,
+        bundle: Bundle = .main,
         fileManager: FileManager = .default
     ) -> ProfilesLocation {
         ProfilesLocation(
-            directory: applicationSupportDirectory(fileManager: fileManager),
+            directory: applicationSupportDirectory(bundle: bundle, fileManager: fileManager),
             seedPath: (scriptsDirectory as NSString).appendingPathComponent(fileName)
         )
     }
 
-    static func applicationSupportDirectory(fileManager: FileManager = .default) -> String {
+    /// The app names its folder after itself as the bundle presents it, so a
+    /// build carrying a distinct identity — `Jetlag Dev` out of a worktree —
+    /// keeps its profiles apart from the installed app's rather than editing
+    /// them. The bundle id's last component covers a bundle with no display
+    /// name, and the bundle's own file name is the last resort.
+    static func applicationSupportFolderName(bundle: Bundle = .main) -> String {
+        if let name = bundle.object(forInfoDictionaryKey: kCFBundleNameKey as String) as? String,
+           !name.isEmpty {
+            return name
+        }
+        if let identifierTail = bundle.bundleIdentifier?.split(separator: ".").last,
+           !identifierTail.isEmpty {
+            return String(identifierTail)
+        }
+        return bundle.bundleURL.deletingPathExtension().lastPathComponent
+    }
+
+    static func applicationSupportDirectory(
+        bundle: Bundle = .main,
+        fileManager: FileManager = .default
+    ) -> String {
         let base = fileManager
             .urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
                 .appendingPathComponent("Library/Application Support", isDirectory: true)
         return base
-            .appendingPathComponent(applicationSupportFolderName, isDirectory: true)
+            .appendingPathComponent(applicationSupportFolderName(bundle: bundle), isDirectory: true)
             .path
     }
 

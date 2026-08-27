@@ -26,14 +26,40 @@ final class ProfilesLocationTests: XCTestCase {
 
     /// With no Settings override the app reads and writes the user-owned copy in
     /// Application Support — never the read-only copy inside the app bundle.
-    func testDefaultProfilesPathIsInApplicationSupportNotTheBundle() {
+    func testDefaultProfilesPathIsInApplicationSupportNotTheBundle() throws {
         let state = AppState()
 
+        let appName = try XCTUnwrap(
+            Bundle.main.object(forInfoDictionaryKey: kCFBundleNameKey as String) as? String)
         let expected = (NSHomeDirectory() as NSString)
-            .appendingPathComponent("Library/Application Support/Jetlag/media-profiles.yaml")
+            .appendingPathComponent("Library/Application Support/\(appName)/media-profiles.yaml")
         XCTAssertEqual(state.resolvedProfilesPath, expected)
         XCTAssertFalse(state.resolvedProfilesPath.hasPrefix(state.scriptsDirectory),
                        "profiles must never resolve into the app bundle's scripts directory")
+    }
+
+    /// A build that carries a distinct identity — a worktree's `Jetlag Dev` —
+    /// must keep its profiles somewhere else too, or it silently edits the
+    /// installed app's file. The folder is therefore named after the app as it
+    /// appears in the Dock, not after a fixed string.
+    func testApplicationSupportFolderIsNamedAfterTheBundle() throws {
+        let bundle = Bundle(for: Self.self)
+        let bundleName = try XCTUnwrap(
+            bundle.object(forInfoDictionaryKey: kCFBundleNameKey as String) as? String)
+
+        XCTAssertEqual(ProfilesLocation.applicationSupportFolderName(bundle: bundle), bundleName)
+        XCTAssertEqual(
+            (ProfilesLocation.applicationSupportDirectory(bundle: bundle) as NSString).lastPathComponent,
+            bundleName)
+    }
+
+    /// A bundle with no `CFBundleName` still has to land somewhere of its own:
+    /// the bundle id's last component keeps a suffixed build separate from the
+    /// installed app.
+    func testFolderNameFallsBackToTheBundleIdentifiersLastComponent() throws {
+        let bundle = try makeBundle(infoPlist: ["CFBundleIdentifier": "com.daniellawrence.Jetlag.dev"])
+
+        XCTAssertEqual(ProfilesLocation.applicationSupportFolderName(bundle: bundle), "dev")
     }
 
     /// The Settings override is how a developer points the app at the repo's
@@ -107,6 +133,16 @@ final class ProfilesLocationTests: XCTestCase {
         process.waitUntilExit()
 
         XCTAssertEqual(lines.first, profilesPath)
+    }
+
+    private func makeBundle(infoPlist: [String: Any]) throws -> Bundle {
+        let root = try makeTemporaryDirectory()
+            .appendingPathComponent("Fixture.bundle/Contents", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let plist = try PropertyListSerialization.data(
+            fromPropertyList: infoPlist, format: .xml, options: 0)
+        try plist.write(to: root.appendingPathComponent("Info.plist"))
+        return try XCTUnwrap(Bundle(url: root.deletingLastPathComponent()))
     }
 
     private func makeTemporaryDirectory() throws -> URL {
