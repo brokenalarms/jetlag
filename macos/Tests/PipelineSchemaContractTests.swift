@@ -51,6 +51,7 @@ final class PipelineSchemaContractTests: XCTestCase {
         case .gyroflowResult: return "gyroflow_result"
         case .pipelineResult: return "pipeline_result"
         case .timezoneConflict: return "timezone_conflict"
+        case .organizeConflict: return "organize_conflict"
         case .pipelineError: return "pipeline_error"
         }
     }

@@ -130,6 +130,7 @@ enum PipelineEvent: Decodable {
     case pipelineResult(file: String, result: String)
     case timezoneConflict(conflictType: String, providedTz: String?,
                           fileTimezones: [String: [String]])
+    case organizeConflict(count: Int, files: [String])
     case pipelineError(message: String)
 
     private enum CodingKeys: String, CodingKey {
@@ -154,6 +155,7 @@ enum PipelineEvent: Decodable {
         case conflictType = "conflict_type"
         case providedTz = "provided_tz"
         case fileTimezones = "file_timezones"
+        case count, files
     }
 
     init(from decoder: Decoder) throws {
@@ -215,6 +217,10 @@ enum PipelineEvent: Decodable {
                 conflictType: try container.decode(String.self, forKey: .conflictType),
                 providedTz: try container.decodeIfPresent(String.self, forKey: .providedTz),
                 fileTimezones: try container.decode([String: [String]].self, forKey: .fileTimezones))
+        case "organize_conflict":
+            self = .organizeConflict(
+                count: try container.decode(Int.self, forKey: .count),
+                files: try container.decode([String].self, forKey: .files))
         case "pipeline_error":
             self = .pipelineError(
                 message: try container.decode(String.self, forKey: .message))
@@ -258,6 +264,14 @@ final class WorkflowSession {
     var timezoneConflictProvidedTz: String?
     var timezoneConflictFileTimezones: [String: [String]]?
     var showTimezoneConflict: Bool = false
+
+    /// What the last run reported it could not move: a different file already
+    /// occupies those destinations. The report outlives the run that made it,
+    /// because it is the preview the user reads before deciding to apply.
+    var organizeConflictCount: Int = 0
+    var organizeConflictFiles: [String] = []
+    var showOverwriteConflict: Bool = false
+    var overwriteDestination: Bool = false
 
     var enabledSteps: Set<PipelineStep> = [] {
         didSet {
@@ -306,15 +320,40 @@ final class WorkflowSession {
         showTimezoneConflict = false
     }
 
+    /// Whether the run has to stop and ask first: applying over the files the
+    /// last run reported blocked replaces them for good, so it needs an answer.
+    /// Returns true when the question was raised and the run must not start.
+    func requestOverwriteAssentIfNeeded() -> Bool {
+        guard applyMode, !overwriteDestination, organizeConflictCount > 0 else { return false }
+        showOverwriteConflict = true
+        return true
+    }
+
+    /// Record the user's answer, so the re-run carries the flag that replaces
+    /// the files already at the destination.
+    func grantOverwriteAssent() {
+        overwriteDestination = true
+        showOverwriteConflict = false
+    }
+
     /// Assent covers the run it was given for. A run the user starts themselves
-    /// begins without it, so a later batch is never relabelled unasked.
-    func clearTimezoneAssent() {
+    /// begins without it, so a later batch is never relabelled or replaced unasked.
+    func clearRunAssent() {
         forceTimezone = false
         allowMixedTimezones = false
         showTimezoneConflict = false
         timezoneConflictType = nil
         timezoneConflictProvidedTz = nil
         timezoneConflictFileTimezones = nil
+        overwriteDestination = false
+        showOverwriteConflict = false
+    }
+
+    /// The conflict report describes the rows of the run that produced it, so it
+    /// is discarded with them rather than carried into the next run's table.
+    func clearConflictReport() {
+        organizeConflictCount = 0
+        organizeConflictFiles = []
     }
 
     private static func computeAvailableSteps(
@@ -417,6 +456,9 @@ final class WorkflowSession {
         }
         if allowMixedTimezones {
             args.append("--allow-mixed-timezones")
+        }
+        if overwriteDestination {
+            args.append("--overwrite")
         }
         if applyMode {
             args.append("--apply")
@@ -567,6 +609,7 @@ final class AppState {
         diffTableRows = []
         currentDiffRow = nil
         liveRow = nil
+        workflowSession.clearConflictReport()
     }
 
     func appendLog(_ line: LogLine) {
@@ -651,6 +694,10 @@ final class AppState {
             // the user to confirm.
             workflowSession.showTimezoneConflict =
                 conflictType == "mixed_timezones" || workflowSession.applyMode
+
+        case .organizeConflict(let count, let files):
+            workflowSession.organizeConflictCount = count
+            workflowSession.organizeConflictFiles = files
 
         case .pipelineError(let message):
             logOutput.append(LogLine(text: "ERROR: \(message)", stream: .stderr))

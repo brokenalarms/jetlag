@@ -149,6 +149,7 @@ def run_organize_by_date(
     template: str,
     apply: bool,
     verbose: bool,
+    overwrite: bool = False,
 ):
     """Organize a file into date-based folders via direct module call.
 
@@ -157,7 +158,7 @@ def run_organize_by_date(
     """
     return _organize_mod.process_file(
         str(file_path), target_dir, template,
-        copy_mode=False, overwrite=False,
+        copy_mode=False, overwrite=overwrite,
         apply=apply, verbose=verbose,
     )
 
@@ -234,15 +235,17 @@ def process_file(
     infer_from_filename: bool = False,
     time_offset: Optional[int] = None,
     force_timezone: bool = False,
+    overwrite: bool = False,
 ) -> dict:
     """Process a single file through the pipeline.
 
     Flow: INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow]
 
     Returns:
-        dict with keys: changed, failed, error, source_files
+        dict with keys: changed, failed, error, source_files, organize_conflict
     """
-    result = {"changed": False, "failed": False, "error": None, "source_files": [str(file_path)]}
+    result = {"changed": False, "failed": False, "error": None,
+              "organize_conflict": None, "source_files": [str(file_path)]}
     file_changed = False
 
     emit_event("pipeline_file", file=file_path.name)
@@ -388,13 +391,20 @@ def process_file(
         template = f"{{{{YYYY}}}}/{group}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
     else:
         template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
-    org_result = run_organize_by_date(active_file, target_dir, template, apply, verbose)
+    org_result = run_organize_by_date(active_file, target_dir, template, apply, verbose,
+                                      overwrite=overwrite)
     emit_event("organize_result",
         file=active_file.name,
         action=org_result.action,
         dest=org_result.dest,
         reason=org_result.reason,
     )
+
+    # A file the destination already holds a different copy of is the one skip
+    # --overwrite can resolve, so it is the only one the batch reports back.
+    if (org_result.action == "skipped"
+            and org_result.reason == _organize_mod.SKIP_EXISTS_DIFFERS):
+        result["organize_conflict"] = active_file.name
 
     if org_result.action == "error":
         print(f"   ❌ Organization failed for {file_path.name}", file=sys.stderr)
@@ -523,6 +533,10 @@ def build_parser():
     parser.add_argument(
         "--force-timezone", action="store_true",
         help="Override existing timezone in DateTimeOriginal with --timezone. Without this flag, the pipeline stops when a provided-vs-embedded conflict is detected."
+    )
+    parser.add_argument(
+        "--overwrite", action="store_true",
+        help="Replace files already at the organize destination. Without this flag, a destination already holding a different file is left alone and reported as a conflict."
     )
     parser.add_argument(
         "--allow-mixed-timezones", action="store_true",
@@ -772,6 +786,7 @@ def main():
         companion_extensions = profile.get("companion_extensions")
 
     all_source_files = []
+    organize_conflicts = []
 
     for i, file_path in enumerate(files, 1):
         stats["processed"] += 1
@@ -796,6 +811,7 @@ def main():
             infer_from_filename=args.infer_from_filename,
             time_offset=args.time_offset,
             force_timezone=args.force_timezone,
+            overwrite=args.overwrite,
         )
 
         if result["failed"]:
@@ -807,8 +823,20 @@ def main():
                 stats["changed"] += 1
 
         all_source_files.extend(result.get("source_files", []))
+        if result.get("organize_conflict"):
+            organize_conflicts.append(result["organize_conflict"])
 
         print(file=sys.stderr)  # Empty line between files
+
+    # One batch-level report of what --overwrite would unblock, so the app has a
+    # single thing to ask about instead of re-deriving it from the per-file rows.
+    if organize_conflicts:
+        print(f"⚠️  {len(organize_conflicts)} file(s) already at the destination with "
+              "different contents. Re-run with --overwrite to replace them.", file=sys.stderr)
+        emit_event("organize_conflict",
+            count=len(organize_conflicts),
+            files=organize_conflicts,
+        )
 
     # Archive source (if in tasks)
     if "archive-source" in tasks:

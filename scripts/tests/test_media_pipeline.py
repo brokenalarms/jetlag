@@ -1804,5 +1804,157 @@ class TestUpdateFilenameDates:
             f"Companion should have corrected date, got: {renamed_thm[0]}"
 
 
+class TestOverwriteDestination:
+    """A file already sitting at the organize destination blocks the move.
+
+    The pipeline reports that as data — every blocked file skips with
+    reason=exists_differs and the batch ends with one organize_conflict event
+    carrying the count — and only replaces those files when --overwrite says so.
+    The app reads the conflict event to ask the user before re-running with the
+    flag, so the count and the file list have to be right.
+    """
+
+    def _run(self, workspace, profile, *extra):
+        return run_pipeline([
+            "--profile", profile,
+            "--source", str(workspace["source"]),
+            "--target", str(workspace["target"]),
+            "--timezone", "+0900",
+            "--group", "Test",
+            *extra,
+        ])
+
+    def _events(self, stdout: str) -> list[dict]:
+        events = [json.loads(line) for line in stdout.strip().split("\n") if line.strip()]
+        for event in events:
+            validate_event(event)
+        return events
+
+    def _seed_differing_destination(self, workspace, profile) -> Path:
+        """Organize one file, then make the copy at the destination differ.
+
+        Leaves a fresh source file behind, so the next run has something to
+        organize into a destination that is already occupied. The filename
+        carries the date because organize reads DateTimeOriginal, which only an
+        applied fix has written — without it a dry run would resolve a different
+        folder than the apply it previews.
+        """
+        create_test_video(workspace["source"] / "VID_20251005_100000_00_001.mp4",
+                          media_create_date="2025:10:05 01:00:00")
+        self._run(workspace, profile, "--apply")
+
+        organized = next(workspace["target"].rglob("VID_20251005_100000_00_001.mp4"))
+        with open(organized, "ab") as f:
+            f.write(b"x" * 100)
+
+        create_test_video(workspace["source"] / "VID_20251005_100000_00_001.mp4",
+                          media_create_date="2025:10:05 01:00:00")
+        return organized
+
+    def test_blocked_files_are_reported_as_one_batch_conflict(self, temp_workspace, test_profile):
+        """Without --overwrite the file stays put and the batch reports the conflict.
+
+        Actual: destination bytes unchanged, organize_conflict names the file
+        Expected: the app has one event to prompt on, listing every blocked file
+        """
+        organized = self._seed_differing_destination(temp_workspace, test_profile)
+        before = organized.read_bytes()
+
+        result = self._run(temp_workspace, test_profile, "--apply")
+
+        events = self._events(result.stdout)
+        organize = next(e for e in events if e["event"] == "organize_result")
+        assert organize["action"] == "skipped", \
+            f"Actual: organize_result.action={organize['action']!r}, Expected: 'skipped'"
+        assert organize.get("reason") == "exists_differs", \
+            f"Actual: organize_result.reason={organize.get('reason')!r}, Expected: 'exists_differs'"
+
+        conflicts = [e for e in events if e["event"] == "organize_conflict"]
+        assert len(conflicts) == 1, \
+            f"Actual: {len(conflicts)} organize_conflict events, Expected: exactly 1 for the batch"
+        assert conflicts[0]["count"] == 1, \
+            f"Actual: organize_conflict.count={conflicts[0]['count']}, Expected: 1"
+        assert conflicts[0]["files"] == ["VID_20251005_100000_00_001.mp4"], \
+            f"Actual: organize_conflict.files={conflicts[0]['files']}, Expected: ['VID_20251005_100000_00_001.mp4']"
+        assert organized.read_bytes() == before, \
+            "Actual: the file at the destination changed, Expected: untouched without --overwrite"
+
+    def test_overwrite_replaces_the_file_at_the_destination(self, temp_workspace, test_profile):
+        """--overwrite is what replaces the occupant, and the token says so.
+
+        Actual: destination no longer carries the padding that made it differ
+        Expected: action=overwrote and the newly processed file in its place
+        """
+        organized = self._seed_differing_destination(temp_workspace, test_profile)
+        before = organized.read_bytes()
+        assert before.endswith(b"x" * 100)
+
+        result = self._run(temp_workspace, test_profile, "--apply", "--overwrite")
+
+        events = self._events(result.stdout)
+        organize = next(e for e in events if e["event"] == "organize_result")
+        assert organize["action"] == "overwrote", \
+            f"Actual: organize_result.action={organize['action']!r}, Expected: 'overwrote'"
+        assert not [e for e in events if e["event"] == "organize_conflict"], \
+            "Actual: a conflict was reported, Expected: none — --overwrite resolved them"
+
+        after = organized.read_bytes()
+        assert after != before, \
+            "Actual: destination bytes unchanged, Expected: replaced by the processed source"
+        assert not after.endswith(b"x" * 100), \
+            "Actual: the old file's padding is still there, Expected: it was replaced"
+
+    def test_dry_run_with_overwrite_previews_without_touching_the_file(self, temp_workspace, test_profile):
+        """The preview names the replacement it would make and makes none.
+
+        Actual: action=would_overwrite, destination bytes identical
+        Expected: a preview, not a move
+        """
+        organized = self._seed_differing_destination(temp_workspace, test_profile)
+        before = organized.read_bytes()
+
+        result = self._run(temp_workspace, test_profile, "--overwrite")
+
+        events = self._events(result.stdout)
+        organize = next(e for e in events if e["event"] == "organize_result")
+        assert organize["action"] == "would_overwrite", \
+            f"Actual: organize_result.action={organize['action']!r}, Expected: 'would_overwrite'"
+        assert organized.read_bytes() == before, \
+            "Actual: a dry run changed the destination, Expected: untouched"
+
+    def test_clean_run_reports_no_conflict(self, temp_workspace, test_profile):
+        """Nothing occupies the destination, so there is nothing to prompt about."""
+        create_test_video(temp_workspace["source"] / "VID_20251005_100000_00_001.mp4",
+                          media_create_date="2025:10:05 01:00:00")
+
+        result = self._run(temp_workspace, test_profile, "--apply")
+
+        events = self._events(result.stdout)
+        assert not [e for e in events if e["event"] == "organize_conflict"], \
+            "Actual: organize_conflict emitted for a clean run, Expected: none"
+
+    def test_identical_copy_is_not_a_conflict(self, temp_workspace, test_profile):
+        """An identical file at the destination is not something to ask about.
+
+        Actual: skipped with reason=identical and no conflict event
+        Expected: the prompt is reserved for files whose contents differ
+        """
+        create_test_video(temp_workspace["source"] / "VID_20251005_100000_00_001.mp4",
+                          media_create_date="2025:10:05 01:00:00")
+        self._run(temp_workspace, test_profile, "--apply")
+
+        organized = next(temp_workspace["target"].rglob("VID_20251005_100000_00_001.mp4"))
+        shutil.copy2(organized, temp_workspace["source"] / "VID_20251005_100000_00_001.mp4")
+
+        result = self._run(temp_workspace, test_profile)
+
+        events = self._events(result.stdout)
+        organize = next(e for e in events if e["event"] == "organize_result")
+        assert organize.get("reason") == "identical", \
+            f"Actual: organize_result.reason={organize.get('reason')!r}, Expected: 'identical'"
+        assert not [e for e in events if e["event"] == "organize_conflict"], \
+            "Actual: organize_conflict emitted for an identical copy, Expected: none"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

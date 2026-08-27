@@ -42,6 +42,13 @@ struct DiffTableRow: Identifiable {
         return organizeReason.flatMap(RowOutcome.SkipReason.init(rawValue:))
     }
 
+    /// A different file is already at this row's destination, so the move was
+    /// refused. The table flags it because only these rows are what --overwrite
+    /// would replace — an identical copy costs nothing to leave alone.
+    var hasDestinationConflict: Bool {
+        skipReason == .existsDiffers
+    }
+
     /// The original timestamp as the table shows it. A UTC clock's stored digits
     /// carry no zone of their own, so the source decides how the value reads.
     var originalTimeDisplay: String? {
