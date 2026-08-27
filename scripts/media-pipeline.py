@@ -29,6 +29,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.filesystem import find_media_files
+from lib.metadata import metadata_service
 from lib.profiles import resolve_profiles_file
 from lib.timestamp_source import (
     build_filename, extract_metadata_timezone, is_zone_name, normalize_timezone_input,
@@ -66,10 +67,24 @@ def emit_event(event_type: str, **fields) -> None:
     print(json.dumps(payload), flush=True)
 
 
+SIGNAL_MESSAGES = {
+    signal.SIGINT: "\n\nInterrupted by user",
+    signal.SIGTERM: "\n\nCancelled",
+}
+
+
 def signal_handler(sig, frame):
-    """Handle Ctrl-C gracefully."""
-    print("\n\nInterrupted by user", file=sys.stderr)
-    sys.exit(130)
+    """Shut the metadata service down, then exit with the signal's status.
+
+    The metadata service owns a persistent jetlag-metadata process, which in
+    turn owns an ``exiftool -stay_open`` process. Under the default SIGTERM
+    disposition the interpreter dies without unwinding, so both are re-parented
+    to launchd and keep running; closing the service here walks that chain down
+    in order instead.
+    """
+    print(SIGNAL_MESSAGES[sig], file=sys.stderr)
+    metadata_service.close()
+    sys.exit(128 + sig)
 
 
 def load_config(profile_name: str) -> tuple[dict, dict]:
@@ -582,8 +597,8 @@ def build_parser():
 
 def main():
     """Main entry point."""
-    # Set up signal handler for Ctrl-C
-    signal.signal(signal.SIGINT, signal_handler)
+    for sig in SIGNAL_MESSAGES:
+        signal.signal(sig, signal_handler)
 
     parser = build_parser()
     args = parser.parse_args()

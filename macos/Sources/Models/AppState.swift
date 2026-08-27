@@ -628,7 +628,7 @@ final class AppState {
     // Execution state
     var isRunning: Bool = false
     var logOutput: [LogLine] = []
-    var currentProcess: Process?
+    var currentProcess: ScriptProcess?
     /// The task draining the process's output into the log. Cancelling the run must
     /// cancel this too: the pipeline can be far ahead of the UI, and terminating the
     /// process alone leaves every buffered line still to be appended.
@@ -851,7 +851,9 @@ final class AppState {
         workflowSession.noteRunCancelled()
         currentRunTask?.cancel()
         currentRunTask = nil
-        currentProcess?.terminate()
+        // The whole group, not just the script: the pipeline's jetlag-metadata and
+        // exiftool children would otherwise be re-parented to launchd and live on.
+        currentProcess?.terminateGroup()
         currentProcess = nil
         isRunning = false
     }
