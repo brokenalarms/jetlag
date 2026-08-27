@@ -122,6 +122,37 @@ What happens to source files after processing:
         static let dryRunHelp = String(localized: "workflow.dryRun.help",
             defaultValue: "Dry Run previews changes without modifying files. Apply performs the actual processing.")
 
+        // Fix Timestamps preview
+        static let fixTimestampSourceFilenamesHint = String(localized: "workflow.fixTimestampPreview.sourceFilenames",
+            defaultValue: "Use filename dates as timestamp source")
+        static let fixTimestampRenameHint = String(localized: "workflow.fixTimestampPreview.rename",
+            defaultValue: "Rename files to match corrected dates")
+
+        static func fixTimestampShiftHint(sign: String, offset: Int) -> String {
+            String(localized: "workflow.fixTimestampPreview.shift",
+                   defaultValue: "Shift timestamps by \(sign)\(offset)s")
+        }
+
+        static func fixTimestampSourceFilenamesZoneHint(city: String, offsetLabel: String) -> String {
+            String(localized: "workflow.fixTimestampPreview.sourceFilenamesZone",
+                   defaultValue: "Use filename dates as \(city) local time (\(offsetLabel))")
+        }
+
+        static func fixTimestampSourceFilenamesZoneMultiHint(city: String) -> String {
+            String(localized: "workflow.fixTimestampPreview.sourceFilenamesZoneMulti",
+                   defaultValue: "Use filename dates as \(city) local time, resolved per file")
+        }
+
+        static func fixTimestampZoneHint(city: String, offsetLabel: String) -> String {
+            String(localized: "workflow.fixTimestampPreview.zone",
+                   defaultValue: "Apply \(city) time (\(offsetLabel))")
+        }
+
+        static func fixTimestampZoneMultiHint(city: String) -> String {
+            String(localized: "workflow.fixTimestampPreview.zoneMulti",
+                   defaultValue: "Apply \(city) time, resolved per file")
+        }
+
         // Timezone conflict dialog
         static let timezoneConflictTitle = String(localized: "workflow.timezoneConflict.title",
             defaultValue: "Timezone Conflict")
