@@ -51,7 +51,7 @@ def _within(seconds, fn):
 class TestSwiftBackendClient:
     """lib/metadata.py talking to jetlag-metadata."""
 
-    def test_backend_that_floods_stderr_still_answers(self, tmp_path):
+    def test_backend_that_floods_stderr_still_answers(self, tmp_path, metadata_client):
         fake = _executable(tmp_path / "jetlag-metadata", f'''#!/usr/bin/env python3
 import sys
 sys.stderr.write("w" * {FLOOD})
@@ -61,18 +61,32 @@ for line in sys.stdin:
     sys.stdout.flush()
 ''')
         from lib.metadata import _SwiftBackend
-        client = _SwiftBackend(str(fake))
-        try:
-            result = _within(10, lambda: client.read_tags("x.mp4", ["DateTimeOriginal"]))
-        finally:
-            client.close()
+        client = metadata_client(_SwiftBackend(str(fake)))
+        result = _within(10, lambda: client.read_tags("x.mp4", ["DateTimeOriginal"]))
         assert result == {"DateTimeOriginal": "2025:06:18 07:25:21"}
+
+    def test_process_is_registered_and_terminated_via_context_manager(self, tmp_path):
+        fake = _executable(tmp_path / "jetlag-metadata", '''#!/usr/bin/env python3
+import sys
+for line in sys.stdin:
+    sys.stdout.write('{"DateTimeOriginal":"2025:06:18 07:25:21"}\\n')
+    sys.stdout.flush()
+''')
+        from lib.metadata import _SwiftBackend, _spawned_pids
+
+        with _SwiftBackend(str(fake)) as client:
+            _within(10, lambda: client.read_tags("x.mp4", ["DateTimeOriginal"]))
+            pid = client._process.pid
+            assert pid in _spawned_pids
+
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
 
 
 class TestExifToolFallbackClient:
     """lib/exiftool.py talking to exiftool -stay_open directly."""
 
-    def test_exiftool_that_floods_stderr_still_answers(self, tmp_path, monkeypatch):
+    def test_exiftool_that_floods_stderr_still_answers(self, tmp_path, monkeypatch, metadata_client):
         _executable(tmp_path / "exiftool", f'''#!/usr/bin/env python3
 import sys
 sys.stderr.write("Warning: [minor] flood\\n" * ({FLOOD} // 24))
@@ -87,12 +101,29 @@ for line in sys.stdin:
 ''')
         monkeypatch.setenv("PATH", f"{tmp_path}:{os.environ['PATH']}")
         from lib.exiftool import ExifTool
-        client = ExifTool()
-        try:
-            result = _within(10, lambda: client.read_tags("x.mp4", ["DateTimeOriginal"]))
-        finally:
-            client.close()
+        client = metadata_client(ExifTool())
+        result = _within(10, lambda: client.read_tags("x.mp4", ["DateTimeOriginal"]))
         assert result == {"DateTimeOriginal": "2025:06:18 07:25:21"}
+
+    def test_process_is_registered_and_terminated_via_context_manager(self, tmp_path, monkeypatch):
+        _executable(tmp_path / "exiftool", '''#!/usr/bin/env python3
+import sys
+for line in sys.stdin:
+    if line.startswith("-execute"):
+        sys.stdout.write("DateTimeOriginal: 2025:06:18 07:25:21\\n")
+        sys.stdout.write("{ready" + line.strip()[len("-execute"):] + "}\\n")
+        sys.stdout.flush()
+''')
+        monkeypatch.setenv("PATH", f"{tmp_path}:{os.environ['PATH']}")
+        from lib.exiftool import ExifTool, _spawned_pids
+
+        with ExifTool() as client:
+            _within(10, lambda: client.read_tags("x.mp4", ["DateTimeOriginal"]))
+            pid = client._process.pid
+            assert pid in _spawned_pids
+
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
 
 
 METADATA_BINARY = SCRIPTS_DIR / "tools" / "jetlag-metadata"
@@ -110,7 +141,7 @@ class TestJetlagMetadataDrainsExifTool:
     uses — the one that wedged the Korea run.
     """
 
-    def test_real_binary_survives_a_flooding_exiftool(self, tmp_path):
+    def test_real_binary_survives_a_flooding_exiftool(self, tmp_path, metadata_client):
         binary = tmp_path / "jetlag-metadata"
         shutil.copy2(METADATA_BINARY, binary)
         _executable(tmp_path / "exiftool", f'''#!/usr/bin/env python3
@@ -126,14 +157,11 @@ for line in sys.stdin:
         sys.stdout.flush()
 ''')
         from lib.metadata import _SwiftBackend
-        client = _SwiftBackend(str(binary))
-        try:
-            # Several requests: the pipe must never accumulate across them.
-            for _ in range(3):
-                updated = _within(15, lambda: client.write_tags("x.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21"]))
-                assert updated is True
-        finally:
-            client.close()
+        client = metadata_client(_SwiftBackend(str(binary)))
+        # Several requests: the pipe must never accumulate across them.
+        for _ in range(3):
+            updated = _within(15, lambda: client.write_tags("x.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21"]))
+            assert updated is True
 
     def test_warnings_are_surfaced_not_swallowed(self, tmp_path):
         binary = tmp_path / "jetlag-metadata"
