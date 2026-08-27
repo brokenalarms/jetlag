@@ -65,6 +65,12 @@ class TestApplyMode:
         assert f"@@dest={expected_dest}" in result.stdout
         assert "@@action=copied" in result.stdout
 
+    def test_apply_is_silent_on_stderr(self):
+        """Staging is silent: apply reports nothing about the working dir on stderr."""
+        result = run_ingest(self.source_file, "--target", self.working_dir, "--apply")
+
+        assert result.stderr == ""
+
 
 class TestDryRun:
     """Without --apply, no file is created."""
@@ -88,10 +94,10 @@ class TestDryRun:
         assert not os.path.exists(self.working_dir), "Working dir should not be created"
 
     def test_dry_run_output(self):
-        """Dry run reports what would happen."""
+        """Dry run reports the action machine-readably, without staging chatter on stderr."""
         result = run_ingest(self.source_file, "--target", self.working_dir)
 
-        assert "Would copy" in result.stderr
+        assert result.stderr == ""
         assert "@@action=would_copy" in result.stdout
 
 

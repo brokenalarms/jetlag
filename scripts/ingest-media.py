@@ -38,10 +38,8 @@ def ingest_file(
     if apply:
         os.makedirs(target_dir, exist_ok=True)
         shutil.copy2(source_file, dest)
-        print(f"Copied: {source_file} → {dest}", file=sys.stderr)
         action = "copied"
     else:
-        print(f"[DRY RUN] Would copy: {source_file} → {dest}", file=sys.stderr)
         action = "would_copy"
 
     if companion_extensions:
@@ -53,9 +51,6 @@ def ingest_file(
                 companion_dest = os.path.join(target_dir, stem + ext)
                 if apply:
                     shutil.copy2(companion_source, companion_dest)
-                    print(f"Copied companion: {companion_source} → {companion_dest}", file=sys.stderr)
-                else:
-                    print(f"[DRY RUN] Would copy companion: {companion_source} → {companion_dest}", file=sys.stderr)
                 companion_dests.append(companion_dest)
 
     return dest, action, companion_dests
