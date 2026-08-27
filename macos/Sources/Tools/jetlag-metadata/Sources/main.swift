@@ -43,8 +43,18 @@ final class ExifToolBackend {
     private var process: Process?
     private var stdin: FileHandle?
     private var stdout: FileHandle?
+    private var stderr: FileHandle?
     private var execId = 0
     private let lock = NSLock()
+
+    /// exiftool's stderr, drained continuously off the main thread. A pipe nobody
+    /// reads fills after ~16 KB; exiftool then blocks on its next warning before it
+    /// prints `{ready}`, and every layer above waits forever. Every `.insv` write
+    /// emits an "Insta360 trailer" warning, so a real card reached that after a few
+    /// hundred files. Only the tail is kept; each request takes what accumulated.
+    private let stderrLock = NSLock()
+    private var stderrBuffer = Data()
+    private static let stderrKeep = 64 * 1024
 
     func ensureRunning() throws {
         if let p = process, p.isRunning { return }
@@ -63,11 +73,38 @@ final class ExifToolBackend {
         proc.standardOutput = stdoutPipe
         proc.standardError = stderrPipe
 
+        let stderrHandle = stderrPipe.fileHandleForReading
+        stderrHandle.readabilityHandler = { [weak self] handle in
+            let chunk = handle.availableData
+            guard let self else { return }
+            if chunk.isEmpty {
+                handle.readabilityHandler = nil
+                return
+            }
+            self.stderrLock.lock()
+            self.stderrBuffer.append(chunk)
+            if self.stderrBuffer.count > Self.stderrKeep {
+                self.stderrBuffer.removeFirst(self.stderrBuffer.count - Self.stderrKeep)
+            }
+            self.stderrLock.unlock()
+        }
+
         try proc.run()
 
         self.process = proc
         self.stdin = stdinPipe.fileHandleForWriting
         self.stdout = stdoutPipe.fileHandleForReading
+        self.stderr = stderrHandle
+    }
+
+    /// What exiftool wrote to stderr since the last call — warnings for the request
+    /// just completed, surfaced to the caller instead of left in the pipe.
+    func takeWarnings() -> String {
+        stderrLock.lock()
+        defer { stderrLock.unlock() }
+        let text = String(data: stderrBuffer, encoding: .utf8) ?? ""
+        stderrBuffer.removeAll(keepingCapacity: true)
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func resolveExifToolPath() -> String {
@@ -175,6 +212,7 @@ final class ExifToolBackend {
         }
         stdin?.write("-stay_open\nFalse\n".data(using: .utf8)!)
         proc.waitUntilExit()
+        stderr?.readabilityHandler = nil
         process = nil
     }
 
@@ -210,11 +248,13 @@ func handleRequest(_ jsonLine: String) -> String {
             guard case .array(let tagList) = request.tags else {
                 return #"{"error":"read requires tags as array"}"#
             }
-            let result = try backend.readTags(
+            var result = try backend.readTags(
                 file: request.file,
                 tags: tagList,
                 fast: request.fast ?? false
             )
+            let warnings = backend.takeWarnings()
+            if !warnings.isEmpty { result["_warnings"] = warnings }
             let responseData = try encoder.encode(result)
             return String(data: responseData, encoding: .utf8) ?? "{}"
 
@@ -223,10 +263,12 @@ func handleRequest(_ jsonLine: String) -> String {
                 return #"{"error":"write requires tags as dictionary"}"#
             }
             let (updated, filesChanged) = try backend.writeTags(file: request.file, tags: tagDict)
-            let response: [String: AnyCodableValue] = [
+            var response: [String: AnyCodableValue] = [
                 "updated": .bool(updated),
                 "files_changed": .int(filesChanged),
             ]
+            let warnings = backend.takeWarnings()
+            if !warnings.isEmpty { response["warnings"] = .string(warnings) }
             let responseData = try encoder.encode(response)
             return String(data: responseData, encoding: .utf8) ?? "{}"
 
