@@ -1956,5 +1956,97 @@ class TestOverwriteDestination:
             "Actual: organize_conflict emitted for an identical copy, Expected: none"
 
 
+
+class TestOrganizeReportsTheUserFacingOutcome:
+    """Organize's token names what happened to the user's file, not the staging hop.
+
+    The source directory is a read-only input: ingest copies each file into the
+    working directory and only the separate archive-source step ever touches the
+    original. Organize itself is handed the working copy on an apply (so it
+    reports "moved") and the source file in a dry run (so it reports
+    "would_move"), but neither describes the user's outcome — a new file appears
+    at the destination and the source stays where it is. The pipeline therefore
+    translates both to copied/would_copy before emitting, which also makes a dry
+    run and the apply it previews agree on the token for the same file.
+    """
+
+    def _run(self, workspace, profile, *extra):
+        return run_pipeline([
+            "--profile", profile,
+            "--source", str(workspace["source"]),
+            "--target", str(workspace["target"]),
+            "--timezone", "+0900",
+            "--group", "Test",
+            *extra,
+        ])
+
+    def _organize_actions(self, stdout: str) -> dict[str, str]:
+        actions = {}
+        for line in stdout.strip().split("\n"):
+            if not line.strip():
+                continue
+            event = json.loads(line)
+            validate_event(event)
+            if event["event"] == "organize_result":
+                actions[event["file"]] = event["action"]
+        return actions
+
+    def _seed(self, workspace) -> list[str]:
+        names = ["VID_20251005_100000_00_001.mp4",
+                 "VID_20251005_110000_00_002.mp4",
+                 "VID_20251005_120000_00_003.mp4"]
+        for name in names:
+            create_test_video(workspace["source"] / name,
+                              media_create_date="2025:10:05 01:00:00")
+        return names
+
+    def test_dry_run_and_apply_report_the_same_copy_token_for_every_file(
+            self, temp_workspace, test_profile):
+        """The preview must name the outcome the apply produces, file for file.
+
+        Actual: every organize_result in both runs says would_copy / copied
+        Expected: no file is described as a move, and the two runs agree
+        """
+        names = self._seed(temp_workspace)
+
+        preview = self._organize_actions(
+            self._run(temp_workspace, test_profile).stdout)
+        applied = self._organize_actions(
+            self._run(temp_workspace, test_profile, "--apply").stdout)
+
+        assert preview == {name: "would_copy" for name in names}, \
+            f"Actual: {preview}, Expected: would_copy for every file"
+        assert applied == {name: "copied" for name in names}, \
+            f"Actual: {applied}, Expected: copied for every file"
+        previewed_outcome = {"would_copy": "copied", "would_move": "moved",
+                             "would_overwrite": "overwrote", "skipped": "skipped"}
+        assert {n: previewed_outcome[a] for n, a in preview.items()} == applied, \
+            f"Actual: preview {preview} vs applied {applied}, Expected: the same outcome per file"
+
+    def test_a_pipelined_run_never_reports_a_move(self, temp_workspace, test_profile):
+        """'moved' would claim the source file left its folder, which never happens.
+
+        Actual: the source files are still in place after the apply
+        Expected: no organize_result token describes a move
+        """
+        names = self._seed(temp_workspace)
+
+        preview = self._organize_actions(
+            self._run(temp_workspace, test_profile).stdout)
+        applied = self._organize_actions(
+            self._run(temp_workspace, test_profile, "--apply").stdout)
+
+        moves = {name: action
+                 for actions in (preview, applied)
+                 for name, action in actions.items()
+                 if action in ("moved", "would_move")}
+        assert not moves, \
+            f"Actual: {moves} reported as moves, Expected: none — the pipeline stages a copy"
+
+        left_behind = sorted(p.name for p in temp_workspace["source"].iterdir())
+        assert left_behind == sorted(names), \
+            f"Actual: source holds {left_behind}, Expected: {sorted(names)} — untouched by organize"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

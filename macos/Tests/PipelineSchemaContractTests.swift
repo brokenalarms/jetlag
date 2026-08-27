@@ -141,6 +141,46 @@ final class PipelineSchemaContractTests: XCTestCase {
         XCTAssertEqual(Set(RowOutcome.Correction.allCases.map(\.rawValue)), declared,
                        "RowOutcome.Correction and timestamp_result.action have drifted apart")
     }
+
+    /// The mapping is 1:1: two tokens sharing a label would mean the app decides an
+    /// outcome the script already named. Lumping copied, moved and overwrote into
+    /// "Moved" is exactly what told the user a pipelined file had left its folder.
+    func testNoTwoOrganizeActionTokensShareALabel() throws {
+        let declaredActions = try tokens(schema(), event: "organize_result", field: "action")
+
+        var labels: [String: String] = [:]
+        var combined: [String: String] = [:]
+        for token in declaredActions {
+            let movement = try XCTUnwrap(RowOutcome.Movement(rawValue: token))
+            let label = movement.statusLabel(reason: nil, dryRun: false)
+            let afterFix = movement.statusLabelAfterCorrection(reason: nil, dryRun: false)
+            XCTAssertNil(labels[label],
+                         "'\(token)' and '\(labels[label] ?? "")' both render as '\(label)'")
+            XCTAssertNil(combined[afterFix],
+                         "'\(token)' and '\(combined[afterFix] ?? "")' both render as '\(afterFix)'")
+            labels[label] = token
+            combined[afterFix] = token
+        }
+    }
+
+    /// The app renders the token and consults nothing else. Anything the row knows
+    /// about the working directory or the ingest step would be the app re-deriving
+    /// an outcome the script already decided — the bug this whole contract exists
+    /// to prevent, one layer up from `dest`.
+    func testStatusRenderingNamesNoStagingState() throws {
+        let sources = ["Sources/Models/RowOutcome.swift", "Sources/Views/DiffTableView.swift"]
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // macos
+
+        for source in sources {
+            let text = try String(contentsOf: root.appendingPathComponent(source), encoding: .utf8)
+            for term in ["ingest", "workingDir", "working_dir", "working directory"] {
+                XCTAssertFalse(text.lowercased().contains(term.lowercased()),
+                               "\(source) mentions '\(term)' — the outcome comes from the token alone")
+            }
+        }
+    }
 }
 
 /// The rule the diff table broke on the Korea dry run: a row's status is a function
@@ -228,6 +268,80 @@ final class RowOutcomeTests: XCTestCase {
 
         XCTAssertEqual(applied.outcome.statusLabel, Strings.DiffTable.combinedStatus(
             Strings.DiffTable.fixedStatus, Strings.DiffTable.movedStatusAfterFix))
+    }
+
+    /// The pipeline stages every file, so what it reports is a copy: a new file at
+    /// the destination with the source left where it was. The row has to say so
+    /// rather than borrow the move wording. jetlag-wn7.
+    func testCopiedReadsAsACopyNotAMove() {
+        let applied = row(timestamp: "fixed", organize: "copied",
+                          dest: "/Volumes/Media/Ready/2025/2025-08-15/DJI_0001.MP4",
+                          result: "changed")
+
+        let label = applied.outcome.statusLabel
+
+        XCTAssertEqual(label, Strings.DiffTable.combinedStatus(
+            Strings.DiffTable.fixedStatus, Strings.DiffTable.copiedStatusAfterFix))
+        XCTAssertNotEqual(label, Strings.DiffTable.combinedStatus(
+            Strings.DiffTable.fixedStatus, Strings.DiffTable.movedStatusAfterFix))
+    }
+
+    /// The dry run previews the same copy the apply above performs, so its wording
+    /// has to match — a preview that says "move" describes a different run.
+    func testWouldCopyReadsAsACopyNotAMove() {
+        let planned = row(timestamp: "would_fix", organize: "would_copy",
+                          dest: "/Volumes/Media/Ready/2025/2025-08-15/DJI_0001.MP4",
+                          result: "would_change")
+
+        let label = planned.outcome.statusLabel
+
+        XCTAssertEqual(label, Strings.DiffTable.combinedStatus(
+            Strings.DiffTable.wouldFixStatus, Strings.DiffTable.wouldCopyStatusAfterFix))
+        XCTAssertNotEqual(label, Strings.DiffTable.combinedStatus(
+            Strings.DiffTable.wouldFixStatus, Strings.DiffTable.wouldMoveStatusAfterFix))
+    }
+
+    func testCopyWithoutACorrectionStandsAlone() {
+        let copiedOnly = row(timestamp: "no_change", organize: "copied",
+                             dest: "/Volumes/Media/Ready/2025/2025-08-15/DJI_0001.MP4",
+                             result: "changed")
+
+        XCTAssertEqual(copiedOnly.outcome.statusLabel, Strings.DiffTable.copiedStatus)
+        XCTAssertNotEqual(copiedOnly.outcome.statusLabel, Strings.DiffTable.movedStatus)
+    }
+
+    /// A replacement is neither a plain copy nor a move: something that was at the
+    /// destination is gone, which is the part the user needs told.
+    func testOverwroteReadsAsAReplacement() {
+        let replaced = row(timestamp: "no_change", organize: "overwrote",
+                           dest: "/Volumes/Media/Ready/2025/2025-08-15/DJI_0001.MP4",
+                           result: "changed")
+
+        XCTAssertEqual(replaced.outcome.statusLabel, Strings.DiffTable.overwroteStatus)
+        XCTAssertNotEqual(replaced.outcome.statusLabel, Strings.DiffTable.copiedStatus)
+        XCTAssertNotEqual(replaced.outcome.statusLabel, Strings.DiffTable.movedStatus)
+    }
+
+    /// End to end from the wire: a copied event carries copy wording all the way to
+    /// the row, so nothing between the script and the table reinterprets the token.
+    func testCopiedOrganizeEventReachesTheRowAsACopy() {
+        let state = AppState()
+
+        state.appendLog(LogLine(text: #"{"event": "pipeline_file", "file": "DJI_0001.MP4"}"#,
+                                stream: .stdout))
+        state.appendLog(LogLine(text: """
+        {"event": "organize_result", "file": "DJI_0001.MP4", "action": "copied", \
+        "dest": "/Volumes/Media/Ready/2025/2025-08-15/DJI_0001.MP4"}
+        """, stream: .stdout))
+        state.appendLog(LogLine(
+            text: #"{"event": "pipeline_result", "file": "DJI_0001.MP4", "result": "changed"}"#,
+            stream: .stdout))
+
+        XCTAssertEqual(state.diffTableRows.count, 1)
+        let row = state.diffTableRows[0]
+        XCTAssertEqual(row.organizeAction, "copied")
+        XCTAssertNil(row.skipReason, "A copied file has no skip reason to show")
+        XCTAssertEqual(row.outcome.statusLabel, Strings.DiffTable.copiedStatus)
     }
 
     func testMoveWithoutACorrectionStandsAlone() {

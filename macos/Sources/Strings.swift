@@ -346,22 +346,37 @@ What happens to source files after processing:
         static let failedStatus = String(localized: "diffTable.failed.status", defaultValue: "Failed")
         static let wouldChangeStatus = String(localized: "diffTable.wouldChange.status", defaultValue: "Would change")
         static let wouldFixStatus = String(localized: "diffTable.wouldFix.status", defaultValue: "Would fix")
+        static let wouldCopyStatus = String(localized: "diffTable.wouldCopy.status", defaultValue: "Would copy")
         static let wouldMoveStatus = String(localized: "diffTable.wouldMove.status", defaultValue: "Would move")
         static let fixedStatus = String(localized: "diffTable.fixed.status", defaultValue: "Fixed")
+        static let copiedStatus = String(localized: "diffTable.copied.status", defaultValue: "Copied")
         static let movedStatus = String(localized: "diffTable.moved.status", defaultValue: "Moved")
         static let moveSkippedStatus = String(localized: "diffTable.moveSkipped.status", defaultValue: "Move skipped")
         static let moveFailedStatus = String(localized: "diffTable.moveFailed.status", defaultValue: "Move failed")
 
+        /// A file the destination already held, replaced. "at destination" is what
+        /// separates it from a plain copy: something that was there is gone.
+        static let overwroteStatus = String(
+            localized: "diffTable.overwrote.status", defaultValue: "Replaced at destination")
+        static let wouldOverwriteStatus = String(
+            localized: "diffTable.wouldOverwrite.status", defaultValue: "Would replace at destination")
+
         /// A dry run's conflicting file, standalone: what Apply will actually do — prompt,
-        /// then move and replace — not what "skipped" would suggest on its own.
+        /// then replace — not what "skipped" would suggest on its own.
         static let wouldReplaceStatus = String(
             localized: "diffTable.wouldReplace.status", defaultValue: "Would replace at destination (asks first)")
 
-        // The same outcomes phrased to follow a correction, as in "Would fix + move".
+        // The same outcomes phrased to follow a correction, as in "Would fix + copy".
+        static let wouldCopyStatusAfterFix = String(localized: "diffTable.wouldCopy.afterFix", defaultValue: "copy")
         static let wouldMoveStatusAfterFix = String(localized: "diffTable.wouldMove.afterFix", defaultValue: "move")
+        static let copiedStatusAfterFix = String(localized: "diffTable.copied.afterFix", defaultValue: "copied")
         static let movedStatusAfterFix = String(localized: "diffTable.moved.afterFix", defaultValue: "moved")
         static let moveSkippedStatusAfterFix = String(localized: "diffTable.moveSkipped.afterFix", defaultValue: "move skipped")
         static let moveFailedStatusAfterFix = String(localized: "diffTable.moveFailed.afterFix", defaultValue: "move failed")
+        static let overwroteStatusAfterFix = String(
+            localized: "diffTable.overwrote.afterFix", defaultValue: "replaced at destination")
+        static let wouldOverwriteStatusAfterFix = String(
+            localized: "diffTable.wouldOverwrite.afterFix", defaultValue: "replace at destination")
         static let wouldReplaceStatusAfterFix = String(
             localized: "diffTable.wouldReplace.afterFix", defaultValue: "replace at destination (asks first)")
 

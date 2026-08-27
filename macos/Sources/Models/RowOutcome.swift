@@ -89,15 +89,21 @@ extension RowOutcome.Correction {
 }
 
 extension RowOutcome.Movement {
-    /// Every token the schema enumerates names an outcome here. The switch has no
+    /// Every token the schema enumerates names one outcome here, and no two tokens
+    /// share a label: a copy leaves the source where it is, a move does not, and a
+    /// replacement means something at the destination is gone. The switch has no
     /// default, so a token added to the enum without a label stops compiling, and
     /// one added to the schema alone fails the contract test. `reason` and `dryRun`
     /// only change `.skipped`'s label: a dry run's destination conflict names what
     /// Apply will actually do (prompt, then replace) rather than "skipped".
     func statusLabel(reason: RowOutcome.SkipReason?, dryRun: Bool) -> String {
         switch self {
-        case .copied, .moved, .overwrote: return Strings.DiffTable.movedStatus
-        case .wouldCopy, .wouldMove, .wouldOverwrite: return Strings.DiffTable.wouldMoveStatus
+        case .copied: return Strings.DiffTable.copiedStatus
+        case .moved: return Strings.DiffTable.movedStatus
+        case .overwrote: return Strings.DiffTable.overwroteStatus
+        case .wouldCopy: return Strings.DiffTable.wouldCopyStatus
+        case .wouldMove: return Strings.DiffTable.wouldMoveStatus
+        case .wouldOverwrite: return Strings.DiffTable.wouldOverwriteStatus
         case .skipped:
             if dryRun, reason == .existsDiffers { return Strings.DiffTable.wouldReplaceStatus }
             return Strings.DiffTable.moveSkippedStatus
@@ -105,11 +111,15 @@ extension RowOutcome.Movement {
         }
     }
 
-    /// The same outcome phrased to follow a correction, as in "Would fix + move".
+    /// The same outcome phrased to follow a correction, as in "Would fix + copy".
     func statusLabelAfterCorrection(reason: RowOutcome.SkipReason?, dryRun: Bool) -> String {
         switch self {
-        case .copied, .moved, .overwrote: return Strings.DiffTable.movedStatusAfterFix
-        case .wouldCopy, .wouldMove, .wouldOverwrite: return Strings.DiffTable.wouldMoveStatusAfterFix
+        case .copied: return Strings.DiffTable.copiedStatusAfterFix
+        case .moved: return Strings.DiffTable.movedStatusAfterFix
+        case .overwrote: return Strings.DiffTable.overwroteStatusAfterFix
+        case .wouldCopy: return Strings.DiffTable.wouldCopyStatusAfterFix
+        case .wouldMove: return Strings.DiffTable.wouldMoveStatusAfterFix
+        case .wouldOverwrite: return Strings.DiffTable.wouldOverwriteStatusAfterFix
         case .skipped:
             if dryRun, reason == .existsDiffers { return Strings.DiffTable.wouldReplaceStatusAfterFix }
             return Strings.DiffTable.moveSkippedStatusAfterFix
