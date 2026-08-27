@@ -1,7 +1,12 @@
 import SwiftUI
+import Quartz
 
 struct DiffTableView: View {
     let rows: [DiffTableRow]
+    let sourceDir: String
+
+    @State private var selection: Set<DiffTableRow.ID> = []
+    @State private var previewCoordinator = QuickLookCoordinator()
 
     private static let cellPadding: CGFloat = 20
     private static let iconWidth: CGFloat = 18
@@ -91,6 +96,18 @@ struct DiffTableView: View {
         ]
     }
 
+    /// The rows selected by the given ids, resolved to the file URLs Show in
+    /// Finder / Quick Look can act on — a row whose file no longer exists at
+    /// its known path (moved, archived) is left out rather than disabled
+    /// one-by-one, so a mixed selection still acts on the files that remain.
+    private func availableFileURLs(for ids: Set<DiffTableRow.ID>) -> [URL] {
+        rows
+            .filter { ids.contains($0.id) }
+            .filter { RowFileLocation.exists(for: $0, sourceDir: sourceDir) }
+            .compactMap { RowFileLocation.path(for: $0, sourceDir: sourceDir) }
+            .map { URL(fileURLWithPath: $0) }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
@@ -109,7 +126,7 @@ struct DiffTableView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
 
-            Table(rows) {
+            Table(rows, selection: $selection) {
                 TableColumn(Strings.DiffTable.fileColumn) { row in
                     Text(row.file)
                         .font(.system(size: 11, design: .monospaced))
@@ -160,6 +177,24 @@ struct DiffTableView: View {
                     .help(rowExplanation(row))
                 }
                 .width(min: 80)
+            }
+            .contextMenu(forSelectionType: DiffTableRow.ID.self) { ids in
+                let urls = availableFileURLs(for: ids)
+                Button(Strings.DiffTable.showInFinder) {
+                    NSWorkspace.shared.activateFileViewerSelecting(urls)
+                }
+                .disabled(urls.isEmpty)
+
+                Button(Strings.DiffTable.quickLook) {
+                    previewCoordinator.show(urls)
+                }
+                .disabled(urls.isEmpty)
+            }
+            .onKeyPress(.space) {
+                let urls = availableFileURLs(for: selection)
+                guard !urls.isEmpty else { return .ignored }
+                previewCoordinator.show(urls)
+                return .handled
             }
             .background {
                 ColumnAutoSizer(columnWidths: columnWidths)
@@ -357,6 +392,31 @@ struct DiffTableView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+// MARK: - Quick Look
+
+/// Feeds the shared Quick Look panel the file(s) a context-menu or Space-key
+/// action picked. No custom previewer: a format with no Quick Look generator
+/// simply shows the panel's generic icon.
+final class QuickLookCoordinator: NSObject, QLPreviewPanelDataSource {
+    private var items: [URL] = []
+
+    func show(_ urls: [URL]) {
+        guard !urls.isEmpty, let panel = QLPreviewPanel.shared() else { return }
+        items = urls
+        panel.dataSource = self
+        panel.reloadData()
+        panel.makeKeyAndOrderFront(nil)
+    }
+
+    func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
+        items.count
+    }
+
+    func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> QLPreviewItem! {
+        items[index] as NSURL
     }
 }
 

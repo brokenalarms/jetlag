@@ -328,6 +328,9 @@ What happens to source files after processing:
             String(localized: "diffTable.wouldWrite", defaultValue: "Writes \(fields)")
         }
 
+        static let showInFinder = String(localized: "diffTable.showInFinder", defaultValue: "Show in Finder")
+        static let quickLook = String(localized: "diffTable.quickLook", defaultValue: "Quick Look")
+
         static let wouldFixChange = String(localized: "diffTable.wouldFix.change", defaultValue: "Would fix")
         static let fixedChange = String(localized: "diffTable.fixed.change", defaultValue: "Fixed")
         static let noChangeChange = String(localized: "diffTable.noChange.change", defaultValue: "No change")
