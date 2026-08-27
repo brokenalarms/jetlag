@@ -126,12 +126,8 @@ def _install_python_package(import_name, pip_name):
 def pytest_addoption(parser):
     """Register custom CLI flags."""
     parser.addoption(
-        "--perf-baseline", action="store_true", default=False,
-        help="Record performance baselines instead of comparing against them",
-    )
-    parser.addoption(
-        "--perf-baseline-file", default=None,
-        help="Path to baseline JSON file (default: tests/perf_baseline.json)",
+        "--perf-baseline-scripts-dir", default=None,
+        help="Path to a checkout of the scripts/ dir to compare against (e.g. origin/main)",
     )
     parser.addoption(
         "--perf-results-file", default=None,
