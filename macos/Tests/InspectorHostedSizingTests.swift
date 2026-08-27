@@ -271,70 +271,61 @@ final class InspectorHostedSizingTests: XCTestCase {
             "already-detached view must not be written to again")
     }
 
-    // MARK: - Always-visible horizontal scrollers
+    // MARK: - Horizontal scroller configuration
 
-    /// The Korea dry run (288 rows, #167) computes a `File`/`Timeline`/`Original`/
-    /// `Corrected` column width that overflows a narrow panel, leaving `Timestamp`/
-    /// `Destination`/`Status` clipped off to the right with no way to discover them.
-    /// Proves that once `configureHorizontalScroller` has switched a table's scroll
-    /// view to the legacy style, AppKit itself shows a horizontal scroller as soon as
-    /// the columns are wider than the scroll view.
-    func testHorizontalScrollerIsVisibleWhenColumnsOverflowTheScrollViewWidth() {
+    /// The scroller style is the user's system preference. Proves the table's
+    /// configuration never writes `scrollerStyle` — overriding "Show scroll bars" for
+    /// one view is not the app's call — and that a repeat call on an already-configured
+    /// scroll view writes nothing at all, so it cannot re-invalidate layout from the
+    /// per-row updates it runs on (jetlag-m9a).
+    func testConfigureHorizontalScrollerRespectsThePreferredStyleAndIsInertWhenRepeated() {
+        let scrollView = ScrollerStyleCountingScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 400))
+        let baseline = scrollView.scrollerStyle
+
+        TableColumnSizing.configureHorizontalScroller(for: scrollView)
+
+        XCTAssertEqual(scrollView.scrollerStyle, baseline, "the style must be left to the system preference")
+        XCTAssertEqual(scrollView.scrollerStyleWrites, 0)
+        XCTAssertTrue(scrollView.hasHorizontalScroller)
+        XCTAssertTrue(scrollView.autohidesScrollers)
+
+        TableColumnSizing.configureHorizontalScroller(for: scrollView)
+
+        XCTAssertEqual(scrollView.scrollerStyleWrites, 0)
+    }
+
+    /// Counts `flashScrollers()` calls, which are the only observable side effect of
+    /// revealing an overflow.
+    private final class FlashCountingScrollView: NSScrollView {
+        private(set) var flashes = 0
+        override func flashScrollers() { flashes += 1 }
+    }
+
+    /// Overlay scrollers hide until a gesture, so growing past the panel needs the
+    /// system's own cue. Proves the flash fires only when a column width actually
+    /// changed and the document now overflows — never on an idle update, and never
+    /// when the table fits.
+    func testOverflowIsRevealedOnlyWhenAResizeMakesTheTableOverflow() {
+        let scrollView = FlashCountingScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 400))
+        // A table sizes itself to its columns once tiled, so the overflow comes from
+        // a column, as it does in the app.
         let tableView = NSTableView(frame: NSRect(x: 0, y: 0, width: 1200, height: 400))
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("wide"))
         column.width = 1200
         tableView.addTableColumn(column)
-
-        let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 400))
         scrollView.documentView = tableView
-        TableColumnSizing.configureHorizontalScroller(for: scrollView)
         scrollView.tile()
 
-        XCTAssertEqual(scrollView.scrollerStyle, .legacy)
-        XCTAssertEqual(scrollView.horizontalScroller?.isHidden, false)
-    }
+        TableColumnSizing.revealOverflow(in: scrollView, afterResizing: [])
+        XCTAssertEqual(scrollView.flashes, 0, "an update that resized nothing must not flash")
 
-    /// The same scroll view with columns narrower than its width never overflows, so
-    /// the horizontal scroller stays hidden.
-    func testHorizontalScrollerStaysHiddenWhenColumnsFitTheScrollViewWidth() {
-        let tableView = NSTableView(frame: NSRect(x: 0, y: 0, width: 200, height: 400))
-        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("narrow"))
+        TableColumnSizing.revealOverflow(in: scrollView, afterResizing: [0])
+        XCTAssertEqual(scrollView.flashes, 1, "a resize that overflows the panel reveals the scroller")
+
         column.width = 100
-        tableView.addTableColumn(column)
-
-        let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 400))
-        scrollView.documentView = tableView
-        TableColumnSizing.configureHorizontalScroller(for: scrollView)
+        tableView.sizeToFit()
         scrollView.tile()
-
-        XCTAssertEqual(scrollView.scrollerStyle, .legacy)
-        XCTAssertEqual(scrollView.horizontalScroller?.isHidden, true)
-    }
-
-    /// `configureHorizontalScroller` runs on every `updateNSView` call, same as
-    /// `applyWidths`. Proves a repeat call on an already-configured scroll view writes
-    /// nothing, so it cannot itself re-invalidate layout (jetlag-m9a).
-    func testConfigureHorizontalScrollerIsInertWhenRepeated() {
-        let scrollView = ScrollerStyleCountingScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 400))
-        // A new scroll view starts at whatever the machine's "Show scroll bars"
-        // setting resolves to — overlay on a trackpad, legacy once a mouse is
-        // attached — so the unconfigured state is pinned rather than assumed.
-        scrollView.scrollerStyle = .overlay
-        scrollView.hasHorizontalScroller = false
-        scrollView.autohidesScrollers = false
-        scrollView.forgetWrites()
-
-        TableColumnSizing.configureHorizontalScroller(for: scrollView)
-
-        XCTAssertEqual(scrollView.scrollerStyle, .legacy)
-        XCTAssertTrue(scrollView.hasHorizontalScroller)
-        XCTAssertTrue(scrollView.autohidesScrollers)
-        XCTAssertEqual(scrollView.scrollerStyleWrites, 1)
-
-        TableColumnSizing.configureHorizontalScroller(for: scrollView)
-
-        XCTAssertEqual(
-            scrollView.scrollerStyleWrites, 1,
-            "an already-legacy scroll view must not be rewritten")
+        TableColumnSizing.revealOverflow(in: scrollView, afterResizing: [0])
+        XCTAssertEqual(scrollView.flashes, 1, "a table that fits has nothing to reveal")
     }
 }

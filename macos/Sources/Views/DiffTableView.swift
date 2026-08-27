@@ -454,22 +454,30 @@ enum TableColumnSizing {
         return resized
     }
 
-    /// macOS overlay scrollers only appear during a scroll gesture, hiding the fact
-    /// that the table is wider than the panel. The legacy style draws a scroller
-    /// whenever content overflows and none otherwise (`autohidesScrollers`), so this
-    /// switches the table's scroll view over to it. Each flag is compared before
-    /// assignment for the same reason as `applyWidths`: this runs on every update, and
-    /// an unconditional write would re-invalidate the scroll view's layout every pass.
+    /// The table can be wider than the panel, so it needs a horizontal scroller.
+    /// Which style that scroller takes is the user's system preference, not the
+    /// app's: forcing the legacy style would override "Show scroll bars" for this one
+    /// view. Each flag is compared before assignment because this runs on every
+    /// update, and an unconditional write would re-invalidate the scroll view's
+    /// layout every pass (jetlag-m9a).
     static func configureHorizontalScroller(for scrollView: NSScrollView) {
-        if scrollView.scrollerStyle != .legacy {
-            scrollView.scrollerStyle = .legacy
-        }
         if !scrollView.hasHorizontalScroller {
             scrollView.hasHorizontalScroller = true
         }
         if !scrollView.autohidesScrollers {
             scrollView.autohidesScrollers = true
         }
+    }
+
+    /// Overlay scrollers stay hidden until a scroll gesture, so a table that has just
+    /// grown past its panel gives no sign that columns lie off to the right. AppKit's
+    /// cue for exactly this is `flashScrollers()`, which reveals them briefly — what
+    /// Finder does when a view's content changes. Called only when a width actually
+    /// changed and the document now overflows, so idle updates never flash.
+    static func revealOverflow(in scrollView: NSScrollView, afterResizing resized: [Int]) {
+        guard !resized.isEmpty, let document = scrollView.documentView,
+              document.frame.width > scrollView.contentView.bounds.width else { return }
+        scrollView.flashScrollers()
     }
 }
 
@@ -512,7 +520,7 @@ private struct ColumnAutoSizer: NSViewRepresentable {
         }
 
         if let tableView = coordinator.tableView {
-            TableColumnSizing.applyWidths(columnWidths, to: tableView)
+            let resized = TableColumnSizing.applyWidths(columnWidths, to: tableView)
             tableView.enclosingScrollView?.detachSizeFromContent()
 
             if !coordinator.gestureInstalled, let headerView = tableView.headerView {
@@ -526,6 +534,7 @@ private struct ColumnAutoSizer: NSViewRepresentable {
 
             if let scrollView = tableView.enclosingScrollView {
                 TableColumnSizing.configureHorizontalScroller(for: scrollView)
+                TableColumnSizing.revealOverflow(in: scrollView, afterResizing: resized)
             }
         }
     }
