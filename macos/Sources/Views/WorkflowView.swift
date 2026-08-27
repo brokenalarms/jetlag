@@ -70,7 +70,7 @@ struct WorkflowView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    withAnimation { state.showInspector.toggle() }
+                    state.showInspector.toggle()
                 } label: {
                     Image(systemName: "sidebar.trailing")
                 }
@@ -682,7 +682,7 @@ struct WorkflowView: View {
         }
 
         state.clearLog()
-        withAnimation { state.showInspector = true }
+        state.showInspector = true
         state.isRunning = true
 
         let (script, args) = state.workflowSession.buildPipelineArgs()
