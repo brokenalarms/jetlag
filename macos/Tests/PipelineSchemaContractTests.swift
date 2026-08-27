@@ -85,19 +85,39 @@ final class PipelineSchemaContractTests: XCTestCase {
         XCTAssertEqual(reason, "exists_differs")
     }
 
+    /// `.skipped`'s label also depends on `organize_result.reason` and whether the
+    /// pipeline is in a dry run, so its grid is exhaustive over every reason token
+    /// and both dry-run states; every other action ignores both.
     func testEveryOrganizeActionTokenHasAStatusLabel() throws {
-        let declared = try tokens(schema(), event: "organize_result", field: "action")
+        let declaredActions = try tokens(schema(), event: "organize_result", field: "action")
+        let declaredReasons = try tokens(schema(), event: "organize_result", field: "reason")
 
-        for token in declared {
+        for token in declaredActions {
             let movement = RowOutcome.Movement(rawValue: token)
             XCTAssertNotNil(movement, "organize_result.action '\(token)' has no case in RowOutcome.Movement")
-            XCTAssertFalse(movement?.statusLabel.isEmpty ?? true,
-                           "organize_result.action '\(token)' has no status label")
-            XCTAssertFalse(movement?.statusLabelAfterCorrection.isEmpty ?? true,
-                           "organize_result.action '\(token)' has no combined status label")
+            guard let movement else { continue }
+
+            guard movement == .skipped else {
+                XCTAssertFalse(movement.statusLabel(reason: nil, dryRun: false).isEmpty,
+                               "organize_result.action '\(token)' has no status label")
+                XCTAssertFalse(movement.statusLabelAfterCorrection(reason: nil, dryRun: false).isEmpty,
+                               "organize_result.action '\(token)' has no combined status label")
+                continue
+            }
+
+            for reasonToken in declaredReasons {
+                let reason = RowOutcome.SkipReason(rawValue: reasonToken)
+                XCTAssertNotNil(reason, "organize_result.reason '\(reasonToken)' has no case in RowOutcome.SkipReason")
+                for dryRun in [true, false] {
+                    XCTAssertFalse(movement.statusLabel(reason: reason, dryRun: dryRun).isEmpty,
+                                   "skipped/\(reasonToken) (dryRun=\(dryRun)) has no status label")
+                    XCTAssertFalse(movement.statusLabelAfterCorrection(reason: reason, dryRun: dryRun).isEmpty,
+                                   "skipped/\(reasonToken) (dryRun=\(dryRun)) has no combined status label")
+                }
+            }
         }
 
-        XCTAssertEqual(Set(RowOutcome.Movement.allCases.map(\.rawValue)), declared,
+        XCTAssertEqual(Set(RowOutcome.Movement.allCases.map(\.rawValue)), declaredActions,
                        "RowOutcome.Movement and organize_result.action have drifted apart")
     }
 
@@ -140,6 +160,8 @@ final class RowOutcomeTests: XCTestCase {
         return row
     }
 
+    /// A dry run's destination conflict never reads as a move — but it also must not
+    /// read as "skipped": Apply prompts and, on assent, moves and replaces. jetlag-bjt.
     func testSkippedMoveNeverReadsAsAMove() {
         let skipped = row(timestamp: "would_fix", organize: "skipped",
                           reason: "exists_differs",
@@ -149,9 +171,35 @@ final class RowOutcomeTests: XCTestCase {
         let label = skipped.outcome.statusLabel
 
         XCTAssertEqual(label, Strings.DiffTable.combinedStatus(
-            Strings.DiffTable.wouldFixStatus, Strings.DiffTable.moveSkippedStatusAfterFix))
+            Strings.DiffTable.wouldFixStatus, Strings.DiffTable.wouldReplaceStatusAfterFix))
         XCTAssertNotEqual(label, Strings.DiffTable.combinedStatus(
             Strings.DiffTable.wouldFixStatus, Strings.DiffTable.wouldMoveStatusAfterFix))
+        XCTAssertNotEqual(label, Strings.DiffTable.combinedStatus(
+            Strings.DiffTable.wouldFixStatus, Strings.DiffTable.moveSkippedStatusAfterFix))
+    }
+
+    /// The other skip reason a dry run can report: nothing to apply, so it reads as
+    /// a fact ("destination already has it") rather than a pending action.
+    func testSkippedIdenticalInDryRunNeedsNoMove() {
+        let identical = row(timestamp: "would_fix", organize: "skipped",
+                            reason: "identical",
+                            dest: "/Volumes/Media/Ready/2025/2025-08-15/DJI_0001.MP4",
+                            result: "would_change")
+
+        XCTAssertEqual(identical.outcome.statusLabel,
+                       Strings.DiffTable.wouldFixIdenticalStatus(Strings.DiffTable.wouldFixStatus))
+    }
+
+    /// An applied run's destination conflict keeps "move skipped" — the prompt
+    /// already happened and the user chose not to overwrite, so nothing was moved.
+    func testAppliedSkippedKeepsMoveSkippedLabel() {
+        let applied = row(timestamp: "fixed", organize: "skipped",
+                          reason: "exists_differs",
+                          dest: "/Volumes/Media/Ready/2025/2025-08-15/DJI_0001.MP4",
+                          result: "changed")
+
+        XCTAssertEqual(applied.outcome.statusLabel, Strings.DiffTable.combinedStatus(
+            Strings.DiffTable.fixedStatus, Strings.DiffTable.moveSkippedStatusAfterFix))
     }
 
     func testDestinationAloneNeverProducesAMoveLabel() {
@@ -214,7 +262,7 @@ final class RowOutcomeTests: XCTestCase {
         XCTAssertEqual(row.organizeAction, "skipped")
         XCTAssertEqual(row.skipReason, .existsDiffers)
         XCTAssertEqual(row.outcome.statusLabel, Strings.DiffTable.combinedStatus(
-            Strings.DiffTable.wouldFixStatus, Strings.DiffTable.moveSkippedStatusAfterFix))
+            Strings.DiffTable.wouldFixStatus, Strings.DiffTable.wouldReplaceStatusAfterFix))
     }
 
     func testSkipReasonIsOnlyReadForASkippedRow() {

@@ -1,7 +1,8 @@
 import Foundation
 
 /// What a file's row reports happened to it, composed only from the tokens the
-/// pipeline emitted: `timestamp_result.action` and `organize_result.action`.
+/// pipeline emitted: `timestamp_result.action`, `organize_result.action`,
+/// `organize_result.reason`, and `pipeline_result`.
 ///
 /// The script decides an outcome and names it; the app renders that name. Which
 /// other fields an event happens to carry is not an outcome — a skipped file still
@@ -11,6 +12,8 @@ import Foundation
 struct RowOutcome {
     let correction: Correction?
     let movement: Movement?
+    let reason: SkipReason?
+    let dryRun: Bool
 
     /// The `timestamp_result.action` tokens.
     enum Correction: String, CaseIterable {
@@ -39,9 +42,12 @@ struct RowOutcome {
         case userChoice = "user_choice"
     }
 
-    init(timestampAction: String?, organizeAction: String?) {
+    init(timestampAction: String?, organizeAction: String?,
+         organizeReason: String? = nil, pipelineResult: String? = nil) {
         correction = timestampAction.flatMap(Correction.init(rawValue:))
         movement = organizeAction.flatMap(Movement.init(rawValue:))
+        reason = organizeReason.flatMap(SkipReason.init(rawValue:))
+        dryRun = pipelineResult == "would_change"
     }
 
     /// The row's status, or nil when neither token describes a change and the
@@ -53,10 +59,20 @@ struct RowOutcome {
         case (let correction?, nil):
             return correction
         case (nil, let movement?):
-            return movement.statusLabel
+            return movement.statusLabel(reason: reason, dryRun: dryRun)
         case (let correction?, let movement?):
-            return Strings.DiffTable.combinedStatus(correction, movement.statusLabelAfterCorrection)
+            return combinedStatusLabel(correction: correction, movement: movement)
         }
+    }
+
+    /// `movement`'s label following a correction — except a dry run's destination
+    /// conflict, which names what Apply will actually do (prompt, then replace)
+    /// rather than "skipped", and an identical file, which needs no move at all.
+    private func combinedStatusLabel(correction: String, movement: Movement) -> String {
+        if dryRun, movement == .skipped, reason == .identical {
+            return Strings.DiffTable.wouldFixIdenticalStatus(correction)
+        }
+        return Strings.DiffTable.combinedStatus(correction, movement.statusLabelAfterCorrection(reason: reason, dryRun: dryRun))
     }
 }
 
@@ -75,22 +91,28 @@ extension RowOutcome.Correction {
 extension RowOutcome.Movement {
     /// Every token the schema enumerates names an outcome here. The switch has no
     /// default, so a token added to the enum without a label stops compiling, and
-    /// one added to the schema alone fails the contract test.
-    var statusLabel: String {
+    /// one added to the schema alone fails the contract test. `reason` and `dryRun`
+    /// only change `.skipped`'s label: a dry run's destination conflict names what
+    /// Apply will actually do (prompt, then replace) rather than "skipped".
+    func statusLabel(reason: RowOutcome.SkipReason?, dryRun: Bool) -> String {
         switch self {
         case .copied, .moved, .overwrote: return Strings.DiffTable.movedStatus
         case .wouldCopy, .wouldMove, .wouldOverwrite: return Strings.DiffTable.wouldMoveStatus
-        case .skipped: return Strings.DiffTable.moveSkippedStatus
+        case .skipped:
+            if dryRun, reason == .existsDiffers { return Strings.DiffTable.wouldReplaceStatus }
+            return Strings.DiffTable.moveSkippedStatus
         case .error: return Strings.DiffTable.moveFailedStatus
         }
     }
 
     /// The same outcome phrased to follow a correction, as in "Would fix + move".
-    var statusLabelAfterCorrection: String {
+    func statusLabelAfterCorrection(reason: RowOutcome.SkipReason?, dryRun: Bool) -> String {
         switch self {
         case .copied, .moved, .overwrote: return Strings.DiffTable.movedStatusAfterFix
         case .wouldCopy, .wouldMove, .wouldOverwrite: return Strings.DiffTable.wouldMoveStatusAfterFix
-        case .skipped: return Strings.DiffTable.moveSkippedStatusAfterFix
+        case .skipped:
+            if dryRun, reason == .existsDiffers { return Strings.DiffTable.wouldReplaceStatusAfterFix }
+            return Strings.DiffTable.moveSkippedStatusAfterFix
         case .error: return Strings.DiffTable.moveFailedStatusAfterFix
         }
     }

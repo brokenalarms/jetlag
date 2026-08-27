@@ -33,7 +33,8 @@ struct DiffTableRow: Identifiable {
     /// What the pipeline reported doing to this file, as tokens. The status the
     /// table shows is a function of these — never of whether `dest` is populated.
     var outcome: RowOutcome {
-        RowOutcome(timestampAction: timestampAction, organizeAction: organizeAction)
+        RowOutcome(timestampAction: timestampAction, organizeAction: organizeAction,
+                   organizeReason: organizeReason, pipelineResult: pipelineResult)
     }
 
     /// Why the organize step left the file where it was, when it did.
