@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import atexit
 import re
+import collections
 import subprocess
 import threading
 
@@ -44,6 +45,17 @@ class ExifTool:
         except FileNotFoundError:
             self._unavailable = True
             raise
+        # Drain stderr continuously: a pipe nobody reads fills after ~16 KB and
+        # exiftool then blocks on its next warning before printing the sentinel.
+        # Only the tail is kept, for diagnostics.
+        self._stderr_tail = collections.deque(maxlen=200)
+        threading.Thread(
+            target=self._drain_stderr, args=(self._process.stderr,), daemon=True,
+        ).start()
+
+    def _drain_stderr(self, stream):
+        for raw in iter(stream.readline, b""):
+            self._stderr_tail.append(raw.decode(errors="replace").rstrip("\r\n"))
 
     def execute(self, *args: str) -> str:
         """Send a command and block until the sentinel line is returned."""

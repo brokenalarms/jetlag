@@ -44,11 +44,15 @@ class _SwiftBackend:
     def _ensure_running(self):
         if self._process is not None and self._process.poll() is None:
             return
+        # stderr is inherited, not piped: a pipe nobody reads fills after ~16 KB
+        # and blocks the writer, and this client only ever reads stdout lines.
+        # jetlag-metadata writes nothing to stderr in normal operation; anything it
+        # does write reaches the pipeline's own stderr, which the caller drains.
         self._process = subprocess.Popen(
             [self._binary],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=None,
         )
 
     def _call(self, request: dict) -> dict:
@@ -63,7 +67,12 @@ class _SwiftBackend:
             response_line = self._process.stdout.readline()
             if not response_line:
                 return {}
-            return json.loads(response_line.decode())
+            response = json.loads(response_line.decode())
+            # exiftool's warnings ride along on the response so they are never left
+            # in a pipe; they are diagnostics, not data.
+            response.pop("warnings", None)
+            response.pop("_warnings", None)
+            return response
 
     def read_tags(self, file_path, tags, extra_args=None):
         fast = bool(extra_args and "-fast2" in extra_args)
