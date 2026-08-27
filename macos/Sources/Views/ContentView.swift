@@ -16,7 +16,7 @@ struct ContentView: View {
     static let sidebarWidth: CGFloat = 160
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(alignment: .top, spacing: 0) {
             List(SidebarTab.allCases, selection: $state.selectedTab) { tab in
                 Label(tab.label, systemImage: tab.systemImage)
                     .tag(tab)
@@ -32,5 +32,31 @@ struct ContentView: View {
             }
         }
         .background(WindowEdgeGrowthController(panelOpen: state.showInspector, isRunning: state.isRunning))
+    }
+}
+
+/// The workflow form beside its files/log panel: the form gets exactly the width it
+/// declares and the panel takes every remaining point. A split view would add a
+/// draggable divider, but the form cannot resize, so there is nothing for one to do; it
+/// would also report no minimum of its own, which is what lets the window grow.
+struct WorkflowDetail: View {
+    @Bindable var state: AppState
+
+    /// The panel never grows past twice the width of everything beside it (sidebar +
+    /// form). Wider than that stops being more table and starts being empty desktop;
+    /// the cap also bounds the window's maximum under
+    /// `windowResizability(.contentSize)`, so the frame cannot be dragged past it.
+    static let panelMaxWidth = 2 * (ContentView.sidebarWidth + WorkflowView.formWidth)
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            WorkflowView(state: state)
+                .frame(maxHeight: .infinity, alignment: .top)
+            if state.showInspector {
+                Divider()
+                InspectorPanel(state: state)
+                    .frame(maxWidth: Self.panelMaxWidth)
+            }
+        }
     }
 }

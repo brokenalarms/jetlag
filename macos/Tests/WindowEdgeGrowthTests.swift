@@ -64,4 +64,23 @@ final class WindowEdgeGrowthTests: XCTestCase {
         )
         XCTAssertNil(target)
     }
+
+    /// The content's own maximum bounds the growth as the screen edge does: with a
+    /// panel capped at twice sidebar + form, the window stops at that width even when
+    /// the screen has room, and never grows at all once it is already there.
+    func testGrowthStopsAtTheContentMaximum() {
+        let target = WindowEdgeGrowth.targetFrame(
+            previousPanelOpen: false, panelOpen: true,
+            previousIsRunning: false, isRunning: false,
+            frame: frame, screenEdge: screenEdge, maxWidth: 1500
+        )
+        XCTAssertEqual(target?.maxX, frame.minX + 1500)
+
+        let atCap = CGRect(x: 100, y: 100, width: 1500, height: 700)
+        XCTAssertNil(WindowEdgeGrowth.targetFrame(
+            previousPanelOpen: false, panelOpen: true,
+            previousIsRunning: false, isRunning: false,
+            frame: atCap, screenEdge: screenEdge, maxWidth: 1500
+        ))
+    }
 }
