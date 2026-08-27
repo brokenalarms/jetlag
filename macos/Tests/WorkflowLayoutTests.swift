@@ -81,4 +81,41 @@ final class WorkflowLayoutTests: XCTestCase {
         XCTAssertEqual(closed, WorkflowView.formWidth, accuracy: 1)
         XCTAssertEqual(open - closed, InspectorPanel.minWidth, accuracy: 2)
     }
+
+    /// The form's height is its content's, like its width: enabling a step that adds
+    /// controls raises the content's minimum height, which is what lets the window grow
+    /// to fit instead of the form scrolling inside it. No scroll view may wrap the form.
+    func testEnablingAStepRaisesTheContentMinimumHeight() {
+        let state = AppState()
+        state.selectedTab = .workflow
+        state.showInspector = false
+        state.workflowSession = WorkflowSession(profileName: "probe", gyroflowAvailable: false)
+        state.workflowSession.enabledSteps.remove(.archiveSource)
+
+        // The form alone: the sidebar beside it is a List, which is a scroll view and
+        // height-flexible by design, so it must not take part in this measurement.
+        func minimumHeight() -> CGFloat {
+            NSHostingController(rootView: WorkflowView(state: state))
+                .sizeThatFits(in: NSSize(width: WorkflowView.formWidth, height: 0)).height
+        }
+        let without = minimumHeight()
+        state.workflowSession.enabledSteps.insert(.archiveSource)
+        let with = minimumHeight()
+
+        XCTAssertGreaterThan(without, 0, "the form must declare a height of its own")
+        XCTAssertGreaterThan(with, without, "enabling Archive Source must make the form, and so the window, taller")
+
+        let host = NSHostingView(rootView: WorkflowView(state: state))
+        host.frame = NSRect(x: 0, y: 0, width: WorkflowView.formWidth, height: with)
+        host.layoutSubtreeIfNeeded()
+        XCTAssertNil(firstScrollView(in: host), "the form must not scroll; its height sizes the window")
+    }
+
+    private func firstScrollView(in view: NSView) -> NSScrollView? {
+        if let scroll = view as? NSScrollView { return scroll }
+        for subview in view.subviews {
+            if let scroll = firstScrollView(in: subview) { return scroll }
+        }
+        return nil
+    }
 }
