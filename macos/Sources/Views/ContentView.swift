@@ -18,6 +18,7 @@ struct ContentView: View {
                 ProfilesView(state: state)
             }
         }
+        .background(WindowEdgeGrowthController(panelOpen: state.showInspector, isRunning: state.isRunning))
     }
 }
 
