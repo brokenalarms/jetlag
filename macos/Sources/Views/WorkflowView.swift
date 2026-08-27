@@ -695,13 +695,16 @@ struct WorkflowView: View {
         )
         state.currentProcess = process
 
-        Task {
+        state.currentRunTask = Task {
             for await line in stream {
+                if Task.isCancelled { break }
                 await MainActor.run { state.appendLog(line) }
             }
+            guard !Task.isCancelled else { return }
             await MainActor.run {
                 state.isRunning = false
                 state.currentProcess = nil
+                state.currentRunTask = nil
             }
         }
     }
