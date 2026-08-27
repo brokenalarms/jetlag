@@ -455,12 +455,23 @@ enum TableColumnSizing {
     }
 
     /// macOS overlay scrollers only appear during a scroll gesture, hiding the fact
-    /// that the table is wider than the panel. The legacy style draws a scroller
-    /// whenever content overflows and none otherwise (`autohidesScrollers`), so this
-    /// switches the table's scroll view over to it. Each flag is compared before
-    /// assignment for the same reason as `applyWidths`: this runs on every update, and
-    /// an unconditional write would re-invalidate the scroll view's layout every pass.
+    /// that the table is wider than the panel. Assigning `scrollerStyle = .legacy`
+    /// does not hold: AppKit re-syncs a scroll view's style to the system preference
+    /// after the fact (on window/appearance changes and, for SwiftUI's own scroll
+    /// view, on its updates), which is why the table kept losing its scroller. The
+    /// mechanism AppKit provides for a scroll view that must always draw scrollers is
+    /// a scroller class that declares itself incompatible with the overlay style —
+    /// the scroll view then resolves to legacy itself, every time. Installed once,
+    /// so this cannot re-invalidate layout on the updates it runs from (jetlag-m9a).
     static func configureHorizontalScroller(for scrollView: NSScrollView) {
+        if !(scrollView.horizontalScroller is AlwaysVisibleScroller) {
+            scrollView.horizontalScroller = AlwaysVisibleScroller()
+        }
+        if !(scrollView.verticalScroller is AlwaysVisibleScroller) {
+            scrollView.verticalScroller = AlwaysVisibleScroller()
+        }
+        // The class only governs what AppKit resolves to on its next re-sync; the
+        // style in effect right now still has to be set once.
         if scrollView.scrollerStyle != .legacy {
             scrollView.scrollerStyle = .legacy
         }
@@ -471,6 +482,12 @@ enum TableColumnSizing {
             scrollView.autohidesScrollers = true
         }
     }
+}
+
+/// A scroller that opts its scroll view out of the overlay style, so scrollers are
+/// drawn whenever content overflows regardless of the system preference.
+final class AlwaysVisibleScroller: NSScroller {
+    override class var isCompatibleWithOverlayScrollers: Bool { false }
 }
 
 
