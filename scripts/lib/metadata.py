@@ -33,6 +33,11 @@ def _find_jetlag_metadata():
     return None
 
 
+# pids of every jetlag-metadata child this process has spawned, so a test
+# session can confirm none of them are still running at session end.
+_spawned_pids: list[int] = []
+
+
 class _SwiftBackend:
     """Talks to jetlag-metadata CLI via JSON-over-stdin/stdout."""
 
@@ -40,6 +45,12 @@ class _SwiftBackend:
         self._binary = binary_path
         self._process = None
         self._lock = threading.Lock()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
 
     def _ensure_running(self):
         if self._process is not None and self._process.poll() is None:
@@ -54,6 +65,7 @@ class _SwiftBackend:
             stdout=subprocess.PIPE,
             stderr=None,
         )
+        _spawned_pids.append(self._process.pid)
 
     def _call(self, request: dict) -> dict:
         with self._lock:

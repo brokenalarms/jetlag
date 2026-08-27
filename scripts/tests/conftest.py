@@ -8,6 +8,7 @@ install it automatically. macOS-only tests (tag/SetFile) are skipped on Linux.
 from __future__ import annotations
 
 import atexit
+import contextlib
 import json
 import os
 import shutil
@@ -19,6 +20,8 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+import lib.exiftool as _exiftool_module
+import lib.metadata as _metadata_module
 from lib.metadata import metadata_service as exiftool
 
 _template_video: Path | None = None
@@ -70,6 +73,43 @@ def create_test_photo(path, **exif_tags):
     if exif_tags:
         tag_args = [f"-{field}={value}" for field, value in exif_tags.items()]
         exiftool.write_tags(str(path), tag_args)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _close_metadata_service_at_session_end():
+    """The module-level metadata_service is otherwise only closed via atexit,
+    which does not run when an xdist worker is torn down non-gracefully — the
+    exiftool -stay_open / jetlag-metadata child then outlives the suite."""
+    yield
+    exiftool.close()
+
+
+@pytest.fixture
+def metadata_client():
+    """Registers a metadata client (ExifTool / _SwiftBackend) constructed by a
+    test for guaranteed close() via the context-manager protocol, even if the
+    test body raises."""
+    with contextlib.ExitStack() as stack:
+        yield stack.enter_context
+
+
+def _leaked_metadata_pids():
+    """Pids of exiftool -stay_open / jetlag-metadata children this process
+    spawned (via lib.exiftool / lib.metadata) that are still alive."""
+    tracked = (
+        [(pid, "exiftool") for pid in _exiftool_module._spawned_pids]
+        + [(pid, "jetlag-metadata") for pid in _metadata_module._spawned_pids]
+    )
+    leaked = []
+    for pid, name in tracked:
+        result = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "command="],
+            capture_output=True, text=True,
+        )
+        cmd = result.stdout.strip()
+        if cmd and name in cmd:
+            leaked.append(f"pid {pid} ({cmd})")
+    return leaked
 
 
 # Map of required tool -> install commands by platform.
@@ -214,5 +254,15 @@ def pytest_sessionfinish(session, exitstatus):
         path = Path(results_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(results, indent=2) + "\n")
+
+    leaked = _leaked_metadata_pids()
+    if leaked:
+        message = "leaked metadata subprocess(es) survived the test session: " + ", ".join(leaked)
+        terminal = session.config.pluginmanager.get_plugin("terminalreporter")
+        if terminal:
+            terminal.write_line(message, red=True, bold=True)
+        else:
+            print(message, file=sys.stderr)
+        session.exitstatus = 1
 
 

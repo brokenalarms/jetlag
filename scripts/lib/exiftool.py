@@ -21,6 +21,11 @@ import threading
 
 
 
+# pids of every exiftool -stay_open child this process has spawned, so a test
+# session can confirm none of them are still running at session end.
+_spawned_pids: list[int] = []
+
+
 class ExifTool:
     """Manages a persistent ``exiftool -stay_open True`` subprocess."""
 
@@ -29,6 +34,12 @@ class ExifTool:
         self._lock = threading.Lock()
         self._exec_id = 0
         self._unavailable = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
 
     def _ensure_running(self):
         if self._unavailable:
@@ -45,6 +56,7 @@ class ExifTool:
         except FileNotFoundError:
             self._unavailable = True
             raise
+        _spawned_pids.append(self._process.pid)
         # Drain stderr continuously: a pipe nobody reads fills after ~16 KB and
         # exiftool then blocks on its next warning before printing the sentinel.
         # Only the tail is kept, for diagnostics.
