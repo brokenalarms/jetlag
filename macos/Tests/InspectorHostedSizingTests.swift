@@ -69,6 +69,10 @@ final class InspectorHostedSizingTests: XCTestCase {
                 super.scrollerStyle = newValue
             }
         }
+
+        func forgetWrites() {
+            scrollerStyleWrites = 0
+        }
     }
 
     private func makeTable(
@@ -312,7 +316,13 @@ final class InspectorHostedSizingTests: XCTestCase {
     /// nothing, so it cannot itself re-invalidate layout (jetlag-m9a).
     func testConfigureHorizontalScrollerIsInertWhenRepeated() {
         let scrollView = ScrollerStyleCountingScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 400))
-        XCTAssertEqual(scrollView.scrollerStyle, .overlay, "baseline: AppKit defaults to overlay scrollers")
+        // A new scroll view starts at whatever the machine's "Show scroll bars"
+        // setting resolves to — overlay on a trackpad, legacy once a mouse is
+        // attached — so the unconfigured state is pinned rather than assumed.
+        scrollView.scrollerStyle = .overlay
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = false
+        scrollView.forgetWrites()
 
         TableColumnSizing.configureHorizontalScroller(for: scrollView)
 

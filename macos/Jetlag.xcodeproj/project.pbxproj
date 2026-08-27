@@ -36,6 +36,7 @@
 		8F979D129B6EF35BF9FA8BCB /* TimezoneCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 275EE4D58C8BFA72BF92B86F /* TimezoneCatalog.swift */; };
 		92BA1490C431AC89A5646C85 /* FilenamePatterns.swift in Sources */ = {isa = PBXBuildFile; fileRef = A668F7E7A4F545637B636567 /* FilenamePatterns.swift */; };
 		932EB3F57E4BF42DBFA0EBF9 /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */; };
+		934E26502731FE0C424D7121 /* WorktreeBundleIdentityGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D624A325EEBAC2CBD65CA /* WorktreeBundleIdentityGuardTests.swift */; };
 		A00FA545CCBD5C1CF868B312 /* PythonRuntimeCheckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33AF1E5DF4D368EB36EFB0EC /* PythonRuntimeCheckTests.swift */; };
 		A782F8A1159D170B5CEB4C7E /* LicenseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D2EC9D00CD4EE5A754D59E /* LicenseStore.swift */; };
 		A87A9F7C3870DC8D634B2510 /* MediaProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC0210C9EE3BEF29E07C9DE6 /* MediaProfile.swift */; };
@@ -106,6 +107,7 @@
 		A54A1E7104B0356A474B3968 /* TimezoneMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimezoneMapView.swift; sourceTree = "<group>"; };
 		A668F7E7A4F545637B636567 /* FilenamePatterns.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenamePatterns.swift; sourceTree = "<group>"; };
 		B098EAB2712A13202064D6F1 /* RowFileLocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowFileLocationTests.swift; sourceTree = "<group>"; };
+		B41D624A325EEBAC2CBD65CA /* WorktreeBundleIdentityGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeBundleIdentityGuardTests.swift; sourceTree = "<group>"; };
 		B68CD5F46C4AF7FAFE297AAE /* Jetlag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jetlag.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C4AF4B0A35CD716A34E2A275 /* ProfilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesView.swift; sourceTree = "<group>"; };
 		C698B76B04834D4379CADAA4 /* InspectorHostedSizingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorHostedSizingTests.swift; sourceTree = "<group>"; };
@@ -204,6 +206,7 @@
 				B098EAB2712A13202064D6F1 /* RowFileLocationTests.swift */,
 				31610BDF5B254E8176367A1D /* TimestampSourceTests.swift */,
 				D0A92519F526948204A6F4D6 /* WorkflowLayoutTests.swift */,
+				B41D624A325EEBAC2CBD65CA /* WorktreeBundleIdentityGuardTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -286,6 +289,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 3B345131B7328B247808BE97 /* Build configuration list for PBXNativeTarget "Jetlag" */;
 			buildPhases = (
+				228D47D6D1BB676D9E379B3F /* Guard Worktree Bundle Identity */,
 				65D7687FE2D484BF6F6E0E91 /* Sources */,
 				71A31D1B074F078951F2D4CD /* Resources */,
 				BCB11FBB772D43DDB3F9EE6A /* Frameworks */,
@@ -349,6 +353,25 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		228D47D6D1BB676D9E379B3F /* Guard Worktree Bundle Identity */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Guard Worktree Bundle Identity";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/BuildScripts/guard-worktree-identity.sh\"\n";
+		};
 		FD4A93DF9A898EAE722BC868 /* Bundle scripts */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -425,6 +448,7 @@
 				BCBAB853A58D0989258EE4F5 /* RowFileLocationTests.swift in Sources */,
 				3E3C0BD8BAD159DA18D47303 /* TimestampSourceTests.swift in Sources */,
 				F141198EED92BFBB91AE339E /* WorkflowLayoutTests.swift in Sources */,
+				934E26502731FE0C424D7121 /* WorktreeBundleIdentityGuardTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -511,15 +535,20 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "";
+				INFOPLIST_KEY_CFBundleDisplayName = "Jetlag$(JETLAG_PRODUCT_SUFFIX)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Daniel Lawrence";
+				JETLAG_BUNDLE_SUFFIX = "";
+				JETLAG_PRODUCT_SUFFIX = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.daniellawrence.Jetlag;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.daniellawrence.Jetlag$(JETLAG_BUNDLE_SUFFIX)";
+				PRODUCT_MODULE_NAME = Jetlag;
+				PRODUCT_NAME = "Jetlag$(JETLAG_PRODUCT_SUFFIX)";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
 			};
@@ -531,15 +560,17 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				JETLAG_BUNDLE_SUFFIX = "";
+				JETLAG_PRODUCT_SUFFIX = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.daniellawrence.JetlagTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.daniellawrence.JetlagTests$(JETLAG_BUNDLE_SUFFIX)";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Jetlag.app/Contents/MacOS/Jetlag";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Jetlag$(JETLAG_PRODUCT_SUFFIX).app/Contents/MacOS/Jetlag$(JETLAG_PRODUCT_SUFFIX)";
 			};
 			name = Debug;
 		};
@@ -605,15 +636,17 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				JETLAG_BUNDLE_SUFFIX = "";
+				JETLAG_PRODUCT_SUFFIX = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.daniellawrence.JetlagTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.daniellawrence.JetlagTests$(JETLAG_BUNDLE_SUFFIX)";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Jetlag.app/Contents/MacOS/Jetlag";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Jetlag$(JETLAG_PRODUCT_SUFFIX).app/Contents/MacOS/Jetlag$(JETLAG_PRODUCT_SUFFIX)";
 			};
 			name = Release;
 		};
@@ -626,15 +659,20 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "";
+				INFOPLIST_KEY_CFBundleDisplayName = "Jetlag$(JETLAG_PRODUCT_SUFFIX)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Daniel Lawrence";
+				JETLAG_BUNDLE_SUFFIX = "";
+				JETLAG_PRODUCT_SUFFIX = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.daniellawrence.Jetlag;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.daniellawrence.Jetlag$(JETLAG_BUNDLE_SUFFIX)";
+				PRODUCT_MODULE_NAME = Jetlag;
+				PRODUCT_NAME = "Jetlag$(JETLAG_PRODUCT_SUFFIX)";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
 			};

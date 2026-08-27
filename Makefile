@@ -37,6 +37,16 @@ DMG_STAGING     := $(BUILD_DIR)/dmg-staging
 DMG_PATH        := $(BUILD_DIR)/$(APP_NAME).dmg
 EXPORT_PLIST    := $(MACOS_DIR)/ExportOptions.plist
 
+# A build outside the main checkout must never be able to pass itself off as the
+# installed Jetlag — same bundle id, product name and Application Support folder
+# would mean shared UserDefaults, a shared Launch Services registration and a
+# shared profiles file. Worktrees under .ralph/ therefore build "Jetlag Dev" with
+# bundle id com.daniellawrence.Jetlag.dev; the pre-build guard in
+# macos/BuildScripts/guard-worktree-identity.sh rejects one that does not.
+ifneq (,$(findstring /.ralph/,$(CURDIR)/))
+DEV_IDENTITY := JETLAG_BUNDLE_SUFFIX=.dev JETLAG_PRODUCT_SUFFIX=" Dev"
+endif
+
 .PHONY: all generate test test-scripts test-macos ralph-verify build archive export dmg clean
 
 all: dmg
@@ -74,6 +84,7 @@ test-macos: generate
 		-derivedDataPath $(DERIVED_DIR) \
 		-project $(MACOS_DIR)/$(APP_NAME).xcodeproj \
 		-quiet \
+		$(DEV_IDENTITY) \
 		test < /dev/null
 
 ## Run all tests available on this platform
@@ -93,6 +104,7 @@ build: generate
 		-derivedDataPath $(DERIVED_DIR) \
 		-project $(MACOS_DIR)/$(APP_NAME).xcodeproj \
 		-quiet \
+		$(DEV_IDENTITY) \
 		build
 
 ## Create a Release archive

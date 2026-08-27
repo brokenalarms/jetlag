@@ -30,7 +30,18 @@ targets:
         JETLAG_PRO_UNLOCKED: "1"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.daniellawrence.Jetlag
+        # Empty in the main checkout and the Xcode IDE, so those builds carry the
+        # installed app's identity as before. Builds under .ralph/ pass their own
+        # values on the xcodebuild command line — see the pre-build guard below.
+        JETLAG_BUNDLE_SUFFIX: ""
+        JETLAG_PRODUCT_SUFFIX: ""
+        PRODUCT_BUNDLE_IDENTIFIER: com.daniellawrence.Jetlag$(JETLAG_BUNDLE_SUFFIX)
+        PRODUCT_NAME: Jetlag$(JETLAG_PRODUCT_SUFFIX)
+        INFOPLIST_KEY_CFBundleDisplayName: Jetlag$(JETLAG_PRODUCT_SUFFIX)
+        # The Swift module name defaults to the product name, which would make a
+        # suffixed build's module `Jetlag_Dev` and break `@testable import Jetlag`.
+        # It is not part of the app's identity on disk, so it stays fixed.
+        PRODUCT_MODULE_NAME: Jetlag
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
@@ -42,6 +53,11 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.video
         INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 Daniel Lawrence"
         CODE_SIGN_ENTITLEMENTS: Sources/App.entitlements
+    preBuildScripts:
+      - name: Guard Worktree Bundle Identity
+        basedOnDependencyAnalysis: false
+        script: |
+          "${SRCROOT}/BuildScripts/guard-worktree-identity.sh"
     postBuildScripts:
       - name: Bundle scripts
         script: |
@@ -105,5 +121,11 @@ targets:
       - package: Yams
     settings:
       base:
+        JETLAG_BUNDLE_SUFFIX: ""
+        JETLAG_PRODUCT_SUFFIX: ""
+        PRODUCT_BUNDLE_IDENTIFIER: com.daniellawrence.JetlagTests$(JETLAG_BUNDLE_SUFFIX)
+        # xcodegen writes the unsuffixed product name into TEST_HOST; a suffixed
+        # build's host app is named for its own identity.
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Jetlag$(JETLAG_PRODUCT_SUFFIX).app/Contents/MacOS/Jetlag$(JETLAG_PRODUCT_SUFFIX)
         SWIFT_VERSION: "5.9"
         GENERATE_INFOPLIST_FILE: YES
