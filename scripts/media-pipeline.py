@@ -150,8 +150,13 @@ def run_organize_by_date(
     apply: bool,
     verbose: bool,
     overwrite: bool = False,
+    display_source: Optional[str] = None,
 ):
     """Organize a file into date-based folders via direct module call.
+
+    display_source overrides what organize prints as the file's origin — the
+    pipeline's active_file is the working-dir copy in apply mode, which is
+    internal staging and must never appear in output.
 
     Returns:
         OrganizeResult dataclass.
@@ -160,6 +165,7 @@ def run_organize_by_date(
         str(file_path), target_dir, template,
         copy_mode=False, overwrite=overwrite,
         apply=apply, verbose=verbose,
+        display_source=display_source,
     )
 
 
@@ -409,7 +415,7 @@ def process_file(
     else:
         template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
     org_result = run_organize_by_date(active_file, target_dir, template, apply, verbose,
-                                      overwrite=overwrite)
+                                      overwrite=overwrite, display_source=str(file_path))
     emit_event("organize_result",
         file=active_file.name,
         action=staged_organize_action(org_result.action),
@@ -686,7 +692,6 @@ def main():
 
     # Display configuration
     print(f"→ Source:  {source_dir}", file=sys.stderr)
-    print(f"→ Working: {working_dir}", file=sys.stderr)
     print(f"→ Target:  {target_dir}", file=sys.stderr)
     print(f"→ Mode:    {'APPLY (files will be processed)' if args.apply else 'DRY RUN (no changes)'}", file=sys.stderr)
     if timezone_spec:
