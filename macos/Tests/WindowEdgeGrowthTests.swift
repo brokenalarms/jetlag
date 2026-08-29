@@ -1,5 +1,6 @@
 import XCTest
 import AppKit
+import CoreGraphics
 import SwiftUI
 @testable import Jetlag
 
@@ -12,6 +13,16 @@ import SwiftUI
 final class WindowEdgeGrowthTests: XCTestCase {
     private let frame = CGRect(x: 100, y: 100, width: 900, height: 700)
     private let screenEdge: CGFloat = 2000
+
+    /// The window server drives window frame animations, and stops driving them while
+    /// the screen is locked: the group is entered and the animator holds the frame, but
+    /// the timeline never advances and the completion never runs. What the scheduling
+    /// tests below assert before the wait still holds there; only the frame's arrival
+    /// cannot be observed, so those halves are skipped rather than read as a failure.
+    private var screenIsLocked: Bool {
+        guard let session = CGSessionCopyCurrentDictionary() as? [String: Any] else { return false }
+        return (session["CGSSessionScreenIsLocked"] as? NSNumber)?.boolValue == true
+    }
 
     /// AC 2: opening the panel grows the window's right edge to the screen edge.
     func testGrowsOnPanelOpenTransition() {
@@ -129,6 +140,7 @@ final class WindowEdgeGrowthTests: XCTestCase {
         XCTAssertEqual(window.frame, original,
                        "the update must schedule the resize, not animate it synchronously mid-render")
 
+        try XCTSkipIf(screenIsLocked, "window animations do not advance while the screen is locked")
         wait(for: [grown], timeout: 5)
         XCTAssertEqual(window.frame, expected, "the scheduled animation must land on the target frame")
     }
@@ -136,7 +148,7 @@ final class WindowEdgeGrowthTests: XCTestCase {
     /// `grow` is the whole of how a target frame is applied: it hands the frame to the
     /// window's animator inside an animation group and returns with the window
     /// untouched, and that group's completion runs with the target frame in place.
-    func testGrowAppliesTheFrameThroughTheAnimationGroupsCompletion() {
+    func testGrowAppliesTheFrameThroughTheAnimationGroupsCompletion() throws {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 500),
                               styleMask: [.titled, .resizable], backing: .buffered, defer: false)
         let original = window.frame
@@ -151,6 +163,7 @@ final class WindowEdgeGrowthTests: XCTestCase {
         }
         XCTAssertEqual(window.frame, original, "the animator must not apply the frame synchronously")
 
+        try XCTSkipIf(screenIsLocked, "window animations do not advance while the screen is locked")
         wait(for: [finished], timeout: 5)
         XCTAssertEqual(frameAtCompletion, target)
     }

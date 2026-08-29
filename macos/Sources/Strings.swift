@@ -41,7 +41,7 @@ enum Strings {
         static let gyroflowHelp = String(localized: "pipeline.gyroflow.help",
             defaultValue: "Generate Gyroflow stabilization project files (requires gyro data)")
         static let archiveSourceHelp = String(localized: "pipeline.archiveSource.help",
-            defaultValue: "Act on source folder after processing (archive or delete)")
+            defaultValue: "Act on the source folder once every file has been processed (archive or delete). A cancelled or failed run archives nothing and leaves the source untouched.")
     }
 
     // MARK: - Workflow
@@ -104,6 +104,8 @@ enum Strings {
 What happens to source files after processing:
 • Archive — rename source folder with date suffix (default)
 • Delete — remove only processed files and companions from source
+
+Runs once, after the whole batch: if the run is cancelled or a file fails, the source is left exactly as it was — re-run the folder to finish and archive it.
 """)
         static let timezoneHelp = String(localized: "workflow.timezone.help",
             defaultValue: "Timezone the footage was shot in, used to fix timestamps for your video editor")
