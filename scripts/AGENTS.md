@@ -81,8 +81,7 @@ Expected behaviors that regression tests must verify:
 
 ### fix-media-timestamp
 - If `--infer-from-filename` is specified, `--timezone` must be provided
-- Files with `YYYYMMDD_HHMMSS` in the filename are first source of truth — filename should never be modified
-- `DateTimeOriginal` is next source of truth — should never be modified unless `--infer-from-filename` is specified
+- Source ranking follows the "Timestamp source of truth hierarchy" section above and `docs/timestamp-fields.md` — not restated here
 - If a file was shot in timezone +0800, with the script run in +0900, then `Keys:CreationDate` should end up with the +0800 timezone, and the birthdate should end up as one hour later
 - If a different `--timezone` is specified that doesn't match `DateTimeOriginal`, this is informational (shown in diff) — not blocking
 - If `DateTimeOriginal` is missing and we change timezones, the QuickTime UTC fields `MediaCreateDate`, file birth date, and `Keys:CreationDate` should all be updated

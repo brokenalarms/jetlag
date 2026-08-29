@@ -209,25 +209,12 @@ now lives in `docs/timestamp-fields.md`.
 
 ## Not yet done
 
-Each of these is separable, and none is needed for a correction to be right:
+This is not needed for a correction to be right:
 
 - `fix-media-timestamp.py` — a correction to a still loses its zone. `DateTimeOriginal`
   is written alone, and exiftool silently drops the zone from a value bound for binary
   EXIF rather than splitting it out (verified; see `timestamp-fields.md`). Stills need
   `OffsetTimeOriginal` written as its own tag alongside `DateTimeOriginal`.
-- `media-pipeline.py` — the provided-versus-embedded mismatch still blocks, against the
-  intent recorded in `time-correction-pipeline-step.md`, where it is informational and
-  dry-run plus explicit apply is the safety gate.
-- `scripts/AGENTS.md` — the hierarchy still lists the filename as the highest-priority
-  source and states filenames are never modified. The filename is the source of truth for
-  wall-clock time only where no corroborated UTC clock contradicts it, and
-  `--update-filename-dates` renames files to match corrections.
-- The app surfaces the winning source in the diff table: `timestamp_source` decodes
-  into `TimestampSource`, which owns the display label shown under each row's action
-  and whether the original's digits are UTC. `stale_fields` names the write tags a
-  correction would change, shown as the row's tooltip and under its status, so a row
-  whose original and corrected times are identical still says what it will write.
-  No dialog is needed: the choice is always decidable.
 
 ## Verification
 

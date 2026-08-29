@@ -52,7 +52,7 @@ This dict-key-as-name constraint is shared between the Swift model and the Pytho
 
 ### Where the file lives
 
-The live file the app reads and writes is `~/Library/Application Support/Jetlag/media-profiles.yaml`. It is created on first launch by copying `scripts/media-profiles.yaml` out of the app bundle, and is the user's from then on — a later launch never overwrites it.
+The live file the app reads and writes is `~/Library/Application Support/<app name>/media-profiles.yaml`, where `<app name>` is `Jetlag` for the installed app and `Jetlag Dev` for a suffixed worktree build (`ProfilesLocation.applicationSupportFolderName` derives it from the bundle name). It is created on first launch by copying `scripts/media-profiles.yaml` out of the app bundle, and is the user's from then on — a later launch never overwrites it.
 
 The copy inside the bundle (`Contents/Resources/scripts/media-profiles.yaml`) is the shipped default and is only ever read. The `Bundle scripts` build phase replaces it on every build, so an edit written there would be discarded on the next build; an installed, signed app cannot write into its own bundle at all.
 
@@ -117,7 +117,7 @@ Direct distribution only via notarized DMG. No App Store version — the depende
 Tests live in `scripts/tests/`.
 
 - **Regression tests** — assert actual file state before and after, not just exit codes or stdout. Structured as "record before → run script → compare after" with human-readable expected vs actual diffs.
-- **Performance tests** — snapshot harness. Runs media-pipeline end-to-end (3 files, fix-timestamp + organize), measures median wall-clock time over 3 runs, compares to a saved baseline. Threshold: 5% slower than baseline = regression. Delete the baseline file to re-record after intentional perf improvements.
+- **Performance tests** — see `docs/testing.md`'s "Performance tests" entry.
 
 Testing rules:
 - Testing `returncode == 0` is not testing behavior — it only confirms the script didn't crash.
