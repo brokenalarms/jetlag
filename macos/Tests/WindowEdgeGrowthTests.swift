@@ -111,8 +111,11 @@ final class WindowEdgeGrowthTests: XCTestCase {
     func testPanelOpenSchedulesTheResizeInsteadOfApplyingItDuringTheUpdate() throws {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 500),
                               styleMask: [.titled, .resizable], backing: .buffered, defer: false)
-        // Laid out but never ordered on screen: a test window appearing over the user's
-        // desktop mid-suite is a real window to them. It resizes the same without it.
+        // On screen, as the app's window is: the controller only grows a visible window,
+        // and only for a visible window does the animator animate rather than resize
+        // outright.
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
         let host = NSHostingView(rootView: GrowthProbe(panelOpen: false))
         window.contentView = host
         host.layoutSubtreeIfNeeded()
@@ -151,6 +154,8 @@ final class WindowEdgeGrowthTests: XCTestCase {
     func testGrowAppliesTheFrameThroughTheAnimationGroupsCompletion() throws {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 500),
                               styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
         let original = window.frame
         var target = original
         target.size.width = original.width + 500
@@ -166,6 +171,35 @@ final class WindowEdgeGrowthTests: XCTestCase {
         try XCTSkipIf(screenIsLocked, "window animations do not advance while the screen is locked")
         wait(for: [finished], timeout: 5)
         XCTAssertEqual(frameAtCompletion, target)
+    }
+
+    /// A window that is not on screen has no visible edge to grow toward, and the
+    /// animator resizes such a window outright rather than animating it — synchronously,
+    /// inside the render pass `updateNSView` runs in. Opening the panel on a controller
+    /// hosted in a window never ordered front must therefore do nothing at all: the frame
+    /// stays where it was and no resize is ever scheduled.
+    func testPanelOpenDoesNotGrowAWindowThatIsNotOnScreen() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 500),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: GrowthProbe(panelOpen: false))
+        window.contentView = host
+        host.layoutSubtreeIfNeeded()
+        XCTAssertFalse(window.isVisible, "the window must never be ordered on screen for this test")
+
+        let original = window.frame
+        let resized = expectation(description: "the window is resized")
+        resized.isInverted = true
+        let observer = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResizeNotification, object: window, queue: nil
+        ) { _ in resized.fulfill() }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        host.rootView = GrowthProbe(panelOpen: true)
+        host.layoutSubtreeIfNeeded()
+        XCTAssertEqual(window.frame, original, "an off-screen window must not be resized during the update")
+
+        wait(for: [resized], timeout: 1)
+        XCTAssertEqual(window.frame, original, "no growth may arrive later either")
     }
 }
 

@@ -37,8 +37,8 @@ enum WindowEdgeGrowth {
     /// from, which is exactly what `grow` exists to avoid.
     static let growthDuration: TimeInterval = 0.25
 
-    /// Schedules the resize on the window's animator, a run loop turn out, and returns;
-    /// the frame arrives when the animation group finishes.
+    /// Schedules the resize on the window's animator and returns; the frame arrives
+    /// when the animation group finishes.
     ///
     /// `setFrame(_:display:animate:)` would animate it synchronously instead: it blocks
     /// and re-lays-out the window's content once per animation frame. Growth is decided
@@ -49,18 +49,15 @@ enum WindowEdgeGrowth {
     /// proxy runs no AppKit layout inside SwiftUI's update, and the visible resize is
     /// the same.
     ///
-    /// The animator alone does not settle it: it holds the frame back only while it has
-    /// an animation to run, and a window it declines to animate — one never ordered on
-    /// screen, among others — is resized outright, back inside the render pass. Handing
-    /// the group to the next run loop turn puts the resize after that pass whichever
-    /// route the animator takes.
+    /// The animator holds the frame back only while it has an animation to run: a window
+    /// it declines to animate — one that is not on screen — is resized outright, inside
+    /// the render pass. Such a window has no edge to grow toward and nobody watching it,
+    /// so the controller does not call this for one.
     static func grow(_ window: NSWindow, to target: CGRect, completion: (() -> Void)? = nil) {
-        DispatchQueue.main.async {
-            NSAnimationContext.runAnimationGroup({ context in
-                context.duration = growthDuration
-                window.animator().setFrame(target, display: true)
-            }, completionHandler: completion)
-        }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = growthDuration
+            window.animator().setFrame(target, display: true)
+        }, completionHandler: completion)
     }
 }
 
@@ -89,7 +86,9 @@ struct WindowEdgeGrowthController: NSViewRepresentable {
             coordinator.previousPanelOpen = panelOpen
             coordinator.previousIsRunning = isRunning
         }
-        guard let window = view.window, let screen = window.screen else { return }
+        // A window that is not on screen has no visible edge to grow toward, and the
+        // animator resizes it synchronously — reentrant layout, from inside this update.
+        guard let window = view.window, window.isVisible, let screen = window.screen else { return }
         guard let target = WindowEdgeGrowth.targetFrame(
             previousPanelOpen: coordinator.previousPanelOpen,
             panelOpen: panelOpen,
