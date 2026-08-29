@@ -1,10 +1,14 @@
 import XCTest
+import AppKit
+import SwiftUI
 @testable import Jetlag
 
 /// Opening the panel used to be the only thing that grew the window to the screen
 /// edge, so a second run started with the panel already open left the window narrow
 /// and the table clipped. These tests pin `WindowEdgeGrowth.targetFrame` as a pure
-/// function of the panel/run transitions, independent of any window or screen.
+/// function of the panel/run transitions, independent of any window or screen, and
+/// pin how the resulting frame is applied: scheduled on the window's animator, never
+/// animated synchronously inside the SwiftUI update that decides it.
 final class WindowEdgeGrowthTests: XCTestCase {
     private let frame = CGRect(x: 100, y: 100, width: 900, height: 700)
     private let screenEdge: CGFloat = 2000
@@ -82,5 +86,85 @@ final class WindowEdgeGrowthTests: XCTestCase {
             previousIsRunning: false, isRunning: false,
             frame: atCap, screenEdge: screenEdge, maxWidth: 1500
         ))
+    }
+
+    // MARK: - Applying the frame
+
+    /// The controller decides growth from `updateNSView`, which SwiftUI runs while it
+    /// is rendering the hosting view the controller lives in. A synchronous
+    /// `setFrame(_:display:animate:)` there blocks and re-lays-out that hosting view
+    /// once per animation frame, so every SwiftUI layout pass it lands in is dropped.
+    /// Hosting the controller in a real window and driving panel open proves the resize
+    /// is scheduled rather than applied: the window is still at its original frame when
+    /// the update returns, and reaches the target once the scheduled animation has run.
+    func testPanelOpenSchedulesTheResizeInsteadOfApplyingItDuringTheUpdate() throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 500),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        // Laid out but never ordered on screen: a test window appearing over the user's
+        // desktop mid-suite is a real window to them. It resizes the same without it.
+        let host = NSHostingView(rootView: GrowthProbe(panelOpen: false))
+        window.contentView = host
+        host.layoutSubtreeIfNeeded()
+
+        let original = window.frame
+        let screen = try XCTUnwrap(window.screen)
+        let expected = try XCTUnwrap(WindowEdgeGrowth.targetFrame(
+            previousPanelOpen: false, panelOpen: true,
+            previousIsRunning: false, isRunning: false,
+            frame: original, screenEdge: screen.visibleFrame.maxX,
+            maxWidth: WindowEdgeGrowth.contentMaxWidth
+        ), "the test window must have room left to grow into for this to prove anything")
+
+        let grown = expectation(description: "the window reaches the target frame")
+        grown.assertForOverFulfill = false
+        let observer = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResizeNotification, object: window, queue: nil
+        ) { _ in
+            if window.frame == expected { grown.fulfill() }
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        host.rootView = GrowthProbe(panelOpen: true)
+        host.layoutSubtreeIfNeeded()
+        XCTAssertEqual(window.frame, original,
+                       "the update must schedule the resize, not animate it synchronously mid-render")
+
+        wait(for: [grown], timeout: 5)
+        XCTAssertEqual(window.frame, expected, "the scheduled animation must land on the target frame")
+    }
+
+    /// `grow` is the whole of how a target frame is applied: it hands the frame to the
+    /// window's animator inside an animation group and returns with the window
+    /// untouched, and that group's completion runs with the target frame in place.
+    func testGrowAppliesTheFrameThroughTheAnimationGroupsCompletion() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 500),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        let original = window.frame
+        var target = original
+        target.size.width = original.width + 500
+
+        let finished = expectation(description: "the animation group completes")
+        var frameAtCompletion = CGRect.zero
+        WindowEdgeGrowth.grow(window, to: target) {
+            frameAtCompletion = window.frame
+            finished.fulfill()
+        }
+        XCTAssertEqual(window.frame, original, "the animator must not apply the frame synchronously")
+
+        wait(for: [finished], timeout: 5)
+        XCTAssertEqual(frameAtCompletion, target)
+    }
+}
+
+/// A host for the controller under test: nothing about the probe itself matters, so it
+/// is a clear, fully flexible view carrying the controller exactly as `ContentView`
+/// does — in its background, updated on every state change.
+private struct GrowthProbe: View {
+    var panelOpen: Bool
+
+    var body: some View {
+        Color.clear
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(WindowEdgeGrowthController(panelOpen: panelOpen, isRunning: false))
     }
 }
