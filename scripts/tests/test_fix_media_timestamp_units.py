@@ -215,6 +215,87 @@ class TestChangeDetection:
         assert not [tag for tag in changes["clock_targets"] if tag.startswith("QuickTime:")]
         assert not [tag for tag in changes["stale_clock_fields"] if tag.startswith("QuickTime:")]
 
+    def test_still_target_carries_the_zone_in_offsettimeoriginal(self):
+        """A still's DateTimeOriginal is binary EXIF — 19 characters, no room for a
+        zone — so a correction that owns it must also target OffsetTimeOriginal with
+        that value's zone, or the correction is stored as a naive time."""
+        photo = os.path.join(self.temp_dir, "still.jpg")
+        create_test_photo(photo, DateTimeOriginal="2025:06:18 07:25:21")
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+
+        targets = fmt.determine_needed_changes(
+            photo, dt, write_datetime_original=True)["clock_targets"]
+
+        assert targets["DateTimeOriginal"] == "2025:06:18 07:25:21+08:00"
+        assert targets["OffsetTimeOriginal"] == "+08:00"
+
+    def test_still_missing_offset_is_stale_though_the_digits_match(self):
+        """A still whose DateTimeOriginal digits are already right but which carries
+        no zone is not corrected: OffsetTimeOriginal is reported stale so the zone
+        gets written."""
+        photo = os.path.join(self.temp_dir, "still.jpg")
+        create_test_photo(photo, DateTimeOriginal="2025:06:18 07:25:21")
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+
+        changes = fmt.determine_needed_changes(photo, dt, write_datetime_original=True)
+
+        assert "OffsetTimeOriginal" in changes["stale_clock_fields"]
+
+    def test_still_with_a_different_stored_offset_is_stale(self):
+        """A still already carrying a zone that disagrees with the correction has
+        that zone rewritten rather than left contradicting DateTimeOriginal."""
+        photo = os.path.join(self.temp_dir, "still.jpg")
+        create_test_photo(photo, DateTimeOriginal="2025:06:18 07:25:21",
+                          OffsetTimeOriginal="-05:00")
+        fmt._exif_cache.clear()
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+
+        changes = fmt.determine_needed_changes(photo, dt, write_datetime_original=True)
+
+        assert "OffsetTimeOriginal" in changes["stale_clock_fields"]
+
+    def test_still_with_the_correct_offset_is_not_stale(self):
+        """A still whose stored zone already matches the correction is left alone,
+        so a second run of the same correction writes nothing."""
+        photo = os.path.join(self.temp_dir, "still.jpg")
+        create_test_photo(photo, DateTimeOriginal="2025:06:18 07:25:21",
+                          OffsetTimeOriginal="+08:00")
+        fmt._exif_cache.clear()
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+
+        changes = fmt.determine_needed_changes(photo, dt, write_datetime_original=True)
+
+        assert "OffsetTimeOriginal" not in changes["stale_clock_fields"]
+        assert "DateTimeOriginal" not in changes["stale_clock_fields"]
+
+    def test_video_targets_also_carry_the_offset(self):
+        """The zone target is not conditional on file type: a video's targets carry
+        OffsetTimeOriginal too, and exiftool drops it where it cannot be stored."""
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+
+        targets = fmt.determine_needed_changes(
+            self.test_video, dt, write_datetime_original=True)["clock_targets"]
+
+        assert targets["OffsetTimeOriginal"] == "+08:00"
+
+    def test_video_zone_carried_inline_is_not_stale(self):
+        """A video keeps its zone inside XMP DateTimeOriginal, where exiftool can
+        store it — a file already carrying the right zone there must not be rewritten
+        on every run just because the stills-only offset tag is absent."""
+        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
+        self._set_tags(
+            self.test_video,
+            "-Keys:CreationDate=2025:06:18 07:25:21+08:00",
+            "-QuickTime:CreateDate=2025:06:17 23:25:21",
+            "-QuickTime:MediaCreateDate=2025:06:17 23:25:21",
+            "-QuickTime:TrackCreateDate=2025:06:17 23:25:21",
+        )
+
+        changes = fmt.determine_needed_changes(
+            self.test_video, dt, write_datetime_original=True)
+
+        assert changes["stale_clock_fields"] == []
+
     def test_quicktime_targets_share_one_utc_instant(self):
         """Every QuickTime atom targets the same UTC instant as DateTimeOriginal's
         zoned local time, so no atom disagrees with another after a correction."""
@@ -240,20 +321,6 @@ class TestWriteOperations:
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
         fmt._exif_cache.clear()
-
-    def test_write_datetime_original(self):
-        """Test writing DateTimeOriginal"""
-        dt_str = "2025:06:18 07:25:21+08:00"
-
-        success = fmt.write_datetime_original(self.test_video, dt_str)
-
-        assert success is True
-
-        # Verify it was written
-        fmt._exif_cache.clear()
-        data = fmt.read_exif_data(self.test_video)
-        assert "DateTimeOriginal" in data
-        assert "2025:06:18 07:25:21" in data["DateTimeOriginal"]
 
     def test_write_quicktime_createdate_reaches_track_atom(self):
         """Healing a QuickTime clock writes the corrected UTC instant into the

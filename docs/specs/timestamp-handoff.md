@@ -1,6 +1,6 @@
 # Handoff: timestamp source of truth
 
-Read `timestamp-source-of-truth.md` first — it holds the rules and the reasoning. This
+Read `completed/timestamp-source-of-truth.md` first — it holds the rules and the reasoning. This
 file is what a fresh agent needs to pick up the work, and the state of the user's data.
 
 ## What landed

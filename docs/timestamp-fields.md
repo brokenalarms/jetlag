@@ -5,8 +5,7 @@ can mean, whether that meaning is guaranteed, and where it ranks. Change behavio
 in agreement with this table, and change this table when behaviour changes.
 
 The ranking rules and the reasoning behind them live in
-`specs/timestamp-source-of-truth.md` while that work is in flight; the durable
-per-field facts live here.
+`specs/completed/timestamp-source-of-truth.md`; the durable per-field facts live here.
 
 ## Vocabulary
 
@@ -23,7 +22,7 @@ per-field facts live here.
 |---|---|---|---|---|---|---|
 | `Keys:CreationDate` | `com.apple.quicktime.creationdate` (Keys metadata) | text | self-describing: `Z` = digits are UTC; `±HH:MM` = digits are local in that zone; bare = naive | iPhone writes zoned local; trustworthy when zoned. FCP keys off this field | yes | yes — zoned local |
 | `DateTimeOriginal` | `XMP-exif` on video (where a bare exiftool write lands); UserData/`IDIT` natively; binary EXIF on stills | text | XMP is ISO-8601, zone may ride in the value; **binary EXIF is exactly 19 chars — no zone possible** (see `OffsetTimeOriginal`) | camera-written: local + camera's zone setting; jetlag-written: local + declared zone | yes | yes |
-| `OffsetTimeOriginal` | binary EXIF (stills), added in EXIF 2.31 | text `±HH:MM` | **always and only the zone** of `DateTimeOriginal`'s digits — never an instruction to shift time | cameras that set it are stating their zone setting | yes — completes a bare `DateTimeOriginal` into a zoned value at read time | not yet (see policy below) |
+| `OffsetTimeOriginal` | binary EXIF (stills), added in EXIF 2.31 | text `±HH:MM` | **always and only the zone** of `DateTimeOriginal`'s digits — never an instruction to shift time | cameras that set it are stating their zone setting | yes — completes a bare `DateTimeOriginal` into a zoned value at read time | yes — alongside `DateTimeOriginal`, same write |
 | `QuickTime:CreateDate`, `ModifyDate` | `mvhd` movie header atom | integer, seconds since 1904 | UTC by specification | devices vary; ecosystem docs (exiftool, PhotoPrism #1388) report local-time writers. Not observed on our devices — X4 writes true UTC. **Proof required per file** (below) | yes | yes — UTC, computed in Python, written raw |
 | `QuickTime:MediaCreateDate`, `MediaModifyDate` | `mdhd` per-track atom | integer, seconds since 1904 | UTC by specification | as above | yes | yes — UTC, written with the header and track atoms in one call |
 | `TrackCreateDate`, `TrackModifyDate` | `tkhd` per-track atom | integer, seconds since 1904 | UTC by specification | written since corrections reached the track atoms; the provenance record, not these atoms, is what makes a damaged file recoverable | yes | yes — UTC, written with the header and media atoms in one call |
@@ -126,10 +125,9 @@ $ exiftool -s -G -time:all -OffsetTimeOriginal still.jpg
 (`OffsetTimeOriginal` absent — the tag is never touched. Writing it explicitly does
 round-trip: `-OffsetTimeOriginal="+09:00"` reads back intact.)
 
-Consequence: corrections currently lose a still's zone, because they write
-`DateTimeOriginal` alone. Closing that requires writing `OffsetTimeOriginal` as its own
-tag alongside `DateTimeOriginal` whenever the target is a still — write-path work, kept
-separate from the read-side completion above.
+jetlag therefore writes `OffsetTimeOriginal` as its own tag in the same call as
+`DateTimeOriginal`, so the zone survives on a still; on a video the same write is
+harmless, exiftool keeping the zone inline in XMP and dropping the offset tag.
 
 ### Caveat: metadata previously written with a wrong declared zone
 

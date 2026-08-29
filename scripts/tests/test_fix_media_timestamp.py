@@ -12,11 +12,22 @@ import shutil
 from pathlib import Path
 import pytest
 
-from conftest import create_test_video
+from conftest import create_test_photo, create_test_video
 
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 SCRIPT_DIR = Path(__file__).parent.parent
+
+
+def _read_tags(path: str, *tags) -> dict:
+    """Tag name -> value, read straight off the file with exiftool."""
+    result = subprocess.run(
+        ["exiftool", "-s", *tags, path], capture_output=True, text=True, check=True,
+    )
+    return dict(
+        (line.split(":", 1)[0].strip(), line.split(":", 1)[1].strip())
+        for line in result.stdout.strip().splitlines()
+    )
 
 
 def _parse_at_lines(stdout: str) -> dict:
@@ -397,6 +408,51 @@ class TestIdempotenceAcrossRanking:
         assert "No change" in second.stderr, second.stderr
 
         once = subprocess.run(cmd + [processed_once] + apply_args, capture_output=True, text=True)
+        assert once.returncode == 0, once.stderr
+
+        assert self._read_fields(reprocessed) == self._read_fields(processed_once)
+
+    def test_still_keeps_its_zone_in_offsettimeoriginal(self, temp_dir):
+        """Correcting a still must leave the zone readable: binary EXIF
+        DateTimeOriginal holds bare digits, so the declared zone has to reach
+        OffsetTimeOriginal or every reader sees a naive time."""
+        photo = os.path.join(temp_dir, "IMG_0042.jpg")
+        create_test_photo(photo, DateTimeOriginal="2025:06:18 07:25:21")
+
+        cmd = [sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py")]
+        args = ["--timezone", "+0800", "--force-timezone", "--apply"]
+
+        first = subprocess.run(cmd + [photo] + args, capture_output=True, text=True)
+        assert first.returncode == 0, first.stderr
+
+        values = _read_tags(photo, "-EXIF:DateTimeOriginal", "-EXIF:OffsetTimeOriginal")
+        assert values["DateTimeOriginal"] == "2025:06:18 07:25:21"
+        assert values["OffsetTimeOriginal"] == "+08:00"
+
+    def test_corrected_still_reprocesses_as_a_zoned_source(self, temp_dir):
+        """A corrected still is idempotent and reads back as a row 1 source: the
+        zone jetlag wrote is the zone jetlag finds, so a second run has nothing to
+        write and never treats the file as naive."""
+        pristine = os.path.join(temp_dir, "IMG_0043.jpg")
+        create_test_photo(pristine, DateTimeOriginal="2025:06:18 07:25:21")
+
+        reprocessed = os.path.join(temp_dir, "reprocessed_IMG_0043.jpg")
+        processed_once = os.path.join(temp_dir, "once_IMG_0043.jpg")
+        shutil.copy2(pristine, reprocessed)
+        shutil.copy2(pristine, processed_once)
+
+        cmd = [sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py")]
+        args = ["--timezone", "+0800", "--force-timezone", "--apply"]
+
+        first = subprocess.run(cmd + [reprocessed] + args, capture_output=True, text=True)
+        assert first.returncode == 0, first.stderr
+
+        second = subprocess.run(cmd + [reprocessed] + args, capture_output=True, text=True)
+        assert second.returncode == 0, second.stderr
+        assert "No change" in second.stderr, second.stderr
+        assert _parse_at_lines(second.stdout)["timestamp_source"] == "datetimeoriginal"
+
+        once = subprocess.run(cmd + [processed_once] + args, capture_output=True, text=True)
         assert once.returncode == 0, once.stderr
 
         assert self._read_fields(reprocessed) == self._read_fields(processed_once)
