@@ -40,12 +40,19 @@ enum AnyCodable: Decodable {
 }
 
 final class ExifToolBackend {
-    private var process: Process?
-    private var stdin: FileHandle?
-    private var stdout: FileHandle?
-    private var stderr: FileHandle?
+    /// exiftool's pid, 0 when it is not running. Bookkeeping is pid-based rather
+    /// than `Process`-based because `Process` puts the child in a process group of
+    /// its own: the app cancels a run by signalling the pipeline's group, so an
+    /// exiftool outside that group is never reached and outlives the run.
+    private var pid: pid_t = 0
+    private var stdinFD: Int32 = -1
+    private var stdoutFD: Int32 = -1
+    private var stderrHandle: FileHandle?
     private var execId = 0
     private let lock = NSLock()
+
+    private let exited = NSCondition()
+    private var hasExited = true
 
     /// exiftool's stderr, drained continuously off the main thread. A pipe nobody
     /// reads fills after ~16 KB; exiftool then blocks on its next warning before it
@@ -56,25 +63,89 @@ final class ExifToolBackend {
     private var stderrBuffer = Data()
     private static let stderrKeep = 64 * 1024
 
+    /// How long exiftool is given to exit after `-stay_open False` before it is killed.
+    private static let shutdownGracePeriod: TimeInterval = 5
+
+    var isRunning: Bool {
+        exited.lock()
+        defer { exited.unlock() }
+        return pid > 0 && !hasExited
+    }
+
     func ensureRunning() throws {
-        if let p = process, p.isRunning { return }
+        if isRunning { return }
 
         let exiftoolPath = resolveExifToolPath()
+        let arguments = [exiftoolPath, "-stay_open", "True", "-@", "-"]
 
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: exiftoolPath)
-        proc.arguments = ["-stay_open", "True", "-@", "-"]
+        var toChild: [Int32] = [-1, -1]
+        var fromChild: [Int32] = [-1, -1]
+        var childErrors: [Int32] = [-1, -1]
+        guard pipe(&toChild) == 0, pipe(&fromChild) == 0, pipe(&childErrors) == 0 else {
+            throw MetadataError.spawnFailed(String(cString: strerror(errno)))
+        }
 
-        let stdinPipe = Pipe()
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
+        var fileActions: posix_spawn_file_actions_t?
+        posix_spawn_file_actions_init(&fileActions)
+        defer { posix_spawn_file_actions_destroy(&fileActions) }
+        posix_spawn_file_actions_adddup2(&fileActions, toChild[0], STDIN_FILENO)
+        posix_spawn_file_actions_adddup2(&fileActions, fromChild[1], STDOUT_FILENO)
+        posix_spawn_file_actions_adddup2(&fileActions, childErrors[1], STDERR_FILENO)
 
-        proc.standardInput = stdinPipe
-        proc.standardOutput = stdoutPipe
-        proc.standardError = stderrPipe
+        var attributes: posix_spawnattr_t?
+        posix_spawnattr_init(&attributes)
+        defer { posix_spawnattr_destroy(&attributes) }
+        // No SETPGROUP: exiftool stays in this process's group, so the group signal
+        // the app's Cancel sends reaches it directly. SETSIGDEF undoes the SIG_IGN
+        // this process installs to observe SIGINT and SIGTERM — inherited, it would
+        // make exiftool ignore the very signal that is meant to stop it — and
+        // CLOEXEC_DEFAULT hands the child only the three descriptors dup2'd above.
+        var defaultedSignals = sigset_t()
+        sigfillset(&defaultedSignals)
+        posix_spawnattr_setsigdefault(&attributes, &defaultedSignals)
+        var unblockedSignals = sigset_t()
+        sigemptyset(&unblockedSignals)
+        posix_spawnattr_setsigmask(&attributes, &unblockedSignals)
+        posix_spawnattr_setflags(
+            &attributes,
+            Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK))
 
-        let stderrHandle = stderrPipe.fileHandleForReading
-        stderrHandle.readabilityHandler = { [weak self] handle in
+        var spawnedPid: pid_t = 0
+        let result = withCStringArray(arguments) { argv in
+            posix_spawnp(&spawnedPid, exiftoolPath, &fileActions, &attributes, argv, environ)
+        }
+
+        Darwin.close(toChild[0])
+        Darwin.close(fromChild[1])
+        Darwin.close(childErrors[1])
+        guard result == 0 else {
+            Darwin.close(toChild[1])
+            Darwin.close(fromChild[0])
+            Darwin.close(childErrors[0])
+            throw MetadataError.spawnFailed(String(cString: strerror(result)))
+        }
+
+        stdinFD = toChild[1]
+        stdoutFD = fromChild[0]
+        drainStandardError(from: childErrors[0])
+
+        pid = spawnedPid
+        hasExited = false
+        // Reaped on a thread of its own: nothing else waits on exiftool, and an
+        // unreaped child would linger as a zombie for the life of the run.
+        Thread.detachNewThread { [self] in
+            var status: Int32 = 0
+            while waitpid(spawnedPid, &status, 0) < 0 && errno == EINTR {}
+            exited.lock()
+            hasExited = true
+            exited.broadcast()
+            exited.unlock()
+        }
+    }
+
+    private func drainStandardError(from descriptor: Int32) {
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        handle.readabilityHandler = { [weak self] handle in
             let chunk = handle.availableData
             guard let self else { return }
             if chunk.isEmpty {
@@ -88,13 +159,19 @@ final class ExifToolBackend {
             }
             self.stderrLock.unlock()
         }
+        stderrHandle = handle
+    }
 
-        try proc.run()
-
-        self.process = proc
-        self.stdin = stdinPipe.fileHandleForWriting
-        self.stdout = stdoutPipe.fileHandleForReading
-        self.stderr = stderrHandle
+    /// Call `body` with a NULL-terminated `char *[]` view of `values`, valid only
+    /// for the duration of the call.
+    private func withCStringArray<R>(
+        _ values: [String],
+        _ body: (UnsafePointer<UnsafeMutablePointer<CChar>?>) -> R
+    ) -> R {
+        var pointers = values.map { strdup($0) }
+        pointers.append(nil)
+        defer { pointers.forEach { free($0) } }
+        return body(&pointers)
     }
 
     /// What exiftool wrote to stderr since the last call — warnings for the request
@@ -133,7 +210,7 @@ final class ExifToolBackend {
         defer { lock.unlock() }
 
         try ensureRunning()
-        guard let stdinHandle = stdin, let stdoutHandle = stdout else {
+        guard stdinFD >= 0, stdoutFD >= 0 else {
             throw MetadataError.notRunning
         }
 
@@ -141,13 +218,15 @@ final class ExifToolBackend {
         let sentinel = "{ready\(execId)}"
 
         let payload = args.joined(separator: "\n") + "\n-execute\(execId)\n"
-        stdinHandle.write(payload.data(using: .utf8)!)
+        guard writeToExifTool(payload) else {
+            throw MetadataError.notRunning
+        }
 
         var lines: [String] = []
         var buffer = Data()
 
         while true {
-            let chunk = stdoutHandle.availableData
+            let chunk = readFromExifTool()
             if chunk.isEmpty { break }
             buffer.append(chunk)
 
@@ -202,18 +281,79 @@ final class ExifToolBackend {
         return (false, 0)
     }
 
+    /// Shut exiftool down and release its descriptors.
+    ///
+    /// Called from a signal handler as well as from the end of the main loop, so
+    /// it takes the lock opportunistically: the signalled thread may already hold
+    /// it inside `execute`, and blocking here would leave exiftool running. An
+    /// exiftool the same signal has already killed is a success, not an error —
+    /// the write simply fails, and the wait finds a process that is already gone.
     func close() {
-        lock.lock()
-        defer { lock.unlock() }
+        let acquired = lock.try()
+        defer { if acquired { lock.unlock() } }
 
-        guard let proc = process, proc.isRunning else {
-            process = nil
-            return
+        if pid > 0 {
+            if isRunning {
+                _ = writeToExifTool("-stay_open\nFalse\n")
+                if !waitForExit(within: Self.shutdownGracePeriod) {
+                    kill(pid, SIGKILL)
+                    _ = waitForExit(within: Self.shutdownGracePeriod)
+                }
+            }
+            pid = 0
         }
-        stdin?.write("-stay_open\nFalse\n".data(using: .utf8)!)
-        proc.waitUntilExit()
-        stderr?.readabilityHandler = nil
-        process = nil
+
+        stderrHandle?.readabilityHandler = nil
+        stderrHandle = nil
+        if stdinFD >= 0 { Darwin.close(stdinFD) }
+        if stdoutFD >= 0 { Darwin.close(stdoutFD) }
+        stdinFD = -1
+        stdoutFD = -1
+    }
+
+    /// Write to exiftool, reporting whether it took the bytes. SIGPIPE is ignored
+    /// process-wide, so a write to an exiftool that has already exited returns
+    /// EPIPE here instead of killing this process.
+    private func writeToExifTool(_ text: String) -> Bool {
+        guard stdinFD >= 0 else { return false }
+        let bytes = Array(text.utf8)
+        var offset = 0
+        while offset < bytes.count {
+            let written = bytes[offset...].withUnsafeBufferPointer { buffer in
+                write(stdinFD, buffer.baseAddress, buffer.count)
+            }
+            if written < 0 {
+                if errno == EINTR { continue }
+                return false
+            }
+            offset += written
+        }
+        return true
+    }
+
+    private func readFromExifTool() -> Data {
+        guard stdoutFD >= 0 else { return Data() }
+        var buffer = [UInt8](repeating: 0, count: 8192)
+        while true {
+            let count = buffer.withUnsafeMutableBufferPointer { pointer in
+                read(stdoutFD, pointer.baseAddress, pointer.count)
+            }
+            if count < 0 {
+                if errno == EINTR { continue }
+                return Data()
+            }
+            return Data(buffer[0..<count])
+        }
+    }
+
+    private func waitForExit(within timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        exited.lock()
+        defer { exited.unlock() }
+        while !hasExited, Date() < deadline {
+            exited.wait(until: deadline)
+        }
+        return hasExited
     }
 
     deinit {
@@ -223,6 +363,7 @@ final class ExifToolBackend {
 
 enum MetadataError: Error {
     case notRunning
+    case spawnFailed(String)
     case invalidRequest(String)
 }
 
@@ -231,6 +372,33 @@ private extension CharacterSet {
 }
 
 let backend = ExifToolBackend()
+
+/// Shut exiftool down on the signals the app's Cancel sends, then exit with the
+/// status a signalled process reports.
+///
+/// The app cancels a run by signalling the pipeline's process group, so this
+/// process and its exiftool are signalled at the same instant. Without a handler
+/// this process dies immediately and exiftool — mid-command, holding its
+/// stay_open state — is left to be reaped by whatever comes next. SIGPIPE is
+/// ignored so that writing `-stay_open False` to an exiftool the same signal has
+/// already killed fails a write instead of killing the shutdown that is running.
+func installShutdownHandlers() -> [DispatchSourceSignal] {
+    signal(SIGPIPE, SIG_IGN)
+    return [SIGINT, SIGTERM].map { signalNumber in
+        // The default disposition has to go before the source can observe it:
+        // otherwise the process is dead before the handler is ever scheduled.
+        signal(signalNumber, SIG_IGN)
+        let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .global())
+        source.setEventHandler {
+            backend.close()
+            exit(128 + signalNumber)
+        }
+        source.resume()
+        return source
+    }
+}
+
+let shutdownHandlers = installShutdownHandlers()
 
 func handleRequest(_ jsonLine: String) -> String {
     let decoder = JSONDecoder()

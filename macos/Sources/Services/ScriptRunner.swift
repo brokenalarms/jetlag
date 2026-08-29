@@ -117,10 +117,22 @@ struct ScriptRunner {
         // descriptor except the three set up above: the child would otherwise also
         // inherit the pipes' write ends by their original numbers, and anything it
         // backgrounds would hold them open long past its own exit — no EOF, so the
-        // log stream would never finish.
+        // log stream would never finish. SETSIGDEF and SETSIGMASK hand
+        // the script a clean signal environment: an inherited SIG_IGN cannot be
+        // trapped and an inherited block leaves the signal pending forever, so a
+        // script launched from a host that ignores or blocks SIGINT — as a Swift
+        // runtime does — would ignore cancel outright.
+        var defaultedSignals = sigset_t()
+        sigfillset(&defaultedSignals)
+        posix_spawnattr_setsigdefault(&attributes, &defaultedSignals)
+        var unblockedSignals = sigset_t()
+        sigemptyset(&unblockedSignals)
+        posix_spawnattr_setsigmask(&attributes, &unblockedSignals)
         posix_spawnattr_setpgroup(&attributes, 0)
         posix_spawnattr_setflags(
-            &attributes, Int16(POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT))
+            &attributes,
+            Int16(POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT
+                  | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK))
 
         let envStrings = environment.map { "\($0.key)=\($0.value)" }
         var pid: pid_t = 0

@@ -7,7 +7,7 @@ import Foundation
 /// rest re-parented to launchd and still running, so the script is spawned as its
 /// own process group leader and cancel signals the whole group.
 final class ScriptProcess: @unchecked Sendable {
-    /// How long the group is given to shut down on SIGTERM before it is killed.
+    /// How long the group is given to shut down on the interrupt before it is killed.
     /// The pipeline's handler closes jetlag-metadata, which drains exiftool's
     /// pending command before sending it `-stay_open False`.
     static let terminationGracePeriod: TimeInterval = 5
@@ -51,13 +51,15 @@ final class ScriptProcess: @unchecked Sendable {
 
     /// Ask the whole process group to stop, then kill whatever is left.
     ///
-    /// SIGTERM gives the pipeline's handler a chance to close jetlag-metadata and
-    /// exiftool in order; anything still alive after the grace period is killed so
-    /// a wedged child cannot outlive the run.
+    /// Cancel is the app's Ctrl+C, so the group is interrupted exactly as a
+    /// terminal interrupts a foreground job: every member — the script, Python,
+    /// jetlag-metadata and its exiftool — sees SIGINT at once and shuts itself
+    /// down. Anything still alive after the grace period is killed so a wedged
+    /// child cannot outlive the run.
     func terminateGroup(gracePeriod: TimeInterval = ScriptProcess.terminationGracePeriod) {
         let group = processGroupIdentifier
         guard group > 0 else { return }
-        kill(-group, SIGTERM)
+        kill(-group, SIGINT)
 
         let deadline = Date().addingTimeInterval(gracePeriod)
         DispatchQueue.global().async { [self] in
