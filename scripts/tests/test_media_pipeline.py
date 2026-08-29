@@ -12,6 +12,7 @@ import json
 import os
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -79,6 +80,14 @@ def run_pipeline(args: list[str], cwd: Optional[Path] = None) -> PipelineResult:
 
 
 from conftest import create_test_video as _create_video_raw
+
+import importlib.util as _importlib_util
+
+_pipeline_spec = _importlib_util.spec_from_file_location(
+    "media_pipeline_under_test", SCRIPT_DIR / "media-pipeline.py"
+)
+pipeline = _importlib_util.module_from_spec(_pipeline_spec)
+_pipeline_spec.loader.exec_module(pipeline)
 
 
 def create_test_video(path: Path, media_create_date: str = "2025:10:05 01:00:00"):
@@ -2194,6 +2203,269 @@ class TestOrganizeReportsTheUserFacingOutcome:
         left_behind = sorted(p.name for p in temp_workspace["source"].iterdir())
         assert left_behind == sorted(names), \
             f"Actual: source holds {left_behind}, Expected: {sorted(names)} — untouched by organize"
+
+
+class TestWorkingDirIsTransient:
+    """Nothing survives in the working directory past its own file's iteration.
+
+    The working directory is an implementation detail: ingest stages a copy of
+    every source file into it and organize moves that copy out. When organize
+    declines to place it — the destination already holds the same file, or a
+    different one and --overwrite was not given — the staged copy has no further
+    use, so the pipeline discards it. Idempotent re-runs are a designed use, so
+    without this a second run over an already-organized library leaves the whole
+    library duplicated on the working volume.
+    """
+
+    def _run(self, workspace, profile, working_dir, *extra):
+        return run_pipeline([
+            "--profile", profile,
+            "--source", str(workspace["source"]),
+            "--target", str(workspace["target"]),
+            "--timezone", "+0900",
+            "--group", "Test",
+            "--working-dir", str(working_dir),
+            *extra,
+        ])
+
+    def _leftovers(self, working_dir: Path) -> list[str]:
+        if not working_dir.exists():
+            return []
+        return sorted(p.name for p in working_dir.iterdir())
+
+    def _organize_results(self, stdout: str) -> list[dict]:
+        return [event for event in
+                (json.loads(line) for line in stdout.strip().split("\n") if line.strip())
+                if event["event"] == "organize_result"]
+
+    def test_second_identical_apply_leaves_no_staged_copies(self, temp_workspace, test_profile):
+        """Re-running an already-organized folder must not duplicate it into the working dir.
+
+        Actual: after the second apply the working dir holds no files, every
+        file skipped as identical, and the destination files are byte-identical
+        Expected: an idempotent re-run costs no disk space
+        """
+        working_dir = temp_workspace["root"] / "working"
+        names = ["VID_20251005_100000_00_001.mp4", "VID_20251005_110000_00_002.mp4"]
+        for name in names:
+            create_test_video(temp_workspace["source"] / name)
+
+        self._run(temp_workspace, test_profile, working_dir, "--apply")
+        organized = sorted(temp_workspace["target"].rglob("*.mp4"))
+        assert len(organized) == 2, f"Actual: {organized}, Expected: both files organized"
+        before = {p.name: p.read_bytes() for p in organized}
+
+        result = self._run(temp_workspace, test_profile, working_dir, "--apply")
+
+        actions = [(e["action"], e.get("reason")) for e in self._organize_results(result.stdout)]
+        assert actions == [("skipped", "identical")] * 2, \
+            f"Actual: {actions}, Expected: both files skipped as identical"
+        assert self._leftovers(working_dir) == [], \
+            f"Actual: working dir holds {self._leftovers(working_dir)}, Expected: nothing"
+        after = {p.name: p.read_bytes() for p in temp_workspace["target"].rglob("*.mp4")}
+        assert after == before, "Actual: destination bytes changed, Expected: untouched"
+
+    def test_blocked_by_a_different_file_leaves_no_staged_copy(self, temp_workspace, test_profile):
+        """A file organize refuses to overwrite still leaves nothing staged behind.
+
+        Actual: skipped with reason=exists_differs, working dir empty, source intact
+        Expected: the skip cleans up after itself just like the identical one
+        """
+        working_dir = temp_workspace["root"] / "working"
+        name = "VID_20251005_100000_00_001.mp4"
+        source_file = temp_workspace["source"] / name
+        create_test_video(source_file)
+        self._run(temp_workspace, test_profile, working_dir, "--apply")
+
+        organized = next(temp_workspace["target"].rglob(name))
+        with open(organized, "ab") as f:
+            f.write(b"x" * 100)
+        create_test_video(source_file)
+        source_bytes = source_file.read_bytes()
+
+        result = self._run(temp_workspace, test_profile, working_dir, "--apply")
+
+        actions = [(e["action"], e.get("reason")) for e in self._organize_results(result.stdout)]
+        assert actions == [("skipped", "exists_differs")], \
+            f"Actual: {actions}, Expected: skipped/exists_differs"
+        assert self._leftovers(working_dir) == [], \
+            f"Actual: working dir holds {self._leftovers(working_dir)}, Expected: nothing"
+        assert source_file.read_bytes() == source_bytes, \
+            "Actual: the source file changed, Expected: untouched"
+
+    def test_companion_copies_are_discarded_with_the_file_they_belong_to(
+            self, temp_workspace, test_profile):
+        """A discarded staged copy takes its companion copies with it.
+
+        Actual: neither the .mp4 nor its .thm remains in the working dir
+        Expected: companions staged by ingest are cleaned up on a skip too
+        """
+        working_dir = temp_workspace["root"] / "working"
+        name = "VID_20251005_100000_00_001.mp4"
+        video = temp_workspace["source"] / name
+        create_test_video(video)
+        (temp_workspace["source"] / "VID_20251005_100000_00_001.thm").write_bytes(b"thumb")
+
+        self._run(temp_workspace, test_profile, working_dir, "--apply", "--copy-companion-files")
+        result = self._run(temp_workspace, test_profile, working_dir, "--apply",
+                           "--copy-companion-files")
+
+        actions = [e["action"] for e in self._organize_results(result.stdout)]
+        assert actions == ["skipped"], f"Actual: {actions}, Expected: skipped"
+        assert self._leftovers(working_dir) == [], \
+            f"Actual: working dir holds {self._leftovers(working_dir)}, Expected: nothing"
+
+    def test_discard_line_names_the_file_not_the_working_dir(self, temp_workspace, test_profile):
+        """The discard is reported, and reported without leaking the staging path.
+
+        Actual: one 'Discarded staged copy' line naming the file and the skip reason
+        Expected: the user can see where the staged copy went
+        """
+        working_dir = temp_workspace["root"] / "working"
+        name = "VID_20251005_100000_00_001.mp4"
+        create_test_video(temp_workspace["source"] / name)
+        self._run(temp_workspace, test_profile, working_dir, "--apply")
+
+        result = self._run(temp_workspace, test_profile, working_dir, "--apply")
+
+        discards = [line for line in result.output.split("\n") if "Discarded staged copy" in line]
+        assert len(discards) == 1, \
+            f"Actual: {len(discards)} discard lines, Expected: 1\n{result.output}"
+        assert name in discards[0] and "identical" in discards[0], \
+            f"Actual: {discards[0]!r}, Expected: it to name {name} and the skip reason"
+        assert str(working_dir) not in discards[0], \
+            f"Actual: {discards[0]!r} leaks the working dir path, Expected: it names the file only"
+
+    def test_organize_error_keeps_the_staged_copy_for_inspection(self, temp_workspace):
+        """A file whose organize step errors keeps its staged copy on disk.
+
+        Organize only errors when it cannot resolve a date for the file it was
+        handed, which no source directory can be arranged to produce, so the
+        step is stubbed out. The run is marked failed and main() then preserves
+        the whole working dir — discarding the copy would throw away the
+        evidence that failure exists to keep.
+
+        Actual: the staged copy is still in the working dir and the pipeline
+        owns nothing there for a cancel to remove
+        Expected: only a clean run cleans up
+        """
+        working_dir = temp_workspace["root"] / "working"
+        working_dir.mkdir()
+        name = "VID_20251005_100000_00_001.mp4"
+        create_test_video(temp_workspace["source"] / name)
+
+        errored = pipeline._organize_mod.OrganizeResult(dest="", action="error")
+        original = pipeline.run_organize_by_date
+        pipeline.run_organize_by_date = lambda *a, **k: errored
+        try:
+            result = pipeline.process_file(
+                temp_workspace["source"] / name, None, str(temp_workspace["target"]),
+                str(working_dir), None, None, True, False, tasks=set(),
+            )
+        finally:
+            pipeline.run_organize_by_date = original
+
+        assert result["failed"], "Actual: the run succeeded, Expected: organize's error to fail it"
+        assert self._leftovers(working_dir) == [name], \
+            f"Actual: working dir holds {self._leftovers(working_dir)}, Expected: the staged copy"
+        assert pipeline._staged_paths == [], \
+            "Actual: the preserved copy is still owned, Expected: a cancel must not remove it"
+
+    def test_leftover_entries_on_a_clean_run_are_reported(self, temp_workspace, test_profile):
+        """A non-empty working dir after a run with no failures is a defect, not a silence.
+
+        Actual: the run warns, naming how many entries were left behind
+        Expected: the pipeline never hides a working dir it failed to clean up
+        """
+        working_dir = temp_workspace["root"] / "working"
+        working_dir.mkdir()
+        (working_dir / "stray.mp4").write_bytes(b"stray")
+        create_test_video(temp_workspace["source"] / "VID_20251005_100000_00_001.mp4")
+
+        result = self._run(temp_workspace, test_profile, working_dir, "--apply")
+
+        assert result.returncode == 0, f"Actual: rc={result.returncode}, Expected: a clean run"
+        warnings = [line for line in result.output.split("\n")
+                    if "left" in line and "working dir" in line.lower()]
+        assert len(warnings) == 1, \
+            f"Actual: {warnings}, Expected: one leftover warning\n{result.output}"
+        assert "1" in warnings[0], \
+            f"Actual: {warnings[0]!r}, Expected: it to name the leftover count"
+
+    def test_a_clean_run_says_nothing_about_the_working_dir(self, temp_workspace, test_profile):
+        """With the working dir emptied there is nothing to warn about."""
+        working_dir = temp_workspace["root"] / "working"
+        create_test_video(temp_workspace["source"] / "VID_20251005_100000_00_001.mp4")
+
+        result = self._run(temp_workspace, test_profile, working_dir, "--apply")
+
+        assert not working_dir.exists(), \
+            f"Actual: working dir survives holding {self._leftovers(working_dir)}, Expected: removed"
+        assert "left in the working dir" not in result.output, \
+            f"Actual: a clean run warned about leftovers\n{result.output}"
+
+
+class TestCancelClearsTheWorkingDir:
+    """Cancel is not a failure, so it leaves nothing in the working directory.
+
+    The handler runs after the metadata service has been closed — exiftool has
+    finished or died and is no longer writing — so it is safe to remove the
+    copies the interrupted file's iteration owns, the scratch files an
+    interrupted exiftool write left behind, and the directory itself.
+    """
+
+    @pytest.fixture
+    def staged_working_dir(self, tmp_path, monkeypatch):
+        """A working dir mid-file: a staged copy, its companion, exiftool scratch."""
+        working_dir = tmp_path / "working"
+        working_dir.mkdir()
+        staged = working_dir / "VID_20251005_100000_00_001.mp4"
+        companion = working_dir / "VID_20251005_100000_00_001.thm"
+        staged.write_bytes(b"half a video")
+        companion.write_bytes(b"thumb")
+        (working_dir / "VID_20251005_100000_00_001.mp4_exiftool_tmp").write_bytes(b"scratch")
+
+        monkeypatch.setattr(pipeline, "_working_dir", str(working_dir))
+        monkeypatch.setattr(pipeline.metadata_service, "close", lambda: None)
+        pipeline.register_staged_paths([staged, companion])
+        yield working_dir
+        pipeline._staged_paths.clear()
+
+    @pytest.mark.parametrize("sig", [signal.SIGINT, signal.SIGTERM],
+                             ids=["sigint", "sigterm"])
+    def test_handler_removes_staged_copies_scratch_files_and_the_dir(
+            self, staged_working_dir, sig):
+        """Both signals mean the same thing: Cancel in the app is Ctrl+C.
+
+        Actual: after the handler exits, no staged copy, no companion copy, no
+        *_exiftool_tmp entry and no working dir remain
+        Expected: a cancelled run leaves the disk as it found it
+        """
+        with pytest.raises(SystemExit) as exit_info:
+            pipeline.signal_handler(sig, None)
+
+        assert exit_info.value.code == 128 + sig, \
+            f"Actual: exit {exit_info.value.code}, Expected: {128 + sig}"
+        assert not staged_working_dir.exists(), \
+            ("Actual: working dir survives holding "
+             f"{sorted(p.name for p in staged_working_dir.iterdir())}, Expected: removed")
+
+    def test_handler_keeps_a_working_dir_holding_someone_elses_files(
+            self, staged_working_dir):
+        """Cleanup only removes what the run owns — an unexpected file stays put.
+
+        Actual: the staged copies and scratch file go, the stray file and the
+        directory holding it remain
+        Expected: the pipeline never deletes a working dir it does not recognise
+        """
+        stray = staged_working_dir / "not-ours.txt"
+        stray.write_bytes(b"someone else's")
+
+        with pytest.raises(SystemExit):
+            pipeline.signal_handler(signal.SIGTERM, None)
+
+        assert sorted(p.name for p in staged_working_dir.iterdir()) == ["not-ours.txt"], \
+            f"Actual: {sorted(p.name for p in staged_working_dir.iterdir())}, Expected: only the stray"
 
 
 if __name__ == "__main__":
