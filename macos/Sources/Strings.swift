@@ -418,6 +418,9 @@ What happens to source files after processing:
 
         static let showInFinder = String(localized: "diffTable.showInFinder", defaultValue: "Show in Finder")
         static let quickLook = String(localized: "diffTable.quickLook", defaultValue: "Quick Look")
+        static let showExistingAtDestination = String(
+            localized: "diffTable.showExistingAtDestination",
+            defaultValue: "Show Existing File at Destination")
 
         static let wouldFixChange = String(localized: "diffTable.wouldFix.change", defaultValue: "Would fix")
         static let fixedChange = String(localized: "diffTable.fixed.change", defaultValue: "Fixed")

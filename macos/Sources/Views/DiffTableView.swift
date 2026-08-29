@@ -113,6 +113,23 @@ struct DiffTableView: View {
             .map { URL(fileURLWithPath: $0) }
     }
 
+    /// The destination file a row's own conflicting file is blocking — only rows
+    /// whose organize reason is `existsDiffers` have one, and only when that file
+    /// still exists on disk. Reading `dest` here is safe: the reason token itself
+    /// already states a different file is at that path.
+    ///
+    /// Empty unless every selected row is such a row, so a selection that mixes
+    /// conflicts with ordinary rows offers nothing rather than silently revealing
+    /// the destinations of the subset that happens to conflict.
+    func conflictingDestinationURLs(for ids: Set<DiffTableRow.ID>) -> [URL] {
+        let selected = rows.filter { ids.contains($0.id) }
+        guard !selected.isEmpty, selected.allSatisfy({ $0.hasDestinationConflict }) else { return [] }
+        return selected
+            .compactMap { $0.dest }
+            .filter { FileManager.default.fileExists(atPath: $0) }
+            .map { URL(fileURLWithPath: $0) }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
@@ -194,6 +211,13 @@ struct DiffTableView: View {
                     previewCoordinator.show(urls)
                 }
                 .disabled(urls.isEmpty)
+
+                let conflictingURLs = conflictingDestinationURLs(for: ids)
+                if !conflictingURLs.isEmpty {
+                    Button(Strings.DiffTable.showExistingAtDestination) {
+                        NSWorkspace.shared.activateFileViewerSelecting(conflictingURLs)
+                    }
+                }
             }
             .onKeyPress(.space) {
                 let urls = availableFileURLs(for: selection)
