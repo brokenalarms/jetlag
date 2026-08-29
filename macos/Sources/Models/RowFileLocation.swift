@@ -1,9 +1,10 @@
 import Foundation
 
-/// Where a row's file currently lives on disk: `dest` once organize has placed
-/// it there, otherwise wherever the pipeline read it from, under `sourceDir`.
-/// Never re-derives this from display state — `dest` is the same field the
-/// table already uses to decide whether a file moved.
+/// Where a row's file currently lives on disk: `dest` only once organize has
+/// actually placed a file there (`copied`, `moved`, `overwrote`), otherwise
+/// wherever the pipeline read it from, under `sourceDir`. `dest` is present on
+/// skipped and dry-run rows too, so its presence alone is never evidence that
+/// anything moved.
 ///
 /// The pre-move path is a guess, not a certainty: the pipeline's
 /// `pipeline_file` event only ever carries a basename (`file_path.name`), and
@@ -11,8 +12,13 @@ import Foundation
 /// subdirectories of `sourceDir` would resolve to the same path here.
 enum RowFileLocation {
     static func path(for row: DiffTableRow, sourceDir: String) -> String? {
-        if let dest = row.dest {
-            return dest
+        switch row.outcome.movement {
+        case .copied, .moved, .overwrote:
+            if let dest = row.dest {
+                return dest
+            }
+        default:
+            break
         }
         guard !sourceDir.isEmpty else { return nil }
         return (sourceDir as NSString).appendingPathComponent(row.file)
