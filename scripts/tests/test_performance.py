@@ -35,10 +35,7 @@ MEDIA_PIPELINE = SCRIPT_DIR / "media-pipeline.sh"
 # See docs/testing.md "Performance gate noise band" for how this was measured.
 REGRESSION_THRESHOLD = 0.30
 ROUNDS = 3
-# Bounds total create_test_video() calls per pytest session (ROUNDS * 2 sides *
-# FILE_COUNT) to what's already known not to trip the undrained-stderr-pipe
-# deadlock in lib/exiftool.py's persistent worker (see jetlag bead filed for
-# that bug) — well above the ~12 files needed to amortise process startup.
+# Enough files to amortise process startup, small enough to keep the gate fast.
 FILE_COUNT = 40
 
 from conftest import create_test_video as _create_video_raw

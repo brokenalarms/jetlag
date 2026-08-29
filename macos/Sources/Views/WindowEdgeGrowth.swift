@@ -37,8 +37,8 @@ enum WindowEdgeGrowth {
     /// from, which is exactly what `grow` exists to avoid.
     static let growthDuration: TimeInterval = 0.25
 
-    /// Schedules the resize on the window's animator and returns; the frame arrives
-    /// when the animation group finishes.
+    /// Schedules the resize on the window's animator, a run loop turn out, and returns;
+    /// the frame arrives when the animation group finishes.
     ///
     /// `setFrame(_:display:animate:)` would animate it synchronously instead: it blocks
     /// and re-lays-out the window's content once per animation frame. Growth is decided
@@ -48,11 +48,19 @@ enum WindowEdgeGrowth {
     /// taking the AttributeGraph through cycles for the whole animation. The animator
     /// proxy runs no AppKit layout inside SwiftUI's update, and the visible resize is
     /// the same.
+    ///
+    /// The animator alone does not settle it: it holds the frame back only while it has
+    /// an animation to run, and a window it declines to animate — one never ordered on
+    /// screen, among others — is resized outright, back inside the render pass. Handing
+    /// the group to the next run loop turn puts the resize after that pass whichever
+    /// route the animator takes.
     static func grow(_ window: NSWindow, to target: CGRect, completion: (() -> Void)? = nil) {
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = growthDuration
-            window.animator().setFrame(target, display: true)
-        }, completionHandler: completion)
+        DispatchQueue.main.async {
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = growthDuration
+                window.animator().setFrame(target, display: true)
+            }, completionHandler: completion)
+        }
     }
 }
 
