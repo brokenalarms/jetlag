@@ -226,7 +226,7 @@ struct DiffTableView: View {
                 return .handled
             }
             .background {
-                ColumnAutoSizer(columnWidths: columnWidths)
+                ColumnAutoSizer(columnWidths: columnWidths, rowCount: rows.count)
                     .frame(width: 0, height: 0)
             }
         }
@@ -514,11 +514,18 @@ enum TableColumnSizing {
 
 private struct ColumnAutoSizer: NSViewRepresentable {
     let columnWidths: [CGFloat]
+    /// SwiftUI creates the `Table`'s `NSTableView` lazily and updates a representable
+    /// only when its value changes, so widths alone are not enough to reach AppKit: a
+    /// run over uniformly named files computes the same widths every time, and the
+    /// coordinator would never get an update in which the table exists to be found.
+    /// The row count changes on every append, which is exactly when it must look.
+    let rowCount: Int
 
     final class Coordinator: NSObject {
         weak var tableView: NSTableView?
         var columnWidths: [CGFloat] = []
         var gestureInstalled = false
+        var tailFollower: TableTailFollower?
 
         @objc func headerDoubleClicked(_ gesture: NSClickGestureRecognizer) {
             guard let headerView = gesture.view as? NSTableHeaderView,
@@ -571,6 +578,12 @@ private struct ColumnAutoSizer: NSViewRepresentable {
             }
 
             if let scrollView = tableView.enclosingScrollView {
+                // The follower does its own work from AppKit's notifications; nothing
+                // here may scroll, because SwiftUI updates the table's rows in this same
+                // pass and the before/after ordering is undefined.
+                if coordinator.tailFollower?.scrollView !== scrollView {
+                    coordinator.tailFollower = TableTailFollower(scrollView: scrollView)
+                }
                 TableColumnSizing.configureHorizontalScroller(for: scrollView)
                 TableColumnSizing.revealOverflow(in: scrollView, afterResizing: resized)
             }

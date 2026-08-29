@@ -7,12 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		01120EB0D1716B118D991B8F /* TableTailFollowingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2380F7D5A02B13D1DCAD0F23 /* TableTailFollowingTests.swift */; };
 		02C6933E6FD17468C99480B6 /* ScriptProcessGroupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA13B0A4EE78E6DBC6958CF4 /* ScriptProcessGroupTests.swift */; };
 		03E263B765C4C53CE8B6FF7E /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 823EAC4F97C91F6A789E0415 /* MapKit.framework */; };
 		0AFA7495BED7A4348018401D /* RowFileLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F713CD33E597A06A26576EC6 /* RowFileLocation.swift */; };
 		0C5F26D4F582B5EECA31A039 /* WindowEdgeGrowthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5122F4BA350F64B8CB33F83 /* WindowEdgeGrowthTests.swift */; };
 		0D5AC61704A72A9FEF4D4DF3 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F559FB82EF7FBD0FD4101BE5 /* AppState.swift */; };
 		0FC2A646694C6EE62AC3044C /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = 056ABCF1A693228B6082FF5F /* Yams */; };
+		1023ABDDCDFA18D19F4B9D35 /* TableTailFollowing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00C945C6A8E0D2D930006539 /* TableTailFollowing.swift */; };
 		11DAC29BADCD9CB0EF3EB4F0 /* FixTimestampPreviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3CAB3FB148CDC0E0E19191A /* FixTimestampPreviewTests.swift */; };
 		1CFE827872ACAF221D330372 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A0F60C0EC518091F4E34BACB /* Quartz.framework */; };
 		1D23F4385E3C9080D63F95C1 /* DiffTableRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A67A68A82CC97A0B42F497 /* DiffTableRow.swift */; };
@@ -81,9 +83,11 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		00C945C6A8E0D2D930006539 /* TableTailFollowing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableTailFollowing.swift; sourceTree = "<group>"; };
 		14C2F2F2C7D5476AAC832E64 /* DiffTableViewLabelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffTableViewLabelTests.swift; sourceTree = "<group>"; };
 		155795936E0AF78F19DDB808 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1C1D644A22201A7866455A04 /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
+		2380F7D5A02B13D1DCAD0F23 /* TableTailFollowingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableTailFollowingTests.swift; sourceTree = "<group>"; };
 		275EE4D58C8BFA72BF92B86F /* TimezoneCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimezoneCatalog.swift; sourceTree = "<group>"; };
 		27CF0E7DB6265D0EAF8055CE /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
 		2A5BADCA538054410A590FFD /* RowOutcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowOutcome.swift; sourceTree = "<group>"; };
@@ -232,6 +236,7 @@
 				B098EAB2712A13202064D6F1 /* RowFileLocationTests.swift */,
 				BA13B0A4EE78E6DBC6958CF4 /* ScriptProcessGroupTests.swift */,
 				A14C553F637C9236439B7A97 /* StreamingPerformanceTests.swift */,
+				2380F7D5A02B13D1DCAD0F23 /* TableTailFollowingTests.swift */,
 				31610BDF5B254E8176367A1D /* TimestampSourceTests.swift */,
 				F5122F4BA350F64B8CB33F83 /* WindowEdgeGrowthTests.swift */,
 				D0A92519F526948204A6F4D6 /* WorkflowLayoutTests.swift */,
@@ -268,6 +273,7 @@
 				C4AF4B0A35CD716A34E2A275 /* ProfilesView.swift */,
 				6989D9C650B0383E7ABA46E2 /* SandboxView.swift */,
 				6C503D6DF395CB0F0EE8674D /* SettingsView.swift */,
+				00C945C6A8E0D2D930006539 /* TableTailFollowing.swift */,
 				A54A1E7104B0356A474B3968 /* TimezoneMapView.swift */,
 				FEA322FB3423ED25C28C0860 /* UpgradeView.swift */,
 				CEEAE0CBDBBA1FFAFBA4B392 /* WindowEdgeGrowth.swift */,
@@ -453,6 +459,7 @@
 				AAC3E4FC571BCF92D2EBA219 /* ScriptRunner.swift in Sources */,
 				4FDCE64D99169FBCD837CF2B /* SettingsView.swift in Sources */,
 				CF708EB9D2E1C9376806BA71 /* Strings.swift in Sources */,
+				1023ABDDCDFA18D19F4B9D35 /* TableTailFollowing.swift in Sources */,
 				F9B0E22DD5926D701DC7BB8B /* TimestampSource.swift in Sources */,
 				8F979D129B6EF35BF9FA8BCB /* TimezoneCatalog.swift in Sources */,
 				C61A796CA3B728982C946AD4 /* TimezoneMapView.swift in Sources */,
@@ -485,6 +492,7 @@
 				BCBAB853A58D0989258EE4F5 /* RowFileLocationTests.swift in Sources */,
 				02C6933E6FD17468C99480B6 /* ScriptProcessGroupTests.swift in Sources */,
 				8BBB95FCC3F74AD66393C134 /* StreamingPerformanceTests.swift in Sources */,
+				01120EB0D1716B118D991B8F /* TableTailFollowingTests.swift in Sources */,
 				3E3C0BD8BAD159DA18D47303 /* TimestampSourceTests.swift in Sources */,
 				0C5F26D4F582B5EECA31A039 /* WindowEdgeGrowthTests.swift in Sources */,
 				F141198EED92BFBB91AE339E /* WorkflowLayoutTests.swift in Sources */,
