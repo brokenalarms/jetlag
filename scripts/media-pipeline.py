@@ -74,6 +74,11 @@ SIGNAL_MESSAGES = {
 
 EXIFTOOL_TMP_GLOB = "*_exiftool_tmp"
 
+# Staging lives on the target's own volume, so ingest is a single same-volume
+# copy and organize's move is a rename rather than a second full copy across
+# volumes. The destination's free space is then the only limit on a batch.
+WORKING_DIR_NAME = ".jetlag-working"
+
 # The working directory is an implementation detail: nothing survives in it past
 # the iteration of the file it was staged for. These hold what the run currently
 # owns there, so a cancel can take it with it.
@@ -675,8 +680,8 @@ def build_parser():
     )
     parser.add_argument(
         "--working-dir",
-        default=os.path.expanduser("~/Library/Application Support/Jetlag/working"),
-        help="Working directory for intermediate files (default: ~/Library/Application Support/Jetlag/working)"
+        default=None,
+        help=f"Working directory for intermediate files (default: <target>/{WORKING_DIR_NAME})"
     )
     return parser
 
@@ -788,7 +793,7 @@ def main():
 
     # Set up working directory
     global _working_dir
-    working_dir = args.working_dir
+    working_dir = args.working_dir or os.path.join(target_dir, WORKING_DIR_NAME)
     if args.apply:
         os.makedirs(working_dir, exist_ok=True)
         _working_dir = working_dir

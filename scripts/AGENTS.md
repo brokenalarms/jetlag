@@ -68,7 +68,7 @@ Diagnostic knowledge for understanding unexpected timestamp offsets:
 INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow] → [archive-source]
 ```
 
-- **Ingest** copies files from the source (SD card or local directory) to a temporary working directory. Source files are read-only inputs — never modified.
+- **Ingest** copies files from the source (SD card or local directory) to a temporary working directory — `<target>/.jetlag-working` unless `--working-dir` overrides it, so staging shares a volume with the destination and **Output**'s move is a rename rather than a second copy. Source files are read-only inputs — never modified.
 - Optional steps (**tag**, **fix-timestamp**) operate on the working copy.
 - **Output** moves processed files from the working directory to `ready_dir` via organize-by-date (date-based folder structure).
 - **Gyroflow** generates stabilization projects on the file now in `ready_dir`.

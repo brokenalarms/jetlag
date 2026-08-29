@@ -51,9 +51,10 @@ class PipelineResult:
 def run_pipeline(args: list[str], cwd: Optional[Path] = None) -> PipelineResult:
     """Run media-pipeline.sh with given args.
 
-    Each invocation gets its own working directory: the default is a single
-    shared path under Application Support, where identically-named files from
-    parallel test workers collide.
+    Each invocation gets a working directory outside the target, so assertions
+    about what the target holds see only the organized library. The default
+    location — <target>/.jetlag-working — has its own coverage in
+    TestDefaultWorkingDirIsOnTheTargetVolume.
 
     Note on output streams:
     - stdout: media-pipeline's own messages (summary, config, per-file status)
@@ -2204,6 +2205,210 @@ class TestOrganizeReportsTheUserFacingOutcome:
         assert left_behind == sorted(names), \
             f"Actual: source holds {left_behind}, Expected: {sorted(names)} — untouched by organize"
 
+
+# The pipeline stages every file through a working directory before organize
+# places it. These runs exercise the default location, so they cannot go
+# through run_pipeline(), which supplies a --working-dir of its own. The spy
+# runner loads media-pipeline as a module, records where ingest staged each
+# file and the inode organize was handed just before it moved it, then runs
+# main() exactly as the CLI would.
+_PIPELINE_SPY_RUNNER = '''
+import importlib.util
+import json
+import os
+import sys
+
+spec = importlib.util.spec_from_file_location("media_pipeline_under_test", sys.argv[1])
+pipeline = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(pipeline)
+
+record_path = sys.argv[2]
+
+
+def record(**entry):
+    with open(record_path, "a") as handle:
+        handle.write(json.dumps(entry) + "\\n")
+
+
+real_ingest = pipeline._ingest_mod.ingest_file
+real_organize = pipeline._organize_mod.process_file
+
+
+def ingest_spy(source, working_dir, apply, **kwargs):
+    dest, action, companions = real_ingest(source, working_dir, apply, **kwargs)
+    if dest and os.path.exists(dest):
+        record(hook="ingest", dest=dest)
+    return dest, action, companions
+
+
+def organize_spy(file_path, *args, **kwargs):
+    before = os.stat(file_path).st_ino if os.path.exists(file_path) else None
+    result = real_organize(file_path, *args, **kwargs)
+    record(hook="organize", source=file_path, inode=before, dest=result.dest)
+    return result
+
+
+pipeline._ingest_mod.ingest_file = ingest_spy
+pipeline._organize_mod.process_file = organize_spy
+sys.argv = [sys.argv[0]] + sys.argv[3:]
+pipeline.main()
+'''
+
+
+def _staged_paths(entries: list[dict]) -> list[Path]:
+    return [Path(entry["dest"]) for entry in entries if entry["hook"] == "ingest"]
+
+
+class TestDefaultWorkingDirIsOnTheTargetVolume:
+    """With no --working-dir, staging happens on the target's own volume.
+
+    Staging is unavoidable — the source is read-only and organize picks the date
+    folder from the timestamp the correction just wrote — but its location is
+    not. Staged on the boot volume, every file crosses volumes twice: once for
+    ingest's copy and again for organize's move, which degrades to a full copy
+    plus delete between filesystems. Under the target, ingest is one same-volume
+    copy and the move is a rename, so the destination's free space is the only
+    limit on a batch.
+    """
+
+    def _run(self, tmp_path, home, args):
+        runner = tmp_path / "pipeline_spy_runner.py"
+        runner.write_text(_PIPELINE_SPY_RUNNER)
+        record = tmp_path / "hooks.jsonl"
+        environment = dict(os.environ)
+        environment["HOME"] = str(home)
+        # macOS's framework Python caches bytecode under ~/Library/Caches when
+        # the source tree is read-only to it, which would land in the home
+        # directory these runs assert stays empty. That is the interpreter's
+        # doing, not the pipeline's, so turn it off rather than carve it out.
+        environment["PYTHONDONTWRITEBYTECODE"] = "1"
+        completed = subprocess.run(
+            [sys.executable, str(runner), str(SCRIPT_DIR / "media-pipeline.py"),
+             str(record), *args],
+            cwd=str(SCRIPT_DIR), capture_output=True, text=True, env=environment,
+        )
+        entries = [json.loads(line) for line in record.read_text().splitlines()] \
+            if record.exists() else []
+        return PipelineResult(completed.stdout, completed.stderr,
+                              completed.returncode), entries
+
+    @pytest.fixture
+    def empty_home(self, tmp_path):
+        home = tmp_path / "home"
+        home.mkdir()
+        return home
+
+    def _pipeline_args(self, workspace, *extra):
+        return [
+            "--source", str(workspace["source"]),
+            "--target", str(workspace["target"]),
+            "--timezone", "+0900",
+            "--group", "Test",
+            *extra,
+        ]
+
+    def test_apply_stages_under_the_target_and_leaves_home_untouched(
+            self, tmp_path, temp_workspace, empty_home):
+        """An apply run with no --working-dir puts its staged copies under the
+        target, and writes nothing at all under the user's home directory.
+
+        Actual: every staged copy sits in <target>/.jetlag-working and the home
+        directory is still empty after the run
+        Expected: the boot volume's free space is no longer the batch's limit
+        """
+        create_test_video(temp_workspace["source"] / "VID_20251005_100000_00_001.mp4")
+
+        result, entries = self._run(
+            tmp_path, empty_home, self._pipeline_args(temp_workspace, "--apply"))
+
+        assert result.returncode == 0, f"Actual: {result.output}, Expected: a clean run"
+        expected_dir = temp_workspace["target"] / ".jetlag-working"
+        staged = _staged_paths(entries)
+        assert staged, "Actual: nothing staged, Expected: ingest staged the file"
+        assert [path.parent for path in staged] == [expected_dir], \
+            f"Actual: staged at {staged}, Expected: under {expected_dir}"
+        assert sorted(p.name for p in empty_home.rglob("*")) == [], \
+            f"Actual: home holds {sorted(p.name for p in empty_home.rglob('*'))}, " \
+            "Expected: nothing written under HOME"
+
+    def test_staged_copy_is_renamed_into_place_not_copied_again(
+            self, tmp_path, temp_workspace, empty_home):
+        """Organize's move of a same-volume staged copy is a rename, so the file
+        at the destination is the staged copy itself — no second full copy.
+
+        Actual: the destination file's inode is the staged copy's inode
+        Expected: a run costs one copy per file, not two
+        """
+        create_test_video(temp_workspace["source"] / "VID_20251005_100000_00_001.mp4")
+
+        result, entries = self._run(
+            tmp_path, empty_home, self._pipeline_args(temp_workspace, "--apply"))
+
+        assert result.returncode == 0, f"Actual: {result.output}, Expected: a clean run"
+        organized = sorted(temp_workspace["target"].rglob("*.mp4"))
+        assert len(organized) == 1, f"Actual: {organized}, Expected: one organized file"
+        moved = [entry for entry in entries if entry["hook"] == "organize"]
+        assert len(moved) == 1, f"Actual: {moved}, Expected: one organize call"
+        assert os.stat(organized[0]).st_ino == moved[0]["inode"], \
+            f"Actual: {organized[0]} has a different inode from the staged copy " \
+            f"organize was handed ({moved[0]['source']}), " \
+            "Expected: organize renamed the staged copy into place"
+
+    def test_clean_apply_removes_the_default_working_dir(
+            self, tmp_path, temp_workspace, empty_home):
+        """The staging directory does not outlive the run that created it.
+
+        Actual: <target>/.jetlag-working is gone after a run with no failures
+        Expected: the target is left holding only the organized library
+        """
+        create_test_video(temp_workspace["source"] / "VID_20251005_100000_00_001.mp4")
+
+        result, _ = self._run(
+            tmp_path, empty_home, self._pipeline_args(temp_workspace, "--apply"))
+
+        assert result.returncode == 0, f"Actual: {result.output}, Expected: a clean run"
+        assert not (temp_workspace["target"] / ".jetlag-working").exists(), \
+            "Actual: the staging directory survived a clean run, Expected: removed"
+
+    def test_explicit_working_dir_still_overrides_the_default(
+            self, tmp_path, temp_workspace, empty_home):
+        """--working-dir remains an override: nothing is staged under the target.
+
+        Actual: staged copies sit in the given directory and no
+        <target>/.jetlag-working is created
+        Expected: callers that place staging themselves are unaffected
+        """
+        create_test_video(temp_workspace["source"] / "VID_20251005_100000_00_001.mp4")
+        override = tmp_path / "elsewhere"
+
+        result, entries = self._run(
+            tmp_path, empty_home,
+            self._pipeline_args(temp_workspace, "--apply", "--working-dir", str(override)))
+
+        assert result.returncode == 0, f"Actual: {result.output}, Expected: a clean run"
+        staged = _staged_paths(entries)
+        assert [path.parent for path in staged] == [override], \
+            f"Actual: staged at {staged}, Expected: under {override}"
+        assert not (temp_workspace["target"] / ".jetlag-working").exists(), \
+            "Actual: the default staging directory was created anyway, Expected: not used"
+
+    def test_dry_run_creates_no_staging_directory_under_the_target(
+            self, tmp_path, temp_workspace, empty_home):
+        """A dry run stages nothing, so it creates nothing under the target.
+
+        Actual: no .jetlag-working after a preview
+        Expected: previewing a run never writes to the destination volume
+        """
+        create_test_video(temp_workspace["source"] / "VID_20251005_100000_00_001.mp4")
+
+        result, entries = self._run(
+            tmp_path, empty_home, self._pipeline_args(temp_workspace))
+
+        assert result.returncode == 0, f"Actual: {result.output}, Expected: a clean run"
+        staged = _staged_paths(entries)
+        assert staged == [], f"Actual: {staged} staged, Expected: nothing"
+        assert not (temp_workspace["target"] / ".jetlag-working").exists(), \
+            "Actual: a dry run created the staging directory, Expected: not created"
 
 class TestWorkingDirIsTransient:
     """Nothing survives in the working directory past its own file's iteration.
