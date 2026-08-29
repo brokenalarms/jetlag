@@ -50,6 +50,7 @@
 		A782F8A1159D170B5CEB4C7E /* LicenseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D2EC9D00CD4EE5A754D59E /* LicenseStore.swift */; };
 		A87A9F7C3870DC8D634B2510 /* MediaProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC0210C9EE3BEF29E07C9DE6 /* MediaProfile.swift */; };
 		AAC3E4FC571BCF92D2EBA219 /* ScriptRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5FD29C41D642C67671FBAF /* ScriptRunner.swift */; };
+		AB4B7CFCDB6148D26686955C /* ArchiveSourceHelpTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0371BC5F70C37892C2CFAD9 /* ArchiveSourceHelpTextTests.swift */; };
 		AF4D4132C54C04CF1A1ADDB7 /* DirtyableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DB6E838E4C1827858BB004E /* DirtyableTests.swift */; };
 		AF5DDC771125D006AA50AF71 /* GyroflowStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C76405E304A233D40E627ECD /* GyroflowStatusTests.swift */; };
 		B9B58128D9827CE316EB4D34 /* DiffTableViewConflictingDestinationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6283F3F170C528DF8C57F0 /* DiffTableViewConflictingDestinationTests.swift */; };
@@ -128,6 +129,7 @@
 		B41D624A325EEBAC2CBD65CA /* WorktreeBundleIdentityGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeBundleIdentityGuardTests.swift; sourceTree = "<group>"; };
 		B68CD5F46C4AF7FAFE297AAE /* Jetlag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jetlag.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BA13B0A4EE78E6DBC6958CF4 /* ScriptProcessGroupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptProcessGroupTests.swift; sourceTree = "<group>"; };
+		C0371BC5F70C37892C2CFAD9 /* ArchiveSourceHelpTextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveSourceHelpTextTests.swift; sourceTree = "<group>"; };
 		C3CAB3FB148CDC0E0E19191A /* FixTimestampPreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixTimestampPreviewTests.swift; sourceTree = "<group>"; };
 		C4AF4B0A35CD716A34E2A275 /* ProfilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesView.swift; sourceTree = "<group>"; };
 		C698B76B04834D4379CADAA4 /* InspectorHostedSizingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorHostedSizingTests.swift; sourceTree = "<group>"; };
@@ -220,6 +222,7 @@
 			isa = PBXGroup;
 			children = (
 				27CF0E7DB6265D0EAF8055CE /* AppStateTests.swift */,
+				C0371BC5F70C37892C2CFAD9 /* ArchiveSourceHelpTextTests.swift */,
 				DE9A71B38C9F152E65E2D2B8 /* CancelFeedbackTests.swift */,
 				E1F442622CEF248F5E277A97 /* ColumnFitTests.swift */,
 				72241C254A690C5715578E66 /* DiffTableScrollerTests.swift */,
@@ -477,6 +480,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				6A87F1ECCD552C95D40ED1AA /* AppStateTests.swift in Sources */,
+				AB4B7CFCDB6148D26686955C /* ArchiveSourceHelpTextTests.swift in Sources */,
 				22E1D69B22D54B870B63505F /* CancelFeedbackTests.swift in Sources */,
 				6212872C90240AF9DF48B4E0 /* ColumnFitTests.swift in Sources */,
 				E429D831BA4132A2CC9027AF /* DiffTableScrollerTests.swift in Sources */,
