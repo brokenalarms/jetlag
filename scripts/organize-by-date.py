@@ -115,8 +115,7 @@ def _skip_explanation(reason: Optional[str], src_size: int, dst_size: int) -> st
 
 
 def _handle_existing_target(file_path, target_file, target_path, abs_target,
-                            base, organized_path, copy_mode, overwrite, apply,
-                            display_source):
+                            base, organized_path, copy_mode, overwrite, apply):
     """Handle case where target file already exists."""
     src_size = os.path.getsize(file_path)
     dst_size = os.path.getsize(target_file)
@@ -163,7 +162,7 @@ def _handle_existing_target(file_path, target_file, target_path, abs_target,
             transfer(file_path, target_file)
             print(f"\u267b\ufe0f  Overwrote: {base} \u2192 {organized_path}/", file=sys.stderr)
             return OrganizeResult(dest=abs_target, action="overwrote")
-        print(f"[DRY RUN] Would overwrite: {display_source} \u2192 {abs_target}", file=sys.stderr)
+        print(f"[DRY RUN] Would overwrite: {file_path} \u2192 {abs_target}", file=sys.stderr)
         return OrganizeResult(dest=abs_target, action="would_overwrite")
 
     print(f"\u23ed\ufe0f  Skipped ({_skip_explanation(skip_reason, src_size, dst_size)}): {base}",
@@ -174,21 +173,20 @@ def _handle_existing_target(file_path, target_file, target_path, abs_target,
 
 def process_file(file_path: str, target_dir: str, template: str,
                  copy_mode: bool, overwrite: bool, apply: bool,
-                 verbose: bool, display_source: Optional[str] = None) -> OrganizeResult:
+                 verbose: bool) -> OrganizeResult:
     """Process a single file for organization.
 
-    display_source overrides file_path in printed messages — the actual file
-    on disk (e.g. a pipeline's staged working copy) may not be what the user
-    should be told is the file's origin. Defaults to file_path.
+    Printed messages name file_path: they report the operation this function
+    performed, on the file it was handed. A caller that staged a copy states
+    the outcome for the original in a line of its own.
 
     Returns:
         OrganizeResult with dest path and action taken
     """
     base = os.path.basename(file_path)
-    display_source = display_source or file_path
 
     if verbose:
-        print(f"Processing: {display_source}", file=sys.stderr)
+        print(f"Processing: {file_path}", file=sys.stderr)
 
     file_date = get_file_date_for_organization(file_path)
     if not file_date:
@@ -222,25 +220,25 @@ def process_file(file_path: str, target_dir: str, template: str,
     if os.path.exists(target_file):
         return _handle_existing_target(
             file_path, target_file, target_path, abs_target, base,
-            organized_path, copy_mode, overwrite, apply, display_source
+            organized_path, copy_mode, overwrite, apply
         )
 
     if apply:
         os.makedirs(target_path, exist_ok=True)
         if copy_mode:
             shutil.copy2(file_path, target_file)
-            print(f"\u2705 Copied: {display_source} \u2192 {abs_target}", file=sys.stderr)
+            print(f"\u2705 Copied: {file_path} \u2192 {abs_target}", file=sys.stderr)
             return OrganizeResult(dest=abs_target, action="copied")
         else:
             shutil.move(file_path, target_file)
-            print(f"\u2705 Moved: {display_source} \u2192 {abs_target}", file=sys.stderr)
+            print(f"\u2705 Moved: {file_path} \u2192 {abs_target}", file=sys.stderr)
             return OrganizeResult(dest=abs_target, action="moved")
     else:
         if copy_mode:
-            print(f"[DRY RUN] Would copy: {display_source} \u2192 {abs_target}", file=sys.stderr)
+            print(f"[DRY RUN] Would copy: {file_path} \u2192 {abs_target}", file=sys.stderr)
             return OrganizeResult(dest=abs_target, action="would_copy")
         else:
-            print(f"[DRY RUN] Would move: {display_source} \u2192 {abs_target}", file=sys.stderr)
+            print(f"[DRY RUN] Would move: {file_path} \u2192 {abs_target}", file=sys.stderr)
             return OrganizeResult(dest=abs_target, action="would_move")
 
 

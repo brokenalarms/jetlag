@@ -689,6 +689,43 @@ class TestSkipReasonIsData:
             f"Actual: reason={result.reason!r}, Expected: 'user_choice'"
 
 
+class TestLogNamesTheFileItWasGiven:
+    """Organize describes the operation it performed on the file it was handed.
+
+    A caller may hand organize a staged copy of the user's file (the pipeline
+    does exactly that on an apply). Organize has no way to know that and must
+    not be told to claim it moved some other path: its lines are its own
+    report, and a caller that wants to state a different outcome adds its own
+    line beside them.
+    """
+
+    @pytest.fixture
+    def temp_dir(self):
+        tmpdir = tempfile.mkdtemp()
+        yield tmpdir
+        shutil.rmtree(tmpdir)
+
+    def test_move_line_names_the_path_it_was_called_with(self, temp_dir, capsys):
+        """The move line's subject is the file organize actually moved."""
+        staged = os.path.join(temp_dir, "working", "test.mp4")
+        create_test_video(staged, DateTimeOriginal="2025:06:18 07:25:21+08:00")
+        target_dir = os.path.join(temp_dir, "target")
+
+        result = organize.process_file(
+            staged, target_dir, "{{YYYY}}-{{MM}}-{{DD}}",
+            copy_mode=False, overwrite=False, apply=True, verbose=False,
+        )
+
+        stderr = capsys.readouterr().err
+        move_lines = [line for line in stderr.split("\n") if "Moved:" in line]
+        assert len(move_lines) == 1, \
+            f"Actual: {len(move_lines)} move lines, Expected: 1\n{stderr}"
+        assert staged in move_lines[0], \
+            f"Actual: {move_lines[0]!r}, Expected: it to name {staged}"
+        assert result.dest in move_lines[0], \
+            f"Actual: {move_lines[0]!r}, Expected: it to name {result.dest}"
+
+
 class TestSourceDirectoryPreservedAfterMove:
     """Source directory structure is preserved after move — cleanup is handled elsewhere."""
 

@@ -293,22 +293,21 @@ class TestApplyMode:
         assert "+09:00" in creation_date or "+0900" in creation_date
 
 
-class TestWorkingDirNotMentioned:
-    """The working dir is internal staging; it must not appear in normal output.
+class TestPipelineOutcomeLines:
+    """The pipeline states the user-facing outcome; organize states its own.
 
-    Every per-file line the user sees must name the source and the final
-    destination under the target directory — never the internal staging
-    location. The working dir is only ever relevant when a failure leaves
-    files behind for inspection.
-
-    Regression guard for 7534d893 ("add ingest step and always-on output to
-    media-pipeline (#57)"), which introduced both the per-file
-    '[DRY RUN] Would copy: <source> -> <working-dir>/<file>' print in
-    ingest-media.py and the '-> Working:' run header in media-pipeline.py,
-    and e8e590d ("add companion file copying and archive-source integration
-    to media-pipeline (#60)"), which added the companion-file variant of the
-    same print.
+    Each script logs the operation it actually performed and the pipeline
+    collates those lines verbatim, so organize — which is handed the staged
+    working copy on an apply — truthfully names that copy in its own line.
+    Beside it the pipeline adds one line per file naming the user's source
+    and the final destination, which is the outcome the user cares about.
+    The working dir therefore appears only in organize's own line, never in
+    a pipeline-owned one, and on failure only in the preserved-for-inspection
+    line.
     """
+
+    PIPELINE_OWNED_MARKERS = ("Copied:", "Would copy:", "Replaced at destination:",
+                              "Would replace at destination:", "→ Working:")
 
     def test_dry_run_never_mentions_working_dir(self, temp_workspace, test_profile):
         """A dry run's stderr never contains the working dir path."""
@@ -325,23 +324,54 @@ class TestWorkingDirNotMentioned:
         assert working_dir not in result.output
 
     def test_dry_run_prints_one_organize_line_per_file(self, temp_workspace, test_profile):
-        """A dry run over N files prints exactly N organize destination lines."""
+        """A dry run over N files previews N copies, and organize previews N moves."""
         source = temp_workspace["source"]
-        create_test_video(source / "test1.mp4")
-        create_test_video(source / "test2.mp4")
-        create_test_video(source / "test3.mp4")
+        sources = [source / "test1.mp4", source / "test2.mp4", source / "test3.mp4"]
+        for video in sources:
+            create_test_video(video)
 
         result = run_pipeline(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
-        destination_lines = [
-            line for line in result.stderr.split("\n") if "Would move:" in line
-        ]
-        assert len(destination_lines) == 3
+        lines = result.output.split("\n")
+        previews = [line for line in lines if "[DRY RUN] Would copy:" in line]
+        assert len(previews) == 3, \
+            f"Actual: {len(previews)} pipeline preview lines, Expected: 3\n{result.output}"
+        for video in sources:
+            assert any(str(video) in line and str(temp_workspace["target"]) in line
+                       for line in previews), \
+                f"Actual: no preview naming {video} and the target, got:\n" + "\n".join(previews)
 
-    def test_apply_never_mentions_working_dir_on_success(self, temp_workspace, test_profile):
-        """A successful apply's stderr never contains the working dir path."""
+        assert len([line for line in lines if "Would move:" in line]) == 3, \
+            "Actual: organize did not preview one move per file, Expected: 3"
+
+    def test_apply_prints_one_copied_line_per_file_naming_the_source(
+        self, temp_workspace, test_profile
+    ):
+        """An apply reports each file as copied from the user's source to the destination."""
+        source = temp_workspace["source"]
+        sources = [source / "test1.mp4", source / "test2.mp4"]
+        for video in sources:
+            create_test_video(video)
+
+        result = run_pipeline(
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900",
+             "--group", "Test", "--apply"],
+        )
+
+        copied = [line for line in result.output.split("\n") if "✅ Copied:" in line]
+        assert len(copied) == 2, \
+            f"Actual: {len(copied)} '✅ Copied:' lines, Expected: 2\n{result.output}"
+        for video in sources:
+            assert any(str(video) in line and str(temp_workspace["target"]) in line
+                       for line in copied), \
+                f"Actual: no copied line naming {video} and the target, got:\n" + "\n".join(copied)
+
+    def test_apply_names_the_working_dir_only_in_organizes_own_line(
+        self, temp_workspace, test_profile
+    ):
+        """Organize truthfully names the staged copy it moved; no pipeline line does."""
         source = temp_workspace["source"]
         create_test_video(source / "test.mp4")
         working_dir = tempfile.mkdtemp(prefix="pipeline_working_")
@@ -351,7 +381,14 @@ class TestWorkingDirNotMentioned:
              "--group", "Test", "--working-dir", working_dir, "--apply"],
         )
 
-        assert working_dir not in result.output
+        mentions = [line for line in result.output.split("\n") if working_dir in line]
+        assert mentions, \
+            f"Actual: nothing named the staged copy, Expected: organize's own move line\n{result.output}"
+        for line in mentions:
+            assert "✅ Moved:" in line, \
+                f"Actual: {line!r} names the working dir, Expected: only organize's move line does"
+            assert not any(marker in line for marker in self.PIPELINE_OWNED_MARKERS), \
+                f"Actual: a pipeline-owned line names the working dir: {line!r}"
 
     def test_apply_mentions_working_dir_only_when_preserved_for_inspection(
         self, temp_workspace, test_profile
@@ -2003,6 +2040,35 @@ class TestOverwriteDestination:
             f"Actual: organize_result.action={organize['action']!r}, Expected: 'would_overwrite'"
         assert organized.read_bytes() == before, \
             "Actual: a dry run changed the destination, Expected: untouched"
+
+    def test_overwrite_lines_name_the_replacement_from_the_users_source(
+        self, temp_workspace, test_profile
+    ):
+        """The log says the destination file is replaced, not that the source moved.
+
+        Actual: one 'Would replace at destination:' preview then one
+        'Replaced at destination:' line, each naming the untouched source and
+        the destination it lands at
+        Expected: the outcome the user sees matches the overwrote token
+        """
+        organized = self._seed_differing_destination(temp_workspace, test_profile)
+        untouched_source = temp_workspace["source"] / "VID_20251005_100000_00_001.mp4"
+
+        preview = self._run(temp_workspace, test_profile, "--overwrite")
+        previews = [line for line in preview.output.split("\n")
+                    if "Would replace at destination:" in line]
+        assert len(previews) == 1, \
+            f"Actual: {len(previews)} preview lines, Expected: 1\n{preview.output}"
+        assert str(untouched_source) in previews[0] and str(organized) in previews[0], \
+            f"Actual: {previews[0]!r}, Expected: it to name {untouched_source} and {organized}"
+
+        applied = self._run(temp_workspace, test_profile, "--apply", "--overwrite")
+        replaced = [line for line in applied.output.split("\n")
+                    if "Replaced at destination:" in line and "Would" not in line]
+        assert len(replaced) == 1, \
+            f"Actual: {len(replaced)} replacement lines, Expected: 1\n{applied.output}"
+        assert str(untouched_source) in replaced[0] and str(organized) in replaced[0], \
+            f"Actual: {replaced[0]!r}, Expected: it to name {untouched_source} and {organized}"
 
     def test_clean_run_reports_no_conflict(self, temp_workspace, test_profile):
         """Nothing occupies the destination, so there is nothing to prompt about."""
