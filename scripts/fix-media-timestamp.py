@@ -243,17 +243,6 @@ def provenance_field_args(file_path: str, exif: Dict[str, str]) -> list:
     return [f"-{PROVENANCE_TAG}={payload}"]
 
 
-def write_datetime_original(file_path: str, datetime_with_tz: str) -> bool:
-    """Write DateTimeOriginal to file if missing"""
-    try:
-        result = exiftool.write_tags(file_path, [f"-DateTimeOriginal={datetime_with_tz}"])
-        if file_path in _exif_cache:
-            del _exif_cache[file_path]
-        return result
-    except Exception as e:
-        print(f"Error writing DateTimeOriginal: {e}", file=sys.stderr)
-        return False
-
 def write_keys_creationdate(file_path: str, datetime_original: datetime) -> bool:
     """Write Keys:CreationDate with original timezone
 
@@ -284,15 +273,26 @@ class ClockField:
 
     write_tag is what exiftool is given; read_key is what the value comes back
     under in read_exif_data(). quicktime fields hold a raw UTC instant and exist
-    only in a QuickTime container; the rest hold zoned local time.
+    only in a QuickTime container; the rest hold zoned local time, except a
+    holds_zone field, whose value is that zone on its own.
+    container_only marks the fields that exist only in a QuickTime container:
+    exiftool refuses to write them to a still (verified on JPEG and HEIC), so
+    targeting them there would leave every still permanently reporting a stale
+    field it can never hold.
     proves_container marks the fields whose presence identifies the file as a
     QuickTime container — bare `CreateDate` is also an EXIF stills tag holding
     local time, so it can never be the evidence.
+    owned_with_datetime_original marks the fields a correction owns only when it
+    owns DateTimeOriginal: they describe that one value, so they are written with
+    it or not at all.
     """
     write_tag: str
     read_key: str
     quicktime: bool
+    container_only: bool = False
     proves_container: bool = False
+    owned_with_datetime_original: bool = False
+    holds_zone: bool = False
 
 
 # Every metadata clock field a correction owns, per the "jetlag writes" column of
@@ -300,11 +300,16 @@ class ClockField:
 # file's stored values and the write, so a correction can never write a subset:
 # a stale movie header cannot survive a run that found the track atoms correct.
 CLOCK_FIELDS = [
-    ClockField("DateTimeOriginal", "DateTimeOriginal", quicktime=False),
-    ClockField("Keys:CreationDate", "CreationDate", quicktime=False),
-    ClockField("QuickTime:CreateDate", "CreateDate", quicktime=True),
-    ClockField("QuickTime:MediaCreateDate", "MediaCreateDate", quicktime=True, proves_container=True),
-    ClockField("QuickTime:TrackCreateDate", "TrackCreateDate", quicktime=True, proves_container=True),
+    ClockField("DateTimeOriginal", "DateTimeOriginal", quicktime=False,
+               owned_with_datetime_original=True),
+    ClockField("OffsetTimeOriginal", "OffsetTimeOriginal", quicktime=False,
+               owned_with_datetime_original=True, holds_zone=True),
+    ClockField("Keys:CreationDate", "CreationDate", quicktime=False, container_only=True),
+    ClockField("QuickTime:CreateDate", "CreateDate", quicktime=True, container_only=True),
+    ClockField("QuickTime:MediaCreateDate", "MediaCreateDate", quicktime=True,
+               container_only=True, proves_container=True),
+    ClockField("QuickTime:TrackCreateDate", "TrackCreateDate", quicktime=True,
+               container_only=True, proves_container=True),
 ]
 
 QUICKTIME_CLOCK_TAGS = [field.read_key for field in CLOCK_FIELDS if field.quicktime]
@@ -319,23 +324,35 @@ def clock_field_targets(exif: Dict[str, str], datetime_original: datetime,
                         write_datetime_original: bool = False) -> Dict[str, str]:
     """The value every clock field a correction owns must end up holding.
 
-    Zoned local time for DateTimeOriginal and Keys:CreationDate; the same instant
-    as raw UTC for the QuickTime atoms. Stills get no QuickTime entries.
-    DateTimeOriginal is owned only when the caller has decided to write it — an
+    Zoned local time for DateTimeOriginal and Keys:CreationDate; that value's zone
+    alone for OffsetTimeOriginal; the same instant as raw UTC for the QuickTime
+    atoms. Stills get no container-only entries. DateTimeOriginal and the zone that
+    completes it are owned only when the caller has decided to write it — an
     existing tag is otherwise the source, not a target.
+
+    OffsetTimeOriginal is targeted whatever the container holds it: a still's
+    binary EXIF DateTimeOriginal is 19 characters, so the offset tag is the only
+    place its zone can live, while on a video exiftool keeps the zone inline in
+    XMP and drops the offset tag. One uniform write is right for both.
     """
     zoned = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
     zoned = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', zoned)
+    zone = ensure_colon_tz(datetime_original.strftime('%z'))
     utc = datetime_original.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
     container = is_quicktime_container(exif)
 
     targets = {}
     for field in CLOCK_FIELDS:
-        if field.quicktime and not container:
+        if field.container_only and not container:
             continue
-        if field.write_tag == "DateTimeOriginal" and not write_datetime_original:
+        if field.owned_with_datetime_original and not write_datetime_original:
             continue
-        targets[field.write_tag] = utc if field.quicktime else zoned
+        if field.quicktime:
+            targets[field.write_tag] = utc
+        elif field.holds_zone:
+            targets[field.write_tag] = zone
+        else:
+            targets[field.write_tag] = zoned
     return targets
 
 
@@ -352,18 +369,39 @@ def _utc_clock_differs(current: str, target: str) -> bool:
         return True
 
 
+def stored_zone(exif: Dict[str, str]) -> str:
+    """The zone the file already conveys for DateTimeOriginal's digits, as ±HH:MM.
+
+    The raw OffsetTimeOriginal is the whole answer where the file has one — not
+    the value _complete_datetime_original() joins into DateTimeOriginal, which
+    would report the zone as stored no matter what the offset tag holds. Where
+    the tag cannot exist, the zone rides inline in DateTimeOriginal instead
+    (XMP on a video), and it is that inline zone the file conveys.
+    """
+    offset = ensure_colon_tz((exif.get("OffsetTimeOriginal") or "").strip())
+    if offset:
+        return offset
+
+    inline = re.search(r'([+-]\d{2}:?\d{2}|Z)$', exif.get("DateTimeOriginal", ""))
+    if not inline:
+        return ""
+    return "+00:00" if inline.group(1) == "Z" else ensure_colon_tz(inline.group(1))
+
+
 def stale_clock_fields(exif: Dict[str, str], targets: Dict[str, str]) -> list:
     """The write tags in targets whose stored value is missing or differs."""
     stale = []
     for field in CLOCK_FIELDS:
         if field.write_tag not in targets:
             continue
-        current = exif.get(field.read_key, "")
         target = targets[field.write_tag]
         if field.quicktime:
-            differs = _utc_clock_differs(current, target)
+            differs = _utc_clock_differs(exif.get(field.read_key, ""), target)
+        elif field.holds_zone:
+            differs = stored_zone(exif) != target
         else:
-            differs = normalize_exif_value(current) != normalize_exif_value(target)
+            differs = (normalize_exif_value(exif.get(field.read_key, ""))
+                       != normalize_exif_value(target))
         if differs:
             stale.append(field.write_tag)
     return stale
@@ -741,6 +779,11 @@ def format_change_description(changes: dict, timestamp_data: Optional[dict] = No
                          f" → {format_exif_timestamp_display(targets['DateTimeOriginal'])})")
         else:
             parts.append("DateTimeOriginal (missing)")
+
+    if "OffsetTimeOriginal" in stale:
+        current_offset = exif.get("OffsetTimeOriginal", "")
+        parts.append(f"OffsetTimeOriginal ({current_offset or 'missing'}"
+                     f" → {targets['OffsetTimeOriginal']})")
 
     if "Keys:CreationDate" in stale:
         # Show helpful context for Keys:CreationDate change

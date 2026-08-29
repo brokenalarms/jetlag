@@ -1,8 +1,5 @@
 # Timestamp source of truth
 
-The ranking change and its guard are implemented. Everything under "Not yet done" is
-described here but not built, and is deliberately separate work.
-
 ## Problem
 
 Correcting an Insta360 card shot in New Zealand with the camera still set to Japan
@@ -206,15 +203,6 @@ The wall-clock rebuild the flag used to perform (which moved the instant) is del
 
 The durable per-field reference — field meanings, the UTC proof rules, the ranking —
 now lives in `docs/timestamp-fields.md`.
-
-## Not yet done
-
-This is not needed for a correction to be right:
-
-- `fix-media-timestamp.py` — a correction to a still loses its zone. `DateTimeOriginal`
-  is written alone, and exiftool silently drops the zone from a value bound for binary
-  EXIF rather than splitting it out (verified; see `timestamp-fields.md`). Stills need
-  `OffsetTimeOriginal` written as its own tag alongside `DateTimeOriginal`.
 
 ## Verification
 
