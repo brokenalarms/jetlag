@@ -3,7 +3,9 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PACKAGE_DIR="$SCRIPT_DIR/../../macos/Sources/Tools/jetlag-metadata"
-TARGET="$SCRIPT_DIR/jetlag-metadata"
+# Optional destination: tests build into a directory of their own so a test run
+# does not install a binary the rest of the suite would then pick up.
+TARGET="${1:-$SCRIPT_DIR/jetlag-metadata}"
 
 if [ ! -d "$PACKAGE_DIR" ]; then
     echo "error: Swift package not found at $PACKAGE_DIR" >&2

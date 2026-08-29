@@ -64,6 +64,49 @@ final class ScriptProcessGroupTests: XCTestCase {
         XCTAssertTrue(descendantStopped, "the descendant survived cancel")
     }
 
+    /// Cancel is the app's Ctrl+C: the group is interrupted, not terminated, so
+    /// every member sees the signal a foreground job would see from a terminal —
+    /// and anything that ignores it is still killed once the grace period is up.
+    func testTerminateGroupInterruptsBeforeKilling() async throws {
+        let temp = try makeTemporaryDirectory()
+        let received = temp.appendingPathComponent("received-signal")
+        let started = temp.appendingPathComponent("started")
+        // The script records which signal it got and then keeps running, so the
+        // kill fallback is exercised by the same run that proves the signal.
+        try writeScript("""
+        #!/bin/bash
+        trap '/bin/echo INT >> "\(received.path)"' INT
+        trap '/bin/echo TERM >> "\(received.path)"' TERM
+        /usr/bin/touch "\(started.path)"
+        while true; do /bin/sleep 0.1; done
+        """, named: "record-signal.sh", in: temp)
+
+        let (process, _) = ScriptRunner.run(
+            script: "record-signal.sh", args: [], workingDir: temp.path, profilesPath: "")
+        let running = await waitFor { FileManager.default.fileExists(atPath: started.path) }
+        XCTAssertTrue(running, "the script never started")
+
+        process.terminateGroup(gracePeriod: 0.5)
+
+        let recorded = await waitFor {
+            (try? String(contentsOf: received, encoding: .utf8))?.contains("INT") == true
+        }
+        let signals = (try? String(contentsOf: received, encoding: .utf8)) ?? ""
+        XCTAssertTrue(recorded, "Actual: script received \"\(signals)\", Expected: INT")
+
+        let killed = await waitForExit(of: process.processIdentifier)
+        XCTAssertTrue(killed, "a script that ignores the interrupt must still be killed")
+    }
+
+    private func waitFor(_ condition: () -> Bool, timeout: TimeInterval = 5) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        return condition()
+    }
+
     private func waitForExit(of pid: pid_t, timeout: TimeInterval = 5) async -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {

@@ -22,7 +22,17 @@ import threading
 
 
 def _find_jetlag_metadata():
-    """Resolve path to the jetlag-metadata binary, or None if not found."""
+    """Resolve path to the jetlag-metadata binary, or None if not found.
+
+    ``JETLAG_METADATA_BINARY`` overrides the search: a path selects that binary,
+    and an empty value forces the Python fallback. Which backend is in use
+    changes the process tree a cancel has to tear down, so tests need to pick
+    one rather than inherit whichever the machine happens to have built.
+    """
+    override = os.environ.get("JETLAG_METADATA_BINARY")
+    if override is not None:
+        return override or None
+
     tools_dir = os.path.join(os.path.dirname(__file__), "..", "tools")
     candidate = os.path.join(tools_dir, "jetlag-metadata")
     if os.path.isfile(candidate) and os.access(candidate, os.X_OK):

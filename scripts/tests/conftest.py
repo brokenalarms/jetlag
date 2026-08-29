@@ -84,6 +84,40 @@ def _close_metadata_service_at_session_end():
     exiftool.close()
 
 
+BUILD_JETLAG_METADATA = Path(__file__).parent.parent / "tools" / "build-jetlag-metadata.sh"
+
+
+@pytest.fixture(scope="session")
+def jetlag_metadata_binary(tmp_path_factory):
+    """The Swift metadata backend, built from source for the tests that need it.
+
+    The app ships jetlag-metadata but the repo does not, so tests that cover the
+    process tree it owns have to build it. It is built into a temporary directory
+    rather than scripts/tools/ so a test run never installs a binary the rest of
+    the suite would silently switch to.
+    """
+    if sys.platform != "darwin" or shutil.which("swift") is None:
+        pytest.skip("jetlag-metadata needs swift on macOS")
+    # basetemp's parent is shared by every xdist worker, so the build is done once
+    # and the result is published atomically for whichever workers come later.
+    destination = tmp_path_factory.getbasetemp().parent / "jetlag-metadata"
+    staged = destination.with_suffix(f".{os.getpid()}")
+    result = subprocess.run(
+        [str(BUILD_JETLAG_METADATA), str(staged)],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        pytest.fail(f"building jetlag-metadata failed:\n{result.stdout}\n{result.stderr}")
+    os.replace(staged, destination)
+    # jetlag-metadata resolves exiftool as its own sibling first, the way the app
+    # bundle lays the two out; the built binary needs the same neighbourhood.
+    sibling = destination.parent / "exiftool"
+    if not sibling.exists():
+        with contextlib.suppress(FileExistsError):
+            sibling.symlink_to(BUILD_JETLAG_METADATA.parent / "exiftool")
+    return destination
+
+
 @pytest.fixture
 def metadata_client():
     """Registers a metadata client (ExifTool / _SwiftBackend) constructed by a
