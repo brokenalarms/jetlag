@@ -165,13 +165,8 @@ def run_organize_by_date(
     apply: bool,
     verbose: bool,
     overwrite: bool = False,
-    display_source: Optional[str] = None,
 ):
     """Organize a file into date-based folders via direct module call.
-
-    display_source overrides what organize prints as the file's origin — the
-    pipeline's active_file is the working-dir copy in apply mode, which is
-    internal staging and must never appear in output.
 
     Returns:
         OrganizeResult dataclass.
@@ -180,7 +175,6 @@ def run_organize_by_date(
         str(file_path), target_dir, template,
         copy_mode=False, overwrite=overwrite,
         apply=apply, verbose=verbose,
-        display_source=display_source,
     )
 
 
@@ -199,6 +193,19 @@ def staged_organize_action(action: str) -> str:
     the same outcome for the same file.
     """
     return _STAGED_ORGANIZE_ACTION.get(action, action)
+
+
+# Organize logs the hop it performed on the file it was handed — the staged
+# working copy on an apply. These are the pipeline's own lines, stating the
+# same outcome for the file the user actually has. skipped and error are
+# absent: organize's skip line and the pipeline's own "Organization failed"
+# line already carry those.
+_OUTCOME_LINE = {
+    "copied": "✅ Copied: {source} → {dest}",
+    "would_copy": "[DRY RUN] Would copy: {source} → {dest}",
+    "overwrote": "♻️  Replaced at destination: {source} → {dest}",
+    "would_overwrite": "[DRY RUN] Would replace at destination: {source} → {dest}",
+}
 
 
 def run_ingest_media(
@@ -430,13 +437,18 @@ def process_file(
     else:
         template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
     org_result = run_organize_by_date(active_file, target_dir, template, apply, verbose,
-                                      overwrite=overwrite, display_source=str(file_path))
+                                      overwrite=overwrite)
+    staged_action = staged_organize_action(org_result.action)
     emit_event("organize_result",
         file=active_file.name,
-        action=staged_organize_action(org_result.action),
+        action=staged_action,
         dest=org_result.dest,
         reason=org_result.reason,
     )
+
+    outcome_line = _OUTCOME_LINE.get(staged_action)
+    if outcome_line:
+        print(outcome_line.format(source=file_path, dest=org_result.dest), file=sys.stderr)
 
     # A file the destination already holds a different copy of is the one skip
     # --overwrite can resolve, so it is the only one the batch reports back.
