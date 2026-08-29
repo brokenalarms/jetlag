@@ -442,6 +442,7 @@ What happens to source files after processing:
         static let title = String(localized: "logOutput.title", defaultValue: "Output")
         static let clearButton = String(localized: "logOutput.clear.button", defaultValue: "Clear")
         static let copyAllButton = String(localized: "logOutput.copyAll.button", defaultValue: "Copy All")
+        static let cancelled = String(localized: "logOutput.cancelled", defaultValue: "Cancelled")
 
         static func lineCount(_ count: Int) -> String {
             String(localized: "logOutput.lineCount",

@@ -18,6 +18,7 @@
 		11DAC29BADCD9CB0EF3EB4F0 /* FixTimestampPreviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3CAB3FB148CDC0E0E19191A /* FixTimestampPreviewTests.swift */; };
 		1CFE827872ACAF221D330372 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A0F60C0EC518091F4E34BACB /* Quartz.framework */; };
 		1D23F4385E3C9080D63F95C1 /* DiffTableRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A67A68A82CC97A0B42F497 /* DiffTableRow.swift */; };
+		22E1D69B22D54B870B63505F /* CancelFeedbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE9A71B38C9F152E65E2D2B8 /* CancelFeedbackTests.swift */; };
 		30624E27385D5F145ECC1137 /* DryRunFreshnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF1FBD7A42B275AA5183D163 /* DryRunFreshnessTests.swift */; };
 		3E3C0BD8BAD159DA18D47303 /* TimestampSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31610BDF5B254E8176367A1D /* TimestampSourceTests.swift */; };
 		49521EA7D50F8FD80CA4EDFD /* PythonRuntimeCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA47C3147490D4D7AABA5169 /* PythonRuntimeCheck.swift */; };
@@ -138,6 +139,7 @@
 		D0A92519F526948204A6F4D6 /* WorkflowLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowLayoutTests.swift; sourceTree = "<group>"; };
 		D7844419398942BFFCBA70AA /* PipelineSchemaContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineSchemaContractTests.swift; sourceTree = "<group>"; };
 		DC0210C9EE3BEF29E07C9DE6 /* MediaProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaProfile.swift; sourceTree = "<group>"; };
+		DE9A71B38C9F152E65E2D2B8 /* CancelFeedbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CancelFeedbackTests.swift; sourceTree = "<group>"; };
 		E1F442622CEF248F5E277A97 /* ColumnFitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColumnFitTests.swift; sourceTree = "<group>"; };
 		E3FDFFFE053527F6DAFF2443 /* HostedViewSizing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostedViewSizing.swift; sourceTree = "<group>"; };
 		EAE7B2C33B83AA615CCA0EF3 /* ScriptProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptProcess.swift; sourceTree = "<group>"; };
@@ -218,6 +220,7 @@
 			isa = PBXGroup;
 			children = (
 				27CF0E7DB6265D0EAF8055CE /* AppStateTests.swift */,
+				DE9A71B38C9F152E65E2D2B8 /* CancelFeedbackTests.swift */,
 				E1F442622CEF248F5E277A97 /* ColumnFitTests.swift */,
 				72241C254A690C5715578E66 /* DiffTableScrollerTests.swift */,
 				7C6283F3F170C528DF8C57F0 /* DiffTableViewConflictingDestinationTests.swift */,
@@ -474,6 +477,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				6A87F1ECCD552C95D40ED1AA /* AppStateTests.swift in Sources */,
+				22E1D69B22D54B870B63505F /* CancelFeedbackTests.swift in Sources */,
 				6212872C90240AF9DF48B4E0 /* ColumnFitTests.swift in Sources */,
 				E429D831BA4132A2CC9027AF /* DiffTableScrollerTests.swift in Sources */,
 				B9B58128D9827CE316EB4D34 /* DiffTableViewConflictingDestinationTests.swift in Sources */,

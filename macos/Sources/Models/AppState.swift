@@ -634,7 +634,7 @@ final class AppState {
     /// process alone leaves every buffered line still to be appended.
     var currentRunTask: Task<Void, Never>?
     var diffTableRows: [DiffTableRow] = []
-    private var currentDiffRow: DiffTableRow?
+    private(set) var currentDiffRow: DiffTableRow?
     private(set) var liveRow: DiffTableRow?
 
     /// All completed rows plus the in-progress file for live table display
@@ -856,5 +856,11 @@ final class AppState {
         currentProcess?.terminateGroup()
         currentProcess = nil
         isRunning = false
+        // The drain task is cancelled above before the pipeline's own "Interrupted by
+        // user" line can arrive, so that line never reaches the log. This is the app's
+        // own line, not parsed from the pipeline's output.
+        logOutput.append(LogLine(text: Strings.LogOutput.cancelled, stream: .stderr))
+        liveRow = nil
+        currentDiffRow = nil
     }
 }
