@@ -433,7 +433,7 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
 
         static let sourceDateTimeOriginal = String(localized: "diffTable.source.dateTimeOriginal", defaultValue: "DateTimeOriginal")
         static let sourceCreationDate = String(localized: "diffTable.source.creationDate", defaultValue: "Keys:CreationDate")
-        static let sourceClockUTC = String(localized: "diffTable.source.clockUTC", defaultValue: "clock (UTC)")
+        static let sourceClockUTC = String(localized: "diffTable.source.clockUTC", defaultValue: "QuickTime:MediaCreateDate")
         static let sourceFilename = String(localized: "diffTable.source.filename", defaultValue: "filename")
         static let sourceFileTime = String(localized: "diffTable.source.fileTime", defaultValue: "file time")
         static let utcSuffix = String(localized: "diffTable.utc.suffix", defaultValue: "UTC")

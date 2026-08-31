@@ -82,14 +82,15 @@ struct DiffTableView: View {
     /// What each of a row's cells would draw, in column order: the text, its font
     /// and any icon allowance. Building this is string work only; measuring it is
     /// what the cache avoids repeating for rows that have not changed.
-    private func cellTexts(_ row: DiffTableRow) -> [CellText] {
+    func cellTexts(_ row: DiffTableRow) -> [CellText] {
         [
             CellText([(row.file, Self.monoFont)], maxWidth: Self.fileColumnMaxWidth),
             CellText(fixedWidth: Self.timelineColumnWidth),
-            CellText([(row.originalTimeDisplay ?? "", Self.monoFont)]),
+            CellText([(row.originalTimeDisplay ?? "", Self.monoFont),
+                      (row.timestampSource?.label ?? "", Self.detailFont)]),
             CellText([(row.correctedTime ?? "", Self.monoFont)]),
             CellText([(changeBadgeText(row), Self.systemFont),
-                      (row.timestampSource?.label ?? "", Self.detailFont)],
+                      (staleFieldsText(row).map(Strings.DiffTable.wouldWrite) ?? "", Self.detailFont)],
                      extraWidth: row.requiresForceTimezone ? Self.iconWidth : 0),
             CellText([(row.dest.map { ($0 as NSString).lastPathComponent } ?? "", Self.monoFont),
                       (row.skipReason?.explanation ?? "", Self.detailFont)],
@@ -160,9 +161,18 @@ struct DiffTableView: View {
                 .width(min: 50, ideal: 80)
 
                 TableColumn(Strings.DiffTable.originalColumn) { row in
-                    Text(row.originalTimeDisplay ?? "—")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(row.originalTime != nil ? .primary : .tertiary)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(row.originalTimeDisplay ?? "—")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(row.originalTime != nil ? .primary : .tertiary)
+                        if let label = row.timestampSource?.label {
+                            Text(label)
+                                .font(.system(size: 9))
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                        }
+                    }
+                    .help(rowExplanation(row))
                 }
                 .width(min: 130)
 
@@ -348,8 +358,8 @@ struct DiffTableView: View {
     private func timestampCell(_ row: DiffTableRow) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             changeBadge(row)
-            if let label = row.timestampSource?.label {
-                Text(label)
+            if let fields = staleFieldsText(row) {
+                Text(Strings.DiffTable.wouldWrite(fields))
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)

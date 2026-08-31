@@ -57,4 +57,34 @@ final class DiffTableViewLabelTests: XCTestCase {
     func testUnreportedCorrectionShowsAnEmDash() {
         XCTAssertEqual(view.changeBadgeText(row(timestampAction: nil)), "—")
     }
+
+    // MARK: - Original column source subtitle / action column writes summary
+
+    /// The Original column's cell must carry the timestamp source (e.g.
+    /// "DateTimeOriginal") as its detail line, so the reader can see where the
+    /// value was read from without cross-referencing the timestamp/action column.
+    func testOriginalColumnDetailShowsTheTimestampSource() {
+        var diffRow = row(timestampAction: "would_fix")
+        diffRow.timestampSource = .dateTimeOriginal
+
+        let cells = view.cellTexts(diffRow)
+        let originalCell = cells[2]
+
+        XCTAssertEqual(originalCell.parts.last?.text, Strings.DiffTable.sourceDateTimeOriginal)
+    }
+
+    /// The timestamp/action column's detail line must state what a would-fix
+    /// writes, not repeat the source label — a row with identical Original and
+    /// Corrected values otherwise gives no reason for the badge it shows.
+    func testActionColumnDetailShowsTheWritesSummaryNotTheSource() {
+        var diffRow = row(timestampAction: "would_fix")
+        diffRow.timestampSource = .dateTimeOriginal
+        diffRow.staleFields = ["DateTimeOriginal", "CreateDate"]
+
+        let cells = view.cellTexts(diffRow)
+        let actionCell = cells[4]
+
+        XCTAssertEqual(actionCell.parts.last?.text,
+                       Strings.DiffTable.wouldWrite("DateTimeOriginal, CreateDate"))
+    }
 }

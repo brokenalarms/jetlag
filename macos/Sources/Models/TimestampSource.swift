@@ -5,8 +5,8 @@ import Foundation
 ///
 /// The token carries what the timestamp strings cannot: whether the original's
 /// digits are UTC or local wall-clock time. Every display decision that depends on
-/// that — the source label under a row's action, whether the Original cell reads
-/// `UTC` — is taken from the case, never by parsing a formatted value back.
+/// that — the source label under the Original cell, whether that cell's value
+/// reads `UTC` — is taken from the case, never by parsing a formatted value back.
 enum TimestampSource: String {
     case dateTimeOriginal = "datetimeoriginal"
     case creationDate = "creationdate"
