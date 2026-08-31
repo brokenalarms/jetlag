@@ -171,13 +171,64 @@ final class DryRunFreshnessTests: XCTestCase {
         XCTAssertEqual(state.workflowSession.dryRunStaleReason, .noDryRun)
     }
 
-    /// An apply run is not a preview: applying again after one still asks.
+    /// An apply run is not a preview: choosing Apply again after one still
+    /// asks, even though the completed run reset the session out of apply
+    /// mode in between.
     func testACompletedApplyIsNotAPreview() {
         let session = makeSession()
         session.noteRunStarted()
         session.noteRunFinished()
+        session.applyMode = true
 
         XCTAssertTrue(session.requestDryRunAssentIfNeeded())
         XCTAssertEqual(session.dryRunStaleReason, .noDryRun)
+    }
+
+    /// A finished apply must not leave the workflow armed to apply again: the
+    /// next run defaults back to the safe preview, and the stale-dry-run
+    /// assent from this apply must not carry over to it.
+    func testApplyModeResetsAfterApplyRunFinishes() {
+        let session = makeSession()
+        session.applyWithoutDryRun = true
+        session.noteRunStarted()
+
+        session.noteRunFinished()
+
+        XCTAssertFalse(session.applyMode)
+        XCTAssertFalse(session.applyWithoutDryRun)
+    }
+
+    /// Cancelling an apply mid-run is just as much a reason to fall back to
+    /// dry run as letting it finish — nothing was safely applied either way.
+    func testApplyModeResetsAfterApplyRunCancelled() {
+        let session = makeSession()
+        session.applyWithoutDryRun = true
+        session.noteRunStarted()
+
+        session.noteRunCancelled()
+
+        XCTAssertFalse(session.applyMode)
+        XCTAssertFalse(session.applyWithoutDryRun)
+    }
+
+    /// A dry run was never in apply mode, so finishing it must not disturb
+    /// applyMode's already-false state.
+    func testApplyModeStaysClearAfterDryRunFinishes() {
+        let session = makeSession(applyMode: false)
+        session.noteRunStarted()
+
+        session.noteRunFinished()
+
+        XCTAssertFalse(session.applyMode)
+    }
+
+    /// Cancelling a dry run is likewise not an apply outcome.
+    func testApplyModeStaysClearAfterDryRunCancelled() {
+        let session = makeSession(applyMode: false)
+        session.noteRunStarted()
+
+        session.noteRunCancelled()
+
+        XCTAssertFalse(session.applyMode)
     }
 }
