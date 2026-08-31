@@ -4,7 +4,8 @@ archive-source.py
 Acts on the source directory after all pipeline files have been processed.
 
 Modes:
-  archive — rename source folder to "<source> - copied <YYYY-MM-DD>"
+  archive — move the source folder to <destination>/<archived-name>, defaulting
+            to an in-place rename to "<source> - copied <YYYY-MM-DD>"
   delete  — remove only the files passed via --files, then clean empty dirs
 """
 
@@ -15,6 +16,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.filesystem import cleanup_empty_parent_dirs
@@ -33,18 +35,34 @@ def signal_handler(sig, frame):
     sys.exit(130)
 
 
-def archive_source(source: str, apply: bool) -> ArchiveResult:
-    """Rename source folder to '<source> - copied <date>'."""
-    current_date = datetime.now().strftime("%Y-%m-%d")
-    archived_name = f"{source} - copied {current_date}"
+def default_archived_name(source: str, today: Optional[datetime] = None) -> str:
+    """The name an archived folder takes when the caller names none."""
+    current_date = (today or datetime.now()).strftime("%Y-%m-%d")
+    return f"{os.path.basename(os.path.normpath(source))} - copied {current_date}"
+
+
+def archive_source(
+    source: str,
+    apply: bool,
+    destination: Optional[str] = None,
+    archived_name: Optional[str] = None,
+) -> ArchiveResult:
+    """Move the source folder to destination/archived_name.
+
+    Both parts default to today's in-place archive: the folder stays beside
+    where it was and takes the name '<source> - copied <date>'.
+    """
+    parent = destination or os.path.dirname(os.path.abspath(os.path.normpath(source)))
+    name = archived_name or default_archived_name(source)
+    target = os.path.join(parent, name)
 
     if not apply:
-        print(f"Would rename: {source} → {os.path.basename(archived_name)}", file=sys.stderr)
+        print(f"Would rename: {source} → {target}", file=sys.stderr)
         return ArchiveResult(action="would_archive", failed=False)
 
     try:
-        os.rename(source, archived_name)
-        print(f"Archived: {source} → {os.path.basename(archived_name)}", file=sys.stderr)
+        os.rename(source, target)
+        print(f"Archived: {source} → {target}", file=sys.stderr)
         return ArchiveResult(action="archived", failed=False)
     except OSError as e:
         print(f"Read-only source, couldn't archive: {source} ({e})", file=sys.stderr)
@@ -109,6 +127,14 @@ def main():
         default=[],
         help="File paths to delete (required for delete action)",
     )
+    parser.add_argument(
+        "--destination",
+        help="Directory to move the archived folder into (default: where the source already is)",
+    )
+    parser.add_argument(
+        "--archived-name",
+        help="Name for the archived folder (default: '<source> - copied <YYYY-MM-DD>')",
+    )
     parser.add_argument("--apply", action="store_true", help="Apply changes (default: dry run)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed info")
 
@@ -121,7 +147,11 @@ def main():
         sys.exit(1)
 
     if args.action == "archive":
-        result = archive_source(source, args.apply)
+        result = archive_source(
+            source, args.apply,
+            destination=args.destination,
+            archived_name=args.archived_name,
+        )
         emit_result(result)
         sys.exit(1 if result.failed else 0)
 

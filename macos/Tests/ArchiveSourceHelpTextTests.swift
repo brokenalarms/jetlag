@@ -11,11 +11,11 @@ final class ArchiveSourceHelpTextTests: XCTestCase {
     }
 
     func testWorkflowHelpKeepsBulletsAndStatesRunsOnceAfterBatch() {
-        let help = Strings.Workflow.sourceActionHelp
-        XCTAssertTrue(help.contains("• Archive — rename source folder with date suffix (default)"),
-            "should keep the archive bullet")
-        XCTAssertTrue(help.contains("• Delete — remove only processed files and companions from source"),
-            "should keep the delete bullet")
+        let help = Strings.Workflow.archiveSourceHelp
+        XCTAssertTrue(help.contains("• Destination"),
+            "should explain the destination field")
+        XCTAssertTrue(help.contains("• Rename source dir"),
+            "should explain the rename checkbox")
         XCTAssertTrue(help.contains("Runs once, after the whole batch"),
             "should append the runs-once-after-the-whole-batch line")
         XCTAssertTrue(help.contains("re-run the folder to finish and archive it"),

@@ -312,6 +312,8 @@ def run_archive_source(
     action: str,
     files: list[str],
     apply: bool,
+    destination: Optional[str] = None,
+    archived_name: Optional[str] = None,
 ):
     """Archive or delete source files via direct module call.
 
@@ -320,7 +322,9 @@ def run_archive_source(
     """
     if action == "delete":
         return _archive_mod.delete_files(source_dir, files, apply)
-    return _archive_mod.archive_source(source_dir, apply)
+    return _archive_mod.archive_source(
+        source_dir, apply, destination=destination, archived_name=archived_name,
+    )
 
 
 def process_file(
@@ -642,6 +646,14 @@ def build_parser():
         choices=["archive", "delete"],
         default="archive",
         help="Action for source after processing (default: archive). Requires archive-source in --tasks."
+    )
+    parser.add_argument(
+        "--archive-destination",
+        help="Directory to move the archived source folder into (default: where the source already is)."
+    )
+    parser.add_argument(
+        "--archived-name",
+        help="Name for the archived source folder (default: '<source> - copied <YYYY-MM-DD>')."
     )
     parser.add_argument(
         "--copy-companion-files", action="store_true",
@@ -973,6 +985,8 @@ def main():
         print("📦 Archive source...", file=sys.stderr)
         arc_result = run_archive_source(
             source_dir, args.source_action, all_source_files, args.apply,
+            destination=args.archive_destination,
+            archived_name=args.archived_name,
         )
         if arc_result.failed:
             print("   ⚠️  Archive-source failed", file=sys.stderr)

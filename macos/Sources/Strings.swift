@@ -41,7 +41,7 @@ enum Strings {
         static let gyroflowHelp = String(localized: "pipeline.gyroflow.help",
             defaultValue: "Generate Gyroflow stabilization project files (requires gyro data)")
         static let archiveSourceHelp = String(localized: "pipeline.archiveSource.help",
-            defaultValue: "Act on the source folder once every file has been processed (archive or delete). A cancelled or failed run archives nothing and leaves the source untouched.")
+            defaultValue: "Archive the source folder once every file has been processed. A cancelled or failed run archives nothing and leaves the source untouched.")
     }
 
     // MARK: - Workflow
@@ -53,10 +53,10 @@ enum Strings {
         static let tagsLabel = String(localized: "workflow.tags.label", defaultValue: "Tags:")
         static let cameraLabel = String(localized: "workflow.camera.label", defaultValue: "Camera:")
         static let groupLabel = String(localized: "workflow.group.label", defaultValue: "Group")
-        static let sourceActionLabel = String(localized: "workflow.sourceAction.label", defaultValue: "Source action:")
 
         static let sourceDirPlaceholder = String(localized: "workflow.sourceDir.placeholder", defaultValue: "SD card or directory path")
         static let readyDirPlaceholder = String(localized: "workflow.readyDir.placeholder", defaultValue: "Ready directory path")
+        static let archiveDestinationPlaceholder = String(localized: "workflow.archiveDestination.placeholder", defaultValue: "Archive destination path")
         static let tagPlaceholder = String(localized: "workflow.tag.placeholder", defaultValue: "tag1, tag2")
         static let makePlaceholder = String(localized: "workflow.make.placeholder", defaultValue: "Make")
         static let modelPlaceholder = String(localized: "workflow.model.placeholder", defaultValue: "Model")
@@ -67,11 +67,17 @@ enum Strings {
         static let searchTimezones = String(localized: "workflow.searchTimezones", defaultValue: "Search timezones...")
 
         static let copyCompanionToggle = String(localized: "workflow.copyCompanion.toggle", defaultValue: "Copy companion files")
+        static let renameSourceDirToggle = String(localized: "workflow.renameSourceDir.toggle", defaultValue: "Rename source dir")
+
+        /// The name archive-source.py gives a folder it archives with no name of
+        /// its own; the app prefills the field with it so the default is editable.
+        static func archivedNameDefault(source: String, date: String) -> String {
+            String(localized: "workflow.archivedName.default",
+                defaultValue: "\(source) - copied \(date)")
+        }
         static let noCompanionFiles = String(localized: "workflow.noCompanionFiles", defaultValue: "No companion files noted for this device")
         static let readyDirRequired = String(localized: "workflow.readyDirRequired", defaultValue: "Set ready directory above")
 
-        static let archiveOption = String(localized: "workflow.archive.option", defaultValue: "Archive")
-        static let deleteOption = String(localized: "workflow.delete.option", defaultValue: "Delete")
         static let dryRunOption = String(localized: "workflow.dryRun.option", defaultValue: "Dry Run")
         static let applyOption = String(localized: "workflow.apply.option", defaultValue: "Apply")
 
@@ -89,8 +95,8 @@ enum Strings {
 
         static let timezoneUnknown = String(localized: "workflow.timezoneUnknown", defaultValue: "Unrecognized timezone")
         static let timezoneRequired = String(localized: "workflow.timezoneRequired", defaultValue: "Timezone required")
-        static let deleteSourceWarning = String(localized: "workflow.deleteSource.warning",
-            defaultValue: "Deletes processed files and companions from source after successful processing")
+        static let archiveNoChange = String(localized: "workflow.archiveNoChange",
+            defaultValue: "Nothing to archive — rename the source folder or pick another destination")
 
         // Help text
         static let groupHelp = String(localized: "workflow.group.help",
@@ -99,11 +105,11 @@ enum Strings {
             defaultValue: "Directory to import from, usually an SD card mount point. Pre-filled from profile, editable.")
         static let copyCompanionHelp = String(localized: "workflow.copyCompanionFiles.help",
             defaultValue: "Companion files are sidecar files generated alongside the main media — e.g. .thm (thumbnail), .lrv (low-res proxy), .srt (subtitles/telemetry). When enabled, companions are copied alongside the main file to the ready directory.")
-        static let sourceActionHelp = String(localized: "workflow.sourceAction.help",
+        static let archiveSourceHelp = String(localized: "workflow.archiveSource.help",
             defaultValue: """
-What happens to source files after processing:
-• Archive — rename source folder with date suffix (default)
-• Delete — remove only processed files and companions from source
+What happens to the source folder after processing:
+• Destination — the folder is moved here; leave it where it is to archive in place
+• Rename source dir — renames the folder to the name shown; uncheck to keep its own name
 
 Runs once, after the whole batch: if the run is cancelled or a file fails, the source is left exactly as it was — re-run the folder to finish and archive it.
 """)
