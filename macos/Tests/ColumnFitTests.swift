@@ -7,8 +7,9 @@ import AppKit
 /// in: the pipeline appends a sparse live row and completes it event by event before
 /// finalising it. Measuring a row once by position (#185) left the columns sized to
 /// the empty row; this test drives rows through the same event path the app uses and
-/// checks the applied column widths against the widest text each column holds. Only
-/// the filename column has a cap.
+/// checks the applied column widths against the widest text each column holds. The
+/// filename, timestamp/action, and status columns are capped — see
+/// `DiffTableViewLabelTests` for the writes-subtitle cap.
 final class ColumnFitTests: XCTestCase {
 
     private let mono = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
@@ -165,8 +166,9 @@ final class ColumnFitTests: XCTestCase {
         XCTAssertNotNil(doubleClick, "the Files table's header must carry the double-click-to-fit recognizer")
     }
 
-    /// The filename is the one column with a cap: a very long name truncates in the
-    /// middle rather than pushing the other columns off the panel.
+    /// The filename column is capped: a very long name truncates in the middle
+    /// rather than pushing the other columns off the panel. The destination column
+    /// stays uncapped and fits the same long name.
     func testFilenameColumnIsCappedAndOthersAreNot() throws {
         let state = AppState()
         state.selectedTab = .workflow
