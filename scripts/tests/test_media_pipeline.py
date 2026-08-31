@@ -1875,6 +1875,56 @@ class TestUpdateFilenameDates:
             f"Actual: renamed_to={actual_new_name}, " \
             "Expected: filename containing 20250505_140334 (shifted by +3600s)"
 
+    def test_dry_run_rename_organizes_the_real_file(self, temp_workspace, test_profile):
+        """A dry run's pending rename must not repoint organize at a file that
+        does not exist: every read happens at the real path, and only the
+        destination carries the would-be name.
+
+        The reproducing case is a destination that already holds the file under
+        its renamed name (a previous apply ran): organize's existing-target size
+        comparison then stats the source. Pre-fix it statted the would-be
+        renamed source path — FileNotFoundError, killing the whole run with
+        'ERROR: [Errno 2] …' and a pipeline_error event, no pipeline_summary.
+        """
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "VID_20250505_130334_00_001.mp4"
+        _create_video_raw(
+            video,
+            MediaCreateDate="2025:05:05 04:03:34",
+            CreateDate="2025:05:05 04:03:34",
+        )
+        # The earlier apply's outcome: the file already organized under the
+        # name the pending rename will produce, identical content.
+        organized = target / "2025" / "Test" / "2025-05-05" / "VID_20250505_140334_00_001.mp4"
+        organized.parent.mkdir(parents=True)
+        shutil.copy2(video, organized)
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+            "--time-offset", "3600",
+            "--update-filename-dates",
+        ])
+
+        assert "No such file or directory" not in result.output, \
+            "Organize statted the would-be renamed path instead of the real file"
+        events = [json.loads(l) for l in result.stdout.strip().split("\n") if l.strip()]
+        assert not [e for e in events if e["event"] == "pipeline_error"], \
+            "The run must not die on a pending rename"
+        organize_events = [e for e in events if e["event"] == "organize_result"]
+        assert organize_events, "Expected an organize_result event"
+        assert organize_events[0]["action"] == "skipped", \
+            f"Actual: {organize_events[0]['action']}, Expected: skipped (identical at destination)"
+        assert "20250505_140334" in organize_events[0]["dest"], \
+            f"Actual dest: {organize_events[0]['dest']}, " \
+            "Expected: destination carrying the would-be renamed filename"
+        assert [e for e in events if e["event"] == "pipeline_summary"], \
+            "The run must reach its summary"
+        assert video.exists(), "Dry run must leave the source file untouched"
+
     def test_no_rename_when_no_parseable_date(self, temp_workspace, test_profile):
         """Files without parseable date in filename produce no rename_result event.
 

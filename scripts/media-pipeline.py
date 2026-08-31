@@ -225,8 +225,12 @@ def run_organize_by_date(
     apply: bool,
     verbose: bool,
     overwrite: bool = False,
+    dest_name: Optional[str] = None,
 ):
     """Organize a file into date-based folders via direct module call.
+
+    dest_name carries a pending rename's would-be basename into the destination
+    path on a dry run; the file itself is read at file_path either way.
 
     Returns:
         OrganizeResult dataclass.
@@ -234,7 +238,7 @@ def run_organize_by_date(
     return _organize_mod.process_file(
         str(file_path), target_dir, template,
         copy_mode=False, overwrite=overwrite,
-        apply=apply, verbose=verbose,
+        apply=apply, verbose=verbose, dest_name=dest_name,
     )
 
 
@@ -356,6 +360,9 @@ def process_file(
     result = {"changed": False, "failed": False, "error": None,
               "organize_conflict": None, "source_files": [str(file_path)]}
     file_changed = False
+    # A dry run's --update-filename-dates rename that has not happened: the
+    # would-be basename rides along for destination previews only.
+    pending_rename_name = None
 
     emit_event("pipeline_file", file=file_path.name, source_path=str(file_path))
 
@@ -492,12 +499,17 @@ def process_file(
                         register_staged_paths(
                             [new_path] + [Path(c) for c in companion_dests])
                     else:
+                        # The rename has not happened: active_file must keep
+                        # pointing at the real file, and only the destination
+                        # preview carries the would-be name.
                         print(f"  [DRY RUN] Would rename: {active_file.name} → {new_name}", file=sys.stderr)
+                        pending_rename_name = new_name
                     emit_event("rename_result",
                         file=active_file.name,
                         renamed_to=new_name,
                     )
-                    active_file = new_path
+                    if apply:
+                        active_file = new_path
 
     # OUTPUT (always): organize active_file to target_dir
     print("📁 Organizing by date...", file=sys.stderr)
@@ -510,7 +522,7 @@ def process_file(
     else:
         template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
     org_result = run_organize_by_date(active_file, target_dir, template, apply, verbose,
-                                      overwrite=overwrite)
+                                      overwrite=overwrite, dest_name=pending_rename_name)
     staged_action = staged_organize_action(org_result.action)
     emit_event("organize_result",
         file=active_file.name,
