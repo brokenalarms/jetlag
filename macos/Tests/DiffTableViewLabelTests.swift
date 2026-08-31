@@ -8,7 +8,7 @@ import XCTest
 /// through a `default`.
 final class DiffTableViewLabelTests: XCTestCase {
 
-    private let view = DiffTableView(rows: [], sourceDir: "")
+    private let view = DiffTableView(rows: [])
 
     private func row(timestampAction: String?, correctionMode: String? = nil,
                      timeOffsetDisplay: String? = nil, timestampError: String? = nil) -> DiffTableRow {

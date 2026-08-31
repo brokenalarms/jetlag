@@ -3,7 +3,6 @@ import Quartz
 
 struct DiffTableView: View {
     let rows: [DiffTableRow]
-    let sourceDir: String
 
     @State private var selection: Set<DiffTableRow.ID> = []
     @State private var previewCoordinator = QuickLookCoordinator()
@@ -102,14 +101,13 @@ struct DiffTableView: View {
     }
 
     /// The rows selected by the given ids, resolved to the file URLs Show in
-    /// Finder / Quick Look can act on — a row whose file no longer exists at
-    /// its known path (moved, archived) is left out rather than disabled
-    /// one-by-one, so a mixed selection still acts on the files that remain.
-    private func availableFileURLs(for ids: Set<DiffTableRow.ID>) -> [URL] {
+    /// Finder / Quick Look act on. Every row the pipeline reported resolves to
+    /// a path, so the menu items stay enabled: whether that path still holds a
+    /// file is Finder's answer to give, not a reason to withhold the command.
+    func availableFileURLs(for ids: Set<DiffTableRow.ID>) -> [URL] {
         rows
             .filter { ids.contains($0.id) }
-            .filter { RowFileLocation.exists(for: $0, sourceDir: sourceDir) }
-            .compactMap { RowFileLocation.path(for: $0, sourceDir: sourceDir) }
+            .compactMap { RowFileLocation.path(for: $0) }
             .map { URL(fileURLWithPath: $0) }
     }
 
@@ -118,13 +116,12 @@ struct DiffTableView: View {
     /// still exists on disk. Reading `dest` here is safe: the reason token itself
     /// already states a different file is at that path.
     ///
-    /// Empty unless every selected row is such a row, so a selection that mixes
-    /// conflicts with ordinary rows offers nothing rather than silently revealing
-    /// the destinations of the subset that happens to conflict.
+    /// A selection that mixes conflicts with ordinary rows still offers the item,
+    /// acting on the conflicting subset — the alternative is a menu that silently
+    /// loses a command because one extra row was selected.
     func conflictingDestinationURLs(for ids: Set<DiffTableRow.ID>) -> [URL] {
-        let selected = rows.filter { ids.contains($0.id) }
-        guard !selected.isEmpty, selected.allSatisfy({ $0.hasDestinationConflict }) else { return [] }
-        return selected
+        rows
+            .filter { ids.contains($0.id) && $0.hasDestinationConflict }
             .compactMap { $0.dest }
             .filter { FileManager.default.fileExists(atPath: $0) }
             .map { URL(fileURLWithPath: $0) }
@@ -205,12 +202,10 @@ struct DiffTableView: View {
                 Button(Strings.DiffTable.showInFinder) {
                     NSWorkspace.shared.activateFileViewerSelecting(urls)
                 }
-                .disabled(urls.isEmpty)
 
                 Button(Strings.DiffTable.quickLook) {
                     previewCoordinator.show(urls)
                 }
-                .disabled(urls.isEmpty)
 
                 let conflictingURLs = conflictingDestinationURLs(for: ids)
                 if !conflictingURLs.isEmpty {

@@ -72,6 +72,26 @@ class TestEmittedEventsMatchSchema:
                                                 "organize_result", "pipeline_result"}, \
             f"Actual: {sorted({e['event'] for e in events})}, Expected: the core per-file events"
 
+    def test_pipeline_file_carries_the_full_source_path(self, temp_workspace, test_profile):
+        """The app shows a row's file in Finder, so it needs where the file actually is.
+
+        A basename alone forces the app to guess sourceDir + name, which is wrong
+        for any file found in a subdirectory of the recursive source scan.
+        """
+        nested = temp_workspace["source"] / "DCIM" / "100GOPRO"
+        nested.mkdir(parents=True)
+        create_test_video(nested / "test.mp4", media_create_date="2025:10:05 01:00:00")
+
+        result = self._run(temp_workspace, test_profile)
+
+        events = validate_events(_events(result.stdout))
+        started = next(e for e in events if e["event"] == "pipeline_file")
+        assert started["source_path"] == str(nested / "test.mp4"), \
+            f"Actual: pipeline_file.source_path={started.get('source_path')!r}, " \
+            f"Expected: {str(nested / 'test.mp4')!r}"
+        assert started["file"] == "test.mp4", \
+            f"Actual: pipeline_file.file={started['file']!r}, Expected: 'test.mp4'"
+
     def test_apply_events_all_validate(self, temp_workspace, test_profile):
         """Applying emits a different token set (fixed/copied/changed) — also schema-clean."""
         create_test_video(temp_workspace["source"] / "test.mp4",

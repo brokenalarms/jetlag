@@ -24,9 +24,13 @@ events:
     description: "Emitted at the start of processing each file"
     fields:
       file: { type: string, description: "Basename of the file being processed" }
+      source_path:
+        type: string
+        description: "Full path the file was read from — the app's source of truth for where an unmoved row's file is"
     example:
       event: pipeline_file
       file: DJI_20250815_101112_0001.MP4
+      source_path: /Volumes/SD/DCIM/100GOPRO/DJI_20250815_101112_0001.MP4
 
   stage_complete:
     description: "Emitted after each pipeline stage completes for a file"
