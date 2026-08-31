@@ -547,25 +547,25 @@ struct WorkflowView: View {
 
     private var archiveSourceOptions: some View {
         @Bindable var session = state.workflowSession
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 4) {
-                Text(Strings.Workflow.sourceActionLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Picker("", selection: $session.sourceAction) {
-                    Text(Strings.Workflow.archiveOption).tag(SourceAction.archive)
-                    Text(Strings.Workflow.deleteOption).tag(SourceAction.delete)
+        return VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    TextField(Strings.Workflow.archiveDestinationPlaceholder, text: $session.archiveDestination)
+                        .textFieldStyle(.roundedBorder)
+                        .truncationMode(.head)
+                        .help(session.archiveDestination)
+                    Button(Strings.Common.browse) { pickArchiveDestination() }
+                        .controlSize(.small)
+                    HelpButton(Strings.Workflow.archiveSourceHelp)
                 }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .fixedSize()
-                HelpButton(Strings.Workflow.sourceActionHelp)
-                Spacer()
+                .fieldError(session.validateArchiveSource())
             }
-            if session.sourceAction == .delete {
-                Label(Strings.Workflow.deleteSourceWarning, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.yellow)
+            HStack(spacing: 6) {
+                Toggle(Strings.Workflow.renameSourceDirToggle, isOn: $session.renameSourceDir)
+                TextField("", text: $session.archivedName)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(!session.renameSourceDir)
+                    .foregroundStyle(session.renameSourceDir ? .primary : .secondary)
             }
         }
         .padding(10)
@@ -775,6 +775,16 @@ struct WorkflowView: View {
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             state.workflowSession.readyDir.value = url.path
+        }
+    }
+
+    private func pickArchiveDestination() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url {
+            state.workflowSession.archiveDestination = url.path
         }
     }
 }

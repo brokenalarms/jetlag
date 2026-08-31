@@ -22,10 +22,6 @@ enum SidebarTab: String, CaseIterable, Identifiable {
     }
 }
 
-enum SourceAction: String, CaseIterable {
-    case archive, delete
-}
-
 enum PipelineStep: String, CaseIterable, Identifiable {
     case ingest = "Ingest"
     case tag = "Tag"
@@ -276,7 +272,6 @@ final class WorkflowSession {
 
     var group: String = ""
     var copyCompanionFiles: Bool = false
-    var sourceAction: SourceAction = .archive
     var applyMode: Bool = false
     var inferFromFilenames: Bool = false
     var timeOffsetSeconds: Int?
@@ -297,6 +292,13 @@ final class WorkflowSession {
     var showOverwriteConflict: Bool = false
     var overwriteDestination: Bool = false
 
+    /// Where the archived source folder lands and what it is called. Both are
+    /// overrides on top of archiving in place under "<source> - copied <date>",
+    /// which is what the folder does when the user changes neither.
+    var archiveDestinationOverride: String?
+    var renameSourceDir: Bool = true
+    var archivedNameOverride: String?
+
     /// Why the apply about to start was never previewed, which is the whole of
     /// what the question asks.
     enum DryRunStaleReason {
@@ -314,13 +316,7 @@ final class WorkflowSession {
     var showDryRunStale: Bool = false
     var applyWithoutDryRun: Bool = false
 
-    var enabledSteps: Set<PipelineStep> = [] {
-        didSet {
-            if !enabledSteps.contains(.archiveSource) {
-                sourceAction = .archive
-            }
-        }
-    }
+    var enabledSteps: Set<PipelineStep> = []
 
     /// Whether a Gyroflow install was found on this machine. Without one the
     /// step could only ever skip files, so it is not offered at all.
@@ -473,9 +469,66 @@ final class WorkflowSession {
             return validateDirectory(readyDir.current) == nil
         case .fixTimestamps:
             return validateTimezone() == nil
-        case .tag, .gyroflow, .archiveSource:
+        case .archiveSource:
+            return validateArchiveSource() == nil
+        case .tag, .gyroflow:
             return true
         }
+    }
+
+    /// The source folder as the archive step will act on it: an empty or
+    /// trailing-slashed path is not one, and Ingest already reports a missing one.
+    private var sourceURL: URL? {
+        guard !sourceDir.current.isEmpty else { return nil }
+        return URL(fileURLWithPath: sourceDir.current).standardizedFileURL
+    }
+
+    var sourceDirName: String { sourceURL?.lastPathComponent ?? "" }
+
+    var defaultArchiveDestination: String {
+        sourceURL?.deletingLastPathComponent().path ?? ""
+    }
+
+    var defaultArchivedName: String {
+        guard let sourceURL else { return "" }
+        return Strings.Workflow.archivedNameDefault(
+            source: sourceURL.lastPathComponent, date: Self.archivedNameDate(Date())
+        )
+    }
+
+    static func archivedNameDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    var archiveDestination: String {
+        get { archiveDestinationOverride ?? defaultArchiveDestination }
+        set { archiveDestinationOverride = newValue }
+    }
+
+    /// The name the folder is left under. Rename off keeps the name it has, so
+    /// the step is a plain move into whatever destination was chosen.
+    var archivedName: String {
+        get { renameSourceDir ? (archivedNameOverride ?? defaultArchivedName) : sourceDirName }
+        set { archivedNameOverride = newValue }
+    }
+
+    var archivedPath: String {
+        URL(fileURLWithPath: archiveDestination)
+            .appendingPathComponent(archivedName)
+            .standardizedFileURL.path
+    }
+
+    /// An archive that resolves back to the source path moves nothing and
+    /// renames nothing, so it is not a step that can be run.
+    func validateArchiveSource() -> String? {
+        if !enabledSteps.contains(.archiveSource) { return nil }
+        guard let sourceURL else { return nil }
+        if let error = validateDirectory(archiveDestination) { return error }
+        if archivedPath == sourceURL.path { return Strings.Workflow.archiveNoChange }
+        return nil
     }
 
     var timezoneOption: TimezoneOption? {
@@ -540,8 +593,9 @@ final class WorkflowSession {
             args += ["--tasks"] + tasks
         }
 
-        if enabledSteps.contains(.archiveSource) && sourceAction != .archive {
-            args += ["--source-action", sourceAction.rawValue]
+        if enabledSteps.contains(.archiveSource) {
+            args += ["--archive-destination", archiveDestination]
+            args += ["--archived-name", archivedName]
         }
 
         if copyCompanionFiles {

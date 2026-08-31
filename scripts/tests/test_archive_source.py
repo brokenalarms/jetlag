@@ -286,3 +286,91 @@ class TestDryRun:
         assert result.returncode == 0
         assert os.path.exists(self.file_a), "File should still exist in dry run"
         assert "Would delete" in result.stderr
+
+
+class TestArchiveDestinationAndName:
+    """--destination and --archived-name control where the archived folder
+    lands and what it is called, so the app can offer 'move the card's folder
+    somewhere else' and 'call it something else' instead of only the default
+    in-place dated rename."""
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.source = os.path.join(self.temp_dir, "DCIM")
+        os.makedirs(self.source)
+        self.file_a = os.path.join(self.source, "IMG_001.MP4")
+        Path(self.file_a).write_bytes(b"video-a")
+        self.elsewhere = os.path.join(self.temp_dir, "Archive")
+        os.makedirs(self.elsewhere)
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+
+    def test_destination_moves_folder_keeping_default_name(self):
+        """With --destination the archived folder lands there, still under the
+        default '<source> - copied <date>' name."""
+        run_archive_source(
+            "--source", self.source,
+            "--destination", self.elsewhere,
+            "--apply",
+        )
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        moved = os.path.join(self.elsewhere, f"DCIM - copied {today}")
+
+        assert os.path.isdir(moved), f"Expected archived folder at {moved}"
+        assert not os.path.exists(self.source), "Original source should no longer exist"
+        assert Path(os.path.join(moved, "IMG_001.MP4")).read_bytes() == b"video-a"
+
+    def test_archived_name_renames_in_place(self):
+        """With --archived-name the folder keeps its location but takes the
+        given name instead of the dated default."""
+        run_archive_source(
+            "--source", self.source,
+            "--archived-name", "Japan trip footage",
+            "--apply",
+        )
+
+        renamed = os.path.join(self.temp_dir, "Japan trip footage")
+
+        assert os.path.isdir(renamed), f"Expected renamed folder at {renamed}"
+        assert not os.path.exists(self.source), "Original source should no longer exist"
+        assert Path(os.path.join(renamed, "IMG_001.MP4")).read_bytes() == b"video-a"
+
+    def test_destination_with_original_name_moves_without_renaming(self):
+        """Destination plus the original folder name is a plain move — the
+        'rename source dir' checkbox left off in the app."""
+        run_archive_source(
+            "--source", self.source,
+            "--destination", self.elsewhere,
+            "--archived-name", "DCIM",
+            "--apply",
+        )
+
+        moved = os.path.join(self.elsewhere, "DCIM")
+
+        assert os.path.isdir(moved), f"Expected moved folder at {moved}"
+        assert not os.path.exists(self.source), "Original source should no longer exist"
+        assert Path(os.path.join(moved, "IMG_001.MP4")).read_bytes() == b"video-a"
+
+    def test_defaults_still_archive_in_place_with_dated_name(self):
+        """Omitting both flags preserves the previous behaviour exactly."""
+        run_archive_source("--source", self.source, "--apply")
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        archived = os.path.join(self.temp_dir, f"DCIM - copied {today}")
+
+        assert os.path.isdir(archived), f"Expected in-place archive at {archived}"
+        assert not os.path.exists(self.source), "Original source should no longer exist"
+
+    def test_dry_run_with_destination_moves_nothing(self):
+        """A dry run reports the move it would make and touches no files."""
+        result = run_archive_source(
+            "--source", self.source,
+            "--destination", self.elsewhere,
+            "--archived-name", "Backup",
+        )
+
+        assert os.path.isdir(self.source), "Source should still exist in dry run"
+        assert os.listdir(self.elsewhere) == [], "Destination should still be empty"
+        assert "Would rename" in result.stderr

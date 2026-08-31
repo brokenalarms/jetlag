@@ -957,6 +957,32 @@ class TestArchiveSourceIntegration:
         assert not video.exists(), "Processed video should be deleted from source"
         assert unrelated.exists(), "Unrelated file should survive"
 
+    def test_archive_destination_and_name_move_the_source_dir(self, temp_workspace, test_profile):
+        """The pipeline passes --archive-destination and --archived-name through
+        to archive-source, so the app can move the card's folder somewhere else
+        under a name the user chose."""
+        source = temp_workspace["source"]
+        elsewhere = source.parent / "Archive"
+        elsewhere.mkdir()
+
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0900",
+            "--group", "Test",
+            "--tasks", "tag", "fix-timestamp", "archive-source",
+            "--archive-destination", str(elsewhere),
+            "--archived-name", "Japan trip",
+            "--apply",
+        ])
+
+        moved = elsewhere / "Japan trip"
+        assert moved.is_dir(), f"Source should be moved to {moved}"
+        assert not source.exists(), "Original source dir should no longer exist"
+
     def test_archive_source_not_run_by_default(self, temp_workspace, test_profile):
         """Default tasks do not include archive-source, so source is untouched."""
         source = temp_workspace["source"]
