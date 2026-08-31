@@ -168,7 +168,8 @@ struct WorkflowView: View {
         var lines = [Strings.Workflow.runSummaryCounts(
             processed: summary.processed,
             changed: summary.changed,
-            unchanged: summary.unchanged)]
+            unchanged: summary.unchanged,
+            mode: summary.mode)]
         lines.append(summary.mode == .applied
                      ? Strings.Workflow.runSummaryApplied
                      : Strings.Workflow.runSummaryDryRun)
