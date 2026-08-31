@@ -353,7 +353,7 @@ def process_file(
               "organize_conflict": None, "source_files": [str(file_path)]}
     file_changed = False
 
-    emit_event("pipeline_file", file=file_path.name)
+    emit_event("pipeline_file", file=file_path.name, source_path=str(file_path))
 
     # INGEST (always): copy source file to working dir
     print("📥 Ingesting...", file=sys.stderr)

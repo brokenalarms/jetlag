@@ -13,7 +13,7 @@ struct InspectorPanel: View {
             if state.isRunning && state.visibleRows.isEmpty {
                 startingUp
             } else if !state.visibleRows.isEmpty {
-                DiffTableView(rows: state.visibleRows, sourceDir: state.workflowSession.sourceDir.current)
+                DiffTableView(rows: state.visibleRows)
             } else if !state.showLogOutput {
                 Spacer()
                 Text(Strings.Workflow.inspectorEmptyLabel)

@@ -3,6 +3,12 @@ import Foundation
 struct DiffTableRow: Identifiable {
     let id = UUID()
     let file: String
+
+    /// The path the pipeline read this file from, emitted on `pipeline_file`.
+    /// The source of truth for where an unmoved row's file is: the source scan is
+    /// recursive, so a basename under the source directory would not locate it.
+    var sourcePath: String?
+
     var tagAction: String?
     var tagsAdded: String?
     var originalTime: String?

@@ -113,7 +113,7 @@ struct LogLine: Identifiable {
 
 /// JSONL event types emitted by media-pipeline.py on stdout.
 enum PipelineEvent: Decodable {
-    case pipelineFile(file: String)
+    case pipelineFile(file: String, sourcePath: String?)
     case stageComplete(stage: String)
     case tagResult(file: String, action: String, tagsAdded: [String],
                    exifMake: String, exifModel: String)
@@ -140,6 +140,7 @@ enum PipelineEvent: Decodable {
 
     private enum CodingKeys: String, CodingKey {
         case event, file, stage, action
+        case sourcePath = "source_path"
         case tagsAdded = "tags_added"
         case exifMake = "exif_make"
         case exifModel = "exif_model"
@@ -170,7 +171,8 @@ enum PipelineEvent: Decodable {
         switch event {
         case "pipeline_file":
             self = .pipelineFile(
-                file: try container.decode(String.self, forKey: .file))
+                file: try container.decode(String.self, forKey: .file),
+                sourcePath: try container.decodeIfPresent(String.self, forKey: .sourcePath))
         case "stage_complete":
             self = .stageComplete(
                 stage: try container.decode(String.self, forKey: .stage))
@@ -719,12 +721,14 @@ final class AppState {
         else { return }
 
         switch event {
-        case .pipelineFile(let file):
+        case .pipelineFile(let file, let sourcePath):
             if var row = currentDiffRow {
                 row.pipelineResult = row.pipelineResult ?? "in_progress"
                 diffTableRows.append(row)
             }
-            currentDiffRow = DiffTableRow(file: file)
+            var started = DiffTableRow(file: file)
+            started.sourcePath = sourcePath
+            currentDiffRow = started
             liveRow = currentDiffRow
 
         case .pipelineResult(_, let result):
