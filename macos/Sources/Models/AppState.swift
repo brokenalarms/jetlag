@@ -133,6 +133,7 @@ enum PipelineEvent: Decodable {
     case gyroflowResult(file: String, action: String, gyroflowPath: String,
                         error: String?)
     case pipelineResult(file: String, result: String)
+    case pipelineSummary(PipelineSummary)
     case timezoneConflict(conflictType: String, providedTz: String?,
                           fileTimezones: [String: [String]])
     case organizeConflict(count: Int, files: [String])
@@ -162,6 +163,8 @@ enum PipelineEvent: Decodable {
         case providedTz = "provided_tz"
         case fileTimezones = "file_timezones"
         case count, files
+        case processed, succeeded, changed, failed, mode
+        case failedFiles = "failed_files"
     }
 
     init(from decoder: Decoder) throws {
@@ -219,6 +222,20 @@ enum PipelineEvent: Decodable {
             self = .pipelineResult(
                 file: try container.decode(String.self, forKey: .file),
                 result: try container.decode(String.self, forKey: .result))
+        case "pipeline_summary":
+            let modeToken = try container.decode(String.self, forKey: .mode)
+            guard let mode = PipelineSummary.Mode(rawValue: modeToken) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .mode, in: container,
+                    debugDescription: "Unknown pipeline_summary mode: \(modeToken)")
+            }
+            self = .pipelineSummary(PipelineSummary(
+                processed: try container.decode(Int.self, forKey: .processed),
+                succeeded: try container.decode(Int.self, forKey: .succeeded),
+                changed: try container.decode(Int.self, forKey: .changed),
+                failed: try container.decode(Int.self, forKey: .failed),
+                failedFiles: try container.decode([String].self, forKey: .failedFiles),
+                mode: mode))
         case "timezone_conflict":
             self = .timezoneConflict(
                 conflictType: try container.decode(String.self, forKey: .conflictType),
@@ -636,6 +653,10 @@ final class AppState {
     /// process alone leaves every buffered line still to be appended.
     var currentRunTask: Task<Void, Never>?
     var diffTableRows: [DiffTableRow] = []
+    /// What the last run reported when it reached the end of the batch. A
+    /// cancelled run never produces one: the pipeline is killed before it reports.
+    private(set) var runSummary: PipelineSummary?
+    var showRunSummary: Bool = false
     private(set) var currentDiffRow: DiffTableRow?
     private(set) var liveRow: DiffTableRow?
 
@@ -704,6 +725,8 @@ final class AppState {
         diffTableRows = []
         currentDiffRow = nil
         liveRow = nil
+        runSummary = nil
+        showRunSummary = false
         workflowSession.clearConflictReport()
     }
 
@@ -796,6 +819,9 @@ final class AppState {
             workflowSession.organizeConflictCount = count
             workflowSession.organizeConflictFiles = files
 
+        case .pipelineSummary(let summary):
+            runSummary = summary
+
         case .pipelineError(let message):
             logOutput.append(LogLine(text: "ERROR: \(message)", stream: .stderr))
         }
@@ -849,6 +875,17 @@ final class AppState {
             pythonRuntimeAlert = Strings.Errors.commandLineToolsMissing
             return false
         }
+    }
+
+    /// The run reached the end of the pipeline's output. Its counterpart is
+    /// cancelRunning: only a run that finished has an outcome to show, so the
+    /// popup is raised from the summary the pipeline reported, or not at all.
+    func finishRun() {
+        workflowSession.noteRunFinished()
+        isRunning = false
+        currentProcess = nil
+        currentRunTask = nil
+        showRunSummary = runSummary != nil
     }
 
     func cancelRunning() {

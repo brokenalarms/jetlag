@@ -132,6 +132,57 @@ class TestEmittedEventsMatchSchema:
         assert organize.get("dest"), \
             "A skipped file still reports where it would have gone — the app must not read that as a move"
 
+    def test_run_emits_a_summary_of_the_whole_batch(self, temp_workspace, test_profile):
+        """The app's completion popup reads this event, not print_summary's stderr text.
+
+        A finished run has to say how many files it processed, how many changed
+        and whether it wrote anything, as data — the only alternative is parsing
+        the formatted log back out.
+        """
+        create_test_video(temp_workspace["source"] / "one.mp4",
+                          media_create_date="2025:10:05 01:00:00")
+        create_test_video(temp_workspace["source"] / "two.mp4",
+                          media_create_date="2025:10:05 02:00:00")
+
+        result = self._run(temp_workspace, test_profile)
+
+        events = validate_events(_events(result.stdout))
+        summaries = [e for e in events if e["event"] == "pipeline_summary"]
+        assert len(summaries) == 1, \
+            f"Actual: {len(summaries)} pipeline_summary events, Expected: exactly one per run"
+        summary = summaries[0]
+        assert summary["processed"] == 2, \
+            f"Actual: pipeline_summary.processed={summary['processed']}, Expected: 2"
+        assert summary["succeeded"] == 2, \
+            f"Actual: pipeline_summary.succeeded={summary['succeeded']}, Expected: 2"
+        assert summary["failed"] == 0, \
+            f"Actual: pipeline_summary.failed={summary['failed']}, Expected: 0"
+        assert summary["failed_files"] == [], \
+            f"Actual: pipeline_summary.failed_files={summary['failed_files']}, Expected: []"
+        assert summary["mode"] == "dry_run", \
+            f"Actual: pipeline_summary.mode={summary['mode']!r}, Expected: 'dry_run'"
+        changed = len([e for e in events
+                       if e["event"] == "pipeline_result" and e["result"] == "would_change"])
+        assert summary["changed"] == changed, \
+            f"Actual: pipeline_summary.changed={summary['changed']}, " \
+            f"Expected: {changed} (the per-file results agree)"
+
+    def test_applying_reports_the_mode_it_ran_in(self, temp_workspace, test_profile):
+        """Dry run and apply are the same counts with opposite consequences.
+
+        The popup says which one happened, so the run states its mode as a token
+        instead of the app inferring it from its own settings.
+        """
+        create_test_video(temp_workspace["source"] / "test.mp4",
+                          media_create_date="2025:10:05 01:00:00")
+
+        result = self._run(temp_workspace, test_profile, "--apply")
+
+        events = validate_events(_events(result.stdout))
+        summary = next(e for e in events if e["event"] == "pipeline_summary")
+        assert summary["mode"] == "applied", \
+            f"Actual: pipeline_summary.mode={summary['mode']!r}, Expected: 'applied'"
+
     def test_undeclared_token_is_rejected(self):
         """The guard itself: a token the schema does not list fails validation.
 
