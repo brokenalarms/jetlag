@@ -1001,6 +1001,42 @@ class TestArchiveSourceIntegration:
         assert source.exists(), "Source dir should be untouched with default tasks"
         assert video.exists(), "Source file should still exist"
 
+    def test_archive_skipped_when_a_file_failed(self, temp_workspace, test_profile):
+        """A failed file's only copy may still be in the source directory, so
+        archive-source must not run — in apply or dry-run mode — when any file
+        in the batch failed."""
+        source = temp_workspace["source"]
+
+        good = source / "good.mp4"
+        create_test_video(good)
+        bad = source / "bad.mp4"
+        create_test_video(bad)
+        bad.chmod(0o000)
+
+        try:
+            result = run_pipeline([
+                "--profile", test_profile,
+                "--source", str(source),
+                "--timezone", "+0900",
+                "--group", "Test",
+                "--tasks", "tag", "fix-timestamp", "archive-source",
+                "--source-action", "archive",
+                "--apply",
+            ])
+        finally:
+            if bad.exists():
+                bad.chmod(0o644)
+
+        assert "Failed: 1" in result.stderr
+        assert source.exists(), "Source dir should not be archived away after a failure"
+        today = datetime.now().strftime("%Y-%m-%d")
+        not_expected = source.parent / f"{source.name} - copied {today}"
+        assert not not_expected.exists(), "Source should not have been renamed"
+        assert "Skipping archive source" in result.stderr
+        skip_line = next(l for l in result.stderr.split("\n") if "Skipping archive source" in l)
+        assert "1" in skip_line, f"Skip line should mention the failed count: {skip_line}"
+        assert "Archive source..." not in result.stderr
+
     def test_archive_source_with_companions(self, temp_workspace, test_profile):
         """Archive-source with companions: companions included in source file list for delete."""
         source = temp_workspace["source"]

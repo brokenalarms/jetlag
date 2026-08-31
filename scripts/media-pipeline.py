@@ -992,16 +992,20 @@ def main():
             files=organize_conflicts,
         )
 
-    # Archive source (if in tasks)
+    # Archive source (if in tasks) — a failed file's only copy may still be in
+    # the source directory, so archiving it away after failures would strand it.
     if "archive-source" in tasks:
-        print("📦 Archive source...", file=sys.stderr)
-        arc_result = run_archive_source(
-            source_dir, args.source_action, all_source_files, args.apply,
-            destination=args.archive_destination,
-            archived_name=args.archived_name,
-        )
-        if arc_result.failed:
-            print("   ⚠️  Archive-source failed", file=sys.stderr)
+        if stats["failed"] > 0:
+            print(f"📦 Skipping archive source: {stats['failed']} file(s) failed.", file=sys.stderr)
+        else:
+            print("📦 Archive source...", file=sys.stderr)
+            arc_result = run_archive_source(
+                source_dir, args.source_action, all_source_files, args.apply,
+                destination=args.archive_destination,
+                archived_name=args.archived_name,
+            )
+            if arc_result.failed:
+                print("   ⚠️  Archive-source failed", file=sys.stderr)
 
     # Clean up working dir
     if args.apply:
