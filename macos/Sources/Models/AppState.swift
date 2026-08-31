@@ -420,10 +420,21 @@ final class WorkflowSession {
             lastDryRunArgs = previewed
         }
         runningDryRunArgs = nil
+        resetApplyModeAfterRun()
     }
 
     func noteRunCancelled() {
         runningDryRunArgs = nil
+        resetApplyModeAfterRun()
+    }
+
+    /// An apply that just finished or was cancelled leaves nothing previewed
+    /// for the next one, so the stale-dry-run assent it may have needed must
+    /// not carry over — the workflow defaults back to the safe preview.
+    private func resetApplyModeAfterRun() {
+        guard applyMode else { return }
+        applyMode = false
+        applyWithoutDryRun = false
     }
 
     /// Assent covers the run it was given for. A run the user starts themselves
