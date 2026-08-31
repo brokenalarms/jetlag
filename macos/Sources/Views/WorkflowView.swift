@@ -27,6 +27,7 @@ struct WorkflowView: View {
         VStack(spacing: 0) {
             VStack(spacing: 0) {
                 profileSelector
+                    .disabled(state.isRunning)
                     .padding(.vertical)
                 if !session.profileName.isEmpty {
                     pipelineStatusBar
@@ -45,6 +46,7 @@ struct WorkflowView: View {
             VStack(spacing: 16) {
                 if !session.profileName.isEmpty {
                     stepsPipeline
+                        .disabled(state.isRunning)
                 }
             }
             .padding(16)
@@ -641,6 +643,7 @@ struct WorkflowView: View {
             .labelsHidden()
             .pickerStyle(.segmented)
             .fixedSize()
+            .disabled(state.isRunning)
 
             Button(state.isRunning ? Strings.Workflow.runningButton : Strings.Workflow.runButton) {
                 state.workflowSession.clearRunAssent()
