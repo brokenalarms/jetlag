@@ -187,16 +187,21 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let runCompleteDryRunTitle = String(localized: "workflow.runComplete.dryRun.title",
             defaultValue: "Dry Run Complete")
 
-        static func runSummaryCounts(processed: Int, changed: Int, unchanged: Int, mode: PipelineSummary.Mode) -> String {
-            let plural = processed == 1 ? "" : "s"
+        static func runSummaryCounts(processed: Int, changed: Int, mode: PipelineSummary.Mode) -> String {
+            let processedPlural = processed == 1 ? "" : "s"
+            let changedPlural = changed == 1 ? "" : "s"
+            let processedLine = String(localized: "workflow.runSummary.counts.processed",
+                defaultValue: "\(processed) file\(processedPlural) processed")
+            let changedLine: String
             switch mode {
             case .applied:
-                return String(localized: "workflow.runSummary.counts.applied",
-                       defaultValue: "\(processed) file\(plural) processed — \(changed) changed, \(unchanged) unchanged.")
+                changedLine = String(localized: "workflow.runSummary.counts.applied",
+                    defaultValue: "\(changed) file\(changedPlural) changed")
             case .dryRun:
-                return String(localized: "workflow.runSummary.counts.dryRun",
-                       defaultValue: "\(processed) file\(plural) processed — \(changed) would change, \(unchanged) unchanged.")
+                changedLine = String(localized: "workflow.runSummary.counts.dryRun",
+                    defaultValue: "\(changed) file\(changedPlural) would change")
             }
+            return "\(processedLine)\n\(changedLine)"
         }
 
         static let runSummaryApplied = String(localized: "workflow.runSummary.applied",
