@@ -94,4 +94,21 @@ final class RunSummaryTests: XCTestCase {
         XCTAssertNil(state.runSummary)
         XCTAssertFalse(state.showRunSummary)
     }
+
+    /// The completion popup's "Show Output" button dismisses the popup and
+    /// switches the inspector to the log panel, so a run with too many failures
+    /// to list in the alert can still be inspected in full.
+    func testShowOutputForRunSummaryOpensTheLogPanel() {
+        let state = AppState()
+        state.isRunning = true
+        feed(state, appliedSummary)
+        state.finishRun()
+        XCTAssertTrue(state.showRunSummary)
+
+        state.showOutputForRunSummary()
+
+        XCTAssertFalse(state.showRunSummary)
+        XCTAssertTrue(state.showInspector)
+        XCTAssertTrue(state.showLogOutput)
+    }
 }

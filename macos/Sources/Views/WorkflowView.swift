@@ -149,6 +149,12 @@ struct WorkflowView: View {
             isPresented: $state.showRunSummary
         ) {
             Button(Strings.Common.done) { state.showRunSummary = false }
+                .keyboardShortcut(.defaultAction)
+            if (state.runSummary?.failed ?? 0) > 0 {
+                Button(Strings.Workflow.showOutputButton) {
+                    state.showOutputForRunSummary()
+                }
+            }
         } message: {
             Text(runSummaryMessage)
         }

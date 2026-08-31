@@ -961,6 +961,15 @@ final class AppState {
         showRunSummary = runSummary != nil
     }
 
+    /// The run-summary popup's "Show Output" button: dismiss the summary and
+    /// switch the inspector to the log panel, so a run with too many failures to
+    /// list in the alert can be inspected in full.
+    func showOutputForRunSummary() {
+        showRunSummary = false
+        showInspector = true
+        showLogOutput = true
+    }
+
     func cancelRunning() {
         workflowSession.noteRunCancelled()
         currentRunTask?.cancel()
