@@ -87,4 +87,25 @@ final class DiffTableViewLabelTests: XCTestCase {
         XCTAssertEqual(actionCell.parts.last?.text,
                        Strings.DiffTable.wouldWrite("DateTimeOriginal, CreateDate"))
     }
+
+    /// The action and status columns carry the same writes subtitle and must not
+    /// stretch to fit every listed field: a fourth field (e.g.
+    /// QuickTime:MediaCreateDate) must measure to the same capped width as three
+    /// fields, not wider — proving the column truncates rather than grows.
+    func testActionAndStatusColumnsCapWidthAtTheWritesSubtitle() {
+        var diffRow = row(timestampAction: "would_fix")
+        diffRow.staleFields = ["Keys:CreationDate", "QuickTime:CreateDate", "QuickTime:TrackCreateDate"]
+        let threeFieldCells = view.cellTexts(diffRow)
+
+        diffRow.staleFields.append("QuickTime:MediaCreateDate")
+        let fourFieldCells = view.cellTexts(diffRow)
+
+        for index in [4, 6] {
+            XCTAssertEqual(threeFieldCells[index].maxWidth, DiffTableView.writesColumnMaxWidth)
+            XCTAssertEqual(DiffTableView.idealWidth(of: threeFieldCells[index]),
+                           DiffTableView.writesColumnMaxWidth)
+            XCTAssertEqual(DiffTableView.idealWidth(of: fourFieldCells[index]),
+                           DiffTableView.writesColumnMaxWidth)
+        }
+    }
 }

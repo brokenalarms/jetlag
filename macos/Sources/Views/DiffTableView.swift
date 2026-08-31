@@ -11,13 +11,21 @@ struct DiffTableView: View {
     private static let cellPadding: CGFloat = 20
     private static let iconWidth: CGFloat = 18
     private static let timelineColumnWidth: CGFloat = 120
-    /// The one column with an upper bound: a camera filename can run to 40+
-    /// characters, and past this it is truncated in the middle rather than pushing
-    /// every other column off the panel. All other columns fit their content.
+    /// A camera filename can run to 40+ characters, and past this it is truncated
+    /// in the middle rather than pushing every other column off the panel.
     static let fileColumnMaxWidth: CGFloat = 320
     private static let monoFont = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
     private static let systemFont = NSFont.systemFont(ofSize: 11)
     private static let detailFont = NSFont.systemFont(ofSize: 9)
+    /// The writes subtitle lists every stale field (e.g. "Writes Keys:CreationDate,
+    /// QuickTime:CreateDate, QuickTime:TrackCreateDate, …"), which can grow past
+    /// any reasonable column width. Capped to fit three fields untruncated; a
+    /// fourth truncates with an ellipsis. The full list stays available via .help.
+    static let writesColumnMaxWidth: CGFloat = {
+        let threeFields = Strings.DiffTable.wouldWrite(
+            "Keys:CreationDate, QuickTime:CreateDate, QuickTime:TrackCreateDate")
+        return (threeFields as NSString).size(withAttributes: [.font: detailFont]).width + cellPadding
+    }()
 
     static func idealWidth(of cell: CellText) -> CGFloat {
         if let fixed = cell.fixedWidth { return fixed }
@@ -91,13 +99,15 @@ struct DiffTableView: View {
             CellText([(row.correctedTime ?? "", Self.monoFont)]),
             CellText([(changeBadgeText(row), Self.systemFont),
                       (staleFieldsText(row).map(Strings.DiffTable.wouldWrite) ?? "", Self.detailFont)],
-                     extraWidth: row.requiresForceTimezone ? Self.iconWidth : 0),
+                     extraWidth: row.requiresForceTimezone ? Self.iconWidth : 0,
+                     maxWidth: Self.writesColumnMaxWidth),
             CellText([(row.dest.map { ($0 as NSString).lastPathComponent } ?? "", Self.monoFont),
                       (row.skipReason?.explanation ?? "", Self.detailFont)],
                      extraWidth: row.hasDestinationConflict ? Self.iconWidth : 0),
             CellText([(statusText(row), Self.systemFont),
                       (staleFieldsText(row).map(Strings.DiffTable.wouldWrite) ?? "", Self.detailFont)],
-                     extraWidth: Self.iconWidth),
+                     extraWidth: Self.iconWidth,
+                     maxWidth: Self.writesColumnMaxWidth),
         ]
     }
 
