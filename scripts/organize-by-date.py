@@ -173,17 +173,21 @@ def _handle_existing_target(file_path, target_file, target_path, abs_target,
 
 def process_file(file_path: str, target_dir: str, template: str,
                  copy_mode: bool, overwrite: bool, apply: bool,
-                 verbose: bool) -> OrganizeResult:
+                 verbose: bool, dest_name: Optional[str] = None) -> OrganizeResult:
     """Process a single file for organization.
 
     Printed messages name file_path: they report the operation this function
     performed, on the file it was handed. A caller that staged a copy states
     the outcome for the original in a line of its own.
 
+    dest_name overrides the basename used to build the destination path — for a
+    dry run previewing a rename that has not happened, the destination carries
+    the name apply will produce while every read still uses the real file_path.
+
     Returns:
         OrganizeResult with dest path and action taken
     """
-    base = os.path.basename(file_path)
+    base = dest_name or os.path.basename(file_path)
 
     if verbose:
         print(f"Processing: {file_path}", file=sys.stderr)
