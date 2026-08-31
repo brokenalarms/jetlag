@@ -210,10 +210,18 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
             defaultValue: "Nothing was written — run again in Apply mode to make these changes.")
 
         static func runSummaryFailed(count: Int, files: [String]) -> String {
-            let listed = files.map { "  \($0)" }.joined(separator: "\n")
+            let maxListed = 5
+            var listed = files.prefix(maxListed).map { "  \($0)" }.joined(separator: "\n")
+            if files.count > maxListed {
+                let remaining = files.count - maxListed
+                listed += "\n  … and \(remaining) more (see output)"
+            }
             return String(localized: "workflow.runSummary.failed",
                           defaultValue: "\(count) failed:\n\(listed)")
         }
+
+        static let showOutputButton = String(localized: "workflow.runSummary.showOutput",
+            defaultValue: "Show Output")
 
         // Unpreviewed apply dialog
         static let dryRunStaleTitle = String(localized: "workflow.dryRunStale.title",
