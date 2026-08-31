@@ -2,9 +2,10 @@ import AppKit
 import SwiftUI
 
 /// The panel is the column that wants space; opening it or starting a run is the moment
-/// it needs it. `targetFrame` grows the window's right edge to the screen's visible edge
-/// on either transition, never past it and never when the window is already there — a
-/// pure function so the transition logic is testable without AppKit.
+/// it needs it. `targetFrame` grows the window to its target width, centered in the
+/// screen's visible frame so the left and right margins end up equal, on either
+/// transition, never past the visible frame and never when the window is already
+/// there — a pure function so the transition logic is testable without AppKit.
 enum WindowEdgeGrowth {
     /// Past sidebar + form + the panel's own cap the window would hold only empty
     /// desktop, so growth stops there as it stops at the screen edge.
@@ -16,17 +17,21 @@ enum WindowEdgeGrowth {
         previousIsRunning: Bool,
         isRunning: Bool,
         frame: CGRect,
+        screenMinX: CGFloat,
         screenEdge: CGFloat,
         maxWidth: CGFloat = .infinity
     ) -> CGRect? {
         let panelJustOpened = !previousPanelOpen && panelOpen
         let runJustStarted = !previousIsRunning && isRunning
-        // The content's own maximum (the panel's cap) bounds the growth as the screen
-        // edge does: past it the window would only hold empty desktop.
-        let edge = min(screenEdge, frame.minX + maxWidth)
-        guard panelOpen, panelJustOpened || runJustStarted, frame.maxX < edge else { return nil }
+        guard panelOpen, panelJustOpened || runJustStarted else { return nil }
+        // The content's own maximum (the panel's cap) bounds the growth as the visible
+        // screen width does: past it the window would only hold empty desktop.
+        let visibleWidth = screenEdge - screenMinX
+        let width = min(maxWidth, visibleWidth)
         var target = frame
-        target.size.width = edge - frame.minX
+        target.size.width = width
+        target.origin.x = screenMinX + (visibleWidth - width) / 2
+        guard target != frame else { return nil }
         return target
     }
 
@@ -95,6 +100,7 @@ struct WindowEdgeGrowthController: NSViewRepresentable {
             previousIsRunning: coordinator.previousIsRunning,
             isRunning: isRunning,
             frame: window.frame,
+            screenMinX: screen.visibleFrame.minX,
             screenEdge: screen.visibleFrame.maxX,
             maxWidth: WindowEdgeGrowth.contentMaxWidth
         ) else { return }
