@@ -27,62 +27,50 @@ struct ScriptRunner {
         let stream = AsyncStream<LogLine> { continuation in
             let group = DispatchGroup()
 
-            func readLines(from pipe: Pipe, stream: LogLine.Stream) {
+            func reader(for pipe: Pipe, stream: LogLine.Stream) -> PipeLineReader {
                 group.enter()
-                // Buffer for partial lines that span pipe chunk boundaries.
-                // Without this, a chunk ending mid-line (e.g. '{"event":"timestamp_res')
-                // would be yielded as an incomplete line and the remainder lost.
-                var partialLine = ""
-                pipe.fileHandleForReading.readabilityHandler = { handle in
-                    let data = handle.availableData
-                    guard !data.isEmpty else {
-                        if !partialLine.isEmpty {
-                            continuation.yield(LogLine(text: partialLine, stream: stream))
-                            partialLine = ""
-                        }
-                        pipe.fileHandleForReading.readabilityHandler = nil
-                        group.leave()
-                        return
-                    }
-                    if let text = String(data: data, encoding: .utf8) {
-                        let combined = partialLine + text
-                        partialLine = ""
-                        let segments = combined.components(separatedBy: .newlines)
-                        for (i, segment) in segments.enumerated() {
-                            if i == segments.count - 1 {
-                                // Last segment may be a partial line (no trailing newline)
-                                partialLine = segment
-                            } else if !segment.isEmpty {
-                                continuation.yield(LogLine(text: segment, stream: stream))
-                            }
-                        }
-                    }
-                }
+                return PipeLineReader(
+                    handle: pipe.fileHandleForReading,
+                    stream: stream,
+                    emit: { continuation.yield($0) },
+                    onFinished: { group.leave() }
+                )
             }
 
-            readLines(from: stdoutPipe, stream: .stdout)
-            readLines(from: stderrPipe, stream: .stderr)
+            let stdoutReader = reader(for: stdoutPipe, stream: .stdout)
+            let stderrReader = reader(for: stderrPipe, stream: .stderr)
 
             group.notify(queue: .global()) {
                 continuation.finish()
             }
 
             do {
-                spawned = try spawnProcessGroupLeader(
+                let process = try spawnProcessGroupLeader(
                     arguments: arguments,
                     environment: env,
                     workingDir: workingDir,
                     stdout: stdoutPipe.fileHandleForWriting,
                     stderr: stderrPipe.fileHandleForWriting
                 )
+                spawned = process
+                // The run ends when the script ends, not when the pipes reach EOF.
+                // The script's stdout and stderr are fd 1 and 2 in every descendant
+                // it spawns, so one that outlives it — a wedged exiftool, a gyroflow
+                // left running — holds the write ends open and EOF never arrives.
+                // Waiting on the leader instead is an event, not a poll: waitpid
+                // returns, the buffered output is drained, and the readers finish,
+                // so the stream ends and the app's completion handling runs.
+                Thread.detachNewThread {
+                    process.waitUntilExit()
+                    stdoutReader.finishDrainingBufferedOutput()
+                    stderrReader.finishDrainingBufferedOutput()
+                }
             } catch {
-                stdoutPipe.fileHandleForReading.readabilityHandler = nil
-                stderrPipe.fileHandleForReading.readabilityHandler = nil
                 continuation.yield(LogLine(text: Strings.Errors.scriptStartFailed(error.localizedDescription), stream: .stderr))
-                continuation.finish()
             }
             // The child owns the write ends now; holding them open here would keep
-            // the reads from ever seeing EOF, so the stream would never finish.
+            // the reads from ever seeing EOF, so a run whose descendants all exit —
+            // and a spawn that failed outright — would never finish.
             try? stdoutPipe.fileHandleForWriting.close()
             try? stderrPipe.fileHandleForWriting.close()
         }
@@ -116,8 +104,8 @@ struct ScriptRunner {
         // pgroup 0 means "a new group led by the child". CLOEXEC_DEFAULT drops every
         // descriptor except the three set up above: the child would otherwise also
         // inherit the pipes' write ends by their original numbers, and anything it
-        // backgrounds would hold them open long past its own exit — no EOF, so the
-        // log stream would never finish. SETSIGDEF and SETSIGMASK hand
+        // backgrounds would hold them open long past its own exit, keeping the
+        // pipes alive well after the run has ended. SETSIGDEF and SETSIGMASK hand
         // the script a clean signal environment: an inherited SIG_IGN cannot be
         // trapped and an inherited block leaves the signal pending forever, so a
         // script launched from a host that ignores or blocks SIGINT — as a Swift
