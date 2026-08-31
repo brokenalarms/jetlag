@@ -590,13 +590,21 @@ private struct ColumnAutoSizer: NSViewRepresentable {
         }
     }
 
+    /// The window holds more than one `NSTableView` — the sidebar `List` is an outline
+    /// view, and comes first in the window's subview order — so the search starts at
+    /// the nearest ancestor of this view and accepts only a table with this table's
+    /// column count.
     private func findTableView(from view: NSView) -> NSTableView? {
-        guard let contentView = view.window?.contentView else { return nil }
-        return searchForTableView(in: contentView)
+        var ancestor = view.superview
+        while let candidate = ancestor {
+            if let found = searchForTableView(in: candidate) { return found }
+            ancestor = candidate.superview
+        }
+        return nil
     }
 
     private func searchForTableView(in view: NSView) -> NSTableView? {
-        if let tableView = view as? NSTableView {
+        if let tableView = view as? NSTableView, tableView.tableColumns.count == columnWidths.count {
             return tableView
         }
         for subview in view.subviews {

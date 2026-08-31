@@ -26,6 +26,13 @@ final class ColumnFitTests: XCTestCase {
         return nil
     }
 
+    private func allViews<T: NSView>(of type: T.Type, in view: NSView) -> [T] {
+        var found: [T] = []
+        if let match = view as? T { found.append(match) }
+        for subview in view.subviews { found += allViews(of: type, in: subview) }
+        return found
+    }
+
     /// Streams `count` files through the live-row path — pipeline_file, then the
     /// timestamp and organize results, then pipeline_result — as the pipeline emits them.
     private func stream(_ count: Int, into state: AppState, fileName: (Int) -> String) {
@@ -102,6 +109,60 @@ final class ColumnFitTests: XCTestCase {
                 XCTAssertTrue((0...1).contains(fraction), "epoch \(epoch) lands at \(fraction), outside the timeline")
             }
         }
+    }
+
+    /// The app's conditions, not the bare panel's: `ContentView` (which carries
+    /// `WindowEdgeGrowthController`) in a window that is on screen, with a run starting
+    /// after the panel is open so the window grows while the rows stream in.
+    func testEveryColumnFitsItsContentInAVisibleWindowDuringARun() throws {
+        let state = AppState()
+        state.selectedTab = .workflow
+        state.showInspector = true
+        let host = NSHostingView(rootView: ContentView(state: state))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1400, height: 800),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.contentView = host
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+
+        state.isRunning = true
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        stream(30, into: state) { "VID_20250815_1408\(String(format: "%02d", $0))_00_\(String(format: "%03d", $0)).insv" }
+        state.isRunning = false
+        RunLoop.main.run(until: Date().addingTimeInterval(1.0))
+        // The sidebar's `List` is an `NSTableView` too, and precedes the panel in the
+        // window: the Files table is the one with the panel's columns.
+        let table = try XCTUnwrap(
+            allViews(of: NSTableView.self, in: host).first { $0.tableColumns.count == 7 },
+            "no seven-column NSTableView hosted")
+        let scrollView = try XCTUnwrap(table.enclosingScrollView)
+
+        let rows = state.visibleRows
+        XCTAssertEqual(rows.count, 30)
+        let columns = table.tableColumns
+        let widest: [(index: Int, name: String, width: CGFloat)] = [
+            (0, "file", rows.map { width($0.file, mono) }.max()!),
+            (2, "original", rows.map { width($0.originalTimeDisplay ?? "", mono) }.max()!),
+            (3, "corrected", rows.map { width($0.correctedTime ?? "", mono) }.max()!),
+            (5, "destination", rows.map { width(($0.dest! as NSString).lastPathComponent, mono) }.max()!),
+            (6, "status", rows.map { width($0.outcome.statusLabel ?? "", system) }.max()!),
+        ]
+        for column in widest {
+            XCTAssertGreaterThanOrEqual(
+                columns[column.index].width, column.width,
+                "\(column.name) column (\(columns[column.index].width)pt) must fit its widest text (\(column.width)pt)")
+        }
+        XCTAssertGreaterThan(table.frame.width, scrollView.contentView.bounds.width,
+                             "the content-sized columns must overflow the panel (\(columns.map { $0.width }))")
+
+        // Double-clicking a divider fits its column: the recognizer must be on this
+        // table's header, not on whichever table the window happens to list first.
+        let headerView = try XCTUnwrap(table.headerView)
+        let doubleClick = headerView.gestureRecognizers.compactMap { $0 as? NSClickGestureRecognizer }
+            .first { $0.numberOfClicksRequired == 2 }
+        XCTAssertNotNil(doubleClick, "the Files table's header must carry the double-click-to-fit recognizer")
     }
 
     /// The filename is the one column with a cap: a very long name truncates in the
