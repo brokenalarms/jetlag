@@ -211,3 +211,29 @@ events:
       event: pipeline_result
       file: DJI_20250815_101112_0001.MP4
       result: would_change
+
+  pipeline_summary:
+    description: >-
+      Emitted once after every file has been processed, carrying the run's
+      outcome as data. print_summary writes the same counts to stderr for the
+      log; the app reads this event and never parses that text back out.
+    fields:
+      processed: { type: integer }
+      succeeded: { type: integer }
+      changed: { type: integer }
+      failed: { type: integer }
+      failed_files:
+        type: "list[string]"
+        description: "Basenames of the files that failed, empty when failed is 0"
+      mode:
+        type: string
+        enum: [applied, dry_run]
+        description: "Whether the run wrote the changes or only previewed them"
+    example:
+      event: pipeline_summary
+      processed: 2
+      succeeded: 1
+      changed: 1
+      failed: 1
+      failed_files: [DJI_20250815_101112_0001.MP4]
+      mode: applied

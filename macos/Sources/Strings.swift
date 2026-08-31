@@ -175,6 +175,28 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
                          defaultValue: "\(count) files already exist at the destination with different contents. Overwrite them?")
         }
 
+        // Run completion popup
+        static let runCompleteAppliedTitle = String(localized: "workflow.runComplete.applied.title",
+            defaultValue: "Run Complete")
+        static let runCompleteDryRunTitle = String(localized: "workflow.runComplete.dryRun.title",
+            defaultValue: "Dry Run Complete")
+
+        static func runSummaryCounts(processed: Int, changed: Int, unchanged: Int) -> String {
+            String(localized: "workflow.runSummary.counts",
+                   defaultValue: "\(processed) file\(processed == 1 ? "" : "s") processed — \(changed) changed, \(unchanged) unchanged.")
+        }
+
+        static let runSummaryApplied = String(localized: "workflow.runSummary.applied",
+            defaultValue: "The changes were written to the destination.")
+        static let runSummaryDryRun = String(localized: "workflow.runSummary.dryRun",
+            defaultValue: "Nothing was written — run again in Apply mode to make these changes.")
+
+        static func runSummaryFailed(count: Int, files: [String]) -> String {
+            let listed = files.map { "  \($0)" }.joined(separator: "\n")
+            return String(localized: "workflow.runSummary.failed",
+                          defaultValue: "\(count) failed:\n\(listed)")
+        }
+
         // Unpreviewed apply dialog
         static let dryRunStaleTitle = String(localized: "workflow.dryRunStale.title",
             defaultValue: "Settings Changed Since the Last Dry Run")

@@ -1218,12 +1218,17 @@ class TestPipelineMachineOutput:
         assert files[0]["pipeline_result"] == "changed", \
             f"Apply mode should emit changed, got: {files[0]['pipeline_result']}"
 
-    def test_every_event_has_file_field(self, temp_workspace, test_profile):
-        """Each non-control event includes a file field for scoping.
+    def test_every_per_file_event_has_file_field(self, temp_workspace, test_profile):
+        """Each per-file event includes a file field for scoping.
 
-        Actual: all result events include a file field
+        Actual: all per-file result events include a file field
         Expected: JSONL events are self-contained with file context
+
+        Batch-level events — a stage boundary, or the run's own summary — describe
+        the whole run and carry no file, so they are named here rather than left
+        to slip through as an event that forgot its scope.
         """
+        batch_level = {"stage_complete", "pipeline_summary"}
         source = temp_workspace["source"]
         create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
 
@@ -1237,7 +1242,7 @@ class TestPipelineMachineOutput:
         for line in result.stdout.strip().split("\n"):
             if line.strip():
                 event = json.loads(line)
-                if event["event"] not in ("stage_complete",):
+                if event["event"] not in batch_level:
                     assert "file" in event, f"Event {event['event']} should include file field"
 
     def test_tz_mismatch_informational_in_dry_run(self, temp_workspace, test_profile):

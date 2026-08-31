@@ -141,6 +141,16 @@ struct WorkflowView: View {
                  : Strings.Workflow.noDryRunMessage)
         }
         .alert(
+            state.runSummary?.mode == .applied
+                ? Strings.Workflow.runCompleteAppliedTitle
+                : Strings.Workflow.runCompleteDryRunTitle,
+            isPresented: $state.showRunSummary
+        ) {
+            Button(Strings.Common.done) { state.showRunSummary = false }
+        } message: {
+            Text(runSummaryMessage)
+        }
+        .alert(
             Strings.Errors.commandLineToolsTitle,
             isPresented: Binding(
                 get: { state.pythonRuntimeAlert != nil },
@@ -151,6 +161,23 @@ struct WorkflowView: View {
         } message: {
             Text(state.pythonRuntimeAlert ?? "")
         }
+    }
+
+    private var runSummaryMessage: String {
+        guard let summary = state.runSummary else { return "" }
+        var lines = [Strings.Workflow.runSummaryCounts(
+            processed: summary.processed,
+            changed: summary.changed,
+            unchanged: summary.unchanged)]
+        lines.append(summary.mode == .applied
+                     ? Strings.Workflow.runSummaryApplied
+                     : Strings.Workflow.runSummaryDryRun)
+        if summary.failed > 0 {
+            lines.append(Strings.Workflow.runSummaryFailed(
+                count: summary.failed,
+                files: summary.failedFiles))
+        }
+        return lines.joined(separator: "\n\n")
     }
 
     private var timezoneConflictMessage: String {
@@ -727,12 +754,7 @@ struct WorkflowView: View {
                 await MainActor.run { state.appendLog(line) }
             }
             guard !Task.isCancelled else { return }
-            await MainActor.run {
-                state.workflowSession.noteRunFinished()
-                state.isRunning = false
-                state.currentProcess = nil
-                state.currentRunTask = nil
-            }
+            await MainActor.run { state.finishRun() }
         }
     }
 

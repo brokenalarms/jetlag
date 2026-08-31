@@ -18,10 +18,12 @@
 		11DAC29BADCD9CB0EF3EB4F0 /* FixTimestampPreviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3CAB3FB148CDC0E0E19191A /* FixTimestampPreviewTests.swift */; };
 		1CFE827872ACAF221D330372 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A0F60C0EC518091F4E34BACB /* Quartz.framework */; };
 		1D23F4385E3C9080D63F95C1 /* DiffTableRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A67A68A82CC97A0B42F497 /* DiffTableRow.swift */; };
+		1F6A7B753CFE037E46BC5916 /* RunSummaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3A384D1A78A845026DD9131 /* RunSummaryTests.swift */; };
 		22E1D69B22D54B870B63505F /* CancelFeedbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE9A71B38C9F152E65E2D2B8 /* CancelFeedbackTests.swift */; };
 		30624E27385D5F145ECC1137 /* DryRunFreshnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF1FBD7A42B275AA5183D163 /* DryRunFreshnessTests.swift */; };
 		3E3C0BD8BAD159DA18D47303 /* TimestampSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31610BDF5B254E8176367A1D /* TimestampSourceTests.swift */; };
 		49521EA7D50F8FD80CA4EDFD /* PythonRuntimeCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA47C3147490D4D7AABA5169 /* PythonRuntimeCheck.swift */; };
+		49CB4585E7C6D1DC06062400 /* PipelineSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0DC9676D4668FC395DD2A0F /* PipelineSummary.swift */; };
 		4FDCE64D99169FBCD837CF2B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C503D6DF395CB0F0EE8674D /* SettingsView.swift */; };
 		53E52584D7A0F04EBD764B7D /* LogOutputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93163EBEB8CD8B13330BAB7C /* LogOutputView.swift */; };
 		54BF807828E4B1BF2A402E9F /* InspectorHostedSizingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C698B76B04834D4379CADAA4 /* InspectorHostedSizingTests.swift */; };
@@ -139,6 +141,7 @@
 		CEEAE0CBDBBA1FFAFBA4B392 /* WindowEdgeGrowth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowEdgeGrowth.swift; sourceTree = "<group>"; };
 		D08074CC6CCFCC6AFEC75C39 /* PipelineArgsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineArgsTests.swift; sourceTree = "<group>"; };
 		D0A92519F526948204A6F4D6 /* WorkflowLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowLayoutTests.swift; sourceTree = "<group>"; };
+		D0DC9676D4668FC395DD2A0F /* PipelineSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineSummary.swift; sourceTree = "<group>"; };
 		D7844419398942BFFCBA70AA /* PipelineSchemaContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineSchemaContractTests.swift; sourceTree = "<group>"; };
 		DC0210C9EE3BEF29E07C9DE6 /* MediaProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaProfile.swift; sourceTree = "<group>"; };
 		DE9A71B38C9F152E65E2D2B8 /* CancelFeedbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CancelFeedbackTests.swift; sourceTree = "<group>"; };
@@ -146,6 +149,7 @@
 		E3FDFFFE053527F6DAFF2443 /* HostedViewSizing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostedViewSizing.swift; sourceTree = "<group>"; };
 		EAE7B2C33B83AA615CCA0EF3 /* ScriptProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptProcess.swift; sourceTree = "<group>"; };
 		F37A77F3E04133102C3B9228 /* GyroflowStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroflowStatus.swift; sourceTree = "<group>"; };
+		F3A384D1A78A845026DD9131 /* RunSummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunSummaryTests.swift; sourceTree = "<group>"; };
 		F5122F4BA350F64B8CB33F83 /* WindowEdgeGrowthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowEdgeGrowthTests.swift; sourceTree = "<group>"; };
 		F559FB82EF7FBD0FD4101BE5 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		F713CD33E597A06A26576EC6 /* RowFileLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowFileLocation.swift; sourceTree = "<group>"; };
@@ -240,6 +244,7 @@
 				5AFFC7653CEF9432BABAFE94 /* ProfileTests.swift */,
 				33AF1E5DF4D368EB36EFB0EC /* PythonRuntimeCheckTests.swift */,
 				B098EAB2712A13202064D6F1 /* RowFileLocationTests.swift */,
+				F3A384D1A78A845026DD9131 /* RunSummaryTests.swift */,
 				BA13B0A4EE78E6DBC6958CF4 /* ScriptProcessGroupTests.swift */,
 				A14C553F637C9236439B7A97 /* StreamingPerformanceTests.swift */,
 				2380F7D5A02B13D1DCAD0F23 /* TableTailFollowingTests.swift */,
@@ -296,6 +301,7 @@
 				A668F7E7A4F545637B636567 /* FilenamePatterns.swift */,
 				F37A77F3E04133102C3B9228 /* GyroflowStatus.swift */,
 				DC0210C9EE3BEF29E07C9DE6 /* MediaProfile.swift */,
+				D0DC9676D4668FC395DD2A0F /* PipelineSummary.swift */,
 				F713CD33E597A06A26576EC6 /* RowFileLocation.swift */,
 				2A5BADCA538054410A590FFD /* RowOutcome.swift */,
 				8A6E60D543571FFFB0CDF2A0 /* TimestampSource.swift */,
@@ -453,6 +459,7 @@
 				53E52584D7A0F04EBD764B7D /* LogOutputView.swift in Sources */,
 				A87A9F7C3870DC8D634B2510 /* MediaProfile.swift in Sources */,
 				ED7D0C891E4F99927C96CD9D /* PillField.swift in Sources */,
+				49CB4585E7C6D1DC06062400 /* PipelineSummary.swift in Sources */,
 				6A589A5C59B6E0ACF8DC960F /* ProfilePicker.swift in Sources */,
 				932EB3F57E4BF42DBFA0EBF9 /* ProfileService.swift in Sources */,
 				732357FDE1D04D46AB41B1FC /* ProfilesLocation.swift in Sources */,
@@ -498,6 +505,7 @@
 				6996FE5603F77EE4D4B0CAA9 /* ProfilesLocationTests.swift in Sources */,
 				A00FA545CCBD5C1CF868B312 /* PythonRuntimeCheckTests.swift in Sources */,
 				BCBAB853A58D0989258EE4F5 /* RowFileLocationTests.swift in Sources */,
+				1F6A7B753CFE037E46BC5916 /* RunSummaryTests.swift in Sources */,
 				02C6933E6FD17468C99480B6 /* ScriptProcessGroupTests.swift in Sources */,
 				8BBB95FCC3F74AD66393C134 /* StreamingPerformanceTests.swift in Sources */,
 				01120EB0D1716B118D991B8F /* TableTailFollowingTests.swift in Sources */,

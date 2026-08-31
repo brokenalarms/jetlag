@@ -990,7 +990,16 @@ def main():
                     print(f"⚠️  {leftovers} file(s) left in the working dir after a run "
                           "with no failures", file=sys.stderr)
 
-    # Print summary
+    # The run's outcome as data, for the app's completion popup. print_summary
+    # writes the same counts to stderr for the log; neither side reads the other.
+    emit_event("pipeline_summary",
+        processed=stats["processed"],
+        succeeded=stats["succeeded"],
+        changed=stats["changed"],
+        failed=stats["failed"],
+        failed_files=stats["failed_files"],
+        mode="applied" if args.apply else "dry_run",
+    )
     print_summary(stats, args.apply)
 
     # Exit with error if any files failed
