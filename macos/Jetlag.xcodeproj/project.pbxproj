@@ -27,6 +27,7 @@
 		4FDCE64D99169FBCD837CF2B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C503D6DF395CB0F0EE8674D /* SettingsView.swift */; };
 		53E52584D7A0F04EBD764B7D /* LogOutputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93163EBEB8CD8B13330BAB7C /* LogOutputView.swift */; };
 		54BF807828E4B1BF2A402E9F /* InspectorHostedSizingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C698B76B04834D4379CADAA4 /* InspectorHostedSizingTests.swift */; };
+		5825A0BEF59BDB835C591364 /* PipeLineReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90D17E0CA95F70E908193351 /* PipeLineReader.swift */; };
 		58A801CA7BC6ACB325248DA3 /* RowOutcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A5BADCA538054410A590FFD /* RowOutcome.swift */; };
 		5B1E92778017F81FED24A526 /* GyroflowStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F37A77F3E04133102C3B9228 /* GyroflowStatus.swift */; };
 		5C37852483245BC294545B2B /* WorkflowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC02EFEC0D85CEB6F137381 /* WorkflowView.swift */; };
@@ -48,6 +49,7 @@
 		8D5AEC4A3D748ADF6853E7C1 /* JetlagApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1EA0220A8EF5122DF196162 /* JetlagApp.swift */; };
 		8D73DAA303CE63DEDF874F35 /* InspectorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBCBF55CE9225F7CC1BE2FA /* InspectorPanel.swift */; };
 		8F979D129B6EF35BF9FA8BCB /* TimezoneCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 275EE4D58C8BFA72BF92B86F /* TimezoneCatalog.swift */; };
+		92322D3EA3904DAF001B3EA1 /* RunCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D237F58ECB778E9E70964A2E /* RunCompletionTests.swift */; };
 		92BA1490C431AC89A5646C85 /* FilenamePatterns.swift in Sources */ = {isa = PBXBuildFile; fileRef = A668F7E7A4F545637B636567 /* FilenamePatterns.swift */; };
 		932EB3F57E4BF42DBFA0EBF9 /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */; };
 		934E26502731FE0C424D7121 /* WorktreeBundleIdentityGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D624A325EEBAC2CBD65CA /* WorktreeBundleIdentityGuardTests.swift */; };
@@ -130,6 +132,7 @@
 		88D2EC9D00CD4EE5A754D59E /* LicenseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseStore.swift; sourceTree = "<group>"; };
 		8A6E60D543571FFFB0CDF2A0 /* TimestampSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimestampSource.swift; sourceTree = "<group>"; };
 		8DBCBF55CE9225F7CC1BE2FA /* InspectorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorPanel.swift; sourceTree = "<group>"; };
+		90D17E0CA95F70E908193351 /* PipeLineReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipeLineReader.swift; sourceTree = "<group>"; };
 		93163EBEB8CD8B13330BAB7C /* LogOutputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogOutputView.swift; sourceTree = "<group>"; };
 		9C5FD29C41D642C67671FBAF /* ScriptRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptRunner.swift; sourceTree = "<group>"; };
 		A0F60C0EC518091F4E34BACB /* Quartz.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Quartz.framework; path = System/Library/Frameworks/Quartz.framework; sourceTree = SDKROOT; };
@@ -157,6 +160,7 @@
 		D08074CC6CCFCC6AFEC75C39 /* PipelineArgsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineArgsTests.swift; sourceTree = "<group>"; };
 		D0A92519F526948204A6F4D6 /* WorkflowLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowLayoutTests.swift; sourceTree = "<group>"; };
 		D0DC9676D4668FC395DD2A0F /* PipelineSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineSummary.swift; sourceTree = "<group>"; };
+		D237F58ECB778E9E70964A2E /* RunCompletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunCompletionTests.swift; sourceTree = "<group>"; };
 		D7844419398942BFFCBA70AA /* PipelineSchemaContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineSchemaContractTests.swift; sourceTree = "<group>"; };
 		DC0210C9EE3BEF29E07C9DE6 /* MediaProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaProfile.swift; sourceTree = "<group>"; };
 		DE9A71B38C9F152E65E2D2B8 /* CancelFeedbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CancelFeedbackTests.swift; sourceTree = "<group>"; };
@@ -200,6 +204,7 @@
 			isa = PBXGroup;
 			children = (
 				88D2EC9D00CD4EE5A754D59E /* LicenseStore.swift */,
+				90D17E0CA95F70E908193351 /* PipeLineReader.swift */,
 				6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */,
 				61A5900D18DD3679842E737D /* ProfilesLocation.swift */,
 				CA47C3147490D4D7AABA5169 /* PythonRuntimeCheck.swift */,
@@ -264,6 +269,7 @@
 				5AFFC7653CEF9432BABAFE94 /* ProfileTests.swift */,
 				33AF1E5DF4D368EB36EFB0EC /* PythonRuntimeCheckTests.swift */,
 				B098EAB2712A13202064D6F1 /* RowFileLocationTests.swift */,
+				D237F58ECB778E9E70964A2E /* RunCompletionTests.swift */,
 				774F12EFF67C4AC74ABC53E2 /* RunSummaryCountsTests.swift */,
 				F3A384D1A78A845026DD9131 /* RunSummaryTests.swift */,
 				BA13B0A4EE78E6DBC6958CF4 /* ScriptProcessGroupTests.swift */,
@@ -484,6 +490,7 @@
 				CB82382DA59EBF9400CA726B /* LogViewHolder.swift in Sources */,
 				A87A9F7C3870DC8D634B2510 /* MediaProfile.swift in Sources */,
 				ED7D0C891E4F99927C96CD9D /* PillField.swift in Sources */,
+				5825A0BEF59BDB835C591364 /* PipeLineReader.swift in Sources */,
 				49CB4585E7C6D1DC06062400 /* PipelineSummary.swift in Sources */,
 				6A589A5C59B6E0ACF8DC960F /* ProfilePicker.swift in Sources */,
 				932EB3F57E4BF42DBFA0EBF9 /* ProfileService.swift in Sources */,
@@ -534,6 +541,7 @@
 				6996FE5603F77EE4D4B0CAA9 /* ProfilesLocationTests.swift in Sources */,
 				A00FA545CCBD5C1CF868B312 /* PythonRuntimeCheckTests.swift in Sources */,
 				BCBAB853A58D0989258EE4F5 /* RowFileLocationTests.swift in Sources */,
+				92322D3EA3904DAF001B3EA1 /* RunCompletionTests.swift in Sources */,
 				6EDA848824A172B971429439 /* RunSummaryCountsTests.swift in Sources */,
 				1F6A7B753CFE037E46BC5916 /* RunSummaryTests.swift in Sources */,
 				02C6933E6FD17468C99480B6 /* ScriptProcessGroupTests.swift in Sources */,
