@@ -15,7 +15,7 @@ enum HostedViewSizing {
 
 /// A scroll view that reports no intrinsic size, so its document view can grow
 /// without changing what the hosting view asks of the window.
-final class ContentAgnosticScrollView: NSScrollView {
+class ContentAgnosticScrollView: NSScrollView {
     override var intrinsicContentSize: NSSize {
         NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
     }

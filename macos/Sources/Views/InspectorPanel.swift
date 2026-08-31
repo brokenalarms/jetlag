@@ -23,7 +23,10 @@ struct InspectorPanel: View {
             }
 
             if state.showLogOutput {
-                LogOutputView(lines: state.logOutput, onClear: { state.clearLog() })
+                LogOutputView(
+                    lines: state.logOutput,
+                    holder: state.logViewHolder,
+                    onClear: { state.clearLog() })
             }
 
             bottomBar
