@@ -30,19 +30,8 @@ final class StreamingPerformanceTests: XCTestCase {
     }
 
     private func hostedWindow(_ state: AppState) -> (NSHostingView<ContentView>, NSWindow) {
-        state.selectedTab = .workflow
-        state.showInspector = true
         state.showLogOutput = true
-        let host = NSHostingView(rootView: ContentView(state: state))
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1400, height: 800),
-                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
-        // Laid out but never ordered on screen: a test host that appears over the
-        // user's desktop while the suite streams synthetic rows is a real window to
-        // the user. Layout runs the same without it.
-        window.contentView = host
-        host.layoutSubtreeIfNeeded()
-        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-        return (host, window)
+        return HostedWindow.make(state)
     }
 
     /// Streams `count` rows, each followed by eight log lines, through the hosted
@@ -88,40 +77,40 @@ final class StreamingPerformanceTests: XCTestCase {
 
     // MARK: - Incremental log rendering
 
-    private func storage() -> (NSTextStorage, LogTextView.Coordinator) {
-        let scrollView = LogTextView.makeScrollView()
+    private func storage() -> (NSTextStorage, LogViewHolder) {
+        let scrollView = LogScrollView.make()
         let textView = scrollView.documentView as! NSTextView
-        return (textView.textStorage!, LogTextView.Coordinator())
+        return (textView.textStorage!, LogViewHolder())
     }
 
     /// Only the lines added since the last render are appended, and the rendered
     /// transcript is exactly the stripped lines joined by newlines.
     func testLogRenderAppendsOnlyNewLines() {
-        let (storage, coordinator) = storage()
+        let (storage, holder) = storage()
         var lines = [LogLine(text: "\u{1B}[36mone\u{1B}[0m", stream: .stderr)]
-        LogTextView.render(lines, into: storage, coordinator: coordinator)
+        LogTextView.render(lines, into: storage, holder: holder)
         XCTAssertEqual(storage.string, "one")
 
         lines.append(LogLine(text: "two", stream: .stdout))
         lines.append(LogLine(text: "three", stream: .stderr))
         var changes = 0
-        LogTextView.render(lines, into: storage, coordinator: coordinator) { changes += 1; return {} }
+        LogTextView.render(lines, into: storage, holder: holder) { changes += 1; return {} }
         XCTAssertEqual(storage.string, "one\ntwo\nthree")
         XCTAssertEqual(changes, 1)
 
-        LogTextView.render(lines, into: storage, coordinator: coordinator) { changes += 1; return {} }
+        LogTextView.render(lines, into: storage, holder: holder) { changes += 1; return {} }
         XCTAssertEqual(changes, 1, "an update with nothing new must touch nothing")
-        XCTAssertEqual(coordinator.renderedCount, 3)
+        XCTAssertEqual(holder.renderedCount, 3)
     }
 
     /// A cleared transcript (fewer lines than rendered) is rebuilt from scratch.
     func testLogRenderRebuildsAfterClear() {
-        let (storage, coordinator) = storage()
+        let (storage, holder) = storage()
         LogTextView.render((0..<5).map { LogLine(text: "line \($0)", stream: .stderr) },
-                           into: storage, coordinator: coordinator)
-        LogTextView.render([LogLine(text: "fresh", stream: .stderr)], into: storage, coordinator: coordinator)
+                           into: storage, holder: holder)
+        LogTextView.render([LogLine(text: "fresh", stream: .stderr)], into: storage, holder: holder)
         XCTAssertEqual(storage.string, "fresh")
-        XCTAssertEqual(coordinator.renderedCount, 1)
+        XCTAssertEqual(holder.renderedCount, 1)
     }
 
     /// ANSI stripping happens once, when the line is created, not on every render.

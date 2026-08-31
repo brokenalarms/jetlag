@@ -152,7 +152,7 @@ final class InspectorHostedSizingTests: XCTestCase {
     /// here is that the log's scroll view now says so explicitly, so a later change that
     /// derives a size from the document view is caught rather than shipped.
     func testLogScrollViewReportsNoIntrinsicSizeAsTextGrows() throws {
-        let scrollView = LogTextView.makeScrollView()
+        let scrollView = LogScrollView.make()
         scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: 200)
         let textView = try XCTUnwrap(scrollView.documentView as? NSTextView)
 
@@ -176,7 +176,7 @@ final class InspectorHostedSizingTests: XCTestCase {
     /// horizontal scroller. Proves the text view's frame stays pinned to the scroll view's
     /// content width and the line lays out across more than one visual line.
     func testLogScrollViewWrapsALongLine() throws {
-        let scrollView = LogTextView.makeScrollView()
+        let scrollView = LogScrollView.make()
         scrollView.frame = NSRect(x: 0, y: 0, width: 480, height: 200)
         let textView = try XCTUnwrap(scrollView.documentView as? NSTextView)
         let textContainer = try XCTUnwrap(textView.textContainer)
@@ -223,7 +223,7 @@ final class InspectorHostedSizingTests: XCTestCase {
     /// compression-resistance priorities. Proves both are below `.defaultLow` on both
     /// axes, so the inspector's configured width — not the log's content — wins.
     func testLogScrollViewYieldsItsSizeToTheInspector() {
-        let scrollView = LogTextView.makeScrollView()
+        let scrollView = LogScrollView.make()
 
         for axis in [NSLayoutConstraint.Orientation.horizontal, .vertical] {
             XCTAssertLessThan(

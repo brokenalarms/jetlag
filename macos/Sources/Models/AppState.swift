@@ -640,6 +640,11 @@ final class AppState {
     var showInspector: Bool = false
     var showLogOutput: Bool = false
 
+    /// The log's live view, owned here rather than by the panel: the inspector shows the
+    /// log behind a conditional, and a view rebuilt on every toggle comes back with the
+    /// transcript to re-render and the user's scroll position lost.
+    let logViewHolder = LogViewHolder()
+
     /// Message shown when a run was refused because the Python interpreter the
     /// scripts resolve cannot be invoked.
     var pythonRuntimeAlert: String?
