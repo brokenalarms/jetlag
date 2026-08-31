@@ -27,14 +27,23 @@ struct DiffTableView: View {
         return (threeFields as NSString).size(withAttributes: [.font: detailFont]).width + cellPadding
     }()
 
+    /// What the auto-fitter applies: the cell's content width held to the column's cap.
     static func idealWidth(of cell: CellText) -> CGFloat {
+        min(contentFitWidth(of: cell), cell.maxWidth)
+    }
+
+    /// The width that shows the cell's widest content untruncated, ignoring the cap —
+    /// what double-clicking a header divider snaps the column to. Kept alongside the
+    /// capped width rather than replacing it: the cap keeps a long writes subtitle from
+    /// stretching the table, and this is the width that shows the user the whole thing.
+    static func contentFitWidth(of cell: CellText) -> CGFloat {
         if let fixed = cell.fixedWidth { return fixed }
         let widest = cell.parts
             .filter { !$0.text.isEmpty }
             .map { ($0.text as NSString).size(withAttributes: [.font: $0.font]).width }
             .max() ?? 0
         guard widest > 0 else { return 0 }
-        return min(widest + cell.extraWidth + cellPadding, cell.maxWidth)
+        return widest + cell.extraWidth + cellPadding
     }
 
     struct TimelineScale {
@@ -83,7 +92,7 @@ struct DiffTableView: View {
     /// are measured when they first appear and again only when their text changes
     /// (a live row fills in as its events arrive), and the widths are folded into a
     /// running maximum instead of every row being re-measured per update.
-    private var columnWidths: [CGFloat] {
+    private var columnWidths: ColumnWidths {
         measurements.columnWidths(for: rows, texts: cellTexts)
     }
 
@@ -241,7 +250,7 @@ struct DiffTableView: View {
                 return .handled
             }
             .background {
-                ColumnAutoSizer(columnWidths: columnWidths, rowCount: rows.count)
+                ColumnAutoSizer(widths: columnWidths, rowCount: rows.count)
                     .frame(width: 0, height: 0)
             }
         }
@@ -499,6 +508,25 @@ enum TableColumnSizing {
         return resized
     }
 
+    /// How close to a column's right edge a click counts as landing on its divider.
+    static let dividerHitZone: CGFloat = 5
+
+    /// Snaps the column whose divider the click landed on to its unclamped content-fit
+    /// width — the width that shows its widest cell untruncated, past the cap
+    /// `applyWidths` holds it to. That cap lives in the measurement only, never as the
+    /// column's own `maxWidth`, or AppKit would clamp this width straight back down.
+    /// Returns the column it resized, or nil if the click missed every divider.
+    @discardableResult
+    static func fitColumn(atDividerX x: CGFloat, in tableView: NSTableView,
+                          to contentFitWidths: [CGFloat]) -> Int? {
+        for index in 0..<min(tableView.numberOfColumns, contentFitWidths.count)
+        where abs(x - tableView.rect(ofColumn: index).maxX) < dividerHitZone {
+            tableView.tableColumns[index].width = contentFitWidths[index]
+            return index
+        }
+        return nil
+    }
+
     /// The table can be wider than the panel, so it needs a horizontal scroller.
     /// Which style that scroller takes is the user's system preference, not the
     /// app's: forcing the legacy style would override "Show scroll bars" for this one
@@ -528,7 +556,7 @@ enum TableColumnSizing {
 
 
 private struct ColumnAutoSizer: NSViewRepresentable {
-    let columnWidths: [CGFloat]
+    let widths: ColumnWidths
     /// SwiftUI creates the `Table`'s `NSTableView` lazily and updates a representable
     /// only when its value changes, so widths alone are not enough to reach AppKit: a
     /// run over uniformly named files computes the same widths every time, and the
@@ -538,7 +566,7 @@ private struct ColumnAutoSizer: NSViewRepresentable {
 
     final class Coordinator: NSObject {
         weak var tableView: NSTableView?
-        var columnWidths: [CGFloat] = []
+        var widths = ColumnWidths()
         var gestureInstalled = false
         var tailFollower: TableTailFollower?
 
@@ -546,14 +574,8 @@ private struct ColumnAutoSizer: NSViewRepresentable {
             guard let headerView = gesture.view as? NSTableHeaderView,
                   let tableView else { return }
 
-            let location = gesture.location(in: headerView)
-            for i in 0..<tableView.numberOfColumns {
-                let rightEdge = tableView.rect(ofColumn: i).maxX
-                if abs(location.x - rightEdge) < 5, i < columnWidths.count {
-                    tableView.tableColumns[i].width = columnWidths[i]
-                    return
-                }
-            }
+            TableColumnSizing.fitColumn(atDividerX: gesture.location(in: headerView).x,
+                                        in: tableView, to: widths.contentFit)
         }
     }
 
@@ -565,7 +587,7 @@ private struct ColumnAutoSizer: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         let coordinator = context.coordinator
-        coordinator.columnWidths = columnWidths
+        coordinator.widths = widths
 
         if coordinator.tableView == nil || coordinator.tableView?.window == nil {
             coordinator.tableView = findTableView(from: nsView)
@@ -580,7 +602,7 @@ private struct ColumnAutoSizer: NSViewRepresentable {
             if tableView.columnAutoresizingStyle != .noColumnAutoresizing {
                 tableView.columnAutoresizingStyle = .noColumnAutoresizing
             }
-            let resized = TableColumnSizing.applyWidths(columnWidths, to: tableView)
+            let resized = TableColumnSizing.applyWidths(widths.fitted, to: tableView)
             tableView.enclosingScrollView?.detachSizeFromContent()
 
             if !coordinator.gestureInstalled, let headerView = tableView.headerView {
@@ -588,6 +610,13 @@ private struct ColumnAutoSizer: NSViewRepresentable {
                     target: coordinator,
                     action: #selector(Coordinator.headerDoubleClicked(_:)))
                 gesture.numberOfClicksRequired = 2
+                // A click recognizer delays the primary mouse button by default (it
+                // reports YES dynamically for its primary-button mask), which holds
+                // mouse-downs back from the header until the gesture fails — the
+                // divider's resize cursor and drag would then only engage after a
+                // first, discarded click. The action fires on the second click either
+                // way, so nothing here needs the delay.
+                gesture.delaysPrimaryMouseButtonEvents = false
                 headerView.addGestureRecognizer(gesture)
                 coordinator.gestureInstalled = true
             }
@@ -619,7 +648,7 @@ private struct ColumnAutoSizer: NSViewRepresentable {
     }
 
     private func searchForTableView(in view: NSView) -> NSTableView? {
-        if let tableView = view as? NSTableView, tableView.tableColumns.count == columnWidths.count {
+        if let tableView = view as? NSTableView, tableView.tableColumns.count == widths.fitted.count {
             return tableView
         }
         for subview in view.subviews {
@@ -656,6 +685,14 @@ struct CellText: Equatable {
     }
 }
 
+/// The two widths every column has: `fitted` is what the auto-fitter applies — each
+/// column's content width held to its cap — and `contentFit` is the same content
+/// measured without that cap, which a header divider double-click snaps to.
+struct ColumnWidths: Equatable {
+    var fitted: [CGFloat] = []
+    var contentFit: [CGFloat] = []
+}
+
 /// Per-run caches of the quantities that depend on every row. Text measurement is
 /// the expensive part, so each row's cells are measured when the row first appears
 /// and again only when their text changes — a run's live row fills in as its events
@@ -666,17 +703,17 @@ struct CellText: Equatable {
 final class RowMeasurements {
     private struct Measured {
         let texts: [CellText]
-        let widths: [CGFloat]
+        let widths: ColumnWidths
     }
 
     private var measured: [DiffTableRow.ID: Measured] = [:]
-    private var widths: [CGFloat] = []
+    private var widths = ColumnWidths()
     private var epochRange: (lo: Double, hi: Double)?
     private var foldedEpochs: [DiffTableRow.ID: (Double?, Double?)] = [:]
     /// How many rows have had their text measured, for tests that pin the cache.
     private(set) var measurementCount = 0
 
-    func columnWidths(for rows: [DiffTableRow], texts: (DiffTableRow) -> [CellText]) -> [CGFloat] {
+    func columnWidths(for rows: [DiffTableRow], texts: (DiffTableRow) -> [CellText]) -> ColumnWidths {
         var seen = Set<DiffTableRow.ID>()
         for row in rows {
             seen.insert(row.id)
@@ -684,15 +721,11 @@ final class RowMeasurements {
             if let cached = measured[row.id], cached.texts == cells {
                 continue
             }
-            let cellWidths = cells.map(DiffTableView.idealWidth(of:))
+            let cellWidths = ColumnWidths(fitted: cells.map(DiffTableView.idealWidth(of:)),
+                                          contentFit: cells.map(DiffTableView.contentFitWidth(of:)))
             measurementCount += 1
             measured[row.id] = Measured(texts: cells, widths: cellWidths)
-            if widths.count < cellWidths.count {
-                widths.append(contentsOf: repeatElement(0, count: cellWidths.count - widths.count))
-            }
-            for (index, width) in cellWidths.enumerated() where width > widths[index] {
-                widths[index] = width
-            }
+            widths = Self.folding(cellWidths, into: widths)
             fold(epochsOf: row)
         }
         if seen.count < measured.count {
@@ -700,20 +733,32 @@ final class RowMeasurements {
             // rebuild the maxima from what remains.
             measured = measured.filter { seen.contains($0.key) }
             foldedEpochs = foldedEpochs.filter { seen.contains($0.key) }
-            widths = measured.values.reduce(into: [CGFloat]()) { acc, entry in
-                if acc.count < entry.widths.count {
-                    acc.append(contentsOf: repeatElement(0, count: entry.widths.count - acc.count))
-                }
-                for (index, width) in entry.widths.enumerated() where width > acc[index] {
-                    acc[index] = width
-                }
-            }
+            widths = measured.values.reduce(ColumnWidths()) { Self.folding($1.widths, into: $0) }
             epochRange = nil
             for (_, epochs) in foldedEpochs {
                 for epoch in [epochs.0, epochs.1].compactMap({ $0 }) { fold(epoch) }
             }
         }
         return widths
+    }
+
+    /// A column is as wide as its widest row needs, so folding a row's widths into the
+    /// running maxima is a per-column max — growing the maxima to the row's column
+    /// count first, since a row can carry cells for columns nothing has filled yet.
+    private static func folding(_ row: ColumnWidths, into running: ColumnWidths) -> ColumnWidths {
+        ColumnWidths(fitted: folding(row.fitted, into: running.fitted),
+                     contentFit: folding(row.contentFit, into: running.contentFit))
+    }
+
+    private static func folding(_ row: [CGFloat], into running: [CGFloat]) -> [CGFloat] {
+        var maxima = running
+        if maxima.count < row.count {
+            maxima.append(contentsOf: repeatElement(0, count: row.count - maxima.count))
+        }
+        for (index, width) in row.enumerated() where width > maxima[index] {
+            maxima[index] = width
+        }
+        return maxima
     }
 
     func timelineScale(for rows: [DiffTableRow]) -> DiffTableView.TimelineScale {

@@ -176,11 +176,11 @@ final class StreamingPerformanceTests: XCTestCase {
         sparse.correctedTime = "2025:08:15 17:38:54+09:00"
         let filled = cache.columnWidths(for: [sparse], texts: texts)
         XCTAssertEqual(cache.measurementCount, 2, "a row whose text changed is measured again")
-        XCTAssertGreaterThan(filled[1], narrow[1], "the column grows to the filled row")
+        XCTAssertGreaterThan(filled.fitted[1], narrow.fitted[1], "the column grows to the filled row")
 
         let untouched = cache.columnWidths(for: [sparse, DiffTableRow(file: "b.mp4")], texts: texts)
         XCTAssertEqual(cache.measurementCount, 3, "only the new row is measured; the unchanged one is not")
-        XCTAssertEqual(untouched[1], filled[1])
+        XCTAssertEqual(untouched.fitted[1], filled.fitted[1])
 
         _ = cache.columnWidths(for: [sparse, DiffTableRow(file: "b.mp4")], texts: texts)
     }
@@ -192,6 +192,6 @@ final class StreamingPerformanceTests: XCTestCase {
         wide.correctedTime = "2025:08:15 17:38:54+09:00"
         let before = cache.columnWidths(for: [wide], texts: texts)
         let after = cache.columnWidths(for: [DiffTableRow(file: "b.mp4")], texts: texts)
-        XCTAssertLessThan(after[0], before[0])
+        XCTAssertLessThan(after.fitted[0], before.fitted[0])
     }
 }
