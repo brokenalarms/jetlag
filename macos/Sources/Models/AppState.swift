@@ -424,6 +424,9 @@ final class WorkflowSession {
     }
 
     func noteRunCancelled() {
+        if runningDryRunArgs != nil {
+            lastDryRunArgs = nil
+        }
         runningDryRunArgs = nil
         resetApplyModeAfterRun()
     }

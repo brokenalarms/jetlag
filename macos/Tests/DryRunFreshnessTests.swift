@@ -231,4 +231,34 @@ final class DryRunFreshnessTests: XCTestCase {
 
         XCTAssertFalse(session.applyMode)
     }
+
+    /// Cancelling a dry run must invalidate an earlier completed preview of the
+    /// same settings, not just the in-flight one: the user's intent on cancel
+    /// is that the current state is unpreviewed, so a stale earlier match must
+    /// not let a following apply through unasked.
+    func testCancellingADryRunInvalidatesAnEarlierCompletedPreview() {
+        let session = makeSession()
+        completeDryRun(session)
+
+        session.applyMode = false
+        session.noteRunStarted()
+        session.noteRunCancelled()
+        session.applyMode = true
+
+        XCTAssertTrue(session.requestDryRunAssentIfNeeded())
+        XCTAssertEqual(session.dryRunStaleReason, .noDryRun)
+    }
+
+    /// Cancelling an apply must not discard a completed preview made before
+    /// it — an apply run is never itself a preview, so it has nothing to
+    /// invalidate.
+    func testCancellingAnApplyDoesNotClearAnEarlierCompletedPreview() {
+        let session = makeSession()
+        completeDryRun(session)
+
+        session.noteRunStarted()
+        session.noteRunCancelled()
+
+        XCTAssertFalse(session.requestDryRunAssentIfNeeded())
+    }
 }

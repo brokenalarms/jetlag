@@ -223,7 +223,7 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let dryRunStaleMessage = String(localized: "workflow.dryRunStale.message",
             defaultValue: "The table is a preview of different settings. Applying now moves and replaces files against a plan you have not seen.")
         static let noDryRunMessage = String(localized: "workflow.noDryRun.message",
-            defaultValue: "Nothing has been previewed. Applying now moves and replaces files against a plan you have not seen.")
+            defaultValue: "A dry run of these settings has not been completed. Applying now moves and replaces files against a plan you have not seen.")
         static let dryRunFirstButton = String(localized: "workflow.dryRunFirst.button",
             defaultValue: "Dry Run First")
         static let applyAnywayButton = String(localized: "workflow.applyAnyway.button",
