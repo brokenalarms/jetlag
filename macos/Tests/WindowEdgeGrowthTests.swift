@@ -12,6 +12,7 @@ import SwiftUI
 /// animated synchronously inside the SwiftUI update that decides it.
 final class WindowEdgeGrowthTests: XCTestCase {
     private let frame = CGRect(x: 100, y: 100, width: 900, height: 700)
+    private let screenMinX: CGFloat = 0
     private let screenEdge: CGFloat = 2000
 
     /// The window server drives window frame animations, and stops driving them while
@@ -24,16 +25,17 @@ final class WindowEdgeGrowthTests: XCTestCase {
         return (session["CGSSessionScreenIsLocked"] as? NSNumber)?.boolValue == true
     }
 
-    /// AC 2: opening the panel grows the window's right edge to the screen edge.
-    func testGrowsOnPanelOpenTransition() {
+    /// AC 3: with no cap narrower than the screen, growth fills the visible width —
+    /// zero margins on both sides, since there is no leftover to split.
+    func testFillsVisibleWidthOnPanelOpenTransition() {
         let target = WindowEdgeGrowth.targetFrame(
             previousPanelOpen: false, panelOpen: true,
             previousIsRunning: false, isRunning: false,
-            frame: frame, screenEdge: screenEdge
+            frame: frame, screenMinX: screenMinX, screenEdge: screenEdge
         )
+        XCTAssertEqual(target?.minX, screenMinX)
         XCTAssertEqual(target?.maxX, screenEdge)
-        XCTAssertEqual(target?.minX, frame.minX, "the left edge must not move")
-        XCTAssertEqual(target?.height, frame.height, "only the width changes")
+        XCTAssertEqual(target?.height, frame.height, "only x and width change")
     }
 
     /// AC 1: a run starting with the panel already open still grows the window — the
@@ -42,18 +44,34 @@ final class WindowEdgeGrowthTests: XCTestCase {
         let target = WindowEdgeGrowth.targetFrame(
             previousPanelOpen: true, panelOpen: true,
             previousIsRunning: false, isRunning: true,
-            frame: frame, screenEdge: screenEdge
+            frame: frame, screenMinX: screenMinX, screenEdge: screenEdge
         )
         XCTAssertEqual(target?.maxX, screenEdge)
     }
 
-    /// AC 3: never resizes past the screen edge, and never when already there.
-    func testNoOpWhenAlreadyAtTheScreenEdge() {
-        let atEdge = CGRect(x: 100, y: 100, width: screenEdge - 100, height: 700)
+    /// AC 1: a window sitting mid-screen centers into equal left/right margins rather
+    /// than keeping its old left margin and slamming the right edge against the cap.
+    func testCentersWindowMidScreenWithEqualMargins() {
         let target = WindowEdgeGrowth.targetFrame(
             previousPanelOpen: false, panelOpen: true,
             previousIsRunning: false, isRunning: false,
-            frame: atEdge, screenEdge: screenEdge
+            frame: frame, screenMinX: screenMinX, screenEdge: screenEdge, maxWidth: 1500
+        )
+        XCTAssertNotNil(target)
+        let leftMargin = (target?.minX ?? 0) - screenMinX
+        let rightMargin = screenEdge - (target?.maxX ?? 0)
+        XCTAssertEqual(target?.width, 1500)
+        XCTAssertEqual(leftMargin, rightMargin, "left and right margins must be equal")
+        XCTAssertEqual(leftMargin, 250)
+    }
+
+    /// AC 2: a window already centered at the target width is a no-op.
+    func testNoOpWhenAlreadyCenteredAtTargetWidth() {
+        let centered = CGRect(x: 250, y: 100, width: 1500, height: 700)
+        let target = WindowEdgeGrowth.targetFrame(
+            previousPanelOpen: false, panelOpen: true,
+            previousIsRunning: false, isRunning: false,
+            frame: centered, screenMinX: screenMinX, screenEdge: screenEdge, maxWidth: 1500
         )
         XCTAssertNil(target)
     }
@@ -64,7 +82,7 @@ final class WindowEdgeGrowthTests: XCTestCase {
         let target = WindowEdgeGrowth.targetFrame(
             previousPanelOpen: true, panelOpen: true,
             previousIsRunning: false, isRunning: false,
-            frame: frame, screenEdge: screenEdge
+            frame: frame, screenMinX: screenMinX, screenEdge: screenEdge
         )
         XCTAssertNil(target)
     }
@@ -75,28 +93,43 @@ final class WindowEdgeGrowthTests: XCTestCase {
         let target = WindowEdgeGrowth.targetFrame(
             previousPanelOpen: false, panelOpen: false,
             previousIsRunning: false, isRunning: true,
-            frame: frame, screenEdge: screenEdge
+            frame: frame, screenMinX: screenMinX, screenEdge: screenEdge
         )
         XCTAssertNil(target)
     }
 
-    /// The content's own maximum bounds the growth as the screen edge does: with a
-    /// panel capped at twice sidebar + form, the window stops at that width even when
-    /// the screen has room, and never grows at all once it is already there.
-    func testGrowthStopsAtTheContentMaximum() {
+    /// AC 3: the content's own maximum bounds the growth as the visible screen width
+    /// does — with a panel capped at the sidebar + form + panel widths, the window
+    /// centers at that width with equal, symmetric leftover on each side. A screen wide
+    /// enough that the cap (2280pt) is well short of the visible width proves the cap,
+    /// not the screen, decided the width.
+    func testWidthCappedByContentMaxWidthCentersWithSymmetricLeftover() {
+        let maxWidth = WindowEdgeGrowth.contentMaxWidth
+        let wideEdge: CGFloat = 3000
         let target = WindowEdgeGrowth.targetFrame(
             previousPanelOpen: false, panelOpen: true,
             previousIsRunning: false, isRunning: false,
-            frame: frame, screenEdge: screenEdge, maxWidth: 1500
+            frame: frame, screenMinX: screenMinX, screenEdge: wideEdge, maxWidth: maxWidth
         )
-        XCTAssertEqual(target?.maxX, frame.minX + 1500)
+        XCTAssertNotNil(target)
+        let leftover = wideEdge - screenMinX - maxWidth
+        XCTAssertEqual(target?.width, maxWidth)
+        XCTAssertEqual(target?.minX, screenMinX + leftover / 2)
+        XCTAssertEqual(wideEdge - (target?.maxX ?? 0), (target?.minX ?? 0) - screenMinX)
+    }
 
-        let atCap = CGRect(x: 100, y: 100, width: 1500, height: 700)
-        XCTAssertNil(WindowEdgeGrowth.targetFrame(
+    /// AC 3: a screen narrower than the content cap fills the visible width instead of
+    /// leaving margins — there is no leftover to center into.
+    func testFillsVisibleWidthWhenScreenIsNarrowerThanTheCap() {
+        let narrowEdge: CGFloat = 800
+        let target = WindowEdgeGrowth.targetFrame(
             previousPanelOpen: false, panelOpen: true,
             previousIsRunning: false, isRunning: false,
-            frame: atCap, screenEdge: screenEdge, maxWidth: 1500
-        ))
+            frame: frame, screenMinX: screenMinX, screenEdge: narrowEdge, maxWidth: WindowEdgeGrowth.contentMaxWidth
+        )
+        XCTAssertEqual(target?.minX, screenMinX)
+        XCTAssertEqual(target?.maxX, narrowEdge)
+        XCTAssertEqual(target?.width, narrowEdge - screenMinX)
     }
 
     // MARK: - Applying the frame
@@ -125,7 +158,7 @@ final class WindowEdgeGrowthTests: XCTestCase {
         let expected = try XCTUnwrap(WindowEdgeGrowth.targetFrame(
             previousPanelOpen: false, panelOpen: true,
             previousIsRunning: false, isRunning: false,
-            frame: original, screenEdge: screen.visibleFrame.maxX,
+            frame: original, screenMinX: screen.visibleFrame.minX, screenEdge: screen.visibleFrame.maxX,
             maxWidth: WindowEdgeGrowth.contentMaxWidth
         ), "the test window must have room left to grow into for this to prove anything")
 
