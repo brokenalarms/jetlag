@@ -1158,6 +1158,27 @@ class TestCorrectionWritesTheWholeClockTable:
         quicktime_args = [arg for call in calls for arg in call if arg.startswith("-QuickTime:")]
         assert quicktime_args == []
 
+    def test_zoneless_still_gets_the_declared_zone_written(self, monkeypatch):
+        """A still whose DateTimeOriginal is bare, labelled by --timezone, is fixed:
+        OffsetTimeOriginal is written with the declared zone, DateTimeOriginal is not
+        rewritten, and a second run finds nothing left to do."""
+        photo = os.path.join(self.temp_dir, "IMG_0001.jpg")
+        create_test_photo(photo, DateTimeOriginal="2025:06:18 07:25:21")
+        fmt._exif_cache.clear()
+
+        result = fmt.fix_media_timestamps(photo, timezone_spec="+08:00")
+
+        assert result.timestamp_action == "fixed"
+        assert "OffsetTimeOriginal" in result.stale_fields
+        assert "DateTimeOriginal" not in result.stale_fields
+        fmt._exif_cache.clear()
+        exif = fmt.read_exif_data(photo)
+        assert exif["OffsetTimeOriginal"] == "+08:00"
+        assert exif["DateTimeOriginal"].startswith("2025:06:18 07:25:21")
+
+        again = fmt.fix_media_timestamps(photo, timezone_spec="+08:00")
+        assert again.timestamp_action == "no_change"
+
     def test_already_correct_file_is_never_written(self, monkeypatch):
         """When every clock field already equals its target the run reports no
         change and issues no exiftool write — not even an empty one."""

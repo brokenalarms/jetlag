@@ -321,14 +321,17 @@ def is_quicktime_container(exif: Dict[str, str]) -> bool:
 
 
 def clock_field_targets(exif: Dict[str, str], datetime_original: datetime,
-                        write_datetime_original: bool = False) -> Dict[str, str]:
+                        write_datetime_original: bool = False,
+                        write_zone: bool = False) -> Dict[str, str]:
     """The value every clock field a correction owns must end up holding.
 
     Zoned local time for DateTimeOriginal and Keys:CreationDate; that value's zone
     alone for OffsetTimeOriginal; the same instant as raw UTC for the QuickTime
     atoms. Stills get no container-only entries. DateTimeOriginal and the zone that
     completes it are owned only when the caller has decided to write it — an
-    existing tag is otherwise the source, not a target.
+    existing tag is otherwise the source, not a target. write_zone additionally
+    owns the zone alone, for a bare DateTimeOriginal that stays as it is but is
+    being labelled with a declared zone.
 
     OffsetTimeOriginal is targeted whatever the container holds it: a still's
     binary EXIF DateTimeOriginal is 19 characters, so the offset tag is the only
@@ -345,7 +348,8 @@ def clock_field_targets(exif: Dict[str, str], datetime_original: datetime,
     for field in CLOCK_FIELDS:
         if field.container_only and not container:
             continue
-        if field.owned_with_datetime_original and not write_datetime_original:
+        owned = write_datetime_original or (write_zone and field.holds_zone)
+        if field.owned_with_datetime_original and not owned:
             continue
         if field.quicktime:
             targets[field.write_tag] = utc
@@ -581,7 +585,8 @@ def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, 
     return data
 
 def determine_needed_changes(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False,
-                             write_datetime_original: bool = False) -> dict:
+                             write_datetime_original: bool = False,
+                             write_zone: bool = False) -> dict:
     """Determine what changes are needed
 
     Args:
@@ -589,13 +594,14 @@ def determine_needed_changes(file_path: str, datetime_original: datetime, preser
         datetime_original: datetime object with timezone info
         preserve_wallclock: If True, preserve wall-clock shooting time for birth time
         write_datetime_original: If True, DateTimeOriginal is a field this correction owns
+        write_zone: If True, OffsetTimeOriginal is owned even where DateTimeOriginal is not
 
     Returns:
         Dict with the correction's target value per clock field, the write tags
         whose stored value does not already match, and the file system flag.
     """
     exif = read_exif_data(file_path)
-    targets = clock_field_targets(exif, datetime_original, write_datetime_original)
+    targets = clock_field_targets(exif, datetime_original, write_datetime_original, write_zone)
 
     return {
         "clock_targets": targets,
@@ -983,11 +989,21 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
         (force_timezone and current_data["datetime_original_str"])
     )
 
+    # A still's bare DateTimeOriginal labelled by --timezone keeps its digits but
+    # needs the declared zone stored beside it; a video carries its zone elsewhere.
+    should_write_zone = bool(
+        current_data["exif"].get("DateTimeOriginal")
+        and not is_quicktime_container(current_data["exif"])
+        and not stored_zone(current_data["exif"])
+        and current_data.get("timezone_source", "").startswith("--timezone flag")
+    )
+
     # Determine needed changes
     changes = determine_needed_changes(
         file_path, datetime_original,
         preserve_wallclock=preserve_wallclock,
         write_datetime_original=should_write_datetime_original,
+        write_zone=should_write_zone,
     )
 
     # Format and display timestamps
