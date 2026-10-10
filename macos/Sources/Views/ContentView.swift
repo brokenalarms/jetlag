@@ -11,10 +11,13 @@ import SwiftUI
 /// form with the panel closed; growing to the right, panel only, with it open.
 struct ContentView: View {
     @Bindable var state: AppState
-    @State private var contentHeightLimit: CGFloat = .infinity
 
     /// The sidebar's one design width: a two-item list has no intrinsic width of its own.
     static let sidebarWidth: CGFloat = 160
+
+    /// The height a new window opens at; macOS shortens it on a screen with less room.
+    /// From then on the height is the user's.
+    static let defaultHeight: CGFloat = 800
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -27,13 +30,12 @@ struct ContentView: View {
             Divider()
             switch state.selectedTab {
             case .workflow:
-                WorkflowDetail(state: state, maxHeight: contentHeightLimit)
+                WorkflowDetail(state: state)
             case .profiles:
                 ProfilesView(state: state)
             }
         }
         .background(WindowEdgeGrowthController(panelOpen: state.showInspector, isRunning: state.isRunning))
-        .background(WindowContentHeightLimitReader { contentHeightLimit = $0 })
     }
 }
 
@@ -43,7 +45,6 @@ struct ContentView: View {
 /// would also report no minimum of its own, which is what lets the window grow.
 struct WorkflowDetail: View {
     @Bindable var state: AppState
-    var maxHeight: CGFloat = .infinity
 
     /// The panel never grows past twice the width of everything beside it (sidebar +
     /// form). Wider than that stops being more table and starts being empty desktop;
@@ -53,7 +54,7 @@ struct WorkflowDetail: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            WorkflowView(state: state, maxHeight: maxHeight)
+            WorkflowView(state: state)
                 .frame(maxHeight: .infinity, alignment: .top)
             if state.showInspector {
                 Divider()
