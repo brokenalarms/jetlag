@@ -256,36 +256,9 @@ struct WorkflowView: View {
     // MARK: - Pipeline status bar
 
     private var pipelineStatusBar: some View {
-        let steps = state.workflowSession.availableSteps
-        let activeSteps = steps.filter { $0.isAlwaysOn || state.workflowSession.enabledSteps.contains($0) }
-        return HStack(spacing: 0) {
-            ForEach(Array(activeSteps.enumerated()), id: \.element.id) { index, step in
-                HStack(spacing: 4) {
-                    Image(systemName: step.systemImage)
-                        .font(.system(size: 9))
-                    Text(step.label)
-                        .font(.system(size: 10, weight: .medium))
-                }
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(step.iconColor.opacity(0.15))
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-
-                if index < activeSteps.count - 1 {
-                    Image(systemName: "chevron.forward")
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundStyle(Color.secondary.opacity(0.3))
-                        .padding(.horizontal, 1)
-                }
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
+        let session = state.workflowSession
+        return PipelineStatusBar(
+            steps: session.availableSteps.filter { $0.isAlwaysOn || session.enabledSteps.contains($0) })
     }
 
     // MARK: - Pipeline steps
@@ -800,5 +773,54 @@ struct WorkflowView: View {
         if panel.runModal() == .OK, let url = panel.url {
             state.workflowSession.archiveDestination = url.path
         }
+    }
+}
+
+/// Labelled pills when the whole row fits on one line; otherwise icons only, named on
+/// hover. A pill's label never wraps: squeezed, every label broke mid-word.
+struct PipelineStatusBar: View {
+    let steps: [PipelineStep]
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            row(showsLabels: true)
+            row(showsLabels: false)
+        }
+    }
+
+    private func row(showsLabels: Bool) -> some View {
+        HStack(spacing: 0) {
+            ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
+                HStack(spacing: 4) {
+                    Image(systemName: step.systemImage)
+                        .font(.system(size: 9))
+                    if showsLabels {
+                        Text(step.label)
+                            .font(.system(size: 10, weight: .medium))
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                }
+                .help(step.label)
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(step.iconColor.opacity(0.15))
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                if index < steps.count - 1 {
+                    Image(systemName: "chevron.forward")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(Color.secondary.opacity(0.3))
+                        .padding(.horizontal, 1)
+                }
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
     }
 }
