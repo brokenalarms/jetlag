@@ -130,40 +130,68 @@ final class WorkflowLayoutTests: XCTestCase {
         XCTAssertEqual(open - closed, InspectorPanel.minWidth, accuracy: 2)
     }
 
-    /// The form's height is its content's, like its width: enabling a step that adds
-    /// controls raises the content's minimum height, which is what lets the window grow
-    /// to fit instead of the form scrolling inside it. No scroll view may wrap the form.
-    func testEnablingAStepRaisesTheContentMinimumHeight() {
+    private func profileState() -> AppState {
         let state = AppState()
         state.selectedTab = .workflow
         state.showInspector = false
         state.workflowSession = WorkflowSession(profileName: "probe", gyroflowAvailable: false)
-        state.workflowSession.enabledSteps.remove(.archiveSource)
+        return state
+    }
 
-        // The form alone: the sidebar beside it is a List, which is a scroll view and
-        // height-flexible by design, so it must not take part in this measurement.
-        func minimumHeight() -> CGFloat {
-            NSHostingController(rootView: WorkflowView(state: state))
-                .sizeThatFits(in: NSSize(width: WorkflowView.formWidth, height: 0)).height
-        }
-        let without = minimumHeight()
+    /// The form alone: the sidebar beside it is a List, which is a scroll view and
+    /// height-flexible by design, so it must not take part in these measurements.
+    private func formMinimumHeight(_ state: AppState, maxHeight: CGFloat = .infinity) -> CGFloat {
+        NSHostingController(rootView: WorkflowView(state: state, maxHeight: maxHeight))
+            .sizeThatFits(in: NSSize(width: WorkflowView.formWidth, height: 0)).height
+    }
+
+    /// The form's height is its content's, like its width: enabling a step that adds
+    /// controls raises the content's minimum height, which is what lets the window grow
+    /// to fit instead of the form scrolling inside it.
+    func testEnablingAStepRaisesTheContentMinimumHeight() {
+        let state = profileState()
+        state.workflowSession.enabledSteps.remove(.archiveSource)
+        let without = formMinimumHeight(state)
         state.workflowSession.enabledSteps.insert(.archiveSource)
-        let with = minimumHeight()
+        let with = formMinimumHeight(state)
 
         XCTAssertGreaterThan(without, 0, "the form must declare a height of its own")
         XCTAssertGreaterThan(with, without, "enabling Archive Source must make the form, and so the window, taller")
-
-        let host = NSHostingView(rootView: WorkflowView(state: state))
-        host.frame = NSRect(x: 0, y: 0, width: WorkflowView.formWidth, height: with)
-        host.layoutSubtreeIfNeeded()
-        XCTAssertNil(firstScrollView(in: host), "the form must not scroll; its height sizes the window")
     }
 
-    private func firstScrollView(in view: NSView) -> NSScrollView? {
-        if let scroll = view as? NSScrollView { return scroll }
-        for subview in view.subviews {
-            if let scroll = firstScrollView(in: subview) { return scroll }
-        }
-        return nil
+    /// A form taller than the screen used to size the window past the bottom of it,
+    /// under the Dock, where the window's lower edge could be neither seen nor dragged.
+    /// The form now stops at the limit the window reports, and its steps scroll instead.
+    func testFormTallerThanTheLimitStopsAtTheLimit() {
+        let state = profileState()
+        let natural = formMinimumHeight(state)
+        let limit = natural - 200
+
+        XCTAssertEqual(formMinimumHeight(state, maxHeight: limit), limit, accuracy: 1,
+                       "the form must be no taller than the limit")
+        XCTAssertEqual(formMinimumHeight(state, maxHeight: natural + 200), natural, accuracy: 1,
+                       "under the limit the form stays its content's height")
+    }
+
+    /// Only the steps give up height: the profile picker above them and the run bar
+    /// below stay whole, so the form can still be driven with its steps scrolled.
+    func testOnlyTheStepsYieldHeight() {
+        XCTAssertEqual(
+            CappedColumn.heights(natural: [80, 900, 50], yielding: 1, maxHeight: 700),
+            [80, 570, 50])
+        XCTAssertEqual(
+            CappedColumn.heights(natural: [80, 300, 50], yielding: 1, maxHeight: 700),
+            [80, 300, 50], "content under the limit keeps its natural heights")
+        XCTAssertEqual(
+            CappedColumn.heights(natural: [80, 300, 50], yielding: 1, maxHeight: 100),
+            [80, 0, 50], "the steps cannot go below zero")
+    }
+
+    /// The limit leaves room for the window's titlebar and toolbar, so the whole frame —
+    /// not just its content — fits the screen's visible height.
+    func testContentLimitLeavesRoomForTheWindowChrome() {
+        XCTAssertEqual(
+            WindowContentHeightLimitReader.limit(visibleScreenHeight: 922, windowHeight: 800, contentHeight: 748),
+            870)
     }
 }

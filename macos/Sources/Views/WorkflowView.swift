@@ -18,13 +18,15 @@ struct WorkflowView: View {
 
     private let optionLabelWidth: CGFloat = 52
 
+    var maxHeight: CGFloat = .infinity
+
     private var companionExtensions: String {
         state.workflowSession.workingProfile.companionExtensions?.joined(separator: ", ") ?? ""
     }
 
     var body: some View {
         @Bindable var session = state.workflowSession
-        VStack(spacing: 0) {
+        CappedColumn(maxHeight: maxHeight) {
             VStack(spacing: 0) {
                 profileSelector
                     .disabled(state.isRunning)
@@ -39,17 +41,20 @@ struct WorkflowView: View {
                 }
             }
             .padding(.horizontal, 16)
-            // No scroll view: the form is a fixed column of controls, and its height —
-            // like its width — is its content's. Declaring it lets the window follow
-            // (`windowResizability(.contentSize)`) when a step expands, instead of the
-            // form scrolling inside a window that stayed put.
-            VStack(spacing: 16) {
-                if !session.profileName.isEmpty {
-                    stepsPipeline
-                        .disabled(state.isRunning)
+            // The form's height, like its width, is its content's, so the window follows
+            // (`windowResizability(.contentSize)`) when a step expands. The steps only
+            // scroll once the form reaches `maxHeight`, the most the screen can show.
+            ScrollView {
+                VStack(spacing: 16) {
+                    if !session.profileName.isEmpty {
+                        stepsPipeline
+                            .disabled(state.isRunning)
+                    }
                 }
+                .padding(16)
             }
-            .padding(16)
+            .scrollBounceBehavior(.basedOnSize)
+            .layoutPriority(-1)
             if !session.profileName.isEmpty {
                 executionBar
                     .padding(.horizontal, 16)
