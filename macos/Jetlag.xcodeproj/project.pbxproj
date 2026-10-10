@@ -21,6 +21,7 @@
 		1F6A7B753CFE037E46BC5916 /* RunSummaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3A384D1A78A845026DD9131 /* RunSummaryTests.swift */; };
 		22E1D69B22D54B870B63505F /* CancelFeedbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE9A71B38C9F152E65E2D2B8 /* CancelFeedbackTests.swift */; };
 		30624E27385D5F145ECC1137 /* DryRunFreshnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF1FBD7A42B275AA5183D163 /* DryRunFreshnessTests.swift */; };
+		330A139653E33D3B65233F1D /* LicenseStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7415DA440AB142FBAC2F317 /* LicenseStoreTests.swift */; };
 		3E3C0BD8BAD159DA18D47303 /* TimestampSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31610BDF5B254E8176367A1D /* TimestampSourceTests.swift */; };
 		49521EA7D50F8FD80CA4EDFD /* PythonRuntimeCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA47C3147490D4D7AABA5169 /* PythonRuntimeCheck.swift */; };
 		49CB4585E7C6D1DC06062400 /* PipelineSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0DC9676D4668FC395DD2A0F /* PipelineSummary.swift */; };
@@ -157,6 +158,7 @@
 		C3CAB3FB148CDC0E0E19191A /* FixTimestampPreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixTimestampPreviewTests.swift; sourceTree = "<group>"; };
 		C4AF4B0A35CD716A34E2A275 /* ProfilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesView.swift; sourceTree = "<group>"; };
 		C698B76B04834D4379CADAA4 /* InspectorHostedSizingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorHostedSizingTests.swift; sourceTree = "<group>"; };
+		C7415DA440AB142FBAC2F317 /* LicenseStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseStoreTests.swift; sourceTree = "<group>"; };
 		C76405E304A233D40E627ECD /* GyroflowStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroflowStatusTests.swift; sourceTree = "<group>"; };
 		CA47C3147490D4D7AABA5169 /* PythonRuntimeCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PythonRuntimeCheck.swift; sourceTree = "<group>"; };
 		CDF31C93574205EBA3F42FEC /* JetlagTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JetlagTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -265,6 +267,7 @@
 				C76405E304A233D40E627ECD /* GyroflowStatusTests.swift */,
 				1B6D7490C083C0BA8B009794 /* HostedWindow.swift */,
 				C698B76B04834D4379CADAA4 /* InspectorHostedSizingTests.swift */,
+				C7415DA440AB142FBAC2F317 /* LicenseStoreTests.swift */,
 				B400B347B64B7BD6C4A6B368 /* LogPanelScrollTests.swift */,
 				704A9D197F05079199FB21C9 /* OrganizeConflictTests.swift */,
 				D08074CC6CCFCC6AFEC75C39 /* PipelineArgsTests.swift */,
@@ -540,6 +543,7 @@
 				AF5DDC771125D006AA50AF71 /* GyroflowStatusTests.swift in Sources */,
 				BE595984FF6FA6421A8298E9 /* HostedWindow.swift in Sources */,
 				54BF807828E4B1BF2A402E9F /* InspectorHostedSizingTests.swift in Sources */,
+				330A139653E33D3B65233F1D /* LicenseStoreTests.swift in Sources */,
 				FEB799ACD5480F05057281FD /* LogPanelScrollTests.swift in Sources */,
 				C63FEE71B7ACCE008816844A /* OrganizeConflictTests.swift in Sources */,
 				67B98190D68F596BAC4EF2AE /* PipelineArgsTests.swift in Sources */,
