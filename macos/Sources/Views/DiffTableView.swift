@@ -313,9 +313,10 @@ struct DiffTableView: View {
         }
     }
 
-    /// The fields a correction would write, for the rows that would write any.
+    /// The metadata fields and file system times a correction would write, for the rows that would write any.
     private func staleFieldsText(_ row: DiffTableRow) -> String? {
-        row.staleFields.isEmpty ? nil : row.staleFields.joined(separator: ", ")
+        let written = row.staleFields + row.staleFileTimes
+        return written.isEmpty ? nil : written.joined(separator: ", ")
     }
 
     /// Why a row says what it says: which field the correction read, which fields

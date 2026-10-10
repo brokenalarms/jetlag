@@ -123,7 +123,8 @@ enum PipelineEvent: Decodable {
                          originalEpoch: Double?,
                          correctedEpoch: Double?,
                          requiresForceTimezone: Bool,
-                         staleFields: [String])
+                         staleFields: [String],
+                         staleFileTimes: [String])
     case renameResult(file: String, renamedTo: String)
     case organizeResult(file: String, action: String, dest: String, reason: String?)
     case gyroflowResult(file: String, action: String, gyroflowPath: String,
@@ -151,6 +152,7 @@ enum PipelineEvent: Decodable {
         case correctedEpoch = "corrected_epoch"
         case requiresForceTimezone = "requires_force_timezone"
         case staleFields = "stale_fields"
+        case staleFileTimes = "stale_file_times"
         case renamedTo = "renamed_to"
         case dest, reason
         case gyroflowPath = "gyroflow_path"
@@ -197,7 +199,8 @@ enum PipelineEvent: Decodable {
                 originalEpoch: try container.decodeIfPresent(Double.self, forKey: .originalEpoch),
                 correctedEpoch: try container.decodeIfPresent(Double.self, forKey: .correctedEpoch),
                 requiresForceTimezone: try container.decodeIfPresent(Bool.self, forKey: .requiresForceTimezone) ?? false,
-                staleFields: try container.decodeIfPresent([String].self, forKey: .staleFields) ?? [])
+                staleFields: try container.decodeIfPresent([String].self, forKey: .staleFields) ?? [],
+                staleFileTimes: try container.decodeIfPresent([String].self, forKey: .staleFileTimes) ?? [])
         case "rename_result":
             self = .renameResult(
                 file: try container.decode(String.self, forKey: .file),
@@ -844,7 +847,7 @@ final class AppState {
                               let source, let timezone, let correctionMode,
                               _, let timeOffsetDisplay, let error,
                               let originalEpoch, let correctedEpoch,
-                              let requiresForceTimezone, let staleFields):
+                              let requiresForceTimezone, let staleFields, let staleFileTimes):
             currentDiffRow?.timestampAction = action
             currentDiffRow?.originalTime = originalTime
             currentDiffRow?.correctedTime = correctedTime
@@ -857,6 +860,7 @@ final class AppState {
             currentDiffRow?.correctedEpoch = correctedEpoch
             currentDiffRow?.requiresForceTimezone = requiresForceTimezone
             currentDiffRow?.staleFields = staleFields
+            currentDiffRow?.staleFileTimes = staleFileTimes
             liveRow = currentDiffRow
 
         case .renameResult(_, let renamedTo):

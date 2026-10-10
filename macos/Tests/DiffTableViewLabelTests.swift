@@ -88,6 +88,18 @@ final class DiffTableViewLabelTests: XCTestCase {
                        Strings.DiffTable.wouldWrite("DateTimeOriginal, CreateDate"))
     }
 
+    /// A would-fix whose metadata already matches and only file times change must
+    /// still say what it writes, or the badge has no reason beside it.
+    func testActionColumnDetailNamesFileTimesWhenNoMetadataFieldIsStale() {
+        var diffRow = row(timestampAction: "would_fix")
+        diffRow.staleFileTimes = ["FileCreateDate"]
+
+        let actionCell = view.cellTexts(diffRow)[4]
+
+        XCTAssertEqual(actionCell.parts.last?.text,
+                       Strings.DiffTable.wouldWrite("FileCreateDate"))
+    }
+
     /// The action and status columns carry the same writes subtitle and must not
     /// stretch to fit every listed field: a fourth field (e.g.
     /// QuickTime:MediaCreateDate) must measure to the same capped width as three

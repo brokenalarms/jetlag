@@ -79,6 +79,7 @@ class TimestampFixResult:
     requires_force_timezone: Optional[bool] = None
     camera_zone_offset: Optional[str] = None
     stale_fields: list = field(default_factory=list)
+    stale_file_times: list = field(default_factory=list)
 
 
 def same_as_original(dt_with_tz: datetime) -> str:
@@ -1052,6 +1053,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
         original_time=_machine_original_time(current_data),
         corrected_time=datetime_original_str,
         stale_fields=changes["stale_clock_fields"],
+        stale_file_times=["FileCreateDate"] if changes["file_timestamps"] else [],
         timestamp_source=_source_to_machine_token(timestamp_source),
         correction_mode=correction_mode,
         timezone=detected_tz,

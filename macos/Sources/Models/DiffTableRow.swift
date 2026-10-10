@@ -31,6 +31,7 @@ struct DiffTableRow: Identifiable {
     /// give them. A row whose original and corrected times are the same string is
     /// only explicable by this list — it is what "Would fix" would actually write.
     var staleFields: [String] = []
+    var staleFileTimes: [String] = []
 
     /// The file already carries a camera-set zone that the declared zone would
     /// relabel; applying needs the user's explicit confirmation.

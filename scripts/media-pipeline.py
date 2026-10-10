@@ -463,6 +463,7 @@ def process_file(
             requires_force_timezone=bool(ts_result.requires_force_timezone),
             camera_zone_offset=ts_result.camera_zone_offset,
             stale_fields=ts_result.stale_fields,
+            stale_file_times=ts_result.stale_file_times,
         )
 
         if ts_result.timestamp_action == "error":

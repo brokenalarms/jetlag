@@ -1314,6 +1314,42 @@ class TestStaleFieldsNamesWhatWouldBeWritten:
         assert second.stale_fields == []
 
 
+class TestStaleFileTimesNamesFileTimeWrites:
+    """A sidecar whose metadata needs nothing but whose birth time is wrong is a
+    "would fix" with an empty stale_fields. stale_file_times names the file system
+    times the correction would set, so that row has a reason to show.
+    """
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        fmt._exif_cache.clear()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    @pytest.mark.skipif(sys.platform != "darwin", reason="birth time is only corrected on macOS")
+    def test_birth_time_only_change_is_named(self):
+        """A still whose clock fields all match but whose birth time is not its
+        shooting time lists FileCreateDate, and lists nothing once it is set."""
+        still = os.path.join(self.temp_dir, "test.jpg")
+        create_test_photo(still, DateTimeOriginal="2025:06:18 07:25:21",
+                          OffsetTimeOriginal="+08:00")
+        fmt._exif_cache.clear()
+
+        before = fmt.fix_media_timestamps(still, dry_run=True, timezone_spec="+08:00")
+        assert before.timestamp_action == "would_fix"
+        assert before.stale_fields == []
+        assert before.stale_file_times == ["FileCreateDate"]
+
+        fmt.fix_media_timestamps(still, timezone_spec="+08:00")
+        fmt._exif_cache.clear()
+
+        after = fmt.fix_media_timestamps(still, dry_run=True, timezone_spec="+08:00")
+        assert after.timestamp_action == "no_change"
+        assert after.stale_file_times == []
+
+
 if __name__ == "__main__":
     # Run with pytest
     import pytest

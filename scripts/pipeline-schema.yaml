@@ -79,6 +79,7 @@ events:
       requires_force_timezone: { type: boolean, optional: true }
       camera_zone_offset: { type: string, optional: true }
       stale_fields: { type: "list[string]", optional: true }
+      stale_file_times: { type: "list[string]", optional: true }
       error: { type: string, optional: true }
     example:
       event: timestamp_result
@@ -96,6 +97,7 @@ events:
       requires_force_timezone: false
       camera_zone_offset: "+08:00"
       stale_fields: [DateTimeOriginal, CreateDate]
+      stale_file_times: [FileCreateDate]
 
   rename_result:
     description: "Emitted when --update-filename-dates renames a file"
