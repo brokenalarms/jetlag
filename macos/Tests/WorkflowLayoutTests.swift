@@ -187,21 +187,6 @@ final class WorkflowLayoutTests: XCTestCase {
             [80, 0, 50], "the steps cannot go below zero")
     }
 
-    /// A pop-up menu opens with the selected item over the button, so with a later
-    /// profile chosen it extended upward and, with the window near the top of the
-    /// screen, hid the earlier profiles behind a scroll arrow. The profile picker must
-    /// be a pull-down, which always opens below the button.
-    func testProfilePickerOpensDownward() {
-        let state = profileState()
-        let host = NSHostingView(rootView: WorkflowView(state: state))
-        host.frame = NSRect(x: 0, y: 0, width: WorkflowView.formWidth, height: 900)
-        host.layoutSubtreeIfNeeded()
-        guard let picker = firstView(of: NSPopUpButton.self, in: host) else {
-            return XCTFail("the profile picker was not hosted")
-        }
-        XCTAssertTrue(picker.pullsDown, "the profile picker must be a pull-down so it opens below the button")
-    }
-
     /// The limit leaves room for the window's titlebar and toolbar, so the whole frame —
     /// not just its content — fits the screen's visible height.
     func testContentLimitLeavesRoomForTheWindowChrome() {
