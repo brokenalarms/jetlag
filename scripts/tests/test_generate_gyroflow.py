@@ -49,7 +49,7 @@ def run_generate_gyroflow(args: list[str]) -> subprocess.CompletedProcess:
     )
 
 
-from conftest import create_test_video
+from conftest import create_motion_video, create_test_video
 
 
 def get_test_preset() -> str:
@@ -168,6 +168,27 @@ class TestAlreadyExists:
             assert gyroflow_file.read_text() == "{}", "Existing file should not be modified"
 
 
+class TestMotionDetection:
+    """The motion check reads each track's handler and metadata format with ExifTool,
+    which the app already bundles, rather than a separate stream prober."""
+
+    def test_gyro_track_is_detected(self):
+        """A video carrying a track named as gyro data has motion data."""
+        mod = _load_generate_gyroflow()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            video = Path(tmpdir) / "motion.mp4"
+            create_motion_video(video)
+            assert mod.has_motion_data(video) is True
+
+    def test_plain_video_has_no_motion_data(self):
+        """A video with only a picture track has no motion data — checked, not unknown."""
+        mod = _load_generate_gyroflow()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            video = Path(tmpdir) / "plain.mp4"
+            create_test_video(video)
+            assert mod.has_motion_data(video) is False
+
+
 class TestMissingBinary:
     """Tests for missing Gyroflow binary."""
 
@@ -175,15 +196,9 @@ class TestMissingBinary:
         """Missing Gyroflow binary should skip gracefully, not crash the pipeline."""
         with tempfile.TemporaryDirectory() as tmpdir:
             video = Path(tmpdir) / "test.mp4"
-            create_test_video(video)
-
-            # Fake ffprobe that reports motion data so the script reaches the binary check
-            fake_ffprobe = Path(tmpdir) / "ffprobe"
-            fake_ffprobe.write_text(
-                '#!/bin/bash\n'
-                'echo \'{"streams": [{"codec_type": "data", "tags": {"handler_name": "GoPro MET"}, "codec_tag_string": "gpmd"}]}\'\n'
-            )
-            fake_ffprobe.chmod(0o755)
+            # Motion data, so the script gets past the motion check to the binary check
+            create_motion_video(video)
+            (Path(tmpdir) / "exiftool").symlink_to(SCRIPT_DIR / "tools" / "exiftool")
 
             # Point the script at a modified copy of the profiles file via the
             # JETLAG_PROFILES_FILE override — the shared repo file is never
@@ -197,9 +212,13 @@ class TestMissingBinary:
 
             env = os.environ.copy()
             env["JETLAG_PROFILES_FILE"] = str(profiles_copy)
-            # Restrict PATH to tmpdir (fake ffprobe) + essentials only,
+            # Restrict PATH to tmpdir (exiftool) + essentials only,
             # so shutil.which("gyroflow") won't find a real install
             env["PATH"] = f"{tmpdir}:/usr/bin:/bin"
+            env["JETLAG_METADATA_BINARY"] = ""
+            # Nor an installed Gyroflow.app, which resolution checks before PATH
+            env["JETLAG_APPLICATIONS_DIR"] = tmpdir
+            env["JETLAG_TOOLS_DIR"] = tmpdir
 
             result = subprocess.run(
                 [sys.executable, str(SCRIPT_DIR / "generate-gyroflow.py"),

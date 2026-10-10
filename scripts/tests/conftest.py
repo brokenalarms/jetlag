@@ -49,6 +49,23 @@ def create_test_video(path, **exif_tags):
         exiftool.write_tags(str(path), tag_args)
 
 
+def create_motion_video(path):
+    """A video with a second track whose handler names it gyro data, as a camera's
+    motion track is named. ExifTool reads it from the header exactly as it reads a
+    Sony rtmd or GoPro gpmd track, without the test shipping real camera footage."""
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as d:
+        subtitles = Path(d) / "track.srt"
+        subtitles.write_text("1\n00:00:00,000 --> 00:00:00,040\n.\n")
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=0.04",
+            "-i", str(subtitles),
+            "-c:v", "libx264", "-t", "0.04", "-pix_fmt", "yuv420p",
+            "-c:s", "mov_text", "-metadata:s:s:0", "handler_name=Gyro Motion Data",
+            str(path),
+        ], capture_output=True, check=True)
+
+
 _template_photo: Path | None = None
 
 
