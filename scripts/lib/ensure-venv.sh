@@ -25,7 +25,7 @@ _ENSURE_VENV_VENDORED="$_ENSURE_VENV_SCRIPTS_DIR/site-packages"
 _ENSURE_VENV_MIN_MAJOR=3
 _ENSURE_VENV_MIN_MINOR=9
 
-# Prepend vendored tools (ffprobe, gyroflow, exiftool, tag) to PATH
+# Prepend vendored tools (gyroflow, exiftool, tag) to PATH
 if [[ -d "$_ENSURE_VENV_TOOLS" ]]; then
     export PATH="$_ENSURE_VENV_TOOLS:$PATH"
 fi

@@ -97,12 +97,13 @@ class _SwiftBackend:
             return response
 
     def read_tags(self, file_path, tags, extra_args=None):
-        fast = bool(extra_args and "-fast2" in extra_args)
+        extra_args = extra_args or []
         return self._call({
             "op": "read",
             "file": str(file_path),
             "tags": list(tags),
-            "fast": fast,
+            "fast": "-fast2" in extra_args,
+            "duplicates": "-a" in extra_args,
         })
 
     def write_tags(self, file_path, tag_args):

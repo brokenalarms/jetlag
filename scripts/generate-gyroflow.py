@@ -25,6 +25,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.results import emit_result
 from lib.profiles import resolve_profiles_file
+from lib.metadata import metadata_service as exiftool
 
 
 SCRIPT_DIR = Path(__file__).parent
@@ -42,37 +43,34 @@ def signal_handler(sig, frame):
     sys.exit(130)
 
 
+MOTION_TRACK_KEYWORDS = ("motion", "gyro", "imu", "rtmd", "camm", "gpmd")
+
+
 def has_motion_data(file_path: Path) -> Optional[bool]:
-    """Check if video file contains motion/gyro data streams using ffprobe.
+    """Check if a video carries a motion/gyro metadata track (Sony rtmd, GoPro gpmd, camm).
+
+    ExifTool reads each track's handler and metadata format from the file's
+    header, so the media itself is never scanned. Every track is reported
+    (``-a``): a GoPro file carries several metadata tracks, and the gyro one
+    need not be the one a single value would show.
 
     Returns:
         True if motion data found, False if checked and none found,
-        None if ffprobe is unavailable (cannot determine).
+        None if exiftool is unavailable (cannot determine).
     """
     try:
-        result = subprocess.run(
-            [
-                "ffprobe", "-v", "quiet", "-print_format", "json",
-                "-show_streams", str(file_path)
-            ],
-            capture_output=True, text=True
+        tracks = exiftool.read_tags(
+            str(file_path), ["HandlerDescription", "MetaFormat"], extra_args=["-a", "-G4"]
         )
-    except OSError:
+    except FileNotFoundError:
         return None
-    if result.returncode != 0:
-        return False
-
-    data = json.loads(result.stdout)
-    for stream in data.get("streams", []):
-        if stream.get("codec_type") not in ("data", "subtitle"):
-            continue
-        handler = stream.get("tags", {}).get("handler_name", "").lower()
-        codec_tag = stream.get("codec_tag_string", "").lower()
-        if any(kw in handler for kw in ["motion", "gyro", "imu", "rtmd", "camm"]):
-            return True
-        if any(kw in codec_tag for kw in ["gpmd", "camm", "rtmd"]):
-            return True
-    return False
+    if "error" in tracks:
+        return None
+    return any(
+        keyword in value.lower()
+        for value in tracks.values()
+        for keyword in MOTION_TRACK_KEYWORDS
+    )
 
 
 def gyroflow_search_locations() -> tuple[Path, Path]:
@@ -167,9 +165,9 @@ def generate_gyroflow_project(
 
     motion_check = has_motion_data(file_path)
     if motion_check is None:
-        print(f"Skipped: {gyroflow_path} (ffprobe not available)", file=sys.stderr)
+        print(f"Skipped: {gyroflow_path} (exiftool not available)", file=sys.stderr)
         return GyroflowResult(gyroflow_path=gyroflow_path, action="skipped",
-                              error="ffprobe not available — cannot check for motion data")
+                              error="exiftool not available — cannot check for motion data")
     if not motion_check:
         print(f"Skipped: {gyroflow_path} (no motion data)", file=sys.stderr)
         return GyroflowResult(gyroflow_path=gyroflow_path, action="skipped")

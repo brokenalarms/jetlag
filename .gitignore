@@ -16,7 +16,6 @@ scripts/.venv/
 .env
 
 # Vendored tool binaries (downloaded/built locally per developer — see scripts/tools/README)
-# scripts/tools/ffprobe
 scripts/tools/gyroflow
 # scripts/tools/jetlag-metadata
 

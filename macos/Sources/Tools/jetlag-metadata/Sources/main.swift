@@ -4,6 +4,7 @@ struct ReadRequest: Decodable {
     let file: String
     let tags: [String]
     let fast: Bool?
+    let duplicates: Bool?
 }
 
 struct WriteRequest: Decodable {
@@ -16,6 +17,7 @@ struct Request: Decodable {
     let file: String
     let tags: AnyCodable
     let fast: Bool?
+    let duplicates: Bool?
 }
 
 enum AnyCodable: Decodable {
@@ -244,9 +246,12 @@ final class ExifToolBackend {
         return lines.joined(separator: "\n")
     }
 
-    func readTags(file: String, tags: [String], fast: Bool) throws -> [String: String] {
+    /// `duplicates` reports a tag once per track that carries it rather than once per
+    /// file, each keyed by its track (`[Copy3] HandlerDescription`).
+    func readTags(file: String, tags: [String], fast: Bool, duplicates: Bool) throws -> [String: String] {
         var args = ["-s"]
         if fast { args.append("-fast2") }
+        if duplicates { args.append(contentsOf: ["-a", "-G4"]) }
         args.append(contentsOf: tags.map { "-\($0)" })
         args.append(file)
 
@@ -419,7 +424,8 @@ func handleRequest(_ jsonLine: String) -> String {
             var result = try backend.readTags(
                 file: request.file,
                 tags: tagList,
-                fast: request.fast ?? false
+                fast: request.fast ?? false,
+                duplicates: request.duplicates ?? false
             )
             let warnings = backend.takeWarnings()
             if !warnings.isEmpty { result["_warnings"] = warnings }
