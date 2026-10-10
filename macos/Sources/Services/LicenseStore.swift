@@ -12,16 +12,27 @@ final class LicenseStore {
     }
 
     private init() {
+        // Assigning in init skips didSet, so an environment override stays for
+        // this run only.
+        isUnlocked = Self.initialUnlocked(
+            environment: ProcessInfo.processInfo.environment,
+            defaults: .standard
+        )
+    }
+
+    static func initialUnlocked(environment: [String: String], defaults: UserDefaults) -> Bool {
         #if DEBUG
-        // Set by the Jetlag scheme so a debug run is never gated. Assigning in
-        // init skips didSet, so the override stays for this run only. Release
-        // builds cannot be unlocked this way.
-        if let override = ProcessInfo.processInfo.environment["JETLAG_PRO_UNLOCKED"] {
-            isUnlocked = (override as NSString).boolValue
-            return
+        // The Jetlag scheme sets JETLAG_PRO_UNLOCKED, but the scheme is a
+        // generated, untracked file that can be missing — so a debug build with
+        // no stored choice also starts unlocked rather than depending on how it
+        // was launched. Release builds cannot be unlocked this way.
+        if let override = environment["JETLAG_PRO_UNLOCKED"] {
+            return (override as NSString).boolValue
         }
+        return defaults.object(forKey: unlockedKey) as? Bool ?? true
+        #else
+        return defaults.bool(forKey: unlockedKey)
         #endif
-        isUnlocked = UserDefaults.standard.bool(forKey: Self.unlockedKey)
     }
 
     /// Maximum files per run. Free tier: 50. Unlocked: unlimited.
