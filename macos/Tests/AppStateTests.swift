@@ -125,6 +125,23 @@ final class TimezoneConflictTests: XCTestCase {
                        ["Keys:CreationDate", "QuickTime:CreateDate"])
     }
 
+    /// File system times a correction would set reach the row separately from the
+    /// metadata fields, so a would-fix that only changes birth time is explained.
+    func testStaleFileTimesReachTheDiffTableRow() {
+        let state = AppState()
+
+        feed(state, #"{"event": "pipeline_file", "file": "test.xmp"}"#)
+        feed(state, """
+        {"event": "timestamp_result", "file": "test.xmp", "action": "would_fix", \
+        "original_time": "2025:08:15 14:08:51+09:00", "corrected_time": "2025:08:15 14:08:51+09:00", \
+        "stale_fields": [], "stale_file_times": ["FileCreateDate"]}
+        """)
+        feed(state, #"{"event": "pipeline_result", "file": "test.xmp", "result": "would_change"}"#)
+
+        XCTAssertEqual(state.diffTableRows[0].staleFields, [])
+        XCTAssertEqual(state.diffTableRows[0].staleFileTimes, ["FileCreateDate"])
+    }
+
     /// A result that names no fields leaves the row's list empty rather than absent,
     /// and an unrecognised source token leaves the row without one.
     func testMissingSourceAndStaleFieldsLeaveTheRowEmpty() {
