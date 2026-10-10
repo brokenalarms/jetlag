@@ -21,6 +21,9 @@ struct JetlagApp: App {
         // window grows to the right and only the panel can be widened from there. No
         // width is declared anywhere for this — it is derived from the views.
         .windowResizability(.contentSize)
+        // The height, unlike the width, is not the content's: the form's steps scroll,
+        // so the window opens at a default height and the user resizes it from there.
+        .defaultSize(width: ContentView.sidebarWidth + WorkflowView.formWidth, height: ContentView.defaultHeight)
         // ContentView is a plain HStack, not a NavigationSplitView (see ContentView's own
         // doc comment for why), so the titlebar knows nothing about the sidebar column and
         // draws the navigationTitle left-aligned after the traffic lights — straddling the
