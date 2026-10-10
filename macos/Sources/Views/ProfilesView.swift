@@ -4,6 +4,14 @@ struct ProfileEditingSession: Equatable {
     var name: String
     var profile: MediaProfile
     var globalStabilization: StabilizationSettings?
+
+    /// Edited since it was loaded, or never written at all — a new or duplicated
+    /// profile is unchanged from its snapshot but still has to be saved. Save and
+    /// Cancel only show while this holds, so their disappearing is the sign a save
+    /// went through.
+    static func hasUnsavedChanges(editor: Self, snapshot: Self?, isSaved: Bool) -> Bool {
+        editor != snapshot || !isSaved
+    }
 }
 
 struct ProfilesView: View {
@@ -26,6 +34,14 @@ struct ProfilesView: View {
         return editor != snapshot
     }
 
+    private var hasUnsavedChanges: Bool {
+        guard let editor else { return false }
+        return ProfileEditingSession.hasUnsavedChanges(
+            editor: editor,
+            snapshot: snapshot,
+            isSaved: snapshot.flatMap { state.profile(named: $0.name) } != nil)
+    }
+
     private var sessionBinding: Binding<ProfileEditingSession> {
         Binding(
             get: { editor ?? ProfileEditingSession(name: "", profile: MediaProfile()) },
@@ -44,6 +60,7 @@ struct ProfilesView: View {
                 ProfileEditorView(
                     session: sessionBinding,
                     gyroflowAvailable: state.gyroflowStatus.isInstalled,
+                    hasUnsavedChanges: hasUnsavedChanges,
                     onSave: { saveCurrentProfile() },
                     onCancel: {
                         if isDirty {
@@ -294,6 +311,7 @@ struct ProfileEditorView: View {
     /// Gyroflow is optional and not bundled with Jetlag; without an install
     /// the stabilization settings would have nothing to drive.
     let gyroflowAvailable: Bool
+    let hasUnsavedChanges: Bool
     let onSave: () -> Void
     let onCancel: () -> Void
 
@@ -410,17 +428,19 @@ struct ProfileEditorView: View {
             .padding()
         }
         .safeAreaInset(edge: .bottom) {
-            HStack {
-                Spacer()
-                Button(Strings.Common.cancel) { onCancel() }
-                    .keyboardShortcut(.escape)
-                Button(Strings.Profiles.saveButton) { onSave() }
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(session.name.isEmpty)
+            if hasUnsavedChanges {
+                HStack {
+                    Spacer()
+                    Button(Strings.Common.cancel) { onCancel() }
+                        .keyboardShortcut(.escape)
+                    Button(Strings.Profiles.saveButton) { onSave() }
+                        .keyboardShortcut(.return, modifiers: .command)
+                        .buttonStyle(.borderedProminent)
+                        .disabled(session.name.isEmpty)
+                }
+                .padding()
+                .background(.bar)
             }
-            .padding()
-            .background(.bar)
         }
     }
 

@@ -441,4 +441,28 @@ final class ProfileTests: XCTestCase {
         XCTAssertEqual(state.workflowSession.profileName, "gopro")
         XCTAssertNotNil(state.activeProfile)
     }
+
+    // MARK: - Save and Cancel visibility
+
+    /// Save and Cancel used to show on every profile, edited or not, so clicking Save
+    /// gave no sign anything happened. They now show only while there is something to
+    /// save, and their disappearing is the confirmation.
+    func testSavedProfileWithNoEditsHasNothingToSave() {
+        let session = ProfileEditingSession(name: "gopro", profile: MediaProfile(type: .video))
+        XCTAssertFalse(ProfileEditingSession.hasUnsavedChanges(editor: session, snapshot: session, isSaved: true))
+    }
+
+    func testEditedProfileHasUnsavedChanges() {
+        let snapshot = ProfileEditingSession(name: "gopro", profile: MediaProfile(type: .video))
+        var edited = snapshot
+        edited.profile.type = .photo
+        XCTAssertTrue(ProfileEditingSession.hasUnsavedChanges(editor: edited, snapshot: snapshot, isSaved: true))
+    }
+
+    /// A new or duplicated profile matches its snapshot but has never been written,
+    /// so it must still be savable without first editing it.
+    func testUnwrittenProfileHasUnsavedChangesEvenUnedited() {
+        let session = ProfileEditingSession(name: "new-profile", profile: MediaProfile(type: .video))
+        XCTAssertTrue(ProfileEditingSession.hasUnsavedChanges(editor: session, snapshot: session, isSaved: false))
+    }
 }
