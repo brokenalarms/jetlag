@@ -187,6 +187,21 @@ final class WorkflowLayoutTests: XCTestCase {
             [80, 0, 50], "the steps cannot go below zero")
     }
 
+    /// With every step on, the pills overflowed the bar's width and SwiftUI squeezed
+    /// each label until it wrapped mid-word ("Gyroflo / w"). The bar must stay one pill
+    /// high however narrow it is: labels give way to icons rather than wrap.
+    func testStatusBarStaysOneLineWithEveryStep() {
+        func height(_ steps: [PipelineStep], width: CGFloat) -> CGFloat {
+            NSHostingController(rootView: PipelineStatusBar(steps: steps))
+                .sizeThatFits(in: NSSize(width: width, height: 1000)).height
+        }
+        let oneLine = height([.ingest], width: 1000)
+        for width: CGFloat in [WorkflowView.formWidth - 32, 440, 300] {
+            XCTAssertEqual(height(PipelineStep.allCases, width: width), oneLine, accuracy: 1,
+                           "every step's pill must fit on one line at \(width)pt")
+        }
+    }
+
     /// The limit leaves room for the window's titlebar and toolbar, so the whole frame —
     /// not just its content — fits the screen's visible height.
     func testContentLimitLeavesRoomForTheWindowChrome() {
