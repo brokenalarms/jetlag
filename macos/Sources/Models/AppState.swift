@@ -134,6 +134,7 @@ enum PipelineEvent: Decodable {
     case timezoneConflict(conflictType: String, providedTz: String?,
                           fileTimezones: [String: [String]])
     case organizeConflict(count: Int, files: [String])
+    case protectedSources(files: [String])
     case pipelineError(message: String)
 
     private enum CodingKeys: String, CodingKey {
@@ -244,6 +245,9 @@ enum PipelineEvent: Decodable {
             self = .organizeConflict(
                 count: try container.decode(Int.self, forKey: .count),
                 files: try container.decode([String].self, forKey: .files))
+        case "protected_sources":
+            self = .protectedSources(
+                files: try container.decode([String].self, forKey: .files))
         case "pipeline_error":
             self = .pipelineError(
                 message: try container.decode(String.self, forKey: .message))
@@ -294,6 +298,10 @@ final class WorkflowSession {
     var organizeConflictFiles: [String] = []
     var showOverwriteConflict: Bool = false
     var overwriteDestination: Bool = false
+
+    var protectedSourceFiles: [String] = []
+    var showProtectedSources: Bool = false
+    var unlockProtected: Bool = false
 
     /// Where the archived source folder lands and what it is called. Both are
     /// overrides on top of archiving in place under "<source> - copied <date>",
@@ -376,6 +384,18 @@ final class WorkflowSession {
         showOverwriteConflict = false
     }
 
+    /// Record the user's answer, so the re-run carries the flag that imports
+    /// the protected files as unlocked copies. Only an apply is refused, and
+    /// the refused run has already dropped back to preview mode by the time the
+    /// answer arrives, so the answer restores the apply it was asked for —
+    /// which had already passed the dry-run question.
+    func grantUnlockProtectedAssent() {
+        unlockProtected = true
+        showProtectedSources = false
+        applyMode = true
+        applyWithoutDryRun = true
+    }
+
     /// The settings a run would carry, with the answers given for this click
     /// taken out: an override the user just granted is not a setting they
     /// changed, so it never makes the preview they read look stale.
@@ -454,6 +474,9 @@ final class WorkflowSession {
         timezoneConflictFileTimezones = nil
         overwriteDestination = false
         showOverwriteConflict = false
+        protectedSourceFiles = []
+        showProtectedSources = false
+        unlockProtected = false
         applyWithoutDryRun = false
         showDryRunStale = false
         dryRunStaleReason = nil
@@ -567,12 +590,13 @@ final class WorkflowSession {
     static let forceTimezoneFlag = "--force-timezone"
     static let allowMixedTimezonesFlag = "--allow-mixed-timezones"
     static let overwriteFlag = "--overwrite"
+    static let unlockProtectedFlag = "--unlock-protected"
     static let applyFlag = "--apply"
 
     /// What the run carries because of an answer given for one click, rather
     /// than a setting the user chose — the same state `clearRunAssent()` drops.
     private static let assentFlags = [
-        forceTimezoneFlag, allowMixedTimezonesFlag, overwriteFlag, applyFlag,
+        forceTimezoneFlag, allowMixedTimezonesFlag, overwriteFlag, unlockProtectedFlag, applyFlag,
     ]
 
     func buildPipelineArgs() -> (script: String, args: [String]) {
@@ -638,6 +662,9 @@ final class WorkflowSession {
         }
         if overwriteDestination {
             args.append(Self.overwriteFlag)
+        }
+        if unlockProtected {
+            args.append(Self.unlockProtectedFlag)
         }
         if applyMode {
             args.append(Self.applyFlag)
@@ -895,6 +922,12 @@ final class AppState {
         case .organizeConflict(let count, let files):
             workflowSession.organizeConflictCount = count
             workflowSession.organizeConflictFiles = files
+
+        case .protectedSources(let files):
+            workflowSession.protectedSourceFiles = files
+            // A dry run previews the protected files anyway; only an apply is
+            // refused, so only an apply asks.
+            workflowSession.showProtectedSources = workflowSession.applyMode
 
         case .pipelineSummary(let summary):
             runSummary = summary

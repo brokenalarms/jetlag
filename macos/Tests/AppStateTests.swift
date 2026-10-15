@@ -324,3 +324,70 @@ final class TimezoneCarryOverTests: XCTestCase {
         XCTAssertTrue(second.workflowSession.timezone.current.isEmpty)
     }
 }
+
+/// Covers how the app reacts to protected (locked) source files: a dry run
+/// previews them without a modal, while the apply the pipeline refuses asks the
+/// user, and their answer re-runs that apply with --unlock-protected.
+final class ProtectedSourcesTests: XCTestCase {
+
+    private func feedProtected(_ state: AppState) {
+        state.appendLog(LogLine(
+            text: #"{"event": "protected_sources", "files": ["A7V01670.ARW"]}"#,
+            stream: .stdout))
+    }
+
+    /// A preview is not refused, so it is not interrupted either.
+    func testDryRunRecordsTheFilesWithoutAsking() {
+        let state = AppState()
+        state.workflowSession.applyMode = false
+
+        feedProtected(state)
+
+        XCTAssertFalse(state.workflowSession.showProtectedSources)
+        XCTAssertEqual(state.workflowSession.protectedSourceFiles, ["A7V01670.ARW"])
+    }
+
+    /// Applying is where the pipeline refuses without --unlock-protected, so
+    /// that is where the user is asked.
+    func testApplyAsksBeforeImportingProtectedFiles() {
+        let state = AppState()
+        state.workflowSession.applyMode = true
+
+        feedProtected(state)
+
+        XCTAssertTrue(state.workflowSession.showProtectedSources)
+    }
+
+    /// The refused apply has already reset to preview mode when the answer
+    /// arrives; the re-run must still be the apply, carrying the flag.
+    func testAssentReRunsTheRefusedApplyWithTheFlag() {
+        let state = AppState()
+        state.workflowSession.applyMode = true
+        feedProtected(state)
+        state.workflowSession.noteRunFinished()
+
+        state.workflowSession.grantUnlockProtectedAssent()
+
+        XCTAssertFalse(state.workflowSession.showProtectedSources)
+        XCTAssertFalse(state.workflowSession.requestDryRunAssentIfNeeded(),
+                       "The refused apply already passed the dry-run question")
+        let (_, args) = state.workflowSession.buildPipelineArgs()
+        XCTAssertTrue(args.contains("--unlock-protected"))
+        XCTAssertTrue(args.contains("--apply"))
+    }
+
+    /// Assent covers the run it was given for, so a later card's protected
+    /// files are asked about again.
+    func testStartingAFreshRunDropsEarlierAssent() {
+        let state = AppState()
+        state.workflowSession.applyMode = true
+        feedProtected(state)
+        state.workflowSession.grantUnlockProtectedAssent()
+
+        state.workflowSession.clearRunAssent()
+
+        let (_, args) = state.workflowSession.buildPipelineArgs()
+        XCTAssertFalse(args.contains("--unlock-protected"))
+        XCTAssertEqual(state.workflowSession.protectedSourceFiles, [])
+    }
+}

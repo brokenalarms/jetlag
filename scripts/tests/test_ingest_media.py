@@ -8,6 +8,7 @@ missing source file error.
 
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -70,6 +71,47 @@ class TestApplyMode:
         result = run_ingest(self.source_file, "--target", self.working_dir, "--apply")
 
         assert result.stderr == ""
+
+
+@pytest.mark.skipif(not hasattr(os, "chflags"), reason="BSD file flags only")
+class TestLockedSource:
+    """A locked source (user-immutable flag, Finder's "Locked", what a camera's
+    "Protect" becomes) yields an unlocked staged copy. The staged copy is the
+    pipeline's own scratch file: later stages rewrite and move it, and a lock
+    carried over makes every one of those fail with EPERM.
+    """
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.source_file = os.path.join(self.temp_dir, "A7V01670.ARW")
+        self.working_dir = os.path.join(self.temp_dir, "working")
+        Path(self.source_file).write_bytes(b"raw-data")
+        os.chflags(self.source_file, stat.UF_IMMUTABLE)
+
+    def teardown_method(self):
+        for path in Path(self.temp_dir).rglob("*"):
+            os.chflags(path, 0)
+        shutil.rmtree(self.temp_dir)
+
+    def test_staged_copy_is_unlocked(self):
+        """Actual: the staged copy has no immutable flag and the same bytes
+        Expected: the staged copy can be moved and removed by later stages
+        """
+        run_ingest(self.source_file, "--target", self.working_dir, "--apply")
+
+        dest = os.path.join(self.working_dir, "A7V01670.ARW")
+        assert Path(dest).read_bytes() == b"raw-data"
+        assert not os.stat(dest).st_flags & stat.UF_IMMUTABLE, \
+            "Actual: staged copy is locked, Expected: unlocked"
+
+    def test_source_stays_locked(self):
+        """Actual: the source still carries its immutable flag
+        Expected: ingest never modifies the source, its lock included
+        """
+        run_ingest(self.source_file, "--target", self.working_dir, "--apply")
+
+        assert os.stat(self.source_file).st_flags & stat.UF_IMMUTABLE, \
+            "Actual: source lost its lock, Expected: still locked"
 
 
 class TestDryRun:

@@ -194,6 +194,20 @@ events:
       file_timezones:
         "+08:00": [DJI_20250815_101112_0001.MP4]
 
+  protected_sources:
+    description: >-
+      Emitted once before any file is processed when source files carry the
+      user-immutable flag (a camera's "Protect"). Their imported copies come out
+      unprotected, so an apply refuses without --unlock-protected; a dry run
+      reports this and previews anyway.
+    fields:
+      files:
+        type: "list[string]"
+        description: "Basenames of the protected source files"
+    example:
+      event: protected_sources
+      files: [A7V01670.ARW]
+
   pipeline_error:
     description: "Emitted when the run aborts before or during file processing"
     fields:
