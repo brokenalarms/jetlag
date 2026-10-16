@@ -134,6 +134,7 @@ enum PipelineEvent: Decodable {
     case timezoneConflict(conflictType: String, providedTz: String?,
                           fileTimezones: [String: [String]])
     case organizeConflict(count: Int, files: [String])
+    case protectedSources(files: [String])
     case pipelineError(message: String)
 
     private enum CodingKeys: String, CodingKey {
@@ -244,6 +245,9 @@ enum PipelineEvent: Decodable {
             self = .organizeConflict(
                 count: try container.decode(Int.self, forKey: .count),
                 files: try container.decode([String].self, forKey: .files))
+        case "protected_sources":
+            self = .protectedSources(
+                files: try container.decode([String].self, forKey: .files))
         case "pipeline_error":
             self = .pipelineError(
                 message: try container.decode(String.self, forKey: .message))
@@ -294,6 +298,15 @@ final class WorkflowSession {
     var organizeConflictFiles: [String] = []
     var showOverwriteConflict: Bool = false
     var overwriteDestination: Bool = false
+
+    var protectedSourceFiles: [String] = []
+    var showProtectedSources: Bool = false
+    var unlockProtected: Bool = false
+
+    /// Whether the run a conflict alert asks about was an apply. A finished
+    /// apply has dropped back to preview mode before the user answers, so the
+    /// answer needs this to re-run what was actually refused.
+    private var conflictedRunWasApply = false
 
     /// Where the archived source folder lands and what it is called. Both are
     /// overrides on top of archiving in place under "<source> - copied <date>",
@@ -349,6 +362,18 @@ final class WorkflowSession {
         Self.computeAvailableSteps(profile: workingProfile, gyroflowAvailable: gyroflowAvailable)
     }
 
+    func noteConflict() {
+        conflictedRunWasApply = applyMode
+    }
+
+    /// The refused apply had already passed the dry-run question, so its
+    /// re-run is not asked again.
+    private func resumeConflictedRun() {
+        guard conflictedRunWasApply else { return }
+        applyMode = true
+        applyWithoutDryRun = true
+    }
+
     /// Record the user's answer to the conflict the pipeline just refused on,
     /// so the next run carries the override flag that unblocks it.
     func grantTimezoneAssent() {
@@ -358,6 +383,7 @@ final class WorkflowSession {
             forceTimezone = true
         }
         showTimezoneConflict = false
+        resumeConflictedRun()
     }
 
     /// Whether the run has to stop and ask first: applying over the files the
@@ -374,6 +400,14 @@ final class WorkflowSession {
     func grantOverwriteAssent() {
         overwriteDestination = true
         showOverwriteConflict = false
+    }
+
+    /// Record the user's answer, so the re-run carries the flag that imports
+    /// the protected files as unlocked copies.
+    func grantUnlockProtectedAssent() {
+        unlockProtected = true
+        showProtectedSources = false
+        resumeConflictedRun()
     }
 
     /// The settings a run would carry, with the answers given for this click
@@ -454,6 +488,10 @@ final class WorkflowSession {
         timezoneConflictFileTimezones = nil
         overwriteDestination = false
         showOverwriteConflict = false
+        protectedSourceFiles = []
+        showProtectedSources = false
+        unlockProtected = false
+        conflictedRunWasApply = false
         applyWithoutDryRun = false
         showDryRunStale = false
         dryRunStaleReason = nil
@@ -567,12 +605,13 @@ final class WorkflowSession {
     static let forceTimezoneFlag = "--force-timezone"
     static let allowMixedTimezonesFlag = "--allow-mixed-timezones"
     static let overwriteFlag = "--overwrite"
+    static let unlockProtectedFlag = "--unlock-protected"
     static let applyFlag = "--apply"
 
     /// What the run carries because of an answer given for one click, rather
     /// than a setting the user chose — the same state `clearRunAssent()` drops.
     private static let assentFlags = [
-        forceTimezoneFlag, allowMixedTimezonesFlag, overwriteFlag, applyFlag,
+        forceTimezoneFlag, allowMixedTimezonesFlag, overwriteFlag, unlockProtectedFlag, applyFlag,
     ]
 
     func buildPipelineArgs() -> (script: String, args: [String]) {
@@ -638,6 +677,9 @@ final class WorkflowSession {
         }
         if overwriteDestination {
             args.append(Self.overwriteFlag)
+        }
+        if unlockProtected {
+            args.append(Self.unlockProtectedFlag)
         }
         if applyMode {
             args.append(Self.applyFlag)
@@ -881,6 +923,7 @@ final class AppState {
             liveRow = currentDiffRow
 
         case .timezoneConflict(let conflictType, let providedTz, let fileTimezones):
+            workflowSession.noteConflict()
             workflowSession.timezoneConflictType = conflictType
             workflowSession.timezoneConflictProvidedTz = providedTz
             workflowSession.timezoneConflictFileTimezones = fileTimezones
@@ -895,6 +938,13 @@ final class AppState {
         case .organizeConflict(let count, let files):
             workflowSession.organizeConflictCount = count
             workflowSession.organizeConflictFiles = files
+
+        case .protectedSources(let files):
+            workflowSession.noteConflict()
+            workflowSession.protectedSourceFiles = files
+            // A dry run previews the protected files anyway; only an apply is
+            // refused, so only an apply asks.
+            workflowSession.showProtectedSources = workflowSession.applyMode
 
         case .pipelineSummary(let summary):
             runSummary = summary

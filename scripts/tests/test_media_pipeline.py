@@ -13,6 +13,7 @@ import os
 import shlex
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -2230,6 +2231,108 @@ class TestOverwriteDestination:
         assert not [e for e in events if e["event"] == "organize_conflict"], \
             "Actual: organize_conflict emitted for an identical copy, Expected: none"
 
+
+
+@pytest.mark.skipif(not hasattr(os, "chflags"), reason="BSD file flags only")
+class TestProtectedSources:
+    """A source file carrying the user-immutable flag — what a camera's "Protect"
+    becomes on macOS — cannot be imported as it is: every stage rewrites or moves
+    its staged copy, and a lock carried onto that copy fails each of them with
+    EPERM. Importing it means its copy in the library comes out unprotected, so
+    an apply asks first: the batch reports the protected files as one
+    protected_sources event, and only --unlock-protected lets the apply proceed.
+    The source itself keeps its lock either way.
+    """
+
+    VIDEO = "VID_20251005_100000_00_001.mp4"
+
+    @pytest.fixture
+    def locked_source(self, temp_workspace):
+        source = temp_workspace["source"] / self.VIDEO
+        create_test_video(source)
+        os.chflags(source, stat.UF_IMMUTABLE)
+        yield source
+        for path in temp_workspace["root"].rglob("*"):
+            os.chflags(path, 0)
+
+    def _run(self, workspace, profile, *extra):
+        return run_pipeline([
+            "--profile", profile,
+            "--source", str(workspace["source"]),
+            "--target", str(workspace["target"]),
+            "--timezone", "+0900",
+            "--group", "Test",
+            *extra,
+        ])
+
+    def _events(self, stdout: str) -> list[dict]:
+        events = [json.loads(line) for line in stdout.strip().split("\n") if line.strip()]
+        for event in events:
+            validate_event(event)
+        return events
+
+    def _protected_events(self, events):
+        return [e for e in events if e["event"] == "protected_sources"]
+
+    def test_apply_without_assent_refuses_before_touching_anything(
+            self, temp_workspace, test_profile, locked_source):
+        """Actual: the run exits non-zero having reported the protected file,
+        with nothing organized
+        Expected: an apply never silently drops a protection the user set
+        """
+        result = self._run(temp_workspace, test_profile, "--apply")
+
+        events = self._events(result.stdout)
+        assert result.returncode != 0, \
+            f"Actual: {result.output}, Expected: the apply refused"
+        assert [e["files"] for e in self._protected_events(events)] == [[self.VIDEO]], \
+            f"Actual: {events}, Expected: one protected_sources naming {self.VIDEO}"
+        assert [e for e in events if e["event"] == "pipeline_file"] == [], \
+            "Actual: files were processed, Expected: refused before the first file"
+        assert sorted(temp_workspace["target"].rglob("*.mp4")) == [], \
+            "Actual: a file reached the target, Expected: nothing organized"
+
+    def test_apply_with_assent_imports_an_unlocked_copy(
+            self, temp_workspace, test_profile, locked_source):
+        """Actual: the organized file exists unlocked, the staging directory is
+        empty of it, and the source is still locked
+        Expected: a protected photo on the card no longer stops the import with
+        "Operation not permitted" once the user has agreed to it
+        """
+        result = self._run(temp_workspace, test_profile, "--apply", "--unlock-protected")
+
+        assert result.returncode == 0, f"Actual: {result.output}, Expected: a clean run"
+        organized = sorted(temp_workspace["target"].rglob("*.mp4"))
+        assert len(organized) == 1, f"Actual: {organized}, Expected: one organized file"
+        assert not os.stat(organized[0]).st_flags & stat.UF_IMMUTABLE, \
+            "Actual: the organized file is locked, Expected: unlocked"
+        assert os.stat(locked_source).st_flags & stat.UF_IMMUTABLE, \
+            "Actual: the source lost its lock, Expected: source untouched"
+
+    def test_dry_run_reports_protected_files_and_previews_anyway(
+            self, temp_workspace, test_profile, locked_source):
+        """Actual: protected_sources is reported and every file is still previewed
+        Expected: the preview tells the user what the apply will ask about
+        """
+        result = self._run(temp_workspace, test_profile)
+
+        events = self._events(result.stdout)
+        assert result.returncode == 0, f"Actual: {result.output}, Expected: a full preview"
+        assert [e["files"] for e in self._protected_events(events)] == [[self.VIDEO]], \
+            f"Actual: {events}, Expected: one protected_sources naming {self.VIDEO}"
+        previewed = [e for e in events if e["event"] == "pipeline_result"]
+        assert len(previewed) == 1, f"Actual: {previewed}, Expected: the file previewed"
+
+    def test_unprotected_batch_reports_nothing(self, temp_workspace, test_profile):
+        """Actual: no protected_sources event for a batch with no locked files
+        Expected: the app has nothing to ask about on an ordinary import
+        """
+        create_test_video(temp_workspace["source"] / self.VIDEO)
+
+        result = self._run(temp_workspace, test_profile, "--apply")
+
+        assert result.returncode == 0, f"Actual: {result.output}, Expected: a clean run"
+        assert self._protected_events(self._events(result.stdout)) == []
 
 
 class TestOrganizeReportsTheUserFacingOutcome:

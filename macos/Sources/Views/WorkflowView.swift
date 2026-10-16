@@ -122,6 +122,21 @@ struct WorkflowView: View {
                 count: state.workflowSession.organizeConflictCount))
         }
         .alert(
+            Strings.Workflow.protectedSourcesTitle,
+            isPresented: $state.workflowSession.showProtectedSources
+        ) {
+            Button(Strings.Workflow.unlockProtectedButton) {
+                state.workflowSession.grantUnlockProtectedAssent()
+                runWorkflow()
+            }
+            Button(Strings.Common.cancel, role: .cancel) {
+                state.workflowSession.showProtectedSources = false
+            }
+        } message: {
+            Text(Strings.Workflow.protectedSourcesMessage(
+                files: state.workflowSession.protectedSourceFiles))
+        }
+        .alert(
             state.workflowSession.dryRunStaleReason == .settingsChanged
                 ? Strings.Workflow.dryRunStaleTitle
                 : Strings.Workflow.noDryRunTitle,
