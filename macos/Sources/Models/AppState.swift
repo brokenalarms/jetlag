@@ -303,6 +303,11 @@ final class WorkflowSession {
     var showProtectedSources: Bool = false
     var unlockProtected: Bool = false
 
+    /// Whether the run a conflict alert asks about was an apply. A finished
+    /// apply has dropped back to preview mode before the user answers, so the
+    /// answer needs this to re-run what was actually refused.
+    private var conflictedRunWasApply = false
+
     /// Where the archived source folder lands and what it is called. Both are
     /// overrides on top of archiving in place under "<source> - copied <date>",
     /// which is what the folder does when the user changes neither.
@@ -357,6 +362,18 @@ final class WorkflowSession {
         Self.computeAvailableSteps(profile: workingProfile, gyroflowAvailable: gyroflowAvailable)
     }
 
+    func noteConflict() {
+        conflictedRunWasApply = applyMode
+    }
+
+    /// The refused apply had already passed the dry-run question, so its
+    /// re-run is not asked again.
+    private func resumeConflictedRun() {
+        guard conflictedRunWasApply else { return }
+        applyMode = true
+        applyWithoutDryRun = true
+    }
+
     /// Record the user's answer to the conflict the pipeline just refused on,
     /// so the next run carries the override flag that unblocks it.
     func grantTimezoneAssent() {
@@ -366,6 +383,7 @@ final class WorkflowSession {
             forceTimezone = true
         }
         showTimezoneConflict = false
+        resumeConflictedRun()
     }
 
     /// Whether the run has to stop and ask first: applying over the files the
@@ -385,15 +403,11 @@ final class WorkflowSession {
     }
 
     /// Record the user's answer, so the re-run carries the flag that imports
-    /// the protected files as unlocked copies. Only an apply is refused, and
-    /// the refused run has already dropped back to preview mode by the time the
-    /// answer arrives, so the answer restores the apply it was asked for —
-    /// which had already passed the dry-run question.
+    /// the protected files as unlocked copies.
     func grantUnlockProtectedAssent() {
         unlockProtected = true
         showProtectedSources = false
-        applyMode = true
-        applyWithoutDryRun = true
+        resumeConflictedRun()
     }
 
     /// The settings a run would carry, with the answers given for this click
@@ -477,6 +491,7 @@ final class WorkflowSession {
         protectedSourceFiles = []
         showProtectedSources = false
         unlockProtected = false
+        conflictedRunWasApply = false
         applyWithoutDryRun = false
         showDryRunStale = false
         dryRunStaleReason = nil
@@ -908,6 +923,7 @@ final class AppState {
             liveRow = currentDiffRow
 
         case .timezoneConflict(let conflictType, let providedTz, let fileTimezones):
+            workflowSession.noteConflict()
             workflowSession.timezoneConflictType = conflictType
             workflowSession.timezoneConflictProvidedTz = providedTz
             workflowSession.timezoneConflictFileTimezones = fileTimezones
@@ -924,6 +940,7 @@ final class AppState {
             workflowSession.organizeConflictFiles = files
 
         case .protectedSources(let files):
+            workflowSession.noteConflict()
             workflowSession.protectedSourceFiles = files
             // A dry run previews the protected files anyway; only an apply is
             // refused, so only an apply asks.

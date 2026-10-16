@@ -227,6 +227,38 @@ final class TimezoneConflictTests: XCTestCase {
         XCTAssertFalse(args.contains("--allow-mixed-timezones"))
     }
 
+    /// The refused apply has already reset to preview mode by the time the
+    /// user answers; overriding must re-run that apply, not quietly preview it.
+    func testAssentAfterARefusedApplyReRunsTheApply() {
+        let state = AppState()
+        state.workflowSession.applyMode = true
+        feedConflict(state, type: "provided_mismatch")
+        state.workflowSession.noteRunFinished()
+
+        state.workflowSession.grantTimezoneAssent()
+
+        XCTAssertFalse(state.workflowSession.requestDryRunAssentIfNeeded(),
+                       "The refused apply already passed the dry-run question")
+        let (_, args) = state.workflowSession.buildPipelineArgs()
+        XCTAssertTrue(args.contains("--apply"))
+        XCTAssertTrue(args.contains("--force-timezone"))
+    }
+
+    /// A mixed-zone batch is refused even in a dry run; overriding that
+    /// re-runs the preview, never promotes it to an apply.
+    func testAssentAfterARefusedDryRunStaysADryRun() {
+        let state = AppState()
+        state.workflowSession.applyMode = false
+        feedConflict(state, type: "mixed_timezones")
+        state.workflowSession.noteRunFinished()
+
+        state.workflowSession.grantTimezoneAssent()
+
+        let (_, args) = state.workflowSession.buildPipelineArgs()
+        XCTAssertFalse(args.contains("--apply"))
+        XCTAssertTrue(args.contains("--allow-mixed-timezones"))
+    }
+
     /// A mixed-zone batch needs the other override, so assent must not send the
     /// flag that answers a different question.
     func testAssentToMixedTimezonesAddsAllowMixedToTheNextRun() {
