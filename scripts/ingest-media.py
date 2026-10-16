@@ -13,7 +13,26 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import stat
 import sys
+
+
+def is_protected(path: str) -> bool:
+    """Whether path carries the user-immutable flag — Finder's "Locked", and
+    what a camera's "Protect" arrives as on macOS."""
+    return hasattr(os, "chflags") and bool(os.stat(path).st_flags & stat.UF_IMMUTABLE)
+
+
+def stage_copy(source: str, dest: str) -> None:
+    """copy2, minus the user-immutable flag copystat carries across.
+
+    The staged copy is the pipeline's scratch file — later stages rewrite its
+    metadata and move it — so a lock carried onto it fails each of those with
+    EPERM. The source keeps its flag.
+    """
+    shutil.copy2(source, dest)
+    if is_protected(dest):
+        os.chflags(dest, os.stat(dest).st_flags & ~stat.UF_IMMUTABLE)
 
 
 def ingest_file(
@@ -37,7 +56,7 @@ def ingest_file(
 
     if apply:
         os.makedirs(target_dir, exist_ok=True)
-        shutil.copy2(source_file, dest)
+        stage_copy(source_file, dest)
         action = "copied"
     else:
         action = "would_copy"
@@ -50,7 +69,7 @@ def ingest_file(
             if os.path.isfile(companion_source):
                 companion_dest = os.path.join(target_dir, stem + ext)
                 if apply:
-                    shutil.copy2(companion_source, companion_dest)
+                    stage_copy(companion_source, companion_dest)
                 companion_dests.append(companion_dest)
 
     return dest, action, companion_dests

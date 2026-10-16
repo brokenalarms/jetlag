@@ -69,6 +69,7 @@ INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow]
 ```
 
 - **Ingest** copies files from the source (SD card or local directory) to a temporary working directory — `<target>/.jetlag-working` unless `--working-dir` overrides it, so staging shares a volume with the destination and **Output**'s move is a rename rather than a second copy. Source files are read-only inputs — never modified.
+- A protected source file (user-immutable flag — a camera's "Protect") is staged as an unlocked copy, since every later stage rewrites or moves that copy. An apply asks first: the batch reports `protected_sources` and stops unless `--unlock-protected` is given (or answered at a terminal prompt). The source keeps its lock.
 - Optional steps (**tag**, **fix-timestamp**) operate on the working copy.
 - **Output** moves processed files from the working directory to `ready_dir` via organize-by-date (date-based folder structure).
 - **Gyroflow** generates stabilization projects on the file now in `ready_dir`.

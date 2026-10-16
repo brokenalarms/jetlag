@@ -181,6 +181,20 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
                          defaultValue: "\(count) files already exist at the destination with different contents. Overwrite them?")
         }
 
+        static let protectedSourcesTitle = String(localized: "workflow.protectedSources.title",
+            defaultValue: "Protected Files")
+        static let unlockProtectedButton = String(localized: "workflow.unlockProtected.button",
+            defaultValue: "Import Unlocked")
+
+        static func protectedSourcesMessage(files: [String]) -> String {
+            let list = files.joined(separator: "\n")
+            return files.count == 1
+                ? String(localized: "workflow.protectedSources.message.one",
+                         defaultValue: "1 source file is protected (locked), usually by the camera's Protect setting:\n\n\(list)\n\nIts imported copy will be unlocked. The file on the source stays locked.")
+                : String(localized: "workflow.protectedSources.message.many",
+                         defaultValue: "\(files.count) source files are protected (locked), usually by the camera's Protect setting:\n\n\(list)\n\nTheir imported copies will be unlocked. The files on the source stay locked.")
+        }
+
         // Run completion popup
         static let runCompleteAppliedTitle = String(localized: "workflow.runComplete.applied.title",
             defaultValue: "Run Complete")

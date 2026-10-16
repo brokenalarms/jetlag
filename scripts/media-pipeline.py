@@ -693,6 +693,10 @@ def build_parser():
         help="Replace files already at the organize destination. Without this flag, a destination already holding a different file is left alone and reported as a conflict."
     )
     parser.add_argument(
+        "--unlock-protected", action="store_true",
+        help="Import source files that are protected (locked, e.g. by a camera's Protect). Their copies in the target come out unlocked; the source files keep their lock. Without this flag, an apply stops when protected files are found."
+    )
+    parser.add_argument(
         "--allow-mixed-timezones", action="store_true",
         help="Allow processing files with different embedded timezones in a single batch. Without this flag, the pipeline stops when mixed timezones are detected."
     )
@@ -854,6 +858,30 @@ def main():
 
     print(f"📹 Found {total_files} video file(s) to process", file=sys.stderr)
     print(file=sys.stderr)
+
+    protected = [fp.name for fp in files if _ingest_mod.is_protected(str(fp))]
+    if protected:
+        print(f"🔒 {len(protected)} source file(s) are protected (locked):", file=sys.stderr)
+        for name in protected:
+            print(f"   {name}", file=sys.stderr)
+        print("Their imported copies will be unlocked; the source files stay locked.", file=sys.stderr)
+        print(file=sys.stderr)
+        emit_event("protected_sources", files=protected)
+        if args.apply and not args.unlock_protected:
+            # Prompt only on a real terminal, for the reason given at the
+            # exiftool_tmp prompt above.
+            if sys.stdin.isatty() and sys.stderr.isatty():
+                print("Import them unlocked? (y/n) ", end="", file=sys.stderr, flush=True)
+                if sys.stdin.readline().strip().lower() != "y":
+                    print("Cancelled.", file=sys.stderr)
+                    sys.exit(1)
+            else:
+                print("ERROR: Cannot proceed without consent to import protected files unlocked.", file=sys.stderr)
+                print("Re-run with --unlock-protected, or from a terminal to be prompted.", file=sys.stderr)
+                sys.exit(1)
+        elif not args.apply:
+            print("Previewing anyway; applying asks first (or pass --unlock-protected).", file=sys.stderr)
+            print(file=sys.stderr)
 
     # Pre-flight timezone check (before processing any files)
     if "fix-timestamp" in args.tasks and not args.infer_from_filename:
