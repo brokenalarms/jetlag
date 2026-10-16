@@ -8,22 +8,23 @@
 #   make test-scripts  — run script tests (works on Linux and macOS)
 #   make test-macos    — run Swift unit tests (macOS only, requires Xcode)
 #   make test          — run all tests available on this platform
-#   make build         — build Debug app into build/
-#   make archive       — build Release archive (macos/build/Jetlag.xcarchive)
-#   make dmg           — build Release archive and package into build/Jetlag.dmg
-#   make clean         — remove build artifacts
+#   make               — build the Release app into dist/Jetlag.app
+#   make build         — build Debug app into build/derived (quick iteration)
+#   make archive       — build Release archive (build/Jetlag.xcarchive)
+#   make dmg           — package dist/Jetlag.app into dist/Jetlag.dmg
+#   make clean         — remove build artifacts and dist/
 #
 # Code signing:
-#   By default the DMG is built with the Xcode automatic signing identity
-#   (suitable for Developer ID distribution when your certificate is in Keychain).
-#   To build unsigned (ad-hoc, for local testing only):
-#     make dmg SIGNING_IDENTITY=-
+#   With a "Developer ID Application" certificate in the keychain, the app is
+#   exported for Developer ID distribution (macos/ExportOptions.plist). Without
+#   one it keeps the archive's local signing: it runs on this Mac but cannot be
+#   notarized or handed to anyone else.
 #
-# Notarization (required for Gatekeeper-free distribution):
+# Notarization (required for Gatekeeper-free distribution, Developer ID only):
 #   After `make dmg`, run:
-#     xcrun notarytool submit build/Jetlag.dmg \
+#     xcrun notarytool submit dist/Jetlag.dmg \
 #       --apple-id YOU@example.com --team-id XXXXXXXXXX --password @keychain:AC_PASSWORD
-#     xcrun stapler staple build/Jetlag.dmg
+#     xcrun stapler staple dist/Jetlag.dmg
 
 APP_NAME        := Jetlag
 SCHEME          := $(APP_NAME)
@@ -31,11 +32,13 @@ MACOS_DIR       := macos
 BUILD_DIR       := build
 DERIVED_DIR     := $(BUILD_DIR)/derived
 ARCHIVE         := $(BUILD_DIR)/$(APP_NAME).xcarchive
+ARCHIVED_APP    := $(ARCHIVE)/Products/Applications/$(APP_NAME).app
 EXPORT_DIR      := $(BUILD_DIR)/export
-APP_PATH        := $(EXPORT_DIR)/$(APP_NAME).app
-DMG_STAGING     := $(BUILD_DIR)/dmg-staging
-DMG_PATH        := $(BUILD_DIR)/$(APP_NAME).dmg
 EXPORT_PLIST    := $(MACOS_DIR)/ExportOptions.plist
+DIST_DIR        := dist
+DIST_APP        := $(DIST_DIR)/$(APP_NAME).app
+DMG_STAGING     := $(BUILD_DIR)/dmg-staging
+DMG_PATH        := $(DIST_DIR)/$(APP_NAME).dmg
 
 # A build outside the main checkout must never be able to pass itself off as the
 # installed Jetlag — same bundle id, product name and Application Support folder
@@ -47,9 +50,9 @@ ifneq (,$(findstring /.ralph/,$(CURDIR)/))
 DEV_IDENTITY := JETLAG_BUNDLE_SUFFIX=.dev JETLAG_PRODUCT_SUFFIX=" Dev"
 endif
 
-.PHONY: all generate test test-scripts test-macos ralph-verify build archive export dmg clean
+.PHONY: all generate test test-scripts test-macos ralph-verify build archive app dmg clean
 
-all: dmg
+all: app
 
 ## Generate Xcode project from project.yml (requires: brew install xcodegen)
 generate:
@@ -114,22 +117,37 @@ archive: generate
 		-configuration Release \
 		-archivePath $(ARCHIVE) \
 		-project $(MACOS_DIR)/$(APP_NAME).xcodeproj \
-		archive
+		-quiet \
+		archive < /dev/null
 
-## Export the app from the archive
-export: archive
-	xcodebuild \
-		-exportArchive \
-		-archivePath $(ARCHIVE) \
-		-exportPath $(EXPORT_DIR) \
-		-exportOptionsPlist $(EXPORT_PLIST)
+## Place the Release app at dist/Jetlag.app
+# ditto, not cp -r: it keeps the bundle's symlinks and extended attributes, which
+# the code signature covers.
+app: archive
+	@rm -rf "$(DIST_APP)" "$(EXPORT_DIR)"
+	@mkdir -p "$(DIST_DIR)"
+	@if security find-identity -v -p codesigning | grep -q "Developer ID Application"; then \
+		xcodebuild \
+			-exportArchive \
+			-archivePath $(ARCHIVE) \
+			-exportPath $(EXPORT_DIR) \
+			-exportOptionsPlist $(EXPORT_PLIST) \
+			-quiet < /dev/null && \
+		ditto "$(EXPORT_DIR)/$(APP_NAME).app" "$(DIST_APP)"; \
+	else \
+		echo "No Developer ID Application certificate in the keychain: keeping the archive's local signing (runs on this Mac only)."; \
+		ditto "$(ARCHIVED_APP)" "$(DIST_APP)"; \
+	fi
+	@codesign --verify --deep --strict "$(DIST_APP)"
+	@echo ""
+	@echo "App ready: $(DIST_APP)"
 
-## Package the exported app into a distributable DMG
-dmg: export
+## Package dist/Jetlag.app into a DMG
+dmg: app
 	@echo "Creating DMG..."
 	@rm -rf "$(DMG_STAGING)" "$(DMG_PATH)"
 	@mkdir -p "$(DMG_STAGING)"
-	@cp -r "$(APP_PATH)" "$(DMG_STAGING)/"
+	@ditto "$(DIST_APP)" "$(DMG_STAGING)/$(APP_NAME).app"
 	@ln -s /Applications "$(DMG_STAGING)/Applications"
 	hdiutil create \
 		-volname "$(APP_NAME)" \
@@ -147,5 +165,5 @@ dmg: export
 
 ## Remove all build artifacts
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) $(DIST_DIR)
 	rm -rf $(MACOS_DIR)/$(APP_NAME).xcodeproj
