@@ -1,0 +1,8743 @@
+{
+ "Africa/Abidjan": {
+  "aliases": [
+   "Africa/Timbuktu"
+  ],
+  "cities": [
+   "Abobo",
+   "Bouaké",
+   "Korhogo",
+   "Daloa",
+   "Koumassi",
+   "San-Pédro",
+   "Gagnoa",
+   "Yamoussoukro",
+   "Sinfra",
+   "Man",
+   "Marcory",
+   "Bondoukou",
+   "Dabou",
+   "Divo",
+   "Anyama",
+   "Soubré",
+   "Abengourou",
+   "Bonon",
+   "Duekoué",
+   "Bouaflé",
+   "Séguéla",
+   "Daoukro"
+  ],
+  "countries": [
+   "CI"
+  ]
+ },
+ "Africa/Accra": {
+  "cities": [
+   "Kumasi",
+   "Tamale",
+   "Takoradi",
+   "Sekondi",
+   "Cape Coast",
+   "Atsiaman",
+   "Ashaiman",
+   "Obuase",
+   "Tema",
+   "Koforidua",
+   "Teshi Old Town",
+   "Sekondi-Takoradi",
+   "Ho",
+   "Amanfrom",
+   "Medina Estates",
+   "Twifu Praso"
+  ],
+  "countries": [
+   "GH"
+  ]
+ },
+ "Africa/Addis_Ababa": {
+  "aliases": [
+   "Africa/Asmera"
+  ],
+  "cities": [
+   "Jijiga",
+   "Gonder",
+   "Mek'ele",
+   "Nazrēt",
+   "Warder",
+   "Awasa",
+   "Bahir Dar",
+   "Dire Dawa",
+   "Dessie",
+   "Jimma",
+   "Shashamane",
+   "Bishoftu",
+   "Sodo",
+   "Arba Minch",
+   "Hosa’ina",
+   "Dīla",
+   "Harar",
+   "Nek’emtē",
+   "Ārabī",
+   "Debre Birhan",
+   "Debre Mark’os",
+   "Āsela",
+   "Kombolcha",
+   "Debre Tabor",
+   "Ādīgrat",
+   "Cabudwaaq",
+   "Weldiya",
+   "Sebeta",
+   "Burayu",
+   "Inda Silasē"
+  ],
+  "countries": [
+   "ET"
+  ]
+ },
+ "Africa/Algiers": {
+  "cities": [
+   "Oran",
+   "Constantine",
+   "Annaba",
+   "Blida",
+   "Batna",
+   "Bab Ezzouar",
+   "Djelfa",
+   "Sétif",
+   "Sidi Bel Abbes",
+   "Biskra",
+   "Tébessa",
+   "El Oued",
+   "Skikda",
+   "Tiaret",
+   "Chlef",
+   "Béjaïa",
+   "Tlemcen",
+   "Ouargla",
+   "Béchar",
+   "Mostaganem",
+   "Bordj Bou Arreridj",
+   "El Achir",
+   "Souk Ahras",
+   "Médéa",
+   "El Eulma",
+   "Touggourt",
+   "Ghardaïa",
+   "Saïda",
+   "Laghouat",
+   "M'Sila",
+   "Jijel",
+   "Relizane",
+   "Bordj el Kiffan",
+   "Guelma",
+   "Rouiba",
+   "Aïn Beïda",
+   "Khenchela",
+   "Bou Saâda",
+   "Mascara",
+   "Baraki",
+   "Tizi Ouzou"
+  ],
+  "countries": [
+   "DZ"
+  ]
+ },
+ "Africa/Asmara": {
+  "countries": [
+   "ER"
+  ]
+ },
+ "Africa/Bamako": {
+  "cities": [
+   "Sikasso",
+   "Koutiala",
+   "Ségou",
+   "Kayes",
+   "Mopti",
+   "Kalaban Koro",
+   "Gao",
+   "Kati",
+   "San"
+  ],
+  "countries": [
+   "ML"
+  ]
+ },
+ "Africa/Bangui": {
+  "cities": [
+   "Bimbo",
+   "Bégoua",
+   "Carnot",
+   "Berbérati"
+  ],
+  "countries": [
+   "CF"
+  ]
+ },
+ "Africa/Banjul": {
+  "cities": [
+   "Serekunda"
+  ],
+  "countries": [
+   "GM"
+  ]
+ },
+ "Africa/Bissau": {
+  "countries": [
+   "GW"
+  ]
+ },
+ "Africa/Blantyre": {
+  "cities": [
+   "Lilongwe",
+   "Mzuzu",
+   "Zomba"
+  ],
+  "countries": [
+   "MW"
+  ]
+ },
+ "Africa/Brazzaville": {
+  "cities": [
+   "Pointe-Noire",
+   "Dolisie",
+   "Nkayi"
+  ],
+  "countries": [
+   "CG"
+  ]
+ },
+ "Africa/Bujumbura": {
+  "countries": [
+   "BI"
+  ]
+ },
+ "Africa/Cairo": {
+  "cities": [
+   "Alexandria",
+   "Giza",
+   "Shubrā al Khaymah",
+   "Port Said",
+   "Suez",
+   "Madīnat an Naşr",
+   "Al Mansurah",
+   "Al Maḩallah al Kubrá",
+   "Tanta",
+   "Assiut",
+   "Al Fayyum",
+   "Al Khuşūş",
+   "Esna",
+   "Zagazig",
+   "Ismailia",
+   "Luxor",
+   "Kom Ombo",
+   "Aswān",
+   "6th of October City",
+   "Ḩadā’iq al Qubbah",
+   "Damanhur",
+   "New Cairo",
+   "Al Qāhirah al Jadīdah",
+   "Damietta",
+   "Rosetta",
+   "Minya",
+   "Banī Suwayf",
+   "Shibīn al Kawm",
+   "Sohag",
+   "Az-Zuhūr",
+   "Qina",
+   "Al ‘Āshir min Ramaḑān",
+   "Ḩalwān",
+   "Mallawī",
+   "Hurghada",
+   "Arīsh",
+   "Kafr ash Shaykh",
+   "Bilbeis",
+   "Banhā",
+   "Idkū",
+   "Marsá Maţrūḩ",
+   "Al Maţarīyah",
+   "Qalyub",
+   "Al Ḩawāmidīyah",
+   "Abū Kabīr",
+   "Mīt Ghamr",
+   "Akhmīm",
+   "Girga",
+   "Disūq",
+   "Aḍ-Ḍawāḥy",
+   "Samālūţ",
+   "Al-'Ubūr",
+   "Kirdāsah",
+   "Bilqās",
+   "Būsh",
+   "Ţahţā",
+   "Sinnūris",
+   "Kafr ad Dawwār",
+   "Al Manzalah",
+   "Munūf",
+   "Ashmūn",
+   "As Sinbillāwayn",
+   "Maghāghah",
+   "Manfalūţ",
+   "Fāqūs",
+   "Banī Mazār",
+   "Al Fashn",
+   "Ţalkhā",
+   "Abnūb",
+   "Zefta",
+   "Abū Tīj",
+   "Dayrūţ",
+   "Ţimā",
+   "Dikirnis"
+  ],
+  "countries": [
+   "EG"
+  ]
+ },
+ "Africa/Casablanca": {
+  "cities": [
+   "Rabat",
+   "Fes",
+   "Tangier",
+   "Marrakesh",
+   "Salé",
+   "Agadir",
+   "Meknes",
+   "Oujda",
+   "Kenitra",
+   "Tétouan",
+   "Al Hoceïma",
+   "Temara",
+   "Safi",
+   "Mohammedia",
+   "Khouribga",
+   "El Jadida",
+   "Beni Mellal",
+   "Salé Al Jadida",
+   "Ait Melloul",
+   "Nador",
+   "Dar Bouazza",
+   "Taza",
+   "Fès al Bali",
+   "Settat",
+   "Berrechid",
+   "Khemisset",
+   "Inezgane",
+   "Ksar El Kebir",
+   "Larache",
+   "Guelmim",
+   "Khenifra",
+   "Berkane",
+   "Taourirt",
+   "Bouskoura",
+   "Al Fqih Ben Çalah",
+   "Dchira El Jihadia",
+   "Oued Zem",
+   "El Kelaa des Srarhna",
+   "Sidi Slimane",
+   "Errachidia"
+  ],
+  "countries": [
+   "MA"
+  ]
+ },
+ "Africa/Ceuta": {
+  "countries": [
+   "ES"
+  ]
+ },
+ "Africa/Conakry": {
+  "cities": [
+   "Camayenne",
+   "Nzérékoré",
+   "Kankan",
+   "Manéah",
+   "Dixinn",
+   "Dubréka",
+   "Kindia",
+   "Siguiri",
+   "Kamsar",
+   "Kissidougou",
+   "Labé"
+  ],
+  "countries": [
+   "GN"
+  ]
+ },
+ "Africa/Dakar": {
+  "cities": [
+   "Pikine",
+   "Touba",
+   "Guédiawaye",
+   "Thiès",
+   "Kaolack",
+   "Rufisque",
+   "Mbour",
+   "Saint-Louis",
+   "Thiès Nones",
+   "Rufisque est",
+   "Ziguinchor",
+   "Diourbel",
+   "Tambacounda",
+   "Louga",
+   "Kolda",
+   "Tivaouane",
+   "Mbaké",
+   "Tiébo"
+  ],
+  "countries": [
+   "SN"
+  ]
+ },
+ "Africa/Dar_es_Salaam": {
+  "cities": [
+   "Mwanza",
+   "Dodoma",
+   "Zanzibar",
+   "Arusha",
+   "Mbeya",
+   "Morogoro",
+   "Kahama",
+   "Tanga",
+   "Geita",
+   "Tabora",
+   "Sumbawanga",
+   "Songea",
+   "Kibaha",
+   "Bariadi",
+   "Kasulu",
+   "Singida",
+   "Kigoma",
+   "Moshi",
+   "Tunduma",
+   "Ifakara",
+   "Mpanda",
+   "Iringa",
+   "Bunda",
+   "Musoma",
+   "Bukoba",
+   "Mtwara",
+   "Shinyanga",
+   "Tarime",
+   "Nzega",
+   "Makumbako",
+   "Sengerema",
+   "Handeni",
+   "Katumba"
+  ],
+  "countries": [
+   "TZ"
+  ]
+ },
+ "Africa/Djibouti": {
+  "cities": [
+   "Balbala"
+  ],
+  "countries": [
+   "DJ"
+  ]
+ },
+ "Africa/Douala": {
+  "cities": [
+   "Yaoundé",
+   "Bamenda",
+   "Bafoussam",
+   "Maroua",
+   "Ngaoundéré",
+   "Kumba",
+   "Nkongsamba",
+   "Buea",
+   "Kousséri",
+   "Bertoua",
+   "Limbe",
+   "Foumban",
+   "Kumbo",
+   "Edéa",
+   "Ébolowa"
+  ],
+  "countries": [
+   "CM"
+  ]
+ },
+ "Africa/El_Aaiun": {
+  "cities": [
+   "Laayoune",
+   "Dakhla"
+  ],
+  "countries": [
+   "EH"
+  ]
+ },
+ "Africa/Freetown": {
+  "cities": [
+   "Kenema",
+   "Bo",
+   "Koidu"
+  ],
+  "countries": [
+   "SL"
+  ]
+ },
+ "Africa/Gaborone": {
+  "cities": [
+   "Francistown"
+  ],
+  "countries": [
+   "BW"
+  ]
+ },
+ "Africa/Harare": {
+  "cities": [
+   "Bulawayo",
+   "Chitungwiza",
+   "Mutare",
+   "Epworth",
+   "Gweru",
+   "Kwekwe",
+   "Kadoma"
+  ],
+  "countries": [
+   "ZW"
+  ]
+ },
+ "Africa/Johannesburg": {
+  "cities": [
+   "Cape Town",
+   "Durban",
+   "Pretoria",
+   "Soweto",
+   "Gqeberha",
+   "Soshanguve",
+   "Pietermaritzburg",
+   "Evaton",
+   "Benoni",
+   "Bloemfontein",
+   "Thembisa",
+   "East London",
+   "Vereeniging",
+   "Boksburg",
+   "Welkom",
+   "Newcastle",
+   "Krugersdorp",
+   "Rustenburg",
+   "Emalahleni",
+   "Diepsloot",
+   "Randburg",
+   "Roodepoort",
+   "Botshabelo",
+   "Brakpan",
+   "Kariega",
+   "Polokwane",
+   "Germiston",
+   "Richards Bay",
+   "Vanderbijlpark",
+   "Athlone",
+   "Paarl",
+   "Centurion",
+   "Klerksdorp",
+   "Somerset West",
+   "Mdantsane",
+   "Middelburg",
+   "George",
+   "Springs",
+   "Ivory Park",
+   "Carletonville",
+   "Alexandra",
+   "Potchefstroom",
+   "Mthatha",
+   "KwaDukuza",
+   "Westonaria",
+   "Etwatwa",
+   "Vryheid",
+   "Pinetown",
+   "Ladysmith",
+   "eMbalenhle",
+   "Kimberley",
+   "Nigel",
+   "Motherwell",
+   "Mpumalanga",
+   "Bhisho",
+   "Sasolburg",
+   "Randfontein",
+   "Worcester",
+   "Ntuzuma",
+   "Virginia",
+   "Brits",
+   "Alberton",
+   "Queenstown",
+   "Kroonstad",
+   "Somaroboro",
+   "Hammanskraal",
+   "Mabopane",
+   "Mbombela",
+   "Orkney",
+   "Phalaborwa",
+   "Thohoyandou",
+   "Tokoza",
+   "Standerton",
+   "Mokopane",
+   "Ermelo"
+  ],
+  "countries": [
+   "ZA"
+  ]
+ },
+ "Africa/Juba": {
+  "cities": [
+   "Winejok",
+   "Yei",
+   "Malakal",
+   "Wau"
+  ],
+  "countries": [
+   "SS"
+  ]
+ },
+ "Africa/Kampala": {
+  "cities": [
+   "Nansana",
+   "Kira",
+   "Bunamwaya",
+   "Kyengera",
+   "Mbarara",
+   "Kasangati",
+   "Mukono",
+   "Njeru",
+   "Gulu",
+   "Katabi",
+   "Kajansi",
+   "Lugazi",
+   "Hoima",
+   "Mubende",
+   "Lira",
+   "Ibanda",
+   "Masaka",
+   "Kasese",
+   "Mbale",
+   "Masindi",
+   "Mityana",
+   "Entebbe"
+  ],
+  "countries": [
+   "UG"
+  ]
+ },
+ "Africa/Khartoum": {
+  "cities": [
+   "Omdurman",
+   "Khartoum North",
+   "Nyala",
+   "Port Sudan",
+   "Kassala",
+   "El Obeid",
+   "Al Qadarif",
+   "Kosti",
+   "Wad Medani",
+   "El Daein",
+   "El Fasher",
+   "Singa",
+   "Ad-Damazin",
+   "Al-Junaynah",
+   "Rabak",
+   "El Geneina Fort",
+   "Sennar",
+   "Al Manāqil",
+   "Gereida",
+   "Atbara",
+   "An Nuhūd",
+   "Ad-Damir"
+  ],
+  "countries": [
+   "SD"
+  ]
+ },
+ "Africa/Kigali": {
+  "cities": [
+   "Gisenyi",
+   "Musanze",
+   "Nyagatare"
+  ],
+  "countries": [
+   "RW"
+  ]
+ },
+ "Africa/Kinshasa": {
+  "cities": [
+   "Kikwit",
+   "Masina",
+   "Mbandaka",
+   "Matadi",
+   "Boma",
+   "Bandundu Province",
+   "Gemena",
+   "Bumba",
+   "Mbanza-Ngungu",
+   "Moanda",
+   "Lisala",
+   "Inkisi"
+  ],
+  "countries": [
+   "CD"
+  ]
+ },
+ "Africa/Lagos": {
+  "cities": [
+   "Kano",
+   "Ibadan",
+   "Abuja",
+   "Port Harcourt",
+   "Kaduna",
+   "Benin City",
+   "Onitsha",
+   "Aba",
+   "Maiduguri",
+   "Ilorin",
+   "Sokoto",
+   "Jos",
+   "Zaria",
+   "Enugu",
+   "Warri",
+   "Oyo",
+   "Abeokuta",
+   "Akure",
+   "Bauchi",
+   "Agege",
+   "Katsina",
+   "Osogbo",
+   "Ile-Ife",
+   "Gombe",
+   "Ajegunle",
+   "Ogbia",
+   "Owerri",
+   "Calabar",
+   "Ebute Ikorodu",
+   "Okene",
+   "Ikare",
+   "Yola",
+   "Uyo",
+   "Ado-Ekiti",
+   "Ogbomoso",
+   "Minna",
+   "Lekki",
+   "Bida",
+   "Makurdi",
+   "Ondo",
+   "Umuahia",
+   "Iseyin",
+   "Yenagoa",
+   "Gboko",
+   "Ijebu Ode",
+   "Obalende",
+   "Ilesa",
+   "Ikeja",
+   "Akowonjo",
+   "Alimosho",
+   "Sapele",
+   "Efon-Alaaye",
+   "Owo",
+   "Ikot Ekpene",
+   "Ota",
+   "Iwo",
+   "Jimeta",
+   "Atani",
+   "Aliayabiagba",
+   "Gusau",
+   "Mubi",
+   "Ikire",
+   "Shagamu",
+   "Ugep",
+   "Chakwama",
+   "Mushin",
+   "Nnewi",
+   "Surulere",
+   "Ise-Ekiti",
+   "Ila Orangun",
+   "Saki",
+   "Oshodi",
+   "Awka",
+   "Ijero-Ekiti",
+   "Inisa",
+   "Suleja",
+   "Ede",
+   "Kisi",
+   "Shomolu",
+   "Irewe",
+   "Gbongan",
+   "Ejigbo",
+   "Funtua",
+   "Igboho",
+   "Buguma",
+   "Ikirun",
+   "Abakaliki",
+   "Okrika",
+   "Amaigbo",
+   "Lafia",
+   "Gashua",
+   "Modakeke",
+   "Bama",
+   "Ilobu",
+   "Jalingo",
+   "Okigwe",
+   "Offa",
+   "Esuk Oron",
+   "Nsukka",
+   "Nguru",
+   "Hadejia",
+   "Ijebu-Igbo",
+   "Uromi",
+   "Birnin Kebbi",
+   "Pindiga",
+   "Azare",
+   "Nkpor",
+   "Ikere-Ekiti",
+   "Lafiagi",
+   "Alasia"
+  ],
+  "countries": [
+   "NG"
+  ]
+ },
+ "Africa/Libreville": {
+  "cities": [
+   "Port-Gentil",
+   "Franceville"
+  ],
+  "countries": [
+   "GA"
+  ]
+ },
+ "Africa/Lome": {
+  "cities": [
+   "Sokodé",
+   "Kara"
+  ],
+  "countries": [
+   "TG"
+  ]
+ },
+ "Africa/Luanda": {
+  "cities": [
+   "Mulenvos",
+   "Viana",
+   "Kikolo",
+   "Maianga",
+   "Camama",
+   "Golfe",
+   "Calumbo",
+   "Hoji ya Henda",
+   "Lubango",
+   "Huambo",
+   "Benguela",
+   "Cabinda",
+   "Talatona",
+   "Nova Vida",
+   "Malanje",
+   "Kima Kieza",
+   "Cazenga",
+   "Lobito",
+   "Saurimo",
+   "Samba",
+   "Cuíto",
+   "Ramiros",
+   "Uíge",
+   "Luena",
+   "Vila Flor",
+   "Mossamedes",
+   "Menongue",
+   "Chitato",
+   "Navegantes",
+   "Kilamba",
+   "Soyo",
+   "Sumbe",
+   "Zango",
+   "Benfica",
+   "Rangel",
+   "Sambizanga",
+   "Dundo",
+   "Bocoio",
+   "N'dalatando",
+   "Panguíla",
+   "Mbanza Kongo",
+   "Cacuaco",
+   "Ingombota",
+   "Caála",
+   "Ondjiva",
+   "Catchiungo",
+   "Gabela",
+   "Lucapa",
+   "Balombo",
+   "Baía Farta"
+  ],
+  "countries": [
+   "AO"
+  ]
+ },
+ "Africa/Lubumbashi": {
+  "cities": [
+   "Mbuji-Mayi",
+   "Kisangani",
+   "Kananga",
+   "Bukavu",
+   "Kolwezi",
+   "Likasi",
+   "Tshikapa",
+   "Uvira",
+   "Bunia",
+   "Mwene",
+   "Butembo",
+   "Isiro",
+   "Kindu",
+   "Kabinda",
+   "Gandajika",
+   "Kamina",
+   "Mwene-Ditu",
+   "Kipushi",
+   "Kalemie",
+   "Beni",
+   "Ilebo",
+   "Tshilenge",
+   "Bukama",
+   "Bakwa"
+  ],
+  "countries": [
+   "CD"
+  ]
+ },
+ "Africa/Lusaka": {
+  "cities": [
+   "Kitwe",
+   "Ndola",
+   "Chipata",
+   "Solwezi",
+   "Kabwe",
+   "Chingola",
+   "Luanshya",
+   "Kasama",
+   "Livingstone",
+   "Mansa",
+   "Mufulira",
+   "Chunga",
+   "Chililabombwe",
+   "Mongu",
+   "Mazabuka",
+   "Kafue",
+   "Kalulushi"
+  ],
+  "countries": [
+   "ZM"
+  ]
+ },
+ "Africa/Malabo": {
+  "cities": [
+   "Bata"
+  ],
+  "countries": [
+   "GQ"
+  ]
+ },
+ "Africa/Maputo": {
+  "cities": [
+   "Matola",
+   "Nampula",
+   "Beira",
+   "Chimoio",
+   "Tete",
+   "Quelimane",
+   "Lichinga",
+   "Nacala",
+   "Pemba",
+   "Mocuba",
+   "Gurúè",
+   "Xai-Xai",
+   "Maxixe",
+   "Mandimba",
+   "Ressano Garcia",
+   "Angoche"
+  ],
+  "countries": [
+   "MZ"
+  ]
+ },
+ "Africa/Maseru": {
+  "countries": [
+   "LS"
+  ]
+ },
+ "Africa/Mbabane": {
+  "cities": [
+   "Manzini"
+  ],
+  "countries": [
+   "SZ"
+  ]
+ },
+ "Africa/Mogadishu": {
+  "cities": [
+   "Borama",
+   "Hargeysa",
+   "Berbera",
+   "Kismayo",
+   "Marka",
+   "El Dibir",
+   "Ruqi",
+   "Baidoa"
+  ],
+  "countries": [
+   "SO"
+  ]
+ },
+ "Africa/Monrovia": {
+  "countries": [
+   "LR"
+  ]
+ },
+ "Africa/Nairobi": {
+  "cities": [
+   "Kakamega",
+   "Mombasa",
+   "Nakuru",
+   "Ruiru",
+   "Eldoret",
+   "Kisumu",
+   "Kikuyu",
+   "Thika",
+   "Naivasha",
+   "Karuri",
+   "Matuga",
+   "Mwala",
+   "Ongata Rongai",
+   "Lang'ata",
+   "Jomvu",
+   "Garissa",
+   "Kitale",
+   "Limuru",
+   "Juja",
+   "Kitengela",
+   "Kiambu",
+   "Mlolongo",
+   "Malindi",
+   "Mandera",
+   "Khwisero",
+   "Kisii",
+   "Ngong"
+  ],
+  "countries": [
+   "KE"
+  ]
+ },
+ "Africa/Ndjamena": {
+  "cities": [
+   "N'Djamena",
+   "Moundou",
+   "Abéché",
+   "Sarh"
+  ],
+  "countries": [
+   "TD"
+  ]
+ },
+ "Africa/Niamey": {
+  "cities": [
+   "Maradi",
+   "Zinder",
+   "Tahoua",
+   "Agadez",
+   "Arlit"
+  ],
+  "countries": [
+   "NE"
+  ]
+ },
+ "Africa/Nouakchott": {
+  "cities": [
+   "Nouadhibou"
+  ],
+  "countries": [
+   "MR"
+  ]
+ },
+ "Africa/Ouagadougou": {
+  "cities": [
+   "Bobo-Dioulasso",
+   "Koudougou",
+   "Saaba",
+   "Ouahigouya",
+   "Kaya",
+   "Banfora"
+  ],
+  "countries": [
+   "BF"
+  ]
+ },
+ "Africa/Porto-Novo": {
+  "cities": [
+   "Cotonou",
+   "Abomey-Calavi",
+   "Parakou",
+   "Godomè",
+   "Abomey"
+  ],
+  "countries": [
+   "BJ"
+  ]
+ },
+ "Africa/Sao_Tome": {
+  "countries": [
+   "ST"
+  ]
+ },
+ "Africa/Tripoli": {
+  "cities": [
+   "Benghazi",
+   "Misratah",
+   "Zliten",
+   "Al Khums",
+   "Az Zāwīyah",
+   "Zawiya",
+   "Janzūr",
+   "Sabha",
+   "Tobruk",
+   "Ajdabiya",
+   "Al Ajaylat",
+   "Al Bayḑā’",
+   "Al Jadīd",
+   "Sirte",
+   "Darnah",
+   "Al Jumayl",
+   "Qaşr Bin Ghashīr",
+   "Tājūrā’"
+  ],
+  "countries": [
+   "LY"
+  ]
+ },
+ "Africa/Tunis": {
+  "cities": [
+   "Sfax",
+   "Sousse",
+   "Sukrah",
+   "Kairouan",
+   "Bizerte",
+   "Sīdī Ḥusayn",
+   "Sakiet ed Daier",
+   "El Mourouj",
+   "Aryanah",
+   "Gabès",
+   "Hammamet",
+   "Sakiet ez Zit"
+  ],
+  "countries": [
+   "TN"
+  ]
+ },
+ "Africa/Windhoek": {
+  "countries": [
+   "NA"
+  ]
+ },
+ "America/Adak": {
+  "aliases": [
+   "America/Atka",
+   "US/Aleutian"
+  ],
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Anchorage": {
+  "aliases": [
+   "US/Alaska"
+  ],
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Anguilla": {
+  "aliases": [
+   "America/Virgin"
+  ],
+  "countries": [
+   "AI"
+  ]
+ },
+ "America/Antigua": {
+  "countries": [
+   "AG"
+  ]
+ },
+ "America/Araguaina": {
+  "cities": [
+   "Palmas"
+  ],
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/Argentina/Buenos_Aires": {
+  "cities": [
+   "Mar del Plata",
+   "Avellaneda",
+   "Bahía Blanca",
+   "Merlo",
+   "Quilmes",
+   "Palermo",
+   "Laferrere",
+   "José C. Paz",
+   "Lanús",
+   "La Plata",
+   "Berazategui",
+   "San Miguel",
+   "Balvanera",
+   "Moreno",
+   "Belgrano",
+   "San Nicolás de los Arroyos",
+   "Isidro Casanova",
+   "Tandil",
+   "Ezeiza",
+   "Villa Lugano",
+   "Lomas de Zamora",
+   "Castelar",
+   "San Justo"
+  ],
+  "countries": [
+   "AR"
+  ]
+ },
+ "America/Argentina/Catamarca": {
+  "aliases": [
+   "America/Argentina/ComodRivadavia"
+  ],
+  "cities": [
+   "Comodoro Rivadavia"
+  ],
+  "countries": [
+   "AR"
+  ]
+ },
+ "America/Argentina/Cordoba": {
+  "aliases": [
+   "America/Rosario"
+  ],
+  "cities": [
+   "Santa Fe",
+   "Corrientes",
+   "Posadas",
+   "Resistencia",
+   "Santiago del Estero",
+   "Paraná",
+   "Formosa",
+   "Ituzaingó",
+   "Río Cuarto",
+   "Concordia"
+  ],
+  "countries": [
+   "AR"
+  ]
+ },
+ "America/Argentina/Jujuy": {
+  "cities": [
+   "San Salvador de Jujuy"
+  ],
+  "countries": [
+   "AR"
+  ]
+ },
+ "America/Argentina/La_Rioja": {
+  "countries": [
+   "AR"
+  ]
+ },
+ "America/Argentina/Mendoza": {
+  "cities": [
+   "Ciudad de Las Heras",
+   "San Rafael"
+  ],
+  "countries": [
+   "AR"
+  ]
+ },
+ "America/Argentina/Rio_Gallegos": {
+  "countries": [
+   "AR"
+  ]
+ },
+ "America/Argentina/Salta": {
+  "cities": [
+   "Neuquén",
+   "Santa Rosa"
+  ],
+  "countries": [
+   "AR"
+  ]
+ },
+ "America/Argentina/San_Juan": {
+  "cities": [
+   "Rawson"
+  ],
+  "countries": [
+   "AR"
+  ]
+ },
+ "America/Argentina/San_Luis": {
+  "countries": [
+   "AR"
+  ]
+ },
+ "America/Argentina/Tucuman": {
+  "cities": [
+   "San Miguel de Tucumán"
+  ],
+  "countries": [
+   "AR"
+  ]
+ },
+ "America/Argentina/Ushuaia": {
+  "countries": [
+   "AR"
+  ]
+ },
+ "America/Aruba": {
+  "countries": [
+   "AW"
+  ]
+ },
+ "America/Asuncion": {
+  "cities": [
+   "Ciudad del Este",
+   "San Lorenzo",
+   "Capiatá",
+   "Lambaré",
+   "Fernando de la Mora"
+  ],
+  "countries": [
+   "PY"
+  ]
+ },
+ "America/Atikokan": {
+  "aliases": [
+   "America/Coral_Harbour"
+  ],
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Bahia": {
+  "cities": [
+   "Salvador",
+   "Feira de Santana",
+   "Vitória da Conquista",
+   "Camaçari",
+   "Juazeiro",
+   "Lauro de Freitas",
+   "Itabuna",
+   "Ilhéus",
+   "Porto Seguro",
+   "Barreiras",
+   "Alagoinhas",
+   "Teixeira de Freitas",
+   "Jequié",
+   "Eunápolis",
+   "Paulo Afonso",
+   "Simões Filho",
+   "Santo Antônio de Jesus",
+   "Luis Eduardo Magalhães"
+  ],
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/Bahia_Banderas": {
+  "countries": [
+   "MX"
+  ]
+ },
+ "America/Barbados": {
+  "countries": [
+   "BB"
+  ]
+ },
+ "America/Belem": {
+  "cities": [
+   "Ananindeua",
+   "Macapá",
+   "Parauapebas",
+   "Marabá",
+   "Castanhal",
+   "Abaetetuba",
+   "Barcarena",
+   "Cametá",
+   "Bragança",
+   "São Félix do Xingu",
+   "Marituba",
+   "Santana",
+   "Breves",
+   "Tucuruí",
+   "Paragominas"
+  ],
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/Belize": {
+  "countries": [
+   "BZ"
+  ]
+ },
+ "America/Blanc-Sablon": {
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Boa_Vista": {
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/Bogota": {
+  "cities": [
+   "Cali",
+   "Medellín",
+   "Barranquilla",
+   "Kennedy",
+   "Cartagena",
+   "Cúcuta",
+   "Soacha",
+   "Bucaramanga",
+   "Ibagué",
+   "Santa Marta",
+   "Montería",
+   "Valledupar",
+   "Pereira",
+   "Manizales",
+   "Buenaventura",
+   "Bello",
+   "Pasto",
+   "Neiva",
+   "Soledad",
+   "Villavicencio",
+   "Popayán",
+   "Palmira",
+   "Armenia",
+   "Itagüí",
+   "Sincelejo",
+   "Floridablanca",
+   "Tuluá",
+   "Dosquebradas",
+   "Barrancabermeja",
+   "Riohacha",
+   "Tunja",
+   "Yopal",
+   "Florencia",
+   "Maicao",
+   "Piedecuesta",
+   "Envigado",
+   "Facatativá",
+   "Pitalito",
+   "Madrid",
+   "Cartago",
+   "Zipaquirá",
+   "Quibdó",
+   "Malambo",
+   "Rionegro",
+   "Mosquera",
+   "Chía",
+   "Magangué",
+   "Funza",
+   "Guadalajara de Buga",
+   "Sogamoso",
+   "Girón",
+   "Girardot City",
+   "Sabanalarga",
+   "Ocaña"
+  ],
+  "countries": [
+   "CO"
+  ]
+ },
+ "America/Boise": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Cambridge_Bay": {
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Campo_Grande": {
+  "cities": [
+   "Dourados",
+   "Três Lagoas"
+  ],
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/Cancun": {
+  "cities": [
+   "Chetumal",
+   "Playa del Carmen"
+  ],
+  "countries": [
+   "MX"
+  ]
+ },
+ "America/Caracas": {
+  "cities": [
+   "Maracaibo",
+   "Valencia",
+   "Barquisimeto",
+   "Ciudad Guayana",
+   "Barcelona",
+   "Maturín",
+   "Maracay",
+   "Ciudad Bolívar",
+   "Cumaná",
+   "Barinas",
+   "Puerto La Cruz",
+   "Petare",
+   "Cabimas",
+   "Turmero",
+   "Mérida",
+   "San Cristóbal",
+   "Alto Barinas",
+   "Santa Teresa del Tuy",
+   "Los Teques",
+   "Guarenas",
+   "Coro",
+   "Valera",
+   "Baruta",
+   "Ciudad Ojeda",
+   "San Fernando de Apure",
+   "Guatire",
+   "El Tigre",
+   "Porlamar",
+   "San Felipe",
+   "Guacara",
+   "Acarigua",
+   "Cúa",
+   "Araure",
+   "Lander",
+   "Puerto Cabello",
+   "Calabozo",
+   "Carúpano",
+   "Ocumare del Tuy",
+   "El Vigía",
+   "San Juan de los Morros",
+   "Valle de La Pascua",
+   "El Limón",
+   "Punto Fijo",
+   "Anaco",
+   "Táriba",
+   "Machiques",
+   "Charallave",
+   "Palo Negro",
+   "La Victoria",
+   "San Carlos del Zulia",
+   "Puerto Ayacucho",
+   "Carora",
+   "Ejido",
+   "La Concepción",
+   "San Carlos",
+   "Cagua",
+   "Mariara",
+   "Tinaquillo",
+   "Punta Cardón",
+   "Yaritagua",
+   "Upata",
+   "Guanare",
+   "Catia La Mar",
+   "Cabudare",
+   "Los Puertos de Altagracia",
+   "Los Rastrojos"
+  ],
+  "countries": [
+   "VE"
+  ]
+ },
+ "America/Cayenne": {
+  "countries": [
+   "GF"
+  ]
+ },
+ "America/Cayman": {
+  "countries": [
+   "KY"
+  ]
+ },
+ "America/Chicago": {
+  "aliases": [
+   "US/Central"
+  ],
+  "cities": [
+   "Houston",
+   "San Antonio",
+   "Dallas",
+   "Fort Worth",
+   "Austin",
+   "Nashville",
+   "Oklahoma City",
+   "New South Memphis",
+   "Memphis",
+   "Milwaukee",
+   "Omaha",
+   "Kansas City",
+   "Tulsa",
+   "Minneapolis",
+   "Wichita",
+   "Arlington",
+   "New Orleans",
+   "Corpus Christi",
+   "Saint Paul",
+   "Lincoln",
+   "Plano",
+   "Madison",
+   "St. Louis",
+   "Laredo",
+   "Lubbock",
+   "Garland",
+   "Irving",
+   "Baton Rouge",
+   "Huntsville",
+   "Des Moines",
+   "Little Rock",
+   "Cypress",
+   "Aurora",
+   "Amarillo",
+   "Birmingham",
+   "Montgomery",
+   "Grand Prairie",
+   "Shreveport",
+   "Brownsville",
+   "Overland Park",
+   "Mobile",
+   "Sioux Falls",
+   "Springfield",
+   "Clarksville",
+   "Murfreesboro",
+   "McKinney",
+   "Frisco",
+   "Pasadena",
+   "Jackson",
+   "Rockford",
+   "Joliet",
+   "Naperville",
+   "Mesquite",
+   "Metairie Terrace",
+   "Killeen",
+   "McAllen",
+   "Metairie",
+   "Olathe",
+   "Carrollton",
+   "Midland",
+   "Waco",
+   "Denton",
+   "Cedar Rapids",
+   "Columbia",
+   "Norman",
+   "Topeka",
+   "Abilene",
+   "Lafayette",
+   "Evansville",
+   "Fargo",
+   "Independence",
+   "Round Rock",
+   "Beaumont",
+   "Peoria",
+   "Odessa",
+   "North Peoria",
+   "Rochester",
+   "Elgin",
+   "Tuscaloosa",
+   "Richardson",
+   "East Independence",
+   "Pearland",
+   "College Station",
+   "Broken Arrow",
+   "Green Bay",
+   "Wichita Falls",
+   "Lewisville",
+   "Tyler",
+   "Davenport"
+  ],
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Chihuahua": {
+  "cities": [
+   "Cuauhtémoc",
+   "Ciudad Delicias",
+   "Hidalgo del Parral"
+  ],
+  "countries": [
+   "MX"
+  ]
+ },
+ "America/Ciudad_Juarez": {
+  "countries": [
+   "MX"
+  ]
+ },
+ "America/Costa_Rica": {
+  "cities": [
+   "San José"
+  ],
+  "countries": [
+   "CR"
+  ]
+ },
+ "America/Coyhaique": {
+  "countries": [
+   "CL"
+  ]
+ },
+ "America/Creston": {
+  "aliases": [
+   "US/Arizona"
+  ],
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Cuiaba": {
+  "cities": [
+   "Várzea Grande",
+   "Rondonópolis",
+   "Sinop",
+   "Sorriso",
+   "Tangará da Serra"
+  ],
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/Curacao": {
+  "cities": [
+   "Willemstad"
+  ],
+  "countries": [
+   "CW"
+  ]
+ },
+ "America/Danmarkshavn": {
+  "countries": [
+   "GL"
+  ]
+ },
+ "America/Dawson": {
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Dawson_Creek": {
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Denver": {
+  "aliases": [
+   "US/Mountain"
+  ],
+  "cities": [
+   "El Paso",
+   "Albuquerque",
+   "Colorado Springs",
+   "Aurora",
+   "Salt Lake City",
+   "Fort Collins",
+   "Lakewood",
+   "West Valley City",
+   "Thornton",
+   "Billings",
+   "Westminster",
+   "Arvada",
+   "Provo",
+   "West Jordan",
+   "Centennial",
+   "Pueblo",
+   "Greeley",
+   "Boulder",
+   "Las Cruces"
+  ],
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Detroit": {
+  "aliases": [
+   "US/Michigan"
+  ],
+  "cities": [
+   "Grand Rapids",
+   "Warren",
+   "Sterling Heights",
+   "Ann Arbor",
+   "Lansing"
+  ],
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Dominica": {
+  "countries": [
+   "DM"
+  ]
+ },
+ "America/Edmonton": {
+  "aliases": [
+   "Canada/Mountain"
+  ],
+  "cities": [
+   "Calgary",
+   "Lethbridge",
+   "Red Deer"
+  ],
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Eirunepe": {
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/El_Salvador": {
+  "cities": [
+   "San Salvador",
+   "Soyapango",
+   "San Miguel",
+   "Santa Ana",
+   "Mejicanos",
+   "Santa Tecla",
+   "Apopa"
+  ],
+  "countries": [
+   "SV"
+  ]
+ },
+ "America/Fort_Nelson": {
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Fortaleza": {
+  "cities": [
+   "São Luís",
+   "Natal",
+   "Teresina",
+   "João Pessoa",
+   "Campina Grande",
+   "Caucaia",
+   "Juazeiro do Norte",
+   "Imperatriz",
+   "Parnamirim",
+   "Mossoró",
+   "São José de Ribamar",
+   "Maracanaú",
+   "Sobral",
+   "Timon",
+   "Parnaíba",
+   "Caxias",
+   "Paço do Lumiar",
+   "Santa Rita",
+   "Crato",
+   "Itapipoca",
+   "São Gonçalo do Amarante",
+   "Codó",
+   "Açailândia",
+   "Maranguape",
+   "Bacabal",
+   "Balsas"
+  ],
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/Glace_Bay": {
+  "cities": [
+   "Sydney"
+  ],
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Goose_Bay": {
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Grand_Turk": {
+  "countries": [
+   "TC"
+  ]
+ },
+ "America/Grenada": {
+  "countries": [
+   "GD"
+  ]
+ },
+ "America/Guadeloupe": {
+  "countries": [
+   "GP"
+  ]
+ },
+ "America/Guatemala": {
+  "cities": [
+   "Guatemala City",
+   "Villa Nueva",
+   "Mixco",
+   "Cobán",
+   "Quetzaltenango",
+   "Jalapa",
+   "Escuintla",
+   "Villa Canales",
+   "Jutiapa",
+   "Chichicastenango",
+   "San Juan Sacatepéquez",
+   "Petapa",
+   "Santa Lucía Cotzumalguapa",
+   "Chiquimula",
+   "Coatepeque",
+   "Chinautla",
+   "Totonicapán",
+   "Puerto Barrios"
+  ],
+  "countries": [
+   "GT"
+  ]
+ },
+ "America/Guayaquil": {
+  "cities": [
+   "Quito",
+   "Cuenca",
+   "Santo Domingo de los Colorados",
+   "Ambato",
+   "Portoviejo",
+   "Eloy Alfaro",
+   "Machala",
+   "Loja",
+   "Manta",
+   "Riobamba",
+   "Ibarra",
+   "Esmeraldas",
+   "Quevedo",
+   "Latacunga",
+   "Daule",
+   "Milagro"
+  ],
+  "countries": [
+   "EC"
+  ]
+ },
+ "America/Guyana": {
+  "cities": [
+   "Georgetown"
+  ],
+  "countries": [
+   "GY"
+  ]
+ },
+ "America/Halifax": {
+  "aliases": [
+   "Canada/Atlantic"
+  ],
+  "cities": [
+   "Dartmouth"
+  ],
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Havana": {
+  "cities": [
+   "Santiago de Cuba",
+   "Camagüey",
+   "Holguín",
+   "Guantánamo",
+   "Santa Clara",
+   "Almendares",
+   "Diez de Octubre",
+   "Arroyo Naranjo",
+   "Mantilla",
+   "Las Tunas",
+   "Bayamo",
+   "Boyeros",
+   "Pinar del Río",
+   "Cienfuegos",
+   "Fontanar",
+   "Ciudad Camilo Cienfuegos",
+   "San Miguel del Padrón",
+   "Centro Habana",
+   "Balcón de la Lisa",
+   "Matanzas",
+   "Ciego de Ávila",
+   "Plaza de la Revolución",
+   "Marianao",
+   "Cerro",
+   "Manzanillo",
+   "Sancti Spíritus",
+   "Guanabacoa",
+   "Vedado",
+   "Palma Soriano",
+   "Alamar"
+  ],
+  "countries": [
+   "CU"
+  ]
+ },
+ "America/Hermosillo": {
+  "cities": [
+   "Ciudad Obregón",
+   "Nogales",
+   "San Luis Río Colorado",
+   "Heroica Guaymas",
+   "Navojoa"
+  ],
+  "countries": [
+   "MX"
+  ]
+ },
+ "America/Indiana/Indianapolis": {
+  "aliases": [
+   "America/Fort_Wayne",
+   "US/East-Indiana"
+  ],
+  "cities": [
+   "South Bend"
+  ],
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Indiana/Knox": {
+  "aliases": [
+   "America/Knox_IN",
+   "US/Indiana-Starke"
+  ],
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Indiana/Marengo": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Indiana/Petersburg": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Indiana/Tell_City": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Indiana/Vevay": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Indiana/Vincennes": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Indiana/Winamac": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Inuvik": {
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Iqaluit": {
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Jamaica": {
+  "cities": [
+   "Kingston",
+   "New Kingston",
+   "Spanish Town",
+   "Portmore"
+  ],
+  "countries": [
+   "JM"
+  ]
+ },
+ "America/Juneau": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Kentucky/Louisville": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Kentucky/Monticello": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Kralendijk": {
+  "countries": [
+   "BQ"
+  ]
+ },
+ "America/La_Paz": {
+  "cities": [
+   "Santa Cruz de la Sierra",
+   "Cochabamba",
+   "Sucre",
+   "Oruro",
+   "Sacaba",
+   "Quillacollo",
+   "Tarija",
+   "Potosí"
+  ],
+  "countries": [
+   "BO"
+  ]
+ },
+ "America/Lima": {
+  "cities": [
+   "Callao",
+   "Arequipa",
+   "Trujillo",
+   "Piura",
+   "Chiclayo",
+   "Huancayo",
+   "Cusco",
+   "Iquitos",
+   "Pucallpa",
+   "Chimbote",
+   "Tacna",
+   "Ica",
+   "Santiago de Surco",
+   "Juliaca",
+   "Cajamarca",
+   "Huánuco",
+   "Miraflores",
+   "Santa Anita - Los Ficus",
+   "Sullana",
+   "Chincha Alta",
+   "Ayacucho",
+   "San Martin",
+   "Puno",
+   "Huaraz",
+   "San Francisco De Borja"
+  ],
+  "countries": [
+   "PE"
+  ]
+ },
+ "America/Los_Angeles": {
+  "aliases": [
+   "US/Pacific"
+  ],
+  "cities": [
+   "San Diego",
+   "San Jose",
+   "San Francisco",
+   "Seattle",
+   "Portland",
+   "Las Vegas",
+   "Fresno",
+   "Sacramento",
+   "Long Beach",
+   "Oakland",
+   "Bakersfield",
+   "Anaheim",
+   "Riverside",
+   "Santa Ana",
+   "Stockton",
+   "Henderson",
+   "Chula Vista",
+   "Reno",
+   "Irvine",
+   "Tri-Cities",
+   "North Las Vegas",
+   "Fremont",
+   "Spokane",
+   "Paradise",
+   "Tacoma",
+   "San Bernardino",
+   "Fontana",
+   "Modesto",
+   "Oxnard",
+   "Moreno Valley",
+   "Huntington Beach",
+   "Glendale",
+   "Vancouver",
+   "Sunrise Manor",
+   "Santa Clarita",
+   "Spring Valley",
+   "Santa Rosa",
+   "Eugene",
+   "Oceanside",
+   "Salem",
+   "Garden Grove",
+   "Rancho Cucamonga",
+   "Ontario",
+   "Hollywood",
+   "Elk Grove",
+   "Corona",
+   "Lancaster",
+   "Palmdale",
+   "Hayward",
+   "Salinas",
+   "Sunnyvale",
+   "Pomona",
+   "Escondido",
+   "Valencia",
+   "Torrance",
+   "Pasadena",
+   "Orange",
+   "Fullerton",
+   "Bellevue",
+   "Van Nuys",
+   "Roseville",
+   "Visalia",
+   "Thousand Oaks",
+   "Concord",
+   "Kent",
+   "Simi Valley",
+   "East Los Angeles",
+   "Santa Clara",
+   "Koreatown",
+   "Victorville",
+   "Vallejo",
+   "Chico",
+   "Berkeley",
+   "El Monte",
+   "Carlsbad",
+   "Downey",
+   "Costa Mesa",
+   "Fairfield",
+   "Inglewood",
+   "Gresham",
+   "Antioch",
+   "Temecula",
+   "Murrieta",
+   "Richmond",
+   "West Covina",
+   "Enterprise",
+   "Everett",
+   "Norwalk",
+   "Daly City",
+   "Burbank",
+   "Santa Maria",
+   "Universal City",
+   "Clovis",
+   "El Cajon",
+   "San Mateo",
+   "Rialto",
+   "Hillsboro",
+   "Vista",
+   "Chinatown",
+   "Renton"
+  ],
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Lower_Princes": {
+  "countries": [
+   "SX"
+  ]
+ },
+ "America/Maceio": {
+  "cities": [
+   "Aracaju",
+   "Arapiraca",
+   "Nossa Senhora do Socorro",
+   "Itabaiana",
+   "Lagarto",
+   "São Cristóvão"
+  ],
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/Managua": {
+  "cities": [
+   "León",
+   "Masaya",
+   "Chinandega",
+   "Matagalpa"
+  ],
+  "countries": [
+   "NI"
+  ]
+ },
+ "America/Manaus": {
+  "aliases": [
+   "Brazil/West"
+  ],
+  "cities": [
+   "Itacoatiara",
+   "Manacapuru",
+   "Parintins"
+  ],
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/Marigot": {
+  "countries": [
+   "MF"
+  ]
+ },
+ "America/Martinique": {
+  "countries": [
+   "MQ"
+  ]
+ },
+ "America/Matamoros": {
+  "cities": [
+   "Reynosa",
+   "Heroica Matamoros",
+   "Nuevo Laredo",
+   "Ciudad Acuña",
+   "Piedras Negras"
+  ],
+  "countries": [
+   "MX"
+  ]
+ },
+ "America/Mazatlan": {
+  "aliases": [
+   "Mexico/BajaSur"
+  ],
+  "cities": [
+   "Culiacán",
+   "Tepic",
+   "Los Mochis",
+   "La Paz",
+   "Cabo San Lucas",
+   "San José del Cabo"
+  ],
+  "countries": [
+   "MX"
+  ]
+ },
+ "America/Menominee": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Merida": {
+  "cities": [
+   "Tuxtla",
+   "Tapachula",
+   "Villahermosa",
+   "Campeche",
+   "San Cristóbal de las Casas",
+   "Ciudad del Carmen",
+   "Comitán"
+  ],
+  "countries": [
+   "MX"
+  ]
+ },
+ "America/Metlakatla": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Mexico_City": {
+  "aliases": [
+   "Mexico/General"
+  ],
+  "cities": [
+   "Iztapalapa",
+   "Puebla",
+   "Ecatepec de Morelos",
+   "Santiago de Querétaro",
+   "León de los Aldama",
+   "Zapopan",
+   "Guadalajara",
+   "Gustavo Adolfo Madero",
+   "Ciudad Nezahualcoyotl",
+   "Naucalpan de Juárez",
+   "Morelia",
+   "Álvaro Obregón",
+   "Aguascalientes",
+   "Acapulco de Juárez",
+   "Tlalnepantla",
+   "Tlaquepaque",
+   "Coyoacán",
+   "Tlalpan",
+   "Cuautitlán Izcalli",
+   "Cuauhtémoc",
+   "Toluca",
+   "Ciudad López Mateos",
+   "Xochimilco",
+   "Venustiano Carranza",
+   "Veracruz",
+   "Xalapa de Enríquez",
+   "Azcapotzalco",
+   "Tonalá",
+   "Ojo de Agua",
+   "Benito Juárez",
+   "Xico",
+   "Iztacalco",
+   "Irapuato",
+   "Miguel Hidalgo",
+   "Celaya",
+   "Cuernavaca",
+   "Soledad de Graciano Sánchez",
+   "Ixtapaluca",
+   "Coatzacoalcos",
+   "Tláhuac",
+   "Uruapan",
+   "Cholula",
+   "Nicolás Romero",
+   "Zumpango",
+   "Coacalco",
+   "Pachuca de Soto",
+   "Oaxaca",
+   "Colonia del Valle",
+   "Tehuacán",
+   "Magdalena Contreras",
+   "Puerto Vallarta",
+   "Buenavista",
+   "Jiutepec",
+   "Córdoba",
+   "Ciudad Lázaro Cárdenas",
+   "Chilpancingo",
+   "Zamora de Hidalgo",
+   "Poza Rica de Hidalgo",
+   "Cuautitlán",
+   "San Miguel de Allende",
+   "Chicoloapan",
+   "Guadalupe",
+   "Chalco",
+   "Salamanca",
+   "Delegación Cuajimalpa de Morelos",
+   "Manzanillo",
+   "Tuxtepec",
+   "Cuautla",
+   "San Pablo de las Salinas",
+   "San Martin Texmelucan de Labastida",
+   "Colima",
+   "Fresnillo",
+   "San Juan del Río",
+   "Zacatecas",
+   "Huixquilucan",
+   "Ciudad Valles",
+   "Orizaba",
+   "Iguala de la Independencia",
+   "Ciudad de Villa de Álvarez",
+   "Minatitlán",
+   "Ciudad Guzmán",
+   "Yautepec",
+   "Texcoco de Mora",
+   "Teziutlan",
+   "Tepexpan",
+   "Tulancingo",
+   "Apatzingán",
+   "Colonia Lindavista"
+  ],
+  "countries": [
+   "MX"
+  ]
+ },
+ "America/Miquelon": {
+  "countries": [
+   "PM"
+  ]
+ },
+ "America/Moncton": {
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Monterrey": {
+  "cities": [
+   "Torreón",
+   "San Luis Potosí",
+   "Saltillo",
+   "Guadalupe",
+   "Victoria de Durango",
+   "Ciudad Apodaca",
+   "Ciudad General Escobedo",
+   "San Nicolás de los Garza",
+   "Ciudad Victoria",
+   "Tampico",
+   "Ciudad Benito Juárez",
+   "Santa Catarina",
+   "Gómez Palacio",
+   "Monclova",
+   "Ciudad Madero",
+   "San Pedro Garza García",
+   "Miramar"
+  ],
+  "countries": [
+   "MX"
+  ]
+ },
+ "America/Montevideo": {
+  "cities": [
+   "Salto",
+   "Maldonado"
+  ],
+  "countries": [
+   "UY"
+  ]
+ },
+ "America/Montreal": {
+  "aliases": [
+   "Canada/Eastern"
+  ]
+ },
+ "America/Montserrat": {
+  "countries": [
+   "MS"
+  ]
+ },
+ "America/Nassau": {
+  "countries": [
+   "BS"
+  ]
+ },
+ "America/New_York": {
+  "aliases": [
+   "US/Eastern"
+  ],
+  "cities": [
+   "New York City",
+   "Brooklyn",
+   "Queens",
+   "Philadelphia",
+   "Manhattan",
+   "The Bronx",
+   "Jacksonville",
+   "Columbus",
+   "Charlotte",
+   "Washington",
+   "Boston",
+   "Baltimore",
+   "South Boston",
+   "Atlanta",
+   "Miami",
+   "Raleigh",
+   "Staten Island",
+   "Virginia Beach",
+   "Tampa",
+   "Cleveland",
+   "West Raleigh",
+   "Orlando",
+   "Lexington",
+   "Lexington-Fayette",
+   "Cincinnati",
+   "Pittsburgh",
+   "Meads",
+   "Greensboro",
+   "Newark",
+   "Toledo",
+   "Jersey City",
+   "Buffalo",
+   "Durham",
+   "St. Petersburg",
+   "Winston-Salem",
+   "Norfolk",
+   "Hialeah",
+   "Chesapeake",
+   "Upper West Side",
+   "Richmond",
+   "Jamaica",
+   "Rochester",
+   "Arlington",
+   "Worcester",
+   "Fayetteville",
+   "Tallahassee",
+   "Yonkers",
+   "Akron",
+   "Providence",
+   "Knoxville",
+   "Newport News",
+   "Fort Lauderdale",
+   "Chattanooga",
+   "East Flatbush",
+   "Cape Coral",
+   "East New York",
+   "Pembroke Pines",
+   "Port Saint Lucie",
+   "Cary",
+   "Alexandria",
+   "Springfield",
+   "East Chattanooga",
+   "Washington Heights",
+   "Astoria",
+   "Hollywood",
+   "Borough Park",
+   "East Hampton",
+   "Savannah",
+   "Paterson",
+   "Bridgeport",
+   "Gainesville",
+   "Syracuse",
+   "Columbia",
+   "Hampton",
+   "Miramar",
+   "Dayton",
+   "Charleston",
+   "New Haven",
+   "Coral Springs",
+   "Elizabeth",
+   "Stamford",
+   "Athens",
+   "Sunset Park",
+   "Sheepshead Bay",
+   "Amherst",
+   "North Stamford",
+   "Hartford",
+   "West Palm Beach",
+   "Allentown",
+   "Palm Bay",
+   "Clearwater",
+   "Harlem",
+   "Wilmington",
+   "East Harlem",
+   "Elmhurst",
+   "Miami Gardens",
+   "Bushwick",
+   "Gravesend",
+   "Lowell",
+   "Cambridge",
+   "High Point",
+   "Manchester",
+   "Corona",
+   "Waterbury",
+   "North Charleston",
+   "Pompano Beach",
+   "South Fulton",
+   "Sandy Springs",
+   "Lakeland",
+   "Brandon",
+   "Edison",
+   "Albany",
+   "New Bedford",
+   "Davie",
+   "Roanoke"
+  ],
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Nome": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Noronha": {
+  "aliases": [
+   "Brazil/DeNoronha"
+  ],
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/North_Dakota/Beulah": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/North_Dakota/Center": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/North_Dakota/New_Salem": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Nuuk": {
+  "countries": [
+   "GL"
+  ]
+ },
+ "America/Ojinaga": {
+  "countries": [
+   "MX"
+  ]
+ },
+ "America/Panama": {
+  "cities": [
+   "Panama City",
+   "San Miguelito",
+   "Juan Díaz"
+  ],
+  "countries": [
+   "PA"
+  ]
+ },
+ "America/Paramaribo": {
+  "countries": [
+   "SR"
+  ]
+ },
+ "America/Phoenix": {
+  "cities": [
+   "Tucson",
+   "Mesa",
+   "Chandler",
+   "Gilbert",
+   "Glendale",
+   "Scottsdale",
+   "Maryvale",
+   "Peoria",
+   "Tempe",
+   "Deer Valley",
+   "Tempe Junction",
+   "Surprise",
+   "Alhambra"
+  ],
+  "countries": [
+   "US"
+  ]
+ },
+ "America/Port-au-Prince": {
+  "cities": [
+   "Carrefour",
+   "Delmas",
+   "Pétionville",
+   "Port-de-Paix",
+   "Saint-Marc",
+   "Cité Soleil",
+   "Croix-des-Bouquets",
+   "Dessalines",
+   "Jacmel",
+   "Cap-Haïtien",
+   "Léogâne",
+   "Arcahaie",
+   "Les Cayes",
+   "Tigwav"
+  ],
+  "countries": [
+   "HT"
+  ]
+ },
+ "America/Port_of_Spain": {
+  "countries": [
+   "TT"
+  ]
+ },
+ "America/Porto_Velho": {
+  "cities": [
+   "Ji Paraná",
+   "Vilhena"
+  ],
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/Puerto_Rico": {
+  "cities": [
+   "San Juan",
+   "Bayamón",
+   "Carolina",
+   "Ponce"
+  ],
+  "countries": [
+   "PR"
+  ]
+ },
+ "America/Punta_Arenas": {
+  "countries": [
+   "CL"
+  ]
+ },
+ "America/Rainy_River": {
+  "aliases": [
+   "Canada/Central"
+  ]
+ },
+ "America/Rankin_Inlet": {
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Recife": {
+  "cities": [
+   "Jaboatão dos Guararapes",
+   "Petrolina",
+   "Caruaru",
+   "Olinda",
+   "Paulista",
+   "Cabo de Santo Agostinho",
+   "Camaragibe",
+   "Garanhuns",
+   "Vitória de Santo Antão",
+   "Igarassu",
+   "São Lourenço da Mata",
+   "Ipojuca",
+   "Santa Cruz do Capibaribe",
+   "Abreu e Lima"
+  ],
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/Regina": {
+  "aliases": [
+   "Canada/Saskatchewan"
+  ],
+  "cities": [
+   "Saskatoon"
+  ],
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Resolute": {
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Rio_Branco": {
+  "aliases": [
+   "America/Porto_Acre",
+   "Brazil/Acre"
+  ],
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/Santa_Isabel": {
+  "aliases": [
+   "America/Ensenada",
+   "Mexico/BajaNorte"
+  ]
+ },
+ "America/Santarem": {
+  "cities": [
+   "Altamira",
+   "Itaituba"
+  ],
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/Santiago": {
+  "aliases": [
+   "Chile/Continental"
+  ],
+  "cities": [
+   "Puente Alto",
+   "Maipú",
+   "Antofagasta",
+   "Viña del Mar",
+   "Valparaíso",
+   "Ñuñoa",
+   "San Bernardo",
+   "Puerto Montt",
+   "Arica",
+   "Peñalolén",
+   "Temuco",
+   "Concepción",
+   "Rancagua",
+   "Quilicura",
+   "La Pintana",
+   "Iquique",
+   "Talca",
+   "Calama",
+   "Coquimbo",
+   "La Serena",
+   "Talcahuano",
+   "Chillán",
+   "Renca",
+   "Colina",
+   "Alto Hospicio",
+   "Osorno",
+   "Valdivia",
+   "Villa Mercedes",
+   "Quilpué",
+   "Copiapó",
+   "Los Ángeles",
+   "San Pedro de la Paz",
+   "Coronel",
+   "Lo Prado",
+   "Curicó",
+   "Lampa"
+  ],
+  "countries": [
+   "CL"
+  ]
+ },
+ "America/Santo_Domingo": {
+  "cities": [
+   "Santiago de los Caballeros",
+   "Santo Domingo Oeste",
+   "Santo Domingo Este",
+   "San Pedro de Macorís",
+   "La Romana",
+   "Bella Vista",
+   "San Cristóbal",
+   "Puerto Plata",
+   "San Francisco de Macorís",
+   "Salvaleón de Higüey",
+   "La Vega",
+   "Punta Cana"
+  ],
+  "countries": [
+   "DO"
+  ]
+ },
+ "America/Sao_Paulo": {
+  "aliases": [
+   "Brazil/East"
+  ],
+  "cities": [
+   "Rio de Janeiro",
+   "Belo Horizonte",
+   "Brasília",
+   "Curitiba",
+   "Goiânia",
+   "Porto Alegre",
+   "Guarulhos",
+   "Campinas",
+   "Duque de Caxias",
+   "Nova Iguaçu",
+   "São Bernardo do Campo",
+   "Sorocaba",
+   "Uberlândia",
+   "Osasco",
+   "São José dos Campos",
+   "Ribeirão Preto",
+   "Joinville",
+   "Santo André",
+   "Contagem",
+   "Londrina",
+   "Juiz de Fora",
+   "Aparecida de Goiânia",
+   "Serra",
+   "Belford Roxo",
+   "Niterói",
+   "Florianópolis",
+   "Campos dos Goytacazes",
+   "São José do Rio Preto",
+   "Caxias do Sul",
+   "São João de Meriti",
+   "Jundiaí",
+   "Piracicaba",
+   "Montes Claros",
+   "Barra da Tijuca",
+   "Santos",
+   "Mauá",
+   "Maringá",
+   "Diadema",
+   "Vila Velha",
+   "Bauru",
+   "Carapicuíba",
+   "Grajaú",
+   "Betim",
+   "Cariacica",
+   "Itaquaquecetuba",
+   "Cascavel",
+   "Praia Grande",
+   "Franca",
+   "Blumenau",
+   "Uberaba",
+   "São José dos Pinhais",
+   "Ribeirão das Neves",
+   "São Vicente",
+   "Pelotas",
+   "Canoas",
+   "Mogi das Cruzes",
+   "Taubaté",
+   "Suzano",
+   "Anápolis",
+   "Barueri",
+   "Vitória",
+   "Jardim Angela",
+   "Foz do Iguaçu",
+   "São José",
+   "Petrópolis",
+   "Guarujá",
+   "Itajaí",
+   "Ponta Grossa",
+   "Limeira",
+   "Ceilândia",
+   "São Gonçalo",
+   "Chapecó",
+   "Volta Redonda",
+   "Sumaré",
+   "Taboão da Serra",
+   "Santa Maria",
+   "Capao Redondo",
+   "Sapopemba",
+   "Governador Valadares",
+   "São Carlos",
+   "Gravataí",
+   "Macaé",
+   "Sacomã",
+   "Embu das Artes",
+   "Jardim Sao Luis",
+   "Indaiatuba",
+   "Novo Hamburgo",
+   "Cotia",
+   "Jacareí",
+   "Cidade Ademar",
+   "Americana",
+   "Águas Lindas de Goiás",
+   "Magé",
+   "Brasilandia",
+   "Rio Verde",
+   "Itapevi",
+   "Itaboraí",
+   "Sete Lagoas",
+   "Cabo Frio",
+   "Marília",
+   "Hortolândia",
+   "Campo Limpo",
+   "Ipatinga",
+   "Presidente Prudente",
+   "Colombo",
+   "Viamão",
+   "Divinópolis",
+   "Criciúma",
+   "Palhoça",
+   "Luziânia",
+   "Santa Luzia",
+   "Samambaia",
+   "Valparaíso de Goiás",
+   "Jabaquara",
+   "Passo Fundo",
+   "Maricá",
+   "Jaraguá",
+   "Itaquera",
+   "São Leopoldo",
+   "Araçatuba",
+   "Itaim Paulista",
+   "Rio Claro",
+   "Jaraguá do Sul",
+   "Rio Grande",
+   "Plano Piloto",
+   "Cachoeiro de Itapemirim",
+   "Taguatinga",
+   "Cidade Tiradentes",
+   "Nova Friburgo",
+   "Guarapuava",
+   "Santa Bárbara d'Oeste",
+   "Planaltina",
+   "Alvorada",
+   "Linhares",
+   "Cidade Dutra",
+   "Barra Mansa",
+   "Pirituba",
+   "Ibirité",
+   "Ferraz de Vasconcelos",
+   "Angra dos Reis",
+   "Bragança Paulista",
+   "Teresópolis",
+   "Itu",
+   "Senador Canedo",
+   "São Caetano do Sul",
+   "Pindamonhangaba",
+   "Lages",
+   "Poços de Caldas",
+   "Vila Andrade",
+   "Araraquara",
+   "Rio das Ostras",
+   "Francisco Morato",
+   "Lajeado",
+   "Itapetininga",
+   "Santana de Parnaíba",
+   "Pedreira",
+   "Itapecerica da Serra",
+   "Araucária",
+   "Pouso Alegre",
+   "Toledo",
+   "Mogi Guaçu",
+   "Patos de Minas",
+   "Atibaia",
+   "São Mateus",
+   "Nilópolis",
+   "Brusque",
+   "Parelheiros",
+   "Paranaguá",
+   "Iguatemi",
+   "Queimados",
+   "Fazenda Rio Grande",
+   "Sao Rafael",
+   "Botucatu",
+   "Franco da Rocha",
+   "Campo Largo",
+   "Cachoeirinha",
+   "Teófilo Otoni",
+   "Trindade",
+   "Cangaiba",
+   "Salto",
+   "Vila Curuca",
+   "Gama",
+   "Balneário Camboriú",
+   "Conselheiro Lafaiete",
+   "Vespasiano",
+   "Santa Cruz do Sul",
+   "Sao Lucas",
+   "Araruama",
+   "Resende",
+   "Freguesia do Ó",
+   "Cidade Lider",
+   "Varginha",
+   "Guarapari",
+   "Araras",
+   "Apucarana",
+   "Vila Jacui",
+   "Votorantim",
+   "Jaú",
+   "Valinhos",
+   "Sapucaia do Sul",
+   "Rio Pequeno",
+   "Jardim Helena",
+   "Sabará",
+   "Colatina",
+   "Tatuí",
+   "Copacabana",
+   "Águas Claras",
+   "Bosque Saúde",
+   "Jose Bonifacio",
+   "Bento Gonçalves",
+   "Vila Mariana",
+   "Barretos",
+   "Sertãozinho",
+   "Guará",
+   "Barbacena",
+   "Arapongas",
+   "Itaguaí",
+   "Butanta",
+   "Caraguatatuba",
+   "Birigui",
+   "Umuarama",
+   "Itatiba",
+   "Bagé",
+   "Nova Lima",
+   "Uruguaiana",
+   "Almirante Tamandaré",
+   "Catanduva",
+   "Araxá",
+   "Piraquara",
+   "Sarandi",
+   "Itabira",
+   "Jandira",
+   "Guaratinguetá",
+   "Araguari",
+   "Raposo Tavares",
+   "Bairro da Penha",
+   "Camboriú",
+   "Pinhais",
+   "Passos",
+   "Tubarão",
+   "Ipiranga",
+   "Campo Grande",
+   "Formosa",
+   "Várzea Paulista",
+   "Santana",
+   "Ribeirão Pires",
+   "Recanto das Emas",
+   "Cubatão",
+   "Vila Medeiros",
+   "Nova Serrana",
+   "Catalão",
+   "Itumbiara",
+   "Itanhaém",
+   "Ermelino Matarazzo",
+   "Cambé",
+   "Lavras",
+   "São Pedro da Aldeia",
+   "Paulínia",
+   "Guaianases",
+   "Coronel Fabriciano",
+   "Vila Maria",
+   "Muriaé",
+   "Novo Gama",
+   "Ubá",
+   "Itaperuna",
+   "Ituiutaba",
+   "Jataí",
+   "Vila Prudente",
+   "Riacho Fundo II",
+   "Artur Alvim",
+   "Assis",
+   "Campo Mourão",
+   "Ourinhos",
+   "Poá",
+   "Mandaqui",
+   "Vila Matilde",
+   "Cursino",
+   "Caieiras",
+   "Perdizes",
+   "Francisco Beltrão",
+   "Japeri",
+   "Mairiporã",
+   "Pôr do Sol",
+   "Leme",
+   "Itaim Bibi",
+   "Barra do Piraí",
+   "Votuporanga",
+   "Caçapava"
+  ],
+  "countries": [
+   "BR"
+  ]
+ },
+ "America/Scoresbysund": {
+  "countries": [
+   "GL"
+  ]
+ },
+ "America/Sitka": {
+  "countries": [
+   "US"
+  ]
+ },
+ "America/St_Barthelemy": {
+  "countries": [
+   "BL"
+  ]
+ },
+ "America/St_Johns": {
+  "aliases": [
+   "Canada/Newfoundland"
+  ],
+  "cities": [
+   "St. John's"
+  ],
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/St_Kitts": {
+  "countries": [
+   "KN"
+  ]
+ },
+ "America/St_Lucia": {
+  "countries": [
+   "LC"
+  ]
+ },
+ "America/St_Thomas": {
+  "countries": [
+   "VI"
+  ]
+ },
+ "America/St_Vincent": {
+  "countries": [
+   "VC"
+  ]
+ },
+ "America/Swift_Current": {
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Tegucigalpa": {
+  "cities": [
+   "San Pedro Sula",
+   "Danlí",
+   "La Ceiba",
+   "Puerto Cortez",
+   "Catacamas",
+   "Choloma",
+   "Siguatepeque",
+   "Olanchito",
+   "Tocoa",
+   "El Progreso"
+  ],
+  "countries": [
+   "HN"
+  ]
+ },
+ "America/Thule": {
+  "countries": [
+   "GL"
+  ]
+ },
+ "America/Tijuana": {
+  "cities": [
+   "Mexicali",
+   "Ensenada",
+   "Rosarito"
+  ],
+  "countries": [
+   "MX"
+  ]
+ },
+ "America/Toronto": {
+  "cities": [
+   "Montréal",
+   "Ottawa",
+   "Mississauga",
+   "Brampton",
+   "Hamilton",
+   "Québec",
+   "Laval",
+   "London",
+   "Etobicoke",
+   "Markham",
+   "Vaughan",
+   "Gatineau",
+   "Kitchener",
+   "Windsor",
+   "Longueuil",
+   "Oakville",
+   "Richmond Hill",
+   "Burlington",
+   "Nepean",
+   "Oshawa",
+   "Greater Sudbury",
+   "Gloucester",
+   "Saguenay",
+   "Barrie",
+   "Rosemont–La Petite-Patrie",
+   "Villeray–Saint-Michel–Parc-Extension",
+   "Trois-Rivières",
+   "Guelph",
+   "Lévis",
+   "Mercier–Hochelaga-Maisonneuve",
+   "Whitby",
+   "St. Catharines",
+   "Ahuntsic-Cartierville",
+   "Le Vieux-Longueuil",
+   "Milton",
+   "Kingston",
+   "Cambridge",
+   "Sherbrooke",
+   "Orléans",
+   "Ottawa South",
+   "Saint-Louis-de-Terrebonne",
+   "Ajax",
+   "Thornhill",
+   "Rivière-des-Prairies–Pointe-aux-Trembles",
+   "Terrebonne",
+   "Sainte-Foy–Sillery–Cap-Rouge",
+   "Sainte-Foy",
+   "Thunder Bay",
+   "La Cité-Limoilou",
+   "Le Plateau-Mont-Royal",
+   "Waterloo",
+   "Ville-Marie",
+   "Brantford"
+  ],
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Tortola": {
+  "countries": [
+   "VG"
+  ]
+ },
+ "America/Vancouver": {
+  "aliases": [
+   "Canada/Pacific"
+  ],
+  "cities": [
+   "Surrey",
+   "Victoria",
+   "Burnaby",
+   "Richmond",
+   "Newton",
+   "Coquitlam",
+   "Kelowna",
+   "Abbotsford",
+   "Langley",
+   "Saanich",
+   "Kamloops",
+   "Whalley",
+   "Delta",
+   "Chilliwack"
+  ],
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Whitehorse": {
+  "aliases": [
+   "Canada/Yukon"
+  ],
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Winnipeg": {
+  "countries": [
+   "CA"
+  ]
+ },
+ "America/Yakutat": {
+  "countries": [
+   "US"
+  ]
+ },
+ "Antarctica/Casey": {
+  "countries": [
+   "AQ"
+  ]
+ },
+ "Antarctica/Davis": {
+  "countries": [
+   "AQ"
+  ]
+ },
+ "Antarctica/DumontDUrville": {
+  "aliases": [
+   "Pacific/Yap"
+  ],
+  "countries": [
+   "AQ"
+  ]
+ },
+ "Antarctica/Macquarie": {
+  "countries": [
+   "AU"
+  ]
+ },
+ "Antarctica/Mawson": {
+  "countries": [
+   "AQ"
+  ]
+ },
+ "Antarctica/McMurdo": {
+  "countries": [
+   "AQ"
+  ]
+ },
+ "Antarctica/Palmer": {
+  "countries": [
+   "AQ"
+  ]
+ },
+ "Antarctica/Rothera": {
+  "countries": [
+   "AQ"
+  ]
+ },
+ "Antarctica/Syowa": {
+  "countries": [
+   "AQ"
+  ]
+ },
+ "Antarctica/Troll": {
+  "countries": [
+   "AQ"
+  ]
+ },
+ "Antarctica/Vostok": {
+  "countries": [
+   "AQ"
+  ]
+ },
+ "Arctic/Longyearbyen": {
+  "aliases": [
+   "Atlantic/Jan_Mayen"
+  ],
+  "countries": [
+   "SJ"
+  ]
+ },
+ "Asia/Aden": {
+  "cities": [
+   "Sanaa",
+   "Taiz",
+   "Ibb",
+   "Al Ḩudaydah",
+   "Mukalla",
+   "Dhamār"
+  ],
+  "countries": [
+   "YE"
+  ]
+ },
+ "Asia/Almaty": {
+  "cities": [
+   "Astana",
+   "Shymkent",
+   "Karagandy",
+   "Taraz",
+   "Pavlodar",
+   "Ust-Kamenogorsk",
+   "Semey",
+   "Turkistan",
+   "Petropavl",
+   "Temirtau",
+   "Kokshetau",
+   "Ekibastuz",
+   "Taldykorgan",
+   "Zhezqazghan"
+  ],
+  "countries": [
+   "KZ"
+  ]
+ },
+ "Asia/Amman": {
+  "cities": [
+   "Zarqa",
+   "Irbid",
+   "Russeifa",
+   "Ḩayy Khildā",
+   "Khuraybat as Sūq",
+   "Wādī as Sīr",
+   "Ar Ramthā",
+   "Ṣuwayliḥ",
+   "‘Ajlūn",
+   "As Salţ"
+  ],
+  "countries": [
+   "JO"
+  ]
+ },
+ "Asia/Anadyr": {
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Aqtau": {
+  "cities": [
+   "Aktau",
+   "Zhanaozen"
+  ],
+  "countries": [
+   "KZ"
+  ]
+ },
+ "Asia/Aqtobe": {
+  "cities": [
+   "Aktobe"
+  ],
+  "countries": [
+   "KZ"
+  ]
+ },
+ "Asia/Ashgabat": {
+  "aliases": [
+   "Asia/Ashkhabad"
+  ],
+  "cities": [
+   "Türkmenabat",
+   "Daşoguz",
+   "Mary"
+  ],
+  "countries": [
+   "TM"
+  ]
+ },
+ "Asia/Atyrau": {
+  "countries": [
+   "KZ"
+  ]
+ },
+ "Asia/Baghdad": {
+  "cities": [
+   "Al Mawşil al Jadīdah",
+   "Mosul",
+   "Erbil",
+   "Basrah",
+   "Karbala",
+   "Sadr City",
+   "Kirkuk",
+   "Abū Ghurayb",
+   "Sulaymaniyah",
+   "Nasiriyah",
+   "Najaf",
+   "Al Hillah",
+   "Abū al-Kahṣīb",
+   "Al Maḩmūdīyah",
+   "Dihok",
+   "Al ‘Amārah",
+   "Al Diwaniyah",
+   "Al-Kut",
+   "Al Madīnah",
+   "Kelar",
+   "Ramadi",
+   "Al Fallūjah",
+   "Ash Shaţrah",
+   "Khānaqīn",
+   "Bayjī",
+   "Ash Sharqāt",
+   "Sāmarrā’",
+   "Al Miqdādīyah",
+   "As Samawah",
+   "Baqubah",
+   "Sumayl",
+   "Simele",
+   "Xebat",
+   "Khasnahzān",
+   "Qeładizê",
+   "Al Hindīyah",
+   "Al Qurnah",
+   "Baḥarkah",
+   "Sīnah",
+   "Az Zubayr",
+   "Ţūz Khūrmātū",
+   "Rānyah",
+   "Qal‘at Sukkar",
+   "Kufa",
+   "An Nu‘mānīyah",
+   "Abu Gharaq",
+   "Umm Qaşr",
+   "'Ākra",
+   "Al Fāw",
+   "Al-Musayab",
+   "Nāḩiyat al Iskandarīyah"
+  ],
+  "countries": [
+   "IQ"
+  ]
+ },
+ "Asia/Bahrain": {
+  "cities": [
+   "Al Muharraq",
+   "Manama",
+   "Madīnat Ḩamad",
+   "Ar Rifā‘"
+  ],
+  "countries": [
+   "BH"
+  ]
+ },
+ "Asia/Baku": {
+  "cities": [
+   "Sumgayit",
+   "Ganja",
+   "Khirdalan",
+   "Yevlakh",
+   "Mingachevir"
+  ],
+  "countries": [
+   "AZ"
+  ]
+ },
+ "Asia/Bangkok": {
+  "cities": [
+   "Hanoi",
+   "Haiphong",
+   "Huế",
+   "Thanh Hóa",
+   "Vinh",
+   "Bắc Giang",
+   "Nam Định",
+   "Thái Nguyên",
+   "Việt Trì",
+   "Samut Prakan",
+   "Đống Đa",
+   "Long Bien",
+   "Hoa Lư",
+   "Gia Lâm",
+   "Hai Bà Trưng",
+   "Nghi Sơn",
+   "Thanh Xuân",
+   "Cầu Giấy",
+   "Bắc Ninh",
+   "Ba Vì",
+   "Hạ Long",
+   "Hà Tĩnh",
+   "Mueang Nonthaburi",
+   "Thị Trấn Đông Triều",
+   "Hải Dương",
+   "Phổ Yên",
+   "Sơn Tây",
+   "Ba Dinh",
+   "Chon Buri",
+   "Lạng Sơn",
+   "Thuận Thanh",
+   "Phra Pradaeng",
+   "Bang Khae",
+   "Hat Yai",
+   "Pak Kret",
+   "Cẩm Phả",
+   "Sai Mai",
+   "Phúc Yên",
+   "Si Racha",
+   "Latkrabang",
+   "Watthana",
+   "Khlong Sam Wa",
+   "Tây Hồ",
+   "Bang Khun Thian",
+   "Ðông Hà",
+   "Lat Krabang",
+   "Chatuchak",
+   "Ban Khlong Prawet",
+   "Chom Thong",
+   "Nong Chok",
+   "Lampang",
+   "Kỳ Anh",
+   "Nong Khaem",
+   "Bang Kapi",
+   "Bueng Kum",
+   "Kabin Buri",
+   "Phủ Lý",
+   "Tương Mai",
+   "Hoàn Kiếm",
+   "Đồng Hới",
+   "Surat Thani",
+   "Lào Cai",
+   "Udon Thani",
+   "Din Daeng",
+   "Chũ",
+   "Chiang Mai",
+   "Nakhon Ratchasima",
+   "Hua Hin",
+   "Bang Sue",
+   "Ban Samae Dam",
+   "Ubon Ratchathani",
+   "Lat Phrao",
+   "Phasi Charoen",
+   "Bồ Đề",
+   "Ban I Chang",
+   "Thon Buri",
+   "Vĩnh Yên",
+   "Hưng Yên",
+   "Khlong Luang",
+   "Kiến An",
+   "Nakhon Pathom",
+   "Bangkok Noi",
+   "Thung Khru",
+   "Pattaya",
+   "Suan Luang",
+   "Mỹ Hào",
+   "Phong Điền",
+   "Wang Thonglang",
+   "Khon Kaen",
+   "Hoàng Mai",
+   "Lak Si",
+   "Khlong Toei",
+   "Móng Cái",
+   "Dusit",
+   "Yên Vinh",
+   "Rayong",
+   "Ba Đồn",
+   "Sơn La",
+   "Taling Chan",
+   "Hòa Bình",
+   "Bang Bon",
+   "Tuyên Quang",
+   "Nakhon Si Thammarat",
+   "Yên Bái",
+   "Si Maha Phot"
+  ],
+  "countries": [
+   "TH"
+  ]
+ },
+ "Asia/Barnaul": {
+  "cities": [
+   "Biysk",
+   "Rubtsovsk"
+  ],
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Beirut": {
+  "cities": [
+   "Ra’s Bayrūt",
+   "Tripoli",
+   "Sidon",
+   "Tyre",
+   "Aley",
+   "Nabatîyé et Tahta"
+  ],
+  "countries": [
+   "LB"
+  ]
+ },
+ "Asia/Bishkek": {
+  "cities": [
+   "Osh",
+   "Manas"
+  ],
+  "countries": [
+   "KG"
+  ]
+ },
+ "Asia/Brunei": {
+  "countries": [
+   "BN"
+  ]
+ },
+ "Asia/Calcutta": {
+  "aliases": [
+   "Asia/Kolkata"
+  ],
+  "cities": [
+   "Mumbai",
+   "Delhi",
+   "Bengaluru",
+   "Hyderabad",
+   "Ahmedabad",
+   "Chennai",
+   "Surat",
+   "Pune",
+   "Jaipur",
+   "Kanpur",
+   "Navi Mumbai",
+   "Lucknow",
+   "Nagpur",
+   "Coimbatore",
+   "Indore",
+   "Thāne",
+   "Vadodara",
+   "Bhopal",
+   "Rasapūdipalem",
+   "Pimpri-Chinchwad",
+   "Patna",
+   "Kallakurichi",
+   "Ludhiana",
+   "Nashik",
+   "Madurai",
+   "Tirunelveli",
+   "Agra",
+   "Faridabad",
+   "Rājkot",
+   "Najafgarh",
+   "Jamshedpur",
+   "Pimpri",
+   "Kalyān",
+   "Dombivali",
+   "Meerut",
+   "Virār",
+   "Nowrangapur",
+   "Srinagar",
+   "Ghāziābād",
+   "Dhanbad",
+   "Aurangabad",
+   "Varanasi",
+   "Amritsar",
+   "Vijayawada",
+   "Ranchi",
+   "Jabalpur",
+   "Prayagraj",
+   "Visakhapatnam",
+   "Jodhpur",
+   "Gwalior",
+   "Teni",
+   "Howrah",
+   "Raipur",
+   "Tiruchirappalli",
+   "Kota",
+   "Shivaji Nagar",
+   "Sholapur",
+   "Chandigarh",
+   "Tiruppur",
+   "Guwahati",
+   "Hubballi",
+   "Mysuru",
+   "Salem",
+   "Gurugram",
+   "Bhubaneswar",
+   "Bhiwandi",
+   "Jalandhar",
+   "Rohini",
+   "Kanayannur",
+   "Bhayandar",
+   "Narela",
+   "Thiruvananthapuram",
+   "Alīgarh",
+   "Bareilly",
+   "Morādābād",
+   "Warangal",
+   "Dhārāvi",
+   "Gorakhpur",
+   "Guntur",
+   "Puducherry",
+   "Jājmau",
+   "Amravati",
+   "Bikaner",
+   "Kochi",
+   "Bhilai",
+   "Cuttack",
+   "Borivli",
+   "Bhavnagar",
+   "Sāngli",
+   "Jamnagar",
+   "Jammu",
+   "Bokāro",
+   "Nanded",
+   "Kozhikode",
+   "Kolhāpur",
+   "Nellore",
+   "Kalaburagi",
+   "Ajmer",
+   "Dehradun",
+   "Erode",
+   "Durgapur",
+   "Ulhasnagar",
+   "Loni",
+   "Siliguri",
+   "Ujjain",
+   "Bilimora",
+   "Karol Bāgh",
+   "Āsansol",
+   "Mangaluru",
+   "Belagavi",
+   "Sahāranpur",
+   "Vellore",
+   "Bhātpāra",
+   "Malegaon",
+   "Modīnagar",
+   "Gaya",
+   "Ambattur",
+   "Jalgaon",
+   "Kurnool",
+   "Rāmgundam",
+   "Udaipur",
+   "Maheshtala",
+   "Patiāla",
+   "Shyamnagar",
+   "Davangere",
+   "Akola",
+   "Rajpur Sonarpur",
+   "Korba",
+   "Jhānsi",
+   "Thoothukudi",
+   "Ballari",
+   "Bhāgalpur",
+   "Agartala",
+   "Gauriganj",
+   "Kākināda",
+   "Latur",
+   "Pānihāti",
+   "Rajamahendravaram",
+   "Dhule",
+   "Rohtak",
+   "Ahilyanagar",
+   "Kollam",
+   "Bilāspur",
+   "Bhilwara",
+   "Brahmapur",
+   "Muzaffarpur",
+   "Punāsa",
+   "Muzaffarnagar",
+   "Avadi",
+   "Kadapa",
+   "Kukatpally",
+   "Kāmārhāti",
+   "Mathura",
+   "Chānda",
+   "Vijayapura",
+   "Shivamogga",
+   "Alwar",
+   "Shāhjānpur",
+   "Jūnāgadh",
+   "New Delhi",
+   "Thrissur",
+   "Nizāmābād",
+   "Tumkūr",
+   "Parbhani",
+   "Hisar",
+   "Fīrozābād",
+   "Kulti",
+   "Karnāl",
+   "Barddhamān",
+   "Gundupālaiyam",
+   "Bārāsat",
+   "Mulugu",
+   "Bihār Sharīf",
+   "Bāli",
+   "Rāmpur",
+   "Darbhanga",
+   "Panipat",
+   "Tirupati",
+   "Noida",
+   "Greater Noida",
+   "Aizawl",
+   "Gandhinagar",
+   "Dindigul",
+   "Thanjavur",
+   "Karīmnagar",
+   "Dewas",
+   "Sonīpat",
+   "Ichalkaranji",
+   "Bathinda",
+   "Jālna",
+   "Kirāri Sulemānnagar",
+   "Satna",
+   "Purnia",
+   "Imphal",
+   "Saugor",
+   "Kushinagar",
+   "Rourkela",
+   "Durg",
+   "Anantapur",
+   "Ratlām",
+   "Rānipet",
+   "Lal Bahadur Nagar",
+   "Arrah",
+   "Baranagar",
+   "Gajuwaka",
+   "Etāwah",
+   "Ambarnath",
+   "Naihāti",
+   "Bharatpur",
+   "Begusarai",
+   "Tiruvottiyūr",
+   "Gāndhīdhām",
+   "Mau",
+   "Sīkar",
+   "Ramagundam",
+   "Hāpur",
+   "Farrukhābād",
+   "Alappuzha",
+   "Katihar",
+   "Sri Ganganagar",
+   "Rewa",
+   "Uluberiya",
+   "Sivakasi",
+   "Karur",
+   "Rāichūr",
+   "Pallāvaram",
+   "Ooty",
+   "Pāli",
+   "Hosūr",
+   "Vizianagaram",
+   "Shrīrāmpur",
+   "Quthbullapur",
+   "Nadiād",
+   "Nāgercoil",
+   "Karāwalnagar",
+   "Mango",
+   "Murwāra",
+   "Kanchipuram",
+   "Singrauli",
+   "Mirzāpur",
+   "Kharagpur",
+   "Eluru",
+   "Rāniganj",
+   "Yamuna Nagar",
+   "Raurkela Industrial Township",
+   "Bidar",
+   "Munger",
+   "Nandyāl",
+   "Panchkula",
+   "Burhānpur",
+   "Morvi",
+   "Anand",
+   "Ongole",
+   "Hosapete",
+   "Nāngloi Jāt",
+   "Secunderabad",
+   "Deoghar",
+   "Chāpra",
+   "Khandwa",
+   "Puri",
+   "Morena",
+   "Gyānpur",
+   "Bulandshahr",
+   "Bhind",
+   "Bhālswa Jahangirpur",
+   "Khammam",
+   "Sambhal",
+   "Bhiwāni",
+   "Panvel",
+   "Ambāla",
+   "Kumarapalayam",
+   "Machilīpatnam",
+   "Mahesāna",
+   "Mahbūbnagar",
+   "Sambalpur",
+   "Bhusawal",
+   "Raebareli",
+   "Haridwar",
+   "Phusro",
+   "Adoni",
+   "Sūjāngarh",
+   "Sirsa",
+   "Dinapur Nizamat",
+   "Bahraigh",
+   "Kāraikkudi",
+   "Sultan Pur Majra",
+   "Guna",
+   "Chandannagar",
+   "Baharampur",
+   "Shahuwadi",
+   "Madanapalle",
+   "Shivpuri",
+   "Surendranagar",
+   "Neyveli",
+   "Silchar",
+   "Proddatūr",
+   "Hugli",
+   "Hashtsāl",
+   "Amroha",
+   "Chhindwāra",
+   "Tambaram",
+   "Bhetia",
+   "Pathānkot",
+   "Badlapur",
+   "Cuddalore",
+   "Shimla",
+   "Gadag-Betageri",
+   "Gadag",
+   "Verāval",
+   "Navsari",
+   "Bahadurgarh",
+   "Haldia",
+   "Rāiganj",
+   "Malda",
+   "Jaunpur",
+   "Deoli",
+   "Bharūch",
+   "Hoshiārpur",
+   "Jīnd",
+   "Kumbakonam",
+   "Mohali",
+   "Fatehpur",
+   "Tonk",
+   "Udupi",
+   "Thenali",
+   "Sītāpur",
+   "Alandur",
+   "Bhadrāvati",
+   "Vapi",
+   "Moga",
+   "Rāj-Nāndgaon",
+   "Robertsonpet",
+   "Unnāo",
+   "Budaun",
+   "Madhyamgram",
+   "Chittoor",
+   "Jāmuria",
+   "Jaigaon",
+   "Batāla",
+   "Orai",
+   "Saharsa",
+   "Vidisha",
+   "Hanumāngarh",
+   "Thānesar",
+   "Hassan",
+   "Kishangarh",
+   "Dalūpura",
+   "Rudrapur",
+   "Nalgonda",
+   "Hazāribāgh",
+   "Medinīpur",
+   "Bālurghāt",
+   "Fyzābād",
+   "Dinapore",
+   "Porbandar",
+   "Bānda",
+   "Hindupur",
+   "Beāwar",
+   "Anantnag",
+   "Serilingampalle",
+   "Raigarh",
+   "Malkajgiri",
+   "Shāntipur",
+   "Bhuj",
+   "Bārākpur",
+   "Hājīpur",
+   "Sasarām",
+   "Bhimavaram",
+   "Beed",
+   "Burāri",
+   "Krishnanagar",
+   "Chitradurga",
+   "Dibrugarh",
+   "Abohar",
+   "Tiruvannamalai",
+   "Kaithal",
+   "Balasore",
+   "Godhra",
+   "Shillong",
+   "Rewāri",
+   "Basirhat City",
+   "Chhatarpur",
+   "Mandsaur",
+   "Chas",
+   "Pālanpur",
+   "Lakhīmpur",
+   "Valsād",
+   "Damoh",
+   "Haldwani",
+   "Hābra",
+   "Kolār",
+   "Srikakulam",
+   "Mandya",
+   "Madhurampur Dehri",
+   "Kānchrāpāra",
+   "Dimāpur",
+   "Māler Kotla",
+   "Siwān",
+   "Kalol",
+   "Bānkura",
+   "Pātan",
+   "Gondā City",
+   "Dhaulpur",
+   "Gondiā",
+   "Palakkad",
+   "Bettiah",
+   "Palwal",
+   "Etah",
+   "Pīlibhīt",
+   "Rajapalayam",
+   "Botad",
+   "Deoria",
+   "Nimach",
+   "Khardah",
+   "Yavatmāl",
+   "Hālīsahar",
+   "Khanna",
+   "Titāgarh",
+   "Mustafābād",
+   "Hāthras",
+   "Jorhat",
+   "Lalitpur",
+   "Guntakal",
+   "Pithampur",
+   "Mothīhāri",
+   "Kanhangad",
+   "Jagdalpur",
+   "Jagādhri",
+   "Dārjiling",
+   "Kurichchi",
+   "Dam Dam",
+   "Hardoī",
+   "Puruliya",
+   "Dharmavaram",
+   "Gokalpur",
+   "Bhadreswar",
+   "Nagaon",
+   "Vejalpur",
+   "Chikmagalūr",
+   "Bhadrak",
+   "Sawai Madhopur",
+   "Ambikāpur",
+   "Mandoli",
+   "Satara",
+   "Chūru",
+   "Gangāpur",
+   "Madhavaram",
+   "Dohad",
+   "Barshi",
+   "Ādilābād",
+   "Jhunjhunūn",
+   "Jetpur",
+   "Uppal Kalan",
+   "Gudivāda",
+   "Bārān",
+   "Narmadapuram",
+   "Amreli",
+   "Pudukkottai",
+   "Narasaraopet",
+   "Rishra",
+   "Baripāda",
+   "Muktsar",
+   "Azamgarh",
+   "Barnāla",
+   "Yelahanka",
+   "Chittorgarh",
+   "Tinsukia",
+   "Khargone",
+   "Baidyabāti",
+   "Bastī",
+   "Gangavati",
+   "Ambur",
+   "Giridih",
+   "Wardha",
+   "Tadepalligudem",
+   "Chanduasi",
+   "Bagaha",
+   "Achalpur",
+   "Gondal",
+   "Dharashiv",
+   "Port Blair",
+   "Bagalkot",
+   "Suriāpet",
+   "Bangaon",
+   "Ashoknagar Kalyangarh",
+   "Deesa",
+   "Navadwīp",
+   "Nandurbar",
+   "Sultānpur",
+   "Delhi Cantonment",
+   "Firozpur",
+   "Pandit Deen Dayal Upadhyaya Nagar",
+   "Sehore",
+   "Kanpur Cantonment",
+   "Bānsbāria",
+   "Tadpatri",
+   "Jalpāiguri",
+   "Mangalagiri",
+   "Ranebennur",
+   "Khurja",
+   "Kishanganj",
+   "Ponnāni",
+   "Hindaun",
+   "Jamālpur",
+   "Nāgaur",
+   "Ambala Sadar",
+   "Bhiwadi",
+   "Būndi",
+   "Miryalaguda",
+   "Soyībug",
+   "Jagtiāl",
+   "Roorkee",
+   "Udgīr",
+   "Nagda",
+   "Betūl",
+   "Jahānābād",
+   "Kashipur",
+   "Ghazīpur",
+   "Amaravati",
+   "Nagapattinam",
+   "Buxar",
+   "Mormugao",
+   "Seoni",
+   "Hinganghāt",
+   "Dhamtari",
+   "Chilakalūrupet",
+   "Malappuram",
+   "Bānswāra",
+   "Chirmiri",
+   "Itārsi",
+   "Vasco da Gama",
+   "Gangtok",
+   "Datia",
+   "Phagwāra",
+   "Airoli"
+  ],
+  "countries": [
+   "IN"
+  ]
+ },
+ "Asia/Chita": {
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Choibalsan": {
+  "aliases": [
+   "Asia/Ulan_Bator"
+  ]
+ },
+ "Asia/Chongqing": {
+  "aliases": [
+   "Asia/Chungking"
+  ]
+ },
+ "Asia/Colombo": {
+  "cities": [
+   "Dehiwala-Mount Lavinia",
+   "Maharagama",
+   "Jaffna",
+   "Moratuwa",
+   "Negombo",
+   "Pita Kotte",
+   "Sri Jayewardenepura Kotte",
+   "Kandy",
+   "Trincomalee",
+   "Kalmunai"
+  ],
+  "countries": [
+   "LK"
+  ]
+ },
+ "Asia/Damascus": {
+  "cities": [
+   "Aleppo",
+   "Homs",
+   "Latakia",
+   "Ar Raqqah",
+   "Ḩamāh",
+   "Ţarţūs",
+   "Al Ḩasakah",
+   "Deir ez-Zor",
+   "Al Qāmishlī",
+   "Al Bāb",
+   "Idlib",
+   "Dūmā"
+  ],
+  "countries": [
+   "SY"
+  ]
+ },
+ "Asia/Dhaka": {
+  "aliases": [
+   "Asia/Dacca"
+  ],
+  "cities": [
+   "Chattogram",
+   "Gazipur",
+   "Khulna",
+   "Rangpur",
+   "Rajshahi",
+   "Comilla",
+   "Pallabi",
+   "Mirpur Model Thana",
+   "Mohammadpur",
+   "Hāthazāri",
+   "Shibganj",
+   "Natore",
+   "Kafrul",
+   "Tungi",
+   "Bhatara",
+   "Savar",
+   "Narsingdi",
+   "Demra",
+   "Nagar Naluākot",
+   "Bagerhat",
+   "Brāhmanbāria",
+   "Cox’s Bāzār",
+   "Kaliakair",
+   "Jessore",
+   "Nāgarpur",
+   "Sylhet",
+   "Mymensingh",
+   "Narayanganj",
+   "Ashuganj City",
+   "Bogra",
+   "Dinajpur",
+   "Karnaphuli",
+   "Chāndpur",
+   "Motijheel",
+   "Barishal",
+   "Saidpur",
+   "Pār Naogaon",
+   "Pābna",
+   "Paltan",
+   "Tangail",
+   "Jamālpur",
+   "Puthia",
+   "Ramna Maidan",
+   "Nawābganj",
+   "Kushtia",
+   "Maijdi",
+   "Sonārgaon",
+   "Sātkhira",
+   "Sirajganj",
+   "Tungipara",
+   "Farīdpur",
+   "Gulshan",
+   "Sherpur",
+   "Rangamati",
+   "Bhairab Bāzār",
+   "Shāhzādpur",
+   "Thākurgaon"
+  ],
+  "countries": [
+   "BD"
+  ]
+ },
+ "Asia/Dili": {
+  "countries": [
+   "TL"
+  ]
+ },
+ "Asia/Dubai": {
+  "cities": [
+   "Abu Dhabi",
+   "Sharjah",
+   "Al Ain City",
+   "Ajman",
+   "Dayrah",
+   "Ras Al Khaimah",
+   "Musaffah",
+   "Jebel Ali",
+   "Business Bay",
+   "Dubai Investments Park",
+   "International City",
+   "Dubai Marina",
+   "Fujairah",
+   "Al Majaz",
+   "Warīsān"
+  ],
+  "countries": [
+   "AE"
+  ]
+ },
+ "Asia/Dushanbe": {
+  "cities": [
+   "Isfara",
+   "Istaravshan",
+   "Kŭlob",
+   "Konibodom",
+   "Khujand",
+   "Bokhtar"
+  ],
+  "countries": [
+   "TJ"
+  ]
+ },
+ "Asia/Famagusta": {
+  "countries": [
+   "CY"
+  ]
+ },
+ "Asia/Gaza": {
+  "cities": [
+   "Khān Yūnis",
+   "Jabālyā",
+   "Rafaḩ"
+  ],
+  "countries": [
+   "PS"
+  ]
+ },
+ "Asia/Hebron": {
+  "cities": [
+   "East Jerusalem",
+   "Nablus"
+  ],
+  "countries": [
+   "PS"
+  ]
+ },
+ "Asia/Ho_Chi_Minh": {
+  "aliases": [
+   "Asia/Saigon"
+  ],
+  "cities": [
+   "Ho Chi Minh City",
+   "Cần Thơ",
+   "Da Nang",
+   "Biên Hòa",
+   "Thuận An",
+   "Nha Trang",
+   "Chợ Lớn",
+   "Bình Thạnh",
+   "Thủ Đức",
+   "Qui Nhon",
+   "Vũng Tàu",
+   "Dĩ An",
+   "Rạch Giá",
+   "Buôn Ma Thuột",
+   "Quận Mười",
+   "Thủ Dầu Một",
+   "Bến Cát",
+   "Bắc Từ Liêm",
+   "Quận Mười Một",
+   "An Nhơn",
+   "Phu Quoc",
+   "Phú Mỹ",
+   "Long Xuyên",
+   "Quảng Ngãi",
+   "Quận Sáu",
+   "Mỹ Tho",
+   "Ðà Lạt",
+   "Xuân Lộc",
+   "Thành Phố Bà Rịa",
+   "Ninh Hòa",
+   "Phan Thiết",
+   "Điện Bàn",
+   "Cà Mau",
+   "Sóc Trăng",
+   "Chí Linh",
+   "Quận Ba",
+   "Tân An",
+   "Sa Dec",
+   "Cao Lãnh",
+   "Phan Rang-Tháp Chàm",
+   "Việt Yên",
+   "Kon Tum",
+   "Thanh Khê",
+   "Quận Bốn",
+   "Quận Năm",
+   "Vĩnh Châu",
+   "Thị Trấn Đại Từ",
+   "Tân Châu",
+   "Long Khánh",
+   "Bảo Lộc",
+   "Đồng Xoài",
+   "Tam Kỳ",
+   "Trảng Bàng",
+   "Đưc Trọng",
+   "La Gi",
+   "Trà Vinh",
+   "Thốt Nốt",
+   "Bạc Liêu",
+   "Tuy Hòa",
+   "Đức Phổ",
+   "Thị Trấn Thuận Châu",
+   "Cần Giuộc",
+   "Hòa Thành",
+   "Cam Ranh",
+   "Giá Rai",
+   "Huyện Lâm Hà",
+   "Tịnh Biên",
+   "Cai Lậy",
+   "Vĩnh Long",
+   "Cẩm Phả Mines",
+   "Tây Ninh",
+   "Quận Đức Thịnh",
+   "Hải Châu",
+   "Sầm Sơn",
+   "Ô Môn",
+   "Thành phố Sông Công",
+   "Buôn Hồ",
+   "Bến Tre",
+   "Chơn Thành",
+   "Hòa Cường",
+   "Bắc Quang",
+   "Cờ Đỏ",
+   "Pleiku",
+   "Bình Thủy",
+   "Gò Vấp",
+   "Thới Lai",
+   "Ngã Bảy",
+   "Hồng Ngự",
+   "Hà Tiên"
+  ],
+  "countries": [
+   "VN"
+  ]
+ },
+ "Asia/Hong_Kong": {
+  "cities": [
+   "New Territories",
+   "Kowloon",
+   "Hong Kong Island",
+   "Victoria",
+   "Tuen Mun",
+   "Sha Tin",
+   "Sham Shui Po",
+   "Wong Tai Sin",
+   "Kowloon City",
+   "Tseung Kwan O",
+   "Kwai Chung",
+   "Tsuen Wan",
+   "Tin Shui Wai",
+   "Tai Po",
+   "Fanling",
+   "Ma On Shan",
+   "Yuen Long San Hui",
+   "Yuen Long",
+   "Kowloon City Centre",
+   "Tsing Yi Town",
+   "Yuen Long Kau Hui",
+   "Wan Chai",
+   "Aberdeen",
+   "San Tung Chung Hang",
+   "Tung Chung"
+  ],
+  "countries": [
+   "HK"
+  ]
+ },
+ "Asia/Hovd": {
+  "countries": [
+   "MN"
+  ]
+ },
+ "Asia/Irkutsk": {
+  "cities": [
+   "Ulan-Ude",
+   "Bratsk",
+   "Angarsk",
+   "Ust’-Ilimsk"
+  ],
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Jakarta": {
+  "cities": [
+   "Surabaya",
+   "Bekasi",
+   "Bandung",
+   "Medan",
+   "Depok",
+   "Tangerang",
+   "Palembang",
+   "Semarang",
+   "South Tangerang",
+   "Batam",
+   "Jepara",
+   "Pekanbaru",
+   "Bandar Lampung",
+   "Bogor",
+   "Padang",
+   "Malang",
+   "Tasikmalaya",
+   "Serang",
+   "Situbondo",
+   "Jambi City",
+   "Cimahi",
+   "Surakarta",
+   "Cilegon",
+   "Bengkulu",
+   "Yogyakarta",
+   "Sukabumi",
+   "Cibinong",
+   "Dumai",
+   "Cirebon",
+   "Pekalongan",
+   "Percut",
+   "Karawang",
+   "Kediri",
+   "Jember",
+   "Tegal",
+   "Cileungsir",
+   "Binjai",
+   "Pematangsiantar",
+   "Banda Aceh",
+   "Pasarkemis",
+   "Cilacap",
+   "Padangsidempuan",
+   "Probolinggo",
+   "Lubuklinggau",
+   "Purwokerto",
+   "Tanjung Pinang",
+   "Pangkalpinang",
+   "Batu",
+   "Citeureup",
+   "Pasuruan",
+   "Banjar",
+   "Ciputat",
+   "Ciampea",
+   "Madiun",
+   "Rengasdengklok",
+   "Lhokseumawe",
+   "Sumedang",
+   "Salatiga",
+   "Sawangan",
+   "Padalarang",
+   "Curug",
+   "Tanjungbalai",
+   "Pemalang",
+   "Langsa",
+   "Lembang",
+   "Singosari",
+   "Metro",
+   "Purwakarta",
+   "Teluknaga",
+   "Cianjur",
+   "Pamulang",
+   "Cikupa",
+   "Ungaran",
+   "Plumbon",
+   "Banjaran",
+   "Blitar",
+   "Sunggal",
+   "Perbaungan",
+   "Astanajapura",
+   "Kisaran",
+   "Mojokerto",
+   "Payakumbuh",
+   "Batang",
+   "Purwodadi",
+   "Sidoarjo",
+   "Weru",
+   "Subang",
+   "Rangkasbitung",
+   "Gunungsitoli",
+   "Baturaja",
+   "Adiwerna",
+   "Garut",
+   "Parung",
+   "Magelang",
+   "Cikampek",
+   "Klaten",
+   "Jombang",
+   "Paseh",
+   "Lumajang",
+   "Indramayu",
+   "Bukittinggi",
+   "Sepatan",
+   "Banyuwangi",
+   "Tebingtinggi",
+   "Kedungwuni",
+   "Soreang",
+   "Pamanukan",
+   "Lawang",
+   "Kuningan",
+   "Cileunyi",
+   "Kresek",
+   "Ciamis",
+   "Pelabuhanratu",
+   "Pati",
+   "Cikarang",
+   "Pare",
+   "Arjawinangun",
+   "Subulussalam",
+   "Prabumulih",
+   "Tanjung Pandan",
+   "Rantauprapat",
+   "Belawan",
+   "Sungai Penuh",
+   "Sungailiat",
+   "Grogol",
+   "Sumedang Utara"
+  ],
+  "countries": [
+   "ID"
+  ]
+ },
+ "Asia/Jayapura": {
+  "cities": [
+   "Ambon",
+   "Sorong",
+   "Ternate",
+   "Timika",
+   "Manokwari",
+   "Merauke"
+  ],
+  "countries": [
+   "ID"
+  ]
+ },
+ "Asia/Jerusalem": {
+  "aliases": [
+   "Asia/Tel_Aviv"
+  ],
+  "cities": [
+   "West Jerusalem",
+   "Haifa",
+   "Rishon LeTsiyyon",
+   "Petaẖ Tiqva",
+   "Netanya",
+   "Ashdod",
+   "Bnei Brak",
+   "H̱olon",
+   "Beersheba",
+   "Ramat Gan",
+   "Reẖovot",
+   "Ashkelon",
+   "Bat Yam",
+   "Bet Shemesh",
+   "Kfar Saba",
+   "Jaffa"
+  ],
+  "countries": [
+   "IL"
+  ]
+ },
+ "Asia/Kabul": {
+  "cities": [
+   "Herāt",
+   "Mazār-e Sharīf",
+   "Kandahār",
+   "Jalālābād",
+   "Kunduz",
+   "Ghazni",
+   "Balkh",
+   "Bagrām",
+   "Baghlān",
+   "Gardez"
+  ],
+  "countries": [
+   "AF"
+  ]
+ },
+ "Asia/Kamchatka": {
+  "cities": [
+   "Petropavlovsk-Kamchatsky"
+  ],
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Karachi": {
+  "cities": [
+   "Lahore",
+   "Peshawar",
+   "Faisalabad",
+   "Rawalpindi",
+   "Gujranwala",
+   "Multan",
+   "Hyderabad",
+   "Quetta",
+   "Bannu",
+   "Sargodha",
+   "Sialkot",
+   "Bahawalpur",
+   "Arifwala",
+   "Dera Ismail Khan",
+   "Muzaffarābād",
+   "Battagram",
+   "Chunian",
+   "Jhang Sadr",
+   "Islamabad",
+   "Shekhupura",
+   "Gujrat",
+   "Sukkur",
+   "Sahiwal",
+   "Okara",
+   "Rahim Yar Khan",
+   "Kasur",
+   "Jalalpur Pirwala",
+   "Dera Ghazi Khan",
+   "Pindi Bhattian",
+   "Tando Bago",
+   "Tando Allahyar",
+   "Wah Cantt",
+   "Chak Jhumra",
+   "Bhawana",
+   "Larkana",
+   "Nawabshah",
+   "Burewala",
+   "Mingora",
+   "Sinjhoro",
+   "Hafizabad",
+   "Chiniot",
+   "Mardan",
+   "Malir Cantonment",
+   "Kamoke",
+   "Abbottabad",
+   "Saddiqabad",
+   "Mirpur Khas",
+   "Skardu",
+   "Muridke",
+   "Shahkot",
+   "Bahawalnagar",
+   "Kunri",
+   "Muzaffargarh",
+   "Digri",
+   "Jacobabad",
+   "Khuzdar",
+   "Gilgit",
+   "Gojra",
+   "Shikarpur",
+   "Dadu",
+   "Talhar",
+   "Qadirpur Ran",
+   "Dajal",
+   "Ahmadpur East",
+   "Hub",
+   "Dhirkot",
+   "Garhi Khairo",
+   "Khairpur Mir’s",
+   "Jhelum",
+   "Tando Adam",
+   "Hasilpur",
+   "Kamalia",
+   "Arif Wala",
+   "Jampur",
+   "Wazirabad",
+   "Kohat",
+   "Layyah",
+   "Shujaabad",
+   "Eminabad",
+   "Jaranwala",
+   "Tordher",
+   "Chishtian",
+   "Harunabad",
+   "Jalalpur Jattan",
+   "Umarkot",
+   "Lodhran",
+   "Moro",
+   "Khanpur",
+   "Attock City",
+   "Manjhand",
+   "Mian Channun",
+   "Bhakkar",
+   "Narowal",
+   "Chaman",
+   "Nankana Sahib",
+   "Mandi Bahauddin",
+   "Mianwali",
+   "Daur",
+   "Daska Kalan",
+   "Shakargarh",
+   "Pakpattan",
+   "Mailsi",
+   "Dokri",
+   "New Mirpur City",
+   "Toba Tek Singh",
+   "Haveli Lakha",
+   "Shahdad Kot",
+   "Charsadda",
+   "Ghotki",
+   "Sambrial",
+   "Badin",
+   "Taunsa",
+   "Phool Nagar",
+   "Tando Muhammad Khan",
+   "Pattoki",
+   "Shahdadpur",
+   "Jauharabad",
+   "Vihari",
+   "Chichawatni",
+   "Dera Murad Jamali",
+   "Kotri",
+   "Kot Addu",
+   "Sangla Hill",
+   "Kharian",
+   "Khushāb",
+   "Pasrur",
+   "Pano Aqil",
+   "Shabqadar",
+   "Kot Radha Kishan",
+   "Chakwal",
+   "Renala Khurd",
+   "Raja Jang",
+   "Model Town"
+  ],
+  "countries": [
+   "PK"
+  ]
+ },
+ "Asia/Kathmandu": {
+  "cities": [
+   "Pokhara",
+   "Bharatpur",
+   "Pātan",
+   "Birgañj",
+   "Biratnagar",
+   "Dhangaḍhi̇̄",
+   "Hetauda",
+   "Janakpur",
+   "Butwāl",
+   "Dharān",
+   "Nepalgunj",
+   "Birendranagar",
+   "Madhyapur Thimi",
+   "Lahān"
+  ],
+  "countries": [
+   "NP"
+  ]
+ },
+ "Asia/Khandyga": {
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Krasnoyarsk": {
+  "cities": [
+   "Abakan",
+   "Norilsk",
+   "Achinsk",
+   "Kyzyl",
+   "Kansk"
+  ],
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Kuala_Lumpur": {
+  "cities": [
+   "Johor Bahru",
+   "Kampung Baru Subang",
+   "Petaling Jaya",
+   "Ipoh",
+   "Shah Alam",
+   "Subang Jaya",
+   "Bukit Rahman Putra",
+   "Pelentong",
+   "Malacca",
+   "Iskandar Puteri",
+   "Kota Bharu",
+   "Kuantan",
+   "Kota Kuala Muda",
+   "Sungai Petani",
+   "Selayang Baru Utara",
+   "Pasir Gudang",
+   "Mukim Pulai",
+   "Kota Damansara",
+   "Kampung Larkin Lama",
+   "Kuala Terengganu",
+   "Taman Petaling",
+   "Alor Setar",
+   "Kampung Kangkar Teberau",
+   "Puchong",
+   "Seremban",
+   "Setapak",
+   "Kluang",
+   "Muar",
+   "Kapar",
+   "Batu Caves",
+   "Klang",
+   "Kajang",
+   "Teluk Intan",
+   "Kampong Baharu Cheras Batu Sebelas",
+   "Pasir Mas",
+   "Paya Terubong",
+   "Sungai Buloh",
+   "Bandar Seri Alam",
+   "Taiping",
+   "Wangsa Maju",
+   "Bukit Mertajam",
+   "Sepang",
+   "Bukit Jalil",
+   "Bandar Utama",
+   "Bandar Sunway",
+   "Rawang",
+   "Kuala Kubu Baharu",
+   "Kulim",
+   "Skudai",
+   "George Town",
+   "Batu Pahat",
+   "Sitiawan",
+   "Setia Alam",
+   "Bercham",
+   "Bandar Tasik Puteri",
+   "Bandar Bukit Raja",
+   "Kampung Pasir Gudang Baru",
+   "Kampung Sungai Glugur",
+   "Masai",
+   "Kampung Sungai Ara",
+   "Pasir Puteh",
+   "Cheras",
+   "Tasek Glugor",
+   "Bayan Lepas",
+   "Seri Kembangan",
+   "Ampang",
+   "Titiwangsa",
+   "Bukit Bintang",
+   "Port Dickson",
+   "Maran",
+   "Butterworth",
+   "Kuala Krai",
+   "Perling",
+   "Ijok",
+   "Seri Manjung",
+   "Sentul",
+   "Bandar Mahkota Cheras"
+  ],
+  "countries": [
+   "MY"
+  ]
+ },
+ "Asia/Kuching": {
+  "cities": [
+   "Kota Kinabalu",
+   "Sandakan",
+   "Tawau",
+   "Miri",
+   "Sibu",
+   "Bintulu",
+   "Lahad Datu"
+  ],
+  "countries": [
+   "MY"
+  ]
+ },
+ "Asia/Kuwait": {
+  "cities": [
+   "Al Aḩmadī",
+   "Ḩawallī",
+   "As Sālimīyah",
+   "Şabāḩ as Sālim"
+  ],
+  "countries": [
+   "KW"
+  ]
+ },
+ "Asia/Macau": {
+  "aliases": [
+   "Asia/Macao"
+  ],
+  "cities": [
+   "Santo António",
+   "Nossa Senhora de Fátima",
+   "Taipa"
+  ],
+  "countries": [
+   "MO"
+  ]
+ },
+ "Asia/Magadan": {
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Makassar": {
+  "aliases": [
+   "Asia/Ujung_Pandang"
+  ],
+  "cities": [
+   "Samarinda",
+   "Balikpapan",
+   "Denpasar",
+   "Banjarmasin",
+   "Kupang",
+   "Manado",
+   "Mataram",
+   "Palu",
+   "Kendari",
+   "Banjarbaru",
+   "Tarakan",
+   "Toli-Toli",
+   "Bitung",
+   "Klungkung",
+   "Loa Janan",
+   "Gorontalo",
+   "Bontang",
+   "Labuan Bajo",
+   "Palopo",
+   "Bima",
+   "Baubau",
+   "Parepare",
+   "Watampone",
+   "Nusantara",
+   "Singaraja",
+   "Martapura",
+   "Sukawati",
+   "Kotamobagu",
+   "Negara"
+  ],
+  "countries": [
+   "ID"
+  ]
+ },
+ "Asia/Manila": {
+  "cities": [
+   "Quezon City",
+   "Davao",
+   "Caloocan",
+   "Taguig",
+   "Budta",
+   "Malingao",
+   "Zamboanga",
+   "Cebu City",
+   "Antipolo",
+   "Pasig City",
+   "Cagayan de Oro",
+   "Valenzuela",
+   "General Santos",
+   "Paranaque City",
+   "Las Piñas",
+   "Calamba",
+   "Muntinlupa",
+   "Makati City",
+   "Lapu-Lapu City",
+   "Angeles City",
+   "Imus",
+   "Iloilo",
+   "Marikina City",
+   "Mandaluyong City",
+   "Bacolod City",
+   "Mansilingan",
+   "Dasmariñas",
+   "Mandaluyong",
+   "Pasay",
+   "Tarlac City",
+   "Cotabato",
+   "Malabon",
+   "San Jose del Monte",
+   "Bacoor",
+   "San Pedro",
+   "Cabanatuan City",
+   "Iligan",
+   "Mandaue City",
+   "Iligan City",
+   "Butuan",
+   "Cabuyao",
+   "San Pablo",
+   "Biñan",
+   "Santol",
+   "Cainta",
+   "Baguio",
+   "Malolos",
+   "Mantampay",
+   "Bagong Silang",
+   "Marawi City",
+   "Tacloban",
+   "San Fernando",
+   "Libertad",
+   "Navotas",
+   "Ormoc",
+   "Batangas",
+   "Magugpo Poblacion",
+   "Taytay",
+   "Lucena",
+   "Meycauayan",
+   "NIA Valencia",
+   "Puerto Princesa",
+   "Olongapo",
+   "Binangonan",
+   "Santa Rosa",
+   "Commonwealth",
+   "Lipa City",
+   "Panabo",
+   "Kabankalan",
+   "Toledo",
+   "Pagadian",
+   "Koronadal",
+   "Bago City",
+   "Panalanoy",
+   "Mabalacat City",
+   "Sorsogon",
+   "Roxas City",
+   "Legaspi",
+   "Concepcion",
+   "Naga",
+   "Dagupan",
+   "Tuguegarao",
+   "Ilagan",
+   "Pandi",
+   "Capas",
+   "Mariveles",
+   "Guyong",
+   "Urdaneta",
+   "San Jose",
+   "La Trinidad",
+   "Norzagaray",
+   "Gingoog",
+   "Candelaria",
+   "Baliuag",
+   "Angono",
+   "Rodriguez",
+   "San Mateo",
+   "San Juan",
+   "Talisay",
+   "Muricay",
+   "Bulaon",
+   "Gapan",
+   "Bayambang",
+   "Cadiz",
+   "Rosario",
+   "Pulong Santa Cruz",
+   "Bayawan",
+   "Santa Cruz",
+   "Sultan Kudarat",
+   "Poblacion",
+   "Hagonoy",
+   "Tabuk",
+   "Calumpit",
+   "Apalit",
+   "Plaridel",
+   "Silang",
+   "Malita",
+   "Guiguinto",
+   "Manolo Fortich",
+   "Midsayap",
+   "Himamaylan",
+   "Los Baños",
+   "Tacurong",
+   "Dinaig",
+   "Digos",
+   "Cavite City",
+   "Tayabas",
+   "Iriga City",
+   "Quezon",
+   "Dumaguete",
+   "Carmona",
+   "Laoag",
+   "Pulilan",
+   "Bayugan",
+   "Maramag",
+   "Santiago",
+   "Catbalogan",
+   "Bagong Silangan",
+   "Paniqui",
+   "Mati",
+   "Tanza",
+   "Putatan",
+   "Isulan",
+   "Jolo",
+   "Calasiao"
+  ],
+  "countries": [
+   "PH"
+  ]
+ },
+ "Asia/Muscat": {
+  "cities": [
+   "Seeb",
+   "Bawshar",
+   "‘Ibrī",
+   "Şalālah",
+   "Şaḩam",
+   "Rustaq",
+   "Sohar",
+   "As Suwayq"
+  ],
+  "countries": [
+   "OM"
+  ]
+ },
+ "Asia/Nicosia": {
+  "cities": [
+   "Limassol"
+  ],
+  "countries": [
+   "CY"
+  ]
+ },
+ "Asia/Novokuznetsk": {
+  "cities": [
+   "Kemerovo",
+   "Prokop’yevsk",
+   "Leninsk-Kuznetsky",
+   "Kiselëvsk",
+   "Mezhdurechensk"
+  ],
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Novosibirsk": {
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Omsk": {
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Oral": {
+  "countries": [
+   "KZ"
+  ]
+ },
+ "Asia/Phnom_Penh": {
+  "cities": [
+   "Takeo",
+   "Siem Reap",
+   "Battambang"
+  ],
+  "countries": [
+   "KH"
+  ]
+ },
+ "Asia/Pontianak": {
+  "cities": [
+   "Palangkaraya",
+   "Singkawang",
+   "Sampit",
+   "Pangkalanbuun"
+  ],
+  "countries": [
+   "ID"
+  ]
+ },
+ "Asia/Pyongyang": {
+  "cities": [
+   "Hamhŭng",
+   "Namp’o",
+   "Sunch’ŏn",
+   "Hŭngnam",
+   "Kaesŏng",
+   "Wŏnsan",
+   "Chongjin",
+   "Man’gyŏngdae-ri",
+   "Kaech’ŏn",
+   "Sariwŏn-si",
+   "Sinŭiju",
+   "Tŏkch’ŏn",
+   "Haeju",
+   "Kanggye",
+   "Changam-ch’on",
+   "Hyesan",
+   "Paech’ŏn-ŭp",
+   "Sinp’o",
+   "Songnim-ni",
+   "Ch’ŏngdan-ŭp",
+   "Sinch’ŏn-ŭp",
+   "Paek'ak",
+   "Chaeryŏng-ni",
+   "Manp’o",
+   "Ŭllyul",
+   "Kangnyŏng",
+   "Kangsŏn",
+   "P’yŏngsŏng"
+  ],
+  "countries": [
+   "KP"
+  ]
+ },
+ "Asia/Qatar": {
+  "cities": [
+   "Doha",
+   "Ar Rayyān",
+   "Lusail"
+  ],
+  "countries": [
+   "QA"
+  ]
+ },
+ "Asia/Qostanay": {
+  "cities": [
+   "Kostanay",
+   "Rudnyy"
+  ],
+  "countries": [
+   "KZ"
+  ]
+ },
+ "Asia/Qyzylorda": {
+  "cities": [
+   "Kyzylorda"
+  ],
+  "countries": [
+   "KZ"
+  ]
+ },
+ "Asia/Riyadh": {
+  "cities": [
+   "Jeddah",
+   "Makkah",
+   "Madinah",
+   "Dammam",
+   "Sulţānah",
+   "Buraydah",
+   "Ta’if",
+   "Tabuk",
+   "Ha'il",
+   "Najrān",
+   "Al Kharj",
+   "Khamis Mushait",
+   "Al Hufūf",
+   "Al Mubarraz",
+   "Hafar Al-Batin",
+   "Thuqbah",
+   "Al Jubayl",
+   "Şabyā",
+   "Abha",
+   "Yanbu",
+   "Unaizah",
+   "Khobar",
+   "Arar",
+   "Sakakah",
+   "Az Zulfī",
+   "Bīshah",
+   "Jizan",
+   "Qurayyat",
+   "Sabt Alalayah"
+  ],
+  "countries": [
+   "SA"
+  ]
+ },
+ "Asia/Sakhalin": {
+  "cities": [
+   "Yuzhno-Sakhalinsk"
+  ],
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Samarkand": {
+  "cities": [
+   "Nukus",
+   "Bukhara",
+   "Qarshi",
+   "Tirmiz",
+   "Jizzax",
+   "Urganch",
+   "Navoiy",
+   "Shahrisabz",
+   "Xiva"
+  ],
+  "countries": [
+   "UZ"
+  ]
+ },
+ "Asia/Seoul": {
+  "cities": [
+   "Busan",
+   "Incheon",
+   "Daegu",
+   "Daejeon",
+   "Gwangju",
+   "Suwon",
+   "Ulsan",
+   "Goyang-si",
+   "Changwon",
+   "Seongnam-si",
+   "Cheongju-si",
+   "Bucheon-si",
+   "Cheonan",
+   "Hwaseong-si",
+   "Jeonju",
+   "Ansan-si",
+   "Anyang-si",
+   "Kimhae",
+   "Pohang",
+   "Jeju City",
+   "Uijeongbu-si",
+   "Paju",
+   "Masan",
+   "Gumi",
+   "Sejong",
+   "Pyeongtaek",
+   "Yangsan",
+   "Gwangmyeong",
+   "Wŏnju",
+   "Chinju",
+   "Iksan",
+   "Gunpo",
+   "Chuncheon",
+   "Suncheon",
+   "Yeosu",
+   "Mokpo",
+   "Gyeongsan-si",
+   "Gunsan",
+   "Hanam",
+   "Gyeongju",
+   "Osan",
+   "Geoje",
+   "Chungju",
+   "Gangneung",
+   "Gimpo-si",
+   "Icheon-si",
+   "Guri-si",
+   "Yangju",
+   "Seogwipo",
+   "Gijang",
+   "Gwangyang",
+   "Andong",
+   "Gimcheon",
+   "Jeongeup",
+   "Siheungdong",
+   "Yeoju",
+   "Hwado",
+   "Sangju",
+   "Donghae City"
+  ],
+  "countries": [
+   "KR"
+  ]
+ },
+ "Asia/Shanghai": {
+  "cities": [
+   "Chongqing",
+   "Chengdu",
+   "Beijing",
+   "Guangzhou",
+   "Shenzhen",
+   "Tianjin",
+   "Wuhan",
+   "Xi’an",
+   "Hangzhou",
+   "Harbin",
+   "Dongguan",
+   "Hefei",
+   "Weifang",
+   "Nanjing",
+   "Shenyang",
+   "Foshan",
+   "Jinan",
+   "Dalian",
+   "Wuzhong",
+   "Qingdao",
+   "Yantai",
+   "Suzhou",
+   "Puxi",
+   "Zhengzhou",
+   "Nanning",
+   "Kunming",
+   "Shijiazhuang",
+   "Changchun",
+   "Pudong",
+   "Taiyuan",
+   "Zibo",
+   "Xiamen",
+   "Yangzhou",
+   "Huai'an",
+   "Guiyang",
+   "Bao'an",
+   "Wuxi",
+   "Lanzhou",
+   "Fuzhou",
+   "Zaozhuang",
+   "Zhongshan",
+   "Shantou",
+   "Ningbo",
+   "Nanhai",
+   "Puyang",
+   "Shiyan",
+   "Hohhot",
+   "Tangshan",
+   "Lüliang",
+   "Anshan",
+   "Changzhou",
+   "Datong",
+   "Changsha",
+   "Huainan",
+   "Haikou",
+   "Huizhou",
+   "Yinchuan",
+   "Baotou",
+   "Linyi",
+   "Baoding",
+   "Minhang",
+   "Bazhong",
+   "Wenzhou",
+   "Yunfu",
+   "Xining",
+   "Nanchang",
+   "Shaoxing",
+   "Nantong",
+   "Baoshan",
+   "Zhuhai",
+   "Ordos",
+   "Qingyang",
+   "Kunshan",
+   "Zunyi",
+   "Lianyungang",
+   "Puning",
+   "Ganzhou",
+   "Songjiang",
+   "Jieyang",
+   "Jilin",
+   "Jiading",
+   "Shangqiu",
+   "Nanchong",
+   "Nanyang",
+   "Jiangmen",
+   "Jiangyin",
+   "Fuyang",
+   "Bayan Nur",
+   "Chengtangcun",
+   "Chaozhou",
+   "Qingyuan",
+   "Tai’an",
+   "Changshu",
+   "Lu’an",
+   "Yancheng",
+   "Taizhou",
+   "Daqing",
+   "Wuhu",
+   "Dazhou",
+   "Guilin",
+   "Zhaoqing",
+   "Mianyang",
+   "Wanzhou",
+   "Putian",
+   "Jinzhou",
+   "Yiwu",
+   "Quanzhou",
+   "Jinhua",
+   "Cixi",
+   "Changde",
+   "Kaifeng",
+   "Baoji",
+   "Suqian",
+   "Liuzhou",
+   "Zhangjiagang",
+   "Xinyang",
+   "Jinjiang",
+   "Bozhou",
+   "Qujing",
+   "Zhanjiang",
+   "Fushun",
+   "Luoyang",
+   "Guankou",
+   "Lianjiang",
+   "Handan",
+   "Yichang",
+   "Heze",
+   "Liupanshui",
+   "Maoming",
+   "Qinzhou",
+   "Luohe",
+   "Xiangyang",
+   "Yangjiang",
+   "Yixing",
+   "Qingpu",
+   "Xuchang",
+   "Zigong",
+   "Xuzhou",
+   "Neijiang",
+   "Heshan",
+   "Jining",
+   "Putuo",
+   "Liaocheng",
+   "Jinzhong",
+   "Changzhi",
+   "Tianshui",
+   "Yangpu",
+   "Weinan",
+   "Jiaxing",
+   "Zhongwei",
+   "Panjin",
+   "Jiujiang",
+   "Anyang",
+   "Luohu District",
+   "Fengxiang",
+   "Bijie",
+   "Zhuzhou",
+   "Rui’an",
+   "Zoucheng",
+   "Shangrao",
+   "Huaibei",
+   "Xuhui",
+   "Meishan",
+   "Wuchang",
+   "Guigang",
+   "Hengyang",
+   "Yulin",
+   "Jingzhou",
+   "Xinxiang",
+   "Yichun",
+   "Xianyang",
+   "Sanya",
+   "Shaoguan",
+   "Longyan",
+   "Yongzhou",
+   "Huzhou",
+   "Xinyi",
+   "Wuwei",
+   "Yishui",
+   "Hanzhong",
+   "Hezhou",
+   "Zhu Cheng City",
+   "Dongying",
+   "Luzhou",
+   "Meizhou",
+   "Yueyang",
+   "Laiwu",
+   "Pingdingshan",
+   "Bengbu",
+   "Feicheng",
+   "Sanhe",
+   "Guli",
+   "Xiangtan",
+   "Linfen",
+   "Zhenjiang",
+   "Huludao",
+   "Jing’an",
+   "Chengde",
+   "Laibin",
+   "Xiaogan",
+   "Wuchuan",
+   "Ziyang",
+   "Quzhou",
+   "Pingxiang",
+   "Zhoushan",
+   "Qiqihar",
+   "Laiyang",
+   "Daye",
+   "Ankang",
+   "Langfang",
+   "Lhasa",
+   "Jiaozuo",
+   "Benxi",
+   "Wanxian",
+   "Guang’an",
+   "Weihai",
+   "Zhabei",
+   "Shangyu",
+   "Xinyu",
+   "Yibin",
+   "Taicang",
+   "Jiaojiang",
+   "Jinshan",
+   "Chenzhou",
+   "Dandong",
+   "Anqing",
+   "Xingtai",
+   "Zhaotong",
+   "Hondlon",
+   "Panzhihua",
+   "Chuzhou",
+   "Xuancheng",
+   "Anshun",
+   "Wuzhou",
+   "Qinhuangdao",
+   "Shaoyang",
+   "Hegang",
+   "Zhuanghe",
+   "Ma’anshan",
+   "Shizuishan",
+   "Deyang",
+   "Yangquan",
+   "Zhumadian",
+   "Qingshan",
+   "Changning",
+   "Zhangjiakou",
+   "Fuxin",
+   "Huangshi",
+   "Liaoyang",
+   "Hongkou",
+   "Baise",
+   "Binzhou",
+   "Yuncheng",
+   "Dezhou",
+   "Sanmenxia",
+   "E’zhou",
+   "Mudanjiang",
+   "Leshan",
+   "Rizhao",
+   "Dongcun",
+   "Suining",
+   "Huangpu",
+   "Lingyuan",
+   "Mingguang",
+   "Chongming",
+   "Hebi",
+   "Jingmen",
+   "Siping",
+   "Panshan",
+   "Jiaozhou",
+   "Suizhou",
+   "Chizhou",
+   "Ya'an",
+   "Sanming",
+   "Shuangyashan",
+   "Luancheng",
+   "Mengzi",
+   "Yingkou",
+   "Zhangzhou",
+   "Dongsheng",
+   "Xinmin",
+   "Wenchang",
+   "Chuxiong",
+   "Huaihua",
+   "Sishui",
+   "Ulanqab",
+   "Jiamusi",
+   "Wanning",
+   "Xinzhou",
+   "Pingdu",
+   "Ji’an",
+   "Tanggu",
+   "Shangluo",
+   "Qionghai",
+   "Cangzhou",
+   "Yuanping",
+   "Beihai",
+   "Hengshui",
+   "Daxing’anling",
+   "Guangyuan",
+   "Xianning",
+   "Tonghua",
+   "Mianzhu, Deyang, Sichuan",
+   "Banan",
+   "Zhangye",
+   "Zhoukou",
+   "Pingliang",
+   "Zhucheng",
+   "Loudi",
+   "Hecun",
+   "Shanwei",
+   "Jianshui",
+   "Donghe",
+   "Xichang",
+   "Zaoyang",
+   "Chéngguān Qū",
+   "Jincheng",
+   "Hongjiang",
+   "Yan’an",
+   "Shouguang",
+   "Jingdezhen",
+   "Nanping",
+   "Longshan",
+   "Heyuan",
+   "Huangshan",
+   "Tieling",
+   "Wafangdian",
+   "Yongji",
+   "Lishui",
+   "Wenshan City",
+   "Basuo",
+   "Zhangjiajie",
+   "Zhongxiang",
+   "Bei’an",
+   "Macheng",
+   "Shuozhou",
+   "Ningde",
+   "Jiuquan",
+   "Dingxi",
+   "Tongchuan",
+   "Guyuan",
+   "Chaoyang",
+   "Zhijiang",
+   "Jixi",
+   "Tongling",
+   "Hancheng",
+   "Liaozhong",
+   "Gaomi",
+   "Chongzuo",
+   "Tanzhou",
+   "Hechuan",
+   "Yanzhou",
+   "Pingyin",
+   "Xuanhua",
+   "Dachang",
+   "Fenghuang",
+   "Huanggang",
+   "Anqiu",
+   "Jizhou",
+   "Nanqiao",
+   "Lhoka",
+   "Pengze",
+   "Xilinhot",
+   "Hulunbuir",
+   "Chifeng",
+   "Yunlong",
+   "Qitaihe",
+   "Pizhou",
+   "Laixi",
+   "Hechi",
+   "Tongshan",
+   "Yanji",
+   "Lincang",
+   "Xingyi",
+   "Tantou",
+   "Baicheng",
+   "Lianshan",
+   "Changyi",
+   "Yangshuo",
+   "Linqu",
+   "Pu'er",
+   "Baiyin",
+   "Gaozhou",
+   "Xiuying",
+   "Dengzhou",
+   "Qibao",
+   "Enshi",
+   "Tanghe",
+   "Fangchenggang",
+   "Kaili",
+   "Xingning",
+   "Linxia Chengguanzhen",
+   "Longling County",
+   "Fuling",
+   "Chengzhong",
+   "Ulanhot",
+   "Hulan Ergi",
+   "Donghai",
+   "Huayin",
+   "Dongtai",
+   "Tongliao",
+   "Nianbo",
+   "Changle",
+   "Shiqi",
+   "Rugao",
+   "Suicheng",
+   "Nada",
+   "Suihua",
+   "Beibei",
+   "Shijie",
+   "Jiyuan",
+   "Laohekou",
+   "Gucun",
+   "Xiulin",
+   "Xiantao",
+   "Qingzhou",
+   "Yuci",
+   "Bole",
+   "Dali",
+   "Xiangxiang",
+   "Jiayuguan",
+   "Huanren",
+   "Changzheng",
+   "Jinchang",
+   "Fendou",
+   "Jingling",
+   "Heihe",
+   "Tongchuanshi",
+   "Xintai",
+   "Jiexiu",
+   "Wuxue",
+   "Wuhai",
+   "Yintai",
+   "Longgang",
+   "Yingtan",
+   "Xilin Hot",
+   "Zitong",
+   "Luojiang",
+   "Lijiang",
+   "Hailar",
+   "Daliang",
+   "Bachuan",
+   "Hangu",
+   "Gunan",
+   "Yunjinghong",
+   "Gongheyong",
+   "Nanchuan",
+   "Bishan",
+   "Yanghang",
+   "Gaoping",
+   "Nyingchi",
+   "Beiliu",
+   "Duyun",
+   "Kaiyuan",
+   "Lengshuijiang",
+   "Mentougou",
+   "Lushui",
+   "Jijiang",
+   "Hanfeng",
+   "Fengcheng",
+   "Peicheng",
+   "Ezhou",
+   "Zhengding",
+   "Yongchuan",
+   "Hepu",
+   "Aihui",
+   "Fuding",
+   "Humen",
+   "Haicheng",
+   "Beipiao",
+   "Guixi",
+   "Laizhou",
+   "Huixing",
+   "Changyuan",
+   "Shangri-La",
+   "Yangcheng",
+   "Dunhuang",
+   "Baishan",
+   "Zhenping",
+   "Anda",
+   "Gongzhuling",
+   "Pingwu County",
+   "Qianjiang",
+   "Zhenzhou",
+   "Xindi",
+   "Jiutai",
+   "Licheng",
+   "Dongling",
+   "Songcheng",
+   "Hengshan",
+   "Tongzhou",
+   "Anbu",
+   "Ning’er",
+   "Zhicheng",
+   "Nanpiao",
+   "Lizhi",
+   "Yizhou",
+   "Xinqiao",
+   "Lianghu",
+   "Guangshui",
+   "Fu’an",
+   "Zhaodong",
+   "Sanshui",
+   "Boshan",
+   "Yangchun",
+   "Dingzhou",
+   "Pengpu",
+   "Chenghua",
+   "Longfeng",
+   "Beining",
+   "Dunhua",
+   "Sujiatun",
+   "Honggang",
+   "Yima",
+   "Taozhou",
+   "Xinji",
+   "Taishan",
+   "Acheng",
+   "Hailin",
+   "Yong’an",
+   "Nanjin",
+   "Jieshou",
+   "Yushu",
+   "Shuizhai",
+   "Shanhaiguan",
+   "Yuepu",
+   "Huadian",
+   "Liuzhi",
+   "Fuyu",
+   "Wūdān",
+   "Chaohu",
+   "Liangping",
+   "Doilungdêqên",
+   "Jieshi",
+   "Hejiang",
+   "Xiayang",
+   "Wuyishan",
+   "Jiashan",
+   "Jiagedaqi",
+   "Huinong",
+   "Gejiu",
+   "Shiqiao",
+   "Shenglilu",
+   "Jiawang",
+   "Puqi",
+   "Wugang",
+   "Zhalantun",
+   "Fuji",
+   "Dawukou",
+   "Majie",
+   "Hepo",
+   "Shangzhi",
+   "Shuangcheng",
+   "Dongyang",
+   "Nantou",
+   "Jiazi",
+   "Dongxing",
+   "Leiyang",
+   "Shuanglonghu",
+   "Gaojing",
+   "Songnan",
+   "Jiangyou",
+   "Tengyue",
+   "Shajing",
+   "Jinfeng",
+   "Jingzhi",
+   "Danshui",
+   "Huicheng",
+   "Xiazhen",
+   "Haimen",
+   "Shahecheng",
+   "Lecheng",
+   "Nancun",
+   "Jiupu",
+   "Jiaohe",
+   "Wuda",
+   "Huangzhou",
+   "Zhoucun",
+   "Xiangcheng",
+   "Longshui",
+   "Lianhe",
+   "Lichuan",
+   "Bao'an Centre",
+   "Zhujing",
+   "Zhaoyuan",
+   "Xunchang",
+   "Nanbin",
+   "Luodian",
+   "Shaoshan",
+   "Wushan",
+   "Shunyi",
+   "Longjing",
+   "Gulin",
+   "Chenggu",
+   "Dasha",
+   "Yakeshi",
+   "Baisha",
+   "Anliu",
+   "Tianfu",
+   "Mingshui",
+   "Qiaotou",
+   "Yuyao",
+   "Zhaozhou",
+   "Wansheng",
+   "Wayaobu",
+   "Pingshan",
+   "Songyuan",
+   "Maba",
+   "Chengqiao",
+   "Taonan",
+   "Shaowu",
+   "Mengmao",
+   "Wuzhishan",
+   "Xigang",
+   "Chóngfú",
+   "Encheng",
+   "Zhuji",
+   "Datun",
+   "Qingnian",
+   "Linshui",
+   "Hailun",
+   "Shilong",
+   "Didao",
+   "Jianchang",
+   "Hulan",
+   "Dehui",
+   "Hanjia",
+   "Taibai",
+   "Xuyong",
+   "Nehe",
+   "Jalai Nur",
+   "Tieli",
+   "Shaping",
+   "Anning",
+   "Longjiang",
+   "Buhe",
+   "Xinghua",
+   "Yidu",
+   "Zhonghe",
+   "Puyang Chengguanzhen",
+   "Daxing",
+   "Yezhou",
+   "Pailou",
+   "Pulandian",
+   "Salaqi",
+   "Jishu",
+   "Yuxi",
+   "Bashan",
+   "Tongren",
+   "Gangu Chengguanzhen",
+   "Jishou",
+   "Shuifu",
+   "Hedong",
+   "Huacheng",
+   "Linxi",
+   "Xinzhai",
+   "Yanjia",
+   "Suifenhe",
+   "Sino-Singapore Tianjin Eco-city",
+   "Kangding"
+  ],
+  "countries": [
+   "CN"
+  ]
+ },
+ "Asia/Singapore": {
+  "cities": [
+   "Ulu Bedok",
+   "Bedok New Town",
+   "Sengkang New Town",
+   "Tampines Estate",
+   "Jurong Town",
+   "Tampines New Town",
+   "Woodlands",
+   "Jurong West",
+   "Yishun New Town",
+   "Hougang New Town",
+   "Punggol",
+   "Choa Chu Kang New Town",
+   "Ang Mo Kio New Town",
+   "Bukit Batok New Town",
+   "Bukit Merah Estate",
+   "Kampong Pasir Ris",
+   "Bukit Panjang New Town",
+   "Kembangan",
+   "Toa Payoh New Town",
+   "Serangoon New Town",
+   "Serangoon",
+   "Geylang",
+   "Sembawang Estate",
+   "Queenstown Estate",
+   "Kallang"
+  ],
+  "countries": [
+   "SG"
+  ]
+ },
+ "Asia/Srednekolymsk": {
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Taipei": {
+  "cities": [
+   "New Taipei City",
+   "Taichung",
+   "Kaohsiung",
+   "Tainan",
+   "Banqiao",
+   "Taoyuan",
+   "Hsinchu",
+   "Keelung",
+   "Fengshan",
+   "Neihu",
+   "Chiayi City",
+   "Yongkang",
+   "Changhua",
+   "Chang-hua",
+   "Zhubei",
+   "Bade",
+   "Xizhi",
+   "Danshui",
+   "Shulin",
+   "Yuanlin",
+   "Sanxia",
+   "Neili",
+   "Douliu",
+   "Toufen",
+   "Nantou",
+   "Taitung"
+  ],
+  "countries": [
+   "TW"
+  ]
+ },
+ "Asia/Tashkent": {
+  "cities": [
+   "Andijon",
+   "Namangan",
+   "Yunusobod",
+   "Fergana",
+   "Chilanzar",
+   "Qo‘qon",
+   "Marg‘ilon",
+   "Angren",
+   "Chirchiq",
+   "Olmaliq",
+   "Sergeli",
+   "Chust"
+  ],
+  "countries": [
+   "UZ"
+  ]
+ },
+ "Asia/Tbilisi": {
+  "cities": [
+   "Batumi",
+   "Kutaisi",
+   "Rustavi"
+  ],
+  "countries": [
+   "GE"
+  ]
+ },
+ "Asia/Tehran": {
+  "cities": [
+   "Mashhad",
+   "Isfahan",
+   "Karaj",
+   "Tabriz",
+   "Shiraz",
+   "Qom",
+   "Ahvaz",
+   "Kermanshah",
+   "Rasht",
+   "Kerman",
+   "Orūmīyeh",
+   "Zahedan",
+   "Hamadān",
+   "Arāk",
+   "Yazd",
+   "Eslamshahr",
+   "Ardabīl",
+   "Zanjan",
+   "Bandar Abbas",
+   "Sanandaj",
+   "Qazvin",
+   "Khorramshahr",
+   "Khorramabad",
+   "Shahrīār",
+   "Qods",
+   "Kāshān",
+   "Khomeynī Shahr",
+   "Dezful",
+   "Marāgheh",
+   "Sari",
+   "Borūjerd",
+   "Qarchak",
+   "Gorgān",
+   "Sabzevar",
+   "Golestān",
+   "Āmol",
+   "Pākdasht",
+   "Najafābād",
+   "Abadan",
+   "Varāmīn",
+   "Neyshābūr",
+   "Sāveh",
+   "Naz̧arābād",
+   "Qā’em Shahr",
+   "Bābol",
+   "Nasīm Shahr",
+   "Nasimshahr",
+   "Sirjan",
+   "Khūy",
+   "Bīrjand",
+   "Būkān",
+   "Bojnūrd",
+   "Fardīs",
+   "Shāhīn Shahr",
+   "Malāyer",
+   "Piranshahr",
+   "Mahābād",
+   "Bushehr",
+   "Saqqez",
+   "Shahrud",
+   "Bandar-e Māhshahr",
+   "Gonbad-e Kāvūs",
+   "Marvdasht",
+   "Rafsanjān",
+   "Kamālshahr",
+   "Jahrom",
+   "Īlām",
+   "Torbat-e Ḩeydarīyeh",
+   "Marīvān",
+   "Andīmeshk",
+   "Shahreẕā",
+   "Mīāndoāb",
+   "Kāshmar",
+   "Iranshahr",
+   "Jīroft",
+   "Shahr-e Kord",
+   "Semnan",
+   "Marand",
+   "Behbahān",
+   "Shahr-e Ṣadrā",
+   "Zābol",
+   "Dorūd",
+   "Moḩammad Shahr",
+   "Īz̄eh",
+   "Bandar-e Anzalī",
+   "Shahre Jadide Andisheh",
+   "Andīsheh",
+   "Pardīs",
+   "Kāzerūn",
+   "Qūchān",
+   "Borāzjān",
+   "Bāneh",
+   "Chālūs",
+   "Bahārestān",
+   "Mīāneh",
+   "Robāţ Karīm",
+   "Pārsābād",
+   "Shūshtar",
+   "Lāhījān",
+   "Ahar",
+   "Masjed Soleymān",
+   "Shahrak-e Pardīsān"
+  ],
+  "countries": [
+   "IR"
+  ]
+ },
+ "Asia/Thimphu": {
+  "aliases": [
+   "Asia/Thimbu"
+  ],
+  "countries": [
+   "BT"
+  ]
+ },
+ "Asia/Tokyo": {
+  "cities": [
+   "Yokohama",
+   "Osaka",
+   "Nagoya",
+   "Sapporo",
+   "Fukuoka",
+   "Kawasaki",
+   "Kobe",
+   "Kyoto",
+   "Saitama",
+   "Hiroshima",
+   "Sendai",
+   "Chiba",
+   "Kitakyushu",
+   "Setagaya",
+   "Sakai",
+   "Niigata",
+   "Hamamatsu",
+   "Ōta",
+   "Kumamoto",
+   "Aihara",
+   "Okayama",
+   "Sagamihara",
+   "Edogawe",
+   "Adachi",
+   "Shizuoka",
+   "Honchō",
+   "Kawaguchi",
+   "Kagoshima",
+   "Suginami",
+   "Itabashi",
+   "Hachiōji",
+   "Kotō",
+   "Himeji",
+   "Utsunomiya",
+   "Matsuyama",
+   "Matsudo",
+   "Ichikawa",
+   "Higashiosaka",
+   "Nishinomiya",
+   "Kurashiki",
+   "Ōita",
+   "Fukuyama",
+   "Kanazawa",
+   "Amagasaki",
+   "Katsushika",
+   "Fujisawa",
+   "Kashiwa",
+   "Machida",
+   "Toyota",
+   "Shinagawa",
+   "Takamatsu",
+   "Toyama",
+   "Yokosuka",
+   "Nagasaki",
+   "Hirakata",
+   "Gifu",
+   "Toyonaka",
+   "Miyazaki",
+   "Suita",
+   "Okazaki",
+   "Ichinomiya",
+   "Toyohashi",
+   "Minato",
+   "Takasaki",
+   "Nagano",
+   "Nara-shi",
+   "Iwaki",
+   "Wakayama",
+   "Kawagoe",
+   "Takatsuki",
+   "Shinjuku",
+   "Koshigaya",
+   "Ōtsu",
+   "Nakano",
+   "Tokorozawa",
+   "Asahikawa",
+   "Maebashi",
+   "Kita",
+   "Kochi",
+   "Kōriyama",
+   "Naha",
+   "Kasugai",
+   "Akita",
+   "Yokkaichi",
+   "Akashi",
+   "Kurume",
+   "Toshima",
+   "Aomori",
+   "Fukushima",
+   "Morioka",
+   "Meguro",
+   "Sumida",
+   "Ibaraki",
+   "Ichihara",
+   "Hakodate",
+   "Tsu",
+   "Yao",
+   "Kakogawachō-honmachi",
+   "Mito",
+   "Tokushima",
+   "Nagaoka",
+   "Shimonoseki",
+   "Fuchū",
+   "Fukui-shi",
+   "Minato City",
+   "Hiratsuka",
+   "Sōka",
+   "Yamagata",
+   "Fuji",
+   "Sasebo",
+   "Chigasaki",
+   "Chōfu",
+   "Yamato",
+   "Tsukuba",
+   "Matsumoto",
+   "Bunkyo",
+   "Hachinohe",
+   "Neyagawa",
+   "Saga",
+   "Shibuya",
+   "Kasukabe",
+   "Ageo",
+   "Takarazuka",
+   "Minamirinkan",
+   "Atsugi",
+   "Arakawa",
+   "Kure",
+   "Isesaki",
+   "Taito",
+   "Nishi-Tokyo-shi",
+   "Kishiwada",
+   "Matsue",
+   "Nagareyama",
+   "Yachiyo",
+   "Kodaira",
+   "Itami",
+   "Higashihiroshima",
+   "Suzuka",
+   "Kamirenjaku",
+   "Kumagaya",
+   "Yamaguchi",
+   "Uji",
+   "Hino",
+   "Kofu",
+   "Numazu",
+   "Jōetsu",
+   "Odawara",
+   "Anjō",
+   "Tottori-shi",
+   "Toyokawa",
+   "Izumi",
+   "Tachikawa",
+   "Narashino",
+   "Tomakomai",
+   "Hitachi",
+   "Sakura",
+   "Ube",
+   "Kamakura",
+   "Izumo",
+   "Urayasu",
+   "Imabari",
+   "Takaoka",
+   "Nishio",
+   "Chūō",
+   "Hirosaki",
+   "Kushiro",
+   "Oyama",
+   "Iwata",
+   "Obihiro",
+   "Niiza",
+   "Hadano",
+   "Ōgaki",
+   "Miyakonojō",
+   "Sayama",
+   "Matsusaka",
+   "Tochigi",
+   "Ueda",
+   "Hitachi-Naka",
+   "Katsuta",
+   "Kawanishi",
+   "Noda",
+   "Kariya",
+   "Higashimurayama",
+   "Kukichūō",
+   "Musashino",
+   "Shūnan",
+   "Komaki",
+   "Yonago",
+   "Tama",
+   "Iruma",
+   "Fujieda",
+   "Ashikaga",
+   "Kakamigahara",
+   "Tsuchiura",
+   "Kusatsu",
+   "Moriguchi",
+   "Okinawa",
+   "Misato, Saitama",
+   "Fukayachō",
+   "Asaka",
+   "Shimotoda",
+   "Ishinomaki",
+   "Kuwana",
+   "Yaizu",
+   "Koga",
+   "Minoh",
+   "Ebina",
+   "Kisarazu",
+   "Isahaya",
+   "Inazawa",
+   "Ebetsu",
+   "Ōme",
+   "Narita",
+   "Tondabayashichō",
+   "Sandachō",
+   "Fujinomiya",
+   "Zama",
+   "Ōmuta",
+   "Abiko",
+   "Kadoma",
+   "Onomichi",
+   "Matsubara",
+   "Kokubunji",
+   "Iwakuni",
+   "Ōsaki",
+   "Seto",
+   "Iizuka",
+   "Koganei",
+   "Tsuruoka",
+   "Uruma",
+   "Kashihara-shi",
+   "Ise",
+   "Kirishima",
+   "Honmachi",
+   "Niihama",
+   "Beppu",
+   "Kashiwara",
+   "Ikoma",
+   "Nobeoka",
+   "Daitō",
+   "Kitami",
+   "Aizu-Wakamatsu",
+   "Kakegawa",
+   "Handa",
+   "Sano",
+   "Karatsu",
+   "Higashikurume",
+   "Hōfu",
+   "Kōnosu",
+   "Nasushiobara",
+   "Urasoe",
+   "Otaru",
+   "Ichinoseki",
+   "Hatsukaichi",
+   "Akishima",
+   "Tōkai",
+   "Hikone",
+   "Nagahama",
+   "Fujimino",
+   "Ōshū",
+   "Youkaichi",
+   "Kazo",
+   "Kasuga",
+   "Matsutō",
+   "Kamagaya",
+   "Marugame",
+   "Habikino",
+   "Kiryū",
+   "Iwatsuki",
+   "Komatsu",
+   "Mishima",
+   "Tajimi",
+   "Inzai",
+   "Ikeda",
+   "Saijō",
+   "Toride",
+   "Isehara",
+   "Chikushino-shi",
+   "Yono",
+   "Tsuyama",
+   "Kani",
+   "Ōnojō",
+   "Kawachi-Nagano",
+   "Iida",
+   "Tokuyama",
+   "Kanoya",
+   "Chikusei",
+   "Sakado",
+   "Sakata",
+   "Izumisano",
+   "Ginowan"
+  ],
+  "countries": [
+   "JP"
+  ]
+ },
+ "Asia/Tomsk": {
+  "cities": [
+   "Seversk"
+  ],
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Ulaanbaatar": {
+  "cities": [
+   "Ulan Bator"
+  ],
+  "countries": [
+   "MN"
+  ]
+ },
+ "Asia/Urumqi": {
+  "cities": [
+   "Shihezi",
+   "Korla",
+   "Aqsu",
+   "Kashgar",
+   "Gujangbagh",
+   "Huocheng",
+   "Artux",
+   "Xinyuan",
+   "Turpan",
+   "Ghulja",
+   "Karamay",
+   "Hami",
+   "Changji",
+   "Jinshanlu",
+   "Tacheng",
+   "Wujiaqu",
+   "Tumxuk",
+   "Shache",
+   "Ālā'ĕr",
+   "Xincheng"
+  ],
+  "countries": [
+   "CN"
+  ]
+ },
+ "Asia/Ust-Nera": {
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Vientiane": {
+  "cities": [
+   "Savannakhet"
+  ],
+  "countries": [
+   "LA"
+  ]
+ },
+ "Asia/Vladivostok": {
+  "cities": [
+   "Khabarovsk",
+   "Komsomolsk-on-Amur",
+   "Ussuriysk",
+   "Nakhodka",
+   "Artëm"
+  ],
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Yakutsk": {
+  "cities": [
+   "Blagoveshchensk"
+  ],
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Yangon": {
+  "cities": [
+   "Mandalay",
+   "Nay Pyi Taw",
+   "Hlaingthaya",
+   "Mawlamyine",
+   "Kalemyo",
+   "Insein",
+   "Bago",
+   "Amarapura",
+   "Pathein",
+   "Yawnghwe",
+   "Monywa",
+   "Kyaukpyu",
+   "Sittwe",
+   "Meiktila",
+   "Myeik",
+   "Kēng Tung",
+   "Mu-se",
+   "Taunggyi",
+   "Myingyan",
+   "Dawei",
+   "Mingaladon",
+   "Pyay",
+   "Hinthada",
+   "Thandwe",
+   "Kyauktan",
+   "Mingala Tangnyunt",
+   "Lashio",
+   "Pakokku",
+   "Thaton",
+   "Ann",
+   "Pyin Oo Lwin",
+   "Möng Yang",
+   "Set Ka Lay",
+   "Kyimyindine",
+   "Yenangyaung",
+   "Taungoo"
+  ],
+  "countries": [
+   "MM"
+  ]
+ },
+ "Asia/Yekaterinburg": {
+  "cities": [
+   "Chelyabinsk",
+   "Ufa",
+   "Perm",
+   "Tyumen",
+   "Orenburg",
+   "Magnitogorsk",
+   "Nizhny Tagil",
+   "Kurgan",
+   "Surgut",
+   "Sterlitamak",
+   "Orsk",
+   "Nizhnevartovsk",
+   "Zlatoust",
+   "Kamensk-Ural’skiy",
+   "Berezniki",
+   "Miass",
+   "Salavat",
+   "Pervouralsk",
+   "Neftekamsk",
+   "Tobolsk",
+   "Nefteyugansk",
+   "Noyabrsk",
+   "Oktyabrsky",
+   "Novotroitsk",
+   "Khanty-Mansiysk",
+   "Solikamsk"
+  ],
+  "countries": [
+   "RU"
+  ]
+ },
+ "Asia/Yerevan": {
+  "cities": [
+   "Malatia-Sebastia",
+   "Shengavit",
+   "Nor Nork",
+   "Kentron",
+   "Erebuni",
+   "Ajapnyak",
+   "Arabkir",
+   "Gyumri"
+  ],
+  "countries": [
+   "AM"
+  ]
+ },
+ "Atlantic/Azores": {
+  "countries": [
+   "PT"
+  ]
+ },
+ "Atlantic/Bermuda": {
+  "countries": [
+   "BM"
+  ]
+ },
+ "Atlantic/Canary": {
+  "cities": [
+   "Las Palmas de Gran Canaria",
+   "Santa Cruz de Tenerife",
+   "La Laguna",
+   "Telde"
+  ],
+  "countries": [
+   "ES"
+  ]
+ },
+ "Atlantic/Cape_Verde": {
+  "cities": [
+   "Praia"
+  ],
+  "countries": [
+   "CV"
+  ]
+ },
+ "Atlantic/Faroe": {
+  "aliases": [
+   "Atlantic/Faeroe"
+  ],
+  "countries": [
+   "FO"
+  ]
+ },
+ "Atlantic/Madeira": {
+  "cities": [
+   "Funchal"
+  ],
+  "countries": [
+   "PT"
+  ]
+ },
+ "Atlantic/Reykjavik": {
+  "countries": [
+   "IS"
+  ]
+ },
+ "Atlantic/South_Georgia": {
+  "countries": [
+   "GS"
+  ]
+ },
+ "Atlantic/St_Helena": {
+  "countries": [
+   "SH"
+  ]
+ },
+ "Atlantic/Stanley": {
+  "countries": [
+   "FK"
+  ]
+ },
+ "Australia/Adelaide": {
+  "aliases": [
+   "Australia/South"
+  ],
+  "countries": [
+   "AU"
+  ]
+ },
+ "Australia/Brisbane": {
+  "aliases": [
+   "Australia/Queensland"
+  ],
+  "cities": [
+   "Gold Coast",
+   "Sunshine Coast",
+   "Logan City",
+   "Townsville",
+   "Cairns",
+   "Toowoomba"
+  ],
+  "countries": [
+   "AU"
+  ]
+ },
+ "Australia/Broken_Hill": {
+  "aliases": [
+   "Australia/Yancowinna"
+  ],
+  "countries": [
+   "AU"
+  ]
+ },
+ "Australia/Currie": {
+  "aliases": [
+   "Australia/Tasmania"
+  ]
+ },
+ "Australia/Darwin": {
+  "aliases": [
+   "Australia/North"
+  ],
+  "countries": [
+   "AU"
+  ]
+ },
+ "Australia/Eucla": {
+  "countries": [
+   "AU"
+  ]
+ },
+ "Australia/Hobart": {
+  "countries": [
+   "AU"
+  ]
+ },
+ "Australia/Lindeman": {
+  "countries": [
+   "AU"
+  ]
+ },
+ "Australia/Lord_Howe": {
+  "aliases": [
+   "Australia/LHI"
+  ],
+  "countries": [
+   "AU"
+  ]
+ },
+ "Australia/Melbourne": {
+  "aliases": [
+   "Australia/Victoria"
+  ],
+  "cities": [
+   "Geelong",
+   "City of Port Phillip",
+   "Ballarat",
+   "Bendigo"
+  ],
+  "countries": [
+   "AU"
+  ]
+ },
+ "Australia/Perth": {
+  "aliases": [
+   "Australia/West"
+  ],
+  "cities": [
+   "Mandurah"
+  ],
+  "countries": [
+   "AU"
+  ]
+ },
+ "Australia/Sydney": {
+  "aliases": [
+   "Australia/ACT",
+   "Australia/Canberra",
+   "Australia/NSW"
+  ],
+  "cities": [
+   "Newcastle",
+   "Central Coast",
+   "Wollongong"
+  ],
+  "countries": [
+   "AU"
+  ]
+ },
+ "Europe/Amsterdam": {
+  "cities": [
+   "Rotterdam",
+   "The Hague",
+   "Utrecht",
+   "Groningen",
+   "Eindhoven",
+   "Tilburg",
+   "Breda",
+   "Nijmegen",
+   "Almere Stad",
+   "Haarlem",
+   "Arnhem",
+   "'s-Hertogenbosch",
+   "Enschede",
+   "Amsterdam Nieuw-West",
+   "Amsterdam-Zuid",
+   "Amsterdam-West",
+   "Zaanstad",
+   "Amersfoort",
+   "Apeldoorn",
+   "Amsterdam-Oost",
+   "Hoofddorp",
+   "Zwolle",
+   "Leeuwarden",
+   "Maastricht",
+   "Leiden",
+   "Dordrecht",
+   "Noord",
+   "Zoetermeer",
+   "Venlo"
+  ],
+  "countries": [
+   "NL"
+  ]
+ },
+ "Europe/Andorra": {
+  "countries": [
+   "AD"
+  ]
+ },
+ "Europe/Astrakhan": {
+  "countries": [
+   "RU"
+  ]
+ },
+ "Europe/Athens": {
+  "cities": [
+   "Thessaloníki",
+   "Pátra",
+   "Piraeus",
+   "Lárisa",
+   "Peristéri",
+   "Irákleion",
+   "Kallithéa"
+  ],
+  "countries": [
+   "GR"
+  ]
+ },
+ "Europe/Belgrade": {
+  "cities": [
+   "Pristina",
+   "Niš",
+   "Novi Sad",
+   "Novi Beograd",
+   "Prizren",
+   "Zemun",
+   "Kragujevac",
+   "Čačak",
+   "Mitrovicë",
+   "Subotica"
+  ],
+  "countries": [
+   "RS"
+  ]
+ },
+ "Europe/Berlin": {
+  "cities": [
+   "Hamburg",
+   "Munich",
+   "Köln",
+   "Frankfurt am Main",
+   "Düsseldorf",
+   "Stuttgart",
+   "Essen",
+   "Dortmund",
+   "Dresden",
+   "Bremen",
+   "Nuremberg",
+   "Hannover",
+   "Leipzig",
+   "Duisburg",
+   "Wandsbek",
+   "Bochum",
+   "Wuppertal",
+   "Bielefeld",
+   "Bonn",
+   "Hamburg-Nord",
+   "Münster",
+   "Mannheim",
+   "Hamburg-Mitte",
+   "Augsburg",
+   "Wiesbaden",
+   "Marienthal",
+   "Karlsruhe",
+   "Gelsenkirchen",
+   "Eimsbüttel",
+   "Aachen",
+   "Mönchengladbach",
+   "Kiel",
+   "Altona",
+   "Chemnitz",
+   "Braunschweig",
+   "Magdeburg",
+   "Krefeld",
+   "Halle (Saale)",
+   "Freiburg",
+   "Neue Neustadt",
+   "Mainz",
+   "Oberhausen",
+   "Erfurt",
+   "Lübeck",
+   "Hagen",
+   "Rostock",
+   "Kassel",
+   "Potsdam",
+   "Saarbrücken",
+   "Hamm",
+   "Mülheim",
+   "Herne",
+   "Harburg",
+   "Darmstadt",
+   "Osnabrück",
+   "Neukölln",
+   "Solingen",
+   "Ludwigshafen am Rhein",
+   "Leverkusen",
+   "Oldenburg",
+   "Kreuzberg",
+   "Neuss",
+   "Regensburg",
+   "Prenzlauer Berg",
+   "Heidelberg",
+   "Paderborn",
+   "Würzburg",
+   "Fürth",
+   "Charlottenburg",
+   "Wolfsburg",
+   "Schöneberg",
+   "Recklinghausen",
+   "Göttingen",
+   "Heilbronn",
+   "Ingolstadt",
+   "Ulm",
+   "Bottrop",
+   "Bergedorf",
+   "Pforzheim",
+   "Offenbach",
+   "Bremerhaven",
+   "Friedrichshain",
+   "Remscheid",
+   "Nippes",
+   "Porz am Rhein",
+   "Reutlingen",
+   "Marzahn",
+   "Rodenkirchen",
+   "Koblenz",
+   "Siegen",
+   "Bergisch Gladbach",
+   "Salzgitter",
+   "Jena",
+   "Gera",
+   "Moers",
+   "Hildesheim",
+   "Erlangen",
+   "Mitte",
+   "Wilmersdorf",
+   "Trier"
+  ],
+  "countries": [
+   "DE"
+  ]
+ },
+ "Europe/Bratislava": {
+  "cities": [
+   "Košice",
+   "Petržalka"
+  ],
+  "countries": [
+   "SK"
+  ]
+ },
+ "Europe/Brussels": {
+  "cities": [
+   "Antwerp",
+   "Gent",
+   "Charleroi",
+   "Liège",
+   "Anderlecht",
+   "Schaerbeek",
+   "Brugge",
+   "Namur",
+   "Leuven"
+  ],
+  "countries": [
+   "BE"
+  ]
+ },
+ "Europe/Bucharest": {
+  "cities": [
+   "Sector 3",
+   "Iaşi",
+   "Sector 6",
+   "Constanţa",
+   "Sector 2",
+   "Sector 4",
+   "Cluj-Napoca",
+   "Sector 5",
+   "Braşov",
+   "Timişoara",
+   "Craiova",
+   "Sector 1",
+   "Galaţi",
+   "Târgu Mureş",
+   "Oradea",
+   "Ploieşti",
+   "Arad",
+   "Brăila",
+   "Piteşti",
+   "Bacău",
+   "Sibiu",
+   "Satu Mare",
+   "Baia Mare",
+   "Buzău",
+   "Piatra Neamţ"
+  ],
+  "countries": [
+   "RO"
+  ]
+ },
+ "Europe/Budapest": {
+  "cities": [
+   "Pest",
+   "Buda",
+   "Debrecen",
+   "Szeged",
+   "Miskolc",
+   "Pécs",
+   "Budapest XI. kerület",
+   "Zugló",
+   "Győr",
+   "Budapest III. kerület",
+   "Nyíregyháza",
+   "Budapest XIII. kerület",
+   "Kecskemét",
+   "Székesfehérvár",
+   "Újpest"
+  ],
+  "countries": [
+   "HU"
+  ]
+ },
+ "Europe/Busingen": {
+  "countries": [
+   "DE"
+  ]
+ },
+ "Europe/Chisinau": {
+  "aliases": [
+   "Europe/Tiraspol"
+  ],
+  "cities": [
+   "Bălţi",
+   "Bender"
+  ],
+  "countries": [
+   "MD"
+  ]
+ },
+ "Europe/Copenhagen": {
+  "cities": [
+   "Århus",
+   "Odense",
+   "Aalborg"
+  ],
+  "countries": [
+   "DK"
+  ]
+ },
+ "Europe/Dublin": {
+  "cities": [
+   "South Dublin",
+   "Cork",
+   "Limerick"
+  ],
+  "countries": [
+   "IE"
+  ]
+ },
+ "Europe/Gibraltar": {
+  "countries": [
+   "GI"
+  ]
+ },
+ "Europe/Guernsey": {
+  "aliases": [
+   "Europe/Belfast"
+  ],
+  "countries": [
+   "GG"
+  ]
+ },
+ "Europe/Helsinki": {
+  "cities": [
+   "Espoo",
+   "Tampere",
+   "Vantaa",
+   "Oulu",
+   "Turku",
+   "East Helsinki",
+   "Jyväskylä",
+   "Kuopio",
+   "Lahti"
+  ],
+  "countries": [
+   "FI"
+  ]
+ },
+ "Europe/Isle_of_Man": {
+  "countries": [
+   "IM"
+  ]
+ },
+ "Europe/Istanbul": {
+  "cities": [
+   "Ankara",
+   "Bursa",
+   "İzmir",
+   "Gaziantep",
+   "Diyarbakır",
+   "Adana",
+   "Kayseri",
+   "Konya",
+   "Antalya",
+   "Esenyurt",
+   "Eskişehir",
+   "Çankaya",
+   "Küçükçekmece",
+   "Erzurum",
+   "Malatya",
+   "Bağcılar",
+   "Bahçelievler",
+   "Ümraniye",
+   "Mersin",
+   "Nilüfer",
+   "Van",
+   "Üsküdar",
+   "Esenler",
+   "Sancaktepe",
+   "Karabağlar",
+   "Bornova",
+   "Batman",
+   "Muratpaşa",
+   "Şanlıurfa",
+   "Elazığ",
+   "Sultangazi",
+   "Maltepe",
+   "Beylikdüzü",
+   "Antakya",
+   "Samsun",
+   "Kahramanmaraş",
+   "Uşak",
+   "Alanya",
+   "Ataşehir",
+   "Sultanbeyli",
+   "Fatih",
+   "Tarsus",
+   "Karşıyaka",
+   "Konak",
+   "Aksaray",
+   "Şişli",
+   "Denizli",
+   "Batikent",
+   "Adıyaman",
+   "Adapazarı",
+   "Gebze",
+   "Zeytinburnu",
+   "Merkezefendi",
+   "Çorum",
+   "Sivas",
+   "Afyonkarahisar",
+   "İskenderun",
+   "Trabzon",
+   "Manisa",
+   "Balıkesir",
+   "Ordu",
+   "Çiğli",
+   "Osmaniye",
+   "Çorlu",
+   "Arnavutköy",
+   "İzmit",
+   "Düzce",
+   "Başakşehir",
+   "Kırıkkale",
+   "Kütahya",
+   "Bolu",
+   "Edirne",
+   "Karaman",
+   "Siverek",
+   "Isparta",
+   "Gölbaşı",
+   "Büyükçekmece",
+   "Aydın",
+   "Ereğli",
+   "Viranşehir",
+   "Erzincan",
+   "Kırşehir",
+   "Kızıltepe",
+   "Çanakkale",
+   "Cizre",
+   "İnegol",
+   "Silifke",
+   "Mardin",
+   "Tokat",
+   "Bingöl",
+   "Giresun",
+   "Kastamonu",
+   "Derince",
+   "Karabük",
+   "Ağrı",
+   "Samandağ",
+   "Tekirdağ",
+   "Rize",
+   "Nazilli",
+   "Salihli",
+   "Amasya",
+   "Silopi",
+   "Siirt",
+   "Kilis",
+   "Turhal",
+   "Arsuz",
+   "Bandırma",
+   "Turgutlu",
+   "Zonguldak",
+   "Iğdır",
+   "Mustafakemalpaşa",
+   "Suruç"
+  ],
+  "countries": [
+   "TR"
+  ]
+ },
+ "Europe/Jersey": {
+  "countries": [
+   "JE"
+  ]
+ },
+ "Europe/Kaliningrad": {
+  "countries": [
+   "RU"
+  ]
+ },
+ "Europe/Kirov": {
+  "countries": [
+   "RU"
+  ]
+ },
+ "Europe/Kyiv": {
+  "cities": [
+   "Kharkiv",
+   "Odesa",
+   "Dnipro",
+   "Donetsk",
+   "Lviv",
+   "Zaporizhzhya",
+   "Kryvyy Rih",
+   "Mykolayiv",
+   "Vinnytsya",
+   "Saltivka",
+   "Luhansk",
+   "Desna",
+   "Dniprovskyi",
+   "Pravyi Bereh",
+   "Darnytsya",
+   "Makiyivka",
+   "Saltivskyi",
+   "Chernihiv",
+   "Poltava",
+   "Khmelnytskyi",
+   "Cherkasy",
+   "Chernivtsi",
+   "Zhytomyr",
+   "Sumy",
+   "Rivne",
+   "Vyhurivshchyna-Troyeshchyna",
+   "Horlivka",
+   "Obolon",
+   "Ivano-Frankivsk",
+   "Mariupol",
+   "Kamyanske",
+   "Ternopil",
+   "Kremenchuk",
+   "Shevchenkivskyi",
+   "Kropyvnytskyi",
+   "Lutsk",
+   "Bila Tserkva",
+   "Verhunskyi",
+   "Kyivskyi",
+   "Borshchahivka",
+   "Novozavodskyi",
+   "Desnyanskyi",
+   "Tsentralnyi",
+   "Rutchenkivskyi",
+   "Fortechnyi",
+   "Nyzhnodniprovsk",
+   "Industrialnyi",
+   "Avtozavodskyi",
+   "Sykhiv",
+   "Zarichnyi",
+   "Melitopol",
+   "Shevchenko",
+   "Bohuniya",
+   "Kramatorsk",
+   "Slobidskyi",
+   "Nemyshlyanskyi",
+   "Kovpakivskyi",
+   "Rayon KhTZ",
+   "Mykilska Borshchahivka",
+   "Vilkhivskyi",
+   "Livoberezhnyi",
+   "Cheremushky",
+   "Tsentralno-Miskyi",
+   "Smolyanskyi",
+   "Uzhhorod",
+   "Korolyov",
+   "Brovary",
+   "Novobavarskyi",
+   "Hirnytskyi",
+   "Berdyansk",
+   "Alchevsk",
+   "Nikopol",
+   "Slovyansk",
+   "Pozniaky",
+   "Kalynivskyi",
+   "Chumakivskyi",
+   "Skhidni Kvartaly",
+   "Kindrativskyi",
+   "Kalmiuskyi",
+   "Pavlohrad",
+   "Pechersk",
+   "Oleksiyivka",
+   "Oleksandrivskyi"
+  ],
+  "countries": [
+   "UA"
+  ]
+ },
+ "Europe/Lisbon": {
+  "cities": [
+   "Porto",
+   "Braga",
+   "Amadora",
+   "Coimbra",
+   "Leiria",
+   "Setúbal",
+   "Viseu",
+   "Queluz"
+  ],
+  "countries": [
+   "PT"
+  ]
+ },
+ "Europe/Ljubljana": {
+  "countries": [
+   "SI"
+  ]
+ },
+ "Europe/London": {
+  "cities": [
+   "Birmingham",
+   "Glasgow",
+   "Manchester",
+   "Sheffield",
+   "Leeds",
+   "Edinburgh",
+   "Liverpool",
+   "Bristol",
+   "Cardiff",
+   "Leicester",
+   "Bradford",
+   "Belfast",
+   "Coventry",
+   "Brent",
+   "Birkenhead",
+   "Nottingham",
+   "Islington",
+   "Reading",
+   "Kingston upon Hull",
+   "Preston",
+   "Swansea",
+   "Newcastle upon Tyne",
+   "Southend-on-Sea",
+   "Brighton",
+   "Derby",
+   "Southampton",
+   "Wolverhampton",
+   "Plymouth",
+   "Stoke-on-Trent",
+   "Milton Keynes",
+   "City of Westminster",
+   "Northampton",
+   "Oldham",
+   "Bexley",
+   "Luton",
+   "Barking",
+   "Archway",
+   "Portsmouth",
+   "Swindon",
+   "Dudley",
+   "Aberdeen",
+   "Sutton",
+   "St Helens",
+   "Ipswich",
+   "Wigan",
+   "Croydon",
+   "Warrington",
+   "Walsall",
+   "Mansfield",
+   "Sunderland",
+   "Ilford",
+   "Slough",
+   "Bournemouth",
+   "Peterborough",
+   "Oxford",
+   "Newport",
+   "Enfield Town",
+   "York",
+   "Telford",
+   "Poole",
+   "Burnley",
+   "Harrow",
+   "Huddersfield",
+   "Dundee",
+   "Blackburn",
+   "Cambridge",
+   "Blackpool",
+   "Basildon",
+   "Norwich",
+   "Middlesbrough",
+   "Bolton",
+   "Stockport",
+   "High Wycombe",
+   "Gloucester",
+   "Exeter",
+   "Colchester",
+   "Tottenham",
+   "Salford",
+   "Newcastle under Lyme",
+   "Solihull",
+   "Watford",
+   "Saint Peters",
+   "Crawley",
+   "Burton upon Trent",
+   "Cheltenham",
+   "Rotherham",
+   "Worthing",
+   "Doncaster",
+   "Chesterfield",
+   "Chelmsford",
+   "Mendip",
+   "Sutton Coldfield",
+   "Wakefield",
+   "Walthamstow",
+   "Dagenham",
+   "Basingstoke",
+   "Maidstone",
+   "Bedford",
+   "Woking",
+   "Lincoln",
+   "West Bromwich",
+   "Eastbourne",
+   "Worcester",
+   "Bath",
+   "Gillingham",
+   "Becontree"
+  ],
+  "countries": [
+   "GB"
+  ]
+ },
+ "Europe/Luxembourg": {
+  "countries": [
+   "LU"
+  ]
+ },
+ "Europe/Madrid": {
+  "cities": [
+   "Barcelona",
+   "Valencia",
+   "Zaragoza",
+   "Sevilla",
+   "Málaga",
+   "Murcia",
+   "Palma",
+   "Alicante",
+   "Bilbao",
+   "Córdoba",
+   "Valladolid",
+   "Vigo",
+   "Gijón",
+   "Eixample",
+   "Gasteiz / Vitoria",
+   "L'Hospitalet de Llobregat",
+   "Latina",
+   "Carabanchel",
+   "A Coruña",
+   "Puente de Vallecas",
+   "Fuencarral",
+   "Sant Martí",
+   "Elche",
+   "Granada",
+   "Ciudad Lineal",
+   "Fuencarral-El Pardo",
+   "Oviedo",
+   "Terrassa",
+   "Badalona",
+   "Cartagena",
+   "Jerez de la Frontera",
+   "Sabadell",
+   "Pamplona",
+   "Móstoles",
+   "Almería",
+   "Alcalá de Henares",
+   "Fuenlabrada",
+   "Leganés",
+   "Getafe",
+   "Donostia / San Sebastián",
+   "Castelló de la Plana",
+   "Sants-Montjuïc",
+   "Burgos",
+   "Santander",
+   "Albacete",
+   "Alcorcón",
+   "Horta-Guinardó",
+   "Nou Barris",
+   "Hortaleza",
+   "San Blas-Canillejas",
+   "Marbella",
+   "Tetuán de las Victorias",
+   "Logroño",
+   "Badajoz",
+   "Madrid Centro",
+   "Arganzuela",
+   "Sarrià-Sant Gervasi",
+   "Salamanca",
+   "Chamberí",
+   "Huelva",
+   "Sant Andreu",
+   "Tarragona",
+   "Usera",
+   "Lleida",
+   "Chamartín",
+   "Mataró",
+   "Villaverde",
+   "Retiro",
+   "León",
+   "Dos Hermanas",
+   "Gràcia",
+   "Algeciras",
+   "Santa Coloma de Gramenet",
+   "Torrejón de Ardoz",
+   "Cadiz",
+   "Moncloa-Aravaca",
+   "Alcobendas",
+   "Parla",
+   "Jaén",
+   "Delicias",
+   "Ourense",
+   "Moratalaz",
+   "Reus",
+   "Ciutat Vella",
+   "Orihuela",
+   "Barakaldo",
+   "Girona"
+  ],
+  "countries": [
+   "ES"
+  ]
+ },
+ "Europe/Malta": {
+  "countries": [
+   "MT"
+  ]
+ },
+ "Europe/Mariehamn": {
+  "countries": [
+   "AX"
+  ]
+ },
+ "Europe/Minsk": {
+  "cities": [
+   "Homyel'",
+   "Hrodna",
+   "Vitebsk",
+   "Mahilyow",
+   "Brest",
+   "Bobruysk",
+   "Baranovichi",
+   "Barysaw",
+   "Pinsk",
+   "Mazyr",
+   "Lida",
+   "Orsha"
+  ],
+  "countries": [
+   "BY"
+  ]
+ },
+ "Europe/Monaco": {
+  "countries": [
+   "MC"
+  ]
+ },
+ "Europe/Moscow": {
+  "cities": [
+   "Saint Petersburg",
+   "Nizhniy Novgorod",
+   "Kazan",
+   "Rostov-on-Don",
+   "Voronezh",
+   "Krasnodar",
+   "Yaroslavl",
+   "Makhachkala",
+   "Ryazan’",
+   "Penza",
+   "Naberezhnyye Chelny",
+   "Lipetsk",
+   "Kalininskiy",
+   "Cheboksary",
+   "Tula",
+   "Kursk",
+   "Stavropol",
+   "Bryansk",
+   "Tver",
+   "Ivanovo",
+   "Vladimir",
+   "Arkhangel’sk",
+   "Belgorod",
+   "Kaluga",
+   "Krasnogvargeisky",
+   "Smolensk",
+   "Sochi",
+   "Saransk",
+   "Cherepovets",
+   "Vologda",
+   "Vladikavkaz",
+   "Orël",
+   "Grozny",
+   "Murmansk",
+   "Tambov",
+   "Petrozavodsk",
+   "Taganrog",
+   "Kostroma",
+   "Yoshkar-Ola",
+   "Syktyvkar",
+   "Mar’ino",
+   "Novorossiysk",
+   "Khimki",
+   "Nalchik",
+   "Nizhnekamsk",
+   "Dzerzhinsk",
+   "Staryy Oskol",
+   "Velikiy Novgorod",
+   "Shakhty",
+   "Rybinsk",
+   "Vykhino-Zhulebino",
+   "Zelenograd",
+   "Centralniy",
+   "Pskov",
+   "Vasyl'evsky Ostrov",
+   "Severnyy",
+   "Armavir",
+   "Severodvinsk",
+   "Yasenevo",
+   "Podolsk",
+   "Lyublino",
+   "Volgodonsk",
+   "Novocherkassk",
+   "Nazran",
+   "Mytishchi",
+   "Khoroshëvo-Mnevniki",
+   "Bibirevo",
+   "Gol’yanovo",
+   "Admiralteisky",
+   "Lyubertsy",
+   "Kovrov",
+   "Strogino",
+   "Balashikha",
+   "Zhulebino",
+   "Kolomna",
+   "Kuntsevo",
+   "Elektrostal’",
+   "Orekhovo-Borisovo",
+   "Biryulëvo",
+   "Novyye Kuz’minki",
+   "Kuz’minki",
+   "Pyatigorsk",
+   "Chertanovo Yuzhnoye",
+   "Maykop",
+   "Zheleznodorozhnyy",
+   "Al’met’yevsk",
+   "Korolev",
+   "Kolpino",
+   "Odintsovo",
+   "Nevinnomyssk",
+   "Kislovodsk",
+   "Novomoskovsk",
+   "Petrogradka",
+   "Ramenki",
+   "Zyablikovo",
+   "Novocheboksarsk",
+   "Serpukhov",
+   "Orekhovo-Borisovo Severnoye",
+   "Ivanovskoye",
+   "Murom",
+   "Khasavyurt",
+   "Tyoply Stan",
+   "Tsaritsyno",
+   "Cherkessk",
+   "Veshnyaki",
+   "Presnenskiy",
+   "Zyuzino",
+   "Solntsevo",
+   "Orekhovo-Zuyevo",
+   "Troparëvo",
+   "Taganskiy",
+   "Noginsk",
+   "Yelets",
+   "Novo-Peredelkino",
+   "Ochakovo-Matveyevskoye",
+   "Shchyolkovo",
+   "Bataysk",
+   "Arzamas",
+   "Sergiyev Posad",
+   "Obninsk",
+   "Elista",
+   "Cherëmushki",
+   "Derbent",
+   "Izmaylovo",
+   "Akademicheskoe",
+   "Velikiye Luki",
+   "Bogorodskoye",
+   "Pushkino",
+   "Ukhta",
+   "Shchukino",
+   "Brateyevo",
+   "Ryazanskiy",
+   "Novyye Cherëmushki",
+   "Tekstil’shchiki"
+  ],
+  "countries": [
+   "RU"
+  ]
+ },
+ "Europe/Oslo": {
+  "cities": [
+   "Bergen",
+   "Trondheim",
+   "Stavanger",
+   "Kristiansand",
+   "Drammen"
+  ],
+  "countries": [
+   "NO"
+  ]
+ },
+ "Europe/Paris": {
+  "cities": [
+   "Marseille",
+   "Lyon",
+   "Toulouse",
+   "Nice",
+   "Nantes",
+   "Marne La Vallée",
+   "Strasbourg",
+   "Bordeaux",
+   "Montpellier",
+   "Lille",
+   "Paris 15 Vaugirard",
+   "Rennes",
+   "Reims",
+   "Le Havre",
+   "Paris 20 Ménilmontant",
+   "Cergy-Pontoise",
+   "Paris 18 Buttes-Montmartre",
+   "Paris 13 Gobelins",
+   "Paris 19 Buttes-Chaumont",
+   "Paris 13e Arrondissement",
+   "Saint-Étienne",
+   "Toulon",
+   "Angers",
+   "Dijon",
+   "Paris 16 Passy",
+   "Paris 17 Batignolles-Monceau",
+   "Grenoble",
+   "Nîmes",
+   "Clermont-Ferrand",
+   "Aix-en-Provence",
+   "Saint-Quentin-en-Yvelines",
+   "Brest",
+   "Le Mans",
+   "Paris 11e Arrondissement",
+   "Amiens",
+   "Tours",
+   "Limoges",
+   "Paris 12e Arrondissement",
+   "Paris 11 Popincourt",
+   "Paris 12 Reuilly",
+   "Paris 14 Observatoire",
+   "Villeurbanne",
+   "Besançon",
+   "Metz",
+   "Orléans",
+   "Rouen",
+   "Mulhouse",
+   "Montreuil",
+   "Perpignan",
+   "Caen",
+   "Boulogne-Billancourt",
+   "Nancy",
+   "Lyon 03",
+   "Argenteuil"
+  ],
+  "countries": [
+   "FR"
+  ]
+ },
+ "Europe/Podgorica": {
+  "countries": [
+   "ME"
+  ]
+ },
+ "Europe/Prague": {
+  "cities": [
+   "Brno",
+   "Ostrava",
+   "Pilsen",
+   "Liberec"
+  ],
+  "countries": [
+   "CZ"
+  ]
+ },
+ "Europe/Riga": {
+  "countries": [
+   "LV"
+  ]
+ },
+ "Europe/Rome": {
+  "cities": [
+   "Milan",
+   "Naples",
+   "Turin",
+   "Palermo",
+   "Genoa",
+   "Bologna",
+   "Florence",
+   "Bari",
+   "Catania",
+   "Verona",
+   "Messina",
+   "Trieste",
+   "Padua",
+   "Brescia",
+   "Taranto",
+   "Parma",
+   "Prato",
+   "Modena",
+   "Reggio Calabria",
+   "Quarto Oggiaro",
+   "Reggio nell'Emilia",
+   "Livorno",
+   "Cagliari",
+   "Rimini",
+   "Mestre",
+   "Circoiscrizione II",
+   "Foggia",
+   "Circoiscrizione VIII",
+   "Ferrara",
+   "Circoiscrizione III",
+   "Acilia-Castel Fusano-Ostia Antica",
+   "Circoiscrizione V",
+   "Salerno",
+   "Monza",
+   "Siracusa",
+   "Bergamo",
+   "Trento",
+   "Perugia",
+   "Pescara",
+   "Forlì",
+   "Vicenza",
+   "Terni",
+   "Pisa",
+   "Bolzano",
+   "Circoiscrizione VI",
+   "Piacenza",
+   "Novara",
+   "Arezzo",
+   "Udine"
+  ],
+  "countries": [
+   "IT"
+  ]
+ },
+ "Europe/Samara": {
+  "cities": [
+   "Tolyatti",
+   "Izhevsk",
+   "Syzran",
+   "Novokuybyshevsk",
+   "Glazov"
+  ],
+  "countries": [
+   "RU"
+  ]
+ },
+ "Europe/San_Marino": {
+  "countries": [
+   "SM"
+  ]
+ },
+ "Europe/Sarajevo": {
+  "cities": [
+   "Banja Luka",
+   "Zenica",
+   "Tuzla",
+   "Mostar"
+  ],
+  "countries": [
+   "BA"
+  ]
+ },
+ "Europe/Saratov": {
+  "cities": [
+   "Balakovo",
+   "Engels"
+  ],
+  "countries": [
+   "RU"
+  ]
+ },
+ "Europe/Simferopol": {
+  "cities": [
+   "Sevastopol",
+   "Kerch",
+   "Yevpatoriya"
+  ],
+  "countries": [
+   "UA"
+  ]
+ },
+ "Europe/Skopje": {
+  "countries": [
+   "MK"
+  ]
+ },
+ "Europe/Sofia": {
+  "cities": [
+   "Plovdiv",
+   "Varna",
+   "Burgas",
+   "Stara Zagora",
+   "Ruse"
+  ],
+  "countries": [
+   "BG"
+  ]
+ },
+ "Europe/Stockholm": {
+  "cities": [
+   "Gothenburg",
+   "Malmö",
+   "Uppsala",
+   "Linköping",
+   "Örebro",
+   "Sollentuna",
+   "Umeå",
+   "Västerås",
+   "Södermalm",
+   "Jönköping",
+   "Helsingborg"
+  ],
+  "countries": [
+   "SE"
+  ]
+ },
+ "Europe/Tallinn": {
+  "cities": [
+   "Lasnamäe"
+  ],
+  "countries": [
+   "EE"
+  ]
+ },
+ "Europe/Tirane": {
+  "cities": [
+   "Tirana",
+   "Durrës",
+   "Vlorë",
+   "Elbasan"
+  ],
+  "countries": [
+   "AL"
+  ]
+ },
+ "Europe/Ulyanovsk": {
+  "cities": [
+   "Dimitrovgrad"
+  ],
+  "countries": [
+   "RU"
+  ]
+ },
+ "Europe/Vaduz": {
+  "countries": [
+   "LI"
+  ]
+ },
+ "Europe/Vatican": {
+  "countries": [
+   "VA"
+  ]
+ },
+ "Europe/Vienna": {
+  "cities": [
+   "Graz",
+   "Linz",
+   "Favoriten",
+   "Donaustadt",
+   "Floridsdorf",
+   "Salzburg",
+   "Innsbruck",
+   "Ottakring",
+   "Simmering",
+   "Klagenfurt am Wörthersee"
+  ],
+  "countries": [
+   "AT"
+  ]
+ },
+ "Europe/Vilnius": {
+  "cities": [
+   "Kaunas",
+   "Klaipėda"
+  ],
+  "countries": [
+   "LT"
+  ]
+ },
+ "Europe/Volgograd": {
+  "cities": [
+   "Volzhsky",
+   "Kamyshin"
+  ],
+  "countries": [
+   "RU"
+  ]
+ },
+ "Europe/Warsaw": {
+  "cities": [
+   "Kraków",
+   "Wrocław",
+   "Łódź",
+   "Poznań",
+   "Gdańsk",
+   "Szczecin",
+   "Lublin",
+   "Bydgoszcz",
+   "Białystok",
+   "Katowice",
+   "Gdynia",
+   "Częstochowa",
+   "Sosnowiec",
+   "Radom",
+   "Mokotów",
+   "Gliwice",
+   "Rzeszów",
+   "Toruń",
+   "Kielce",
+   "Zabrze",
+   "Bytom",
+   "Praga Południe",
+   "Bielsko-Biala",
+   "Olsztyn",
+   "Ursynów",
+   "Ruda Śląska",
+   "Rybnik",
+   "Wola",
+   "Bielany",
+   "Tychy",
+   "Białołeka",
+   "Opole",
+   "Elbląg",
+   "Płock",
+   "Wałbrzych",
+   "Targówek",
+   "Bemowo",
+   "Włocławek",
+   "Zielona Góra",
+   "Tarnów",
+   "Dąbrowa Górnicza",
+   "Gorzów Wielkopolski",
+   "Chorzów",
+   "Kalisz",
+   "Koszalin",
+   "Legnica"
+  ],
+  "countries": [
+   "PL"
+  ]
+ },
+ "Europe/Zagreb": {
+  "cities": [
+   "Split",
+   "Rijeka"
+  ],
+  "countries": [
+   "HR"
+  ]
+ },
+ "Europe/Zurich": {
+  "cities": [
+   "Geneva",
+   "Basel",
+   "Lausanne",
+   "Bern",
+   "Winterthur"
+  ],
+  "countries": [
+   "CH"
+  ]
+ },
+ "Indian/Antananarivo": {
+  "cities": [
+   "Toamasina",
+   "Antsirabe",
+   "Mahajanga",
+   "Fianarantsoa",
+   "Toliara",
+   "Antsiranana"
+  ],
+  "countries": [
+   "MG"
+  ]
+ },
+ "Indian/Chagos": {
+  "countries": [
+   "IO"
+  ]
+ },
+ "Indian/Christmas": {
+  "countries": [
+   "CX"
+  ]
+ },
+ "Indian/Cocos": {
+  "countries": [
+   "CC"
+  ]
+ },
+ "Indian/Comoro": {
+  "countries": [
+   "KM"
+  ]
+ },
+ "Indian/Kerguelen": {
+  "countries": [
+   "TF"
+  ]
+ },
+ "Indian/Mahe": {
+  "countries": [
+   "SC"
+  ]
+ },
+ "Indian/Maldives": {
+  "cities": [
+   "Male"
+  ],
+  "countries": [
+   "MV"
+  ]
+ },
+ "Indian/Mauritius": {
+  "cities": [
+   "Port Louis",
+   "Vacoas",
+   "Beau Bassin-Rose Hill"
+  ],
+  "countries": [
+   "MU"
+  ]
+ },
+ "Indian/Mayotte": {
+  "countries": [
+   "YT"
+  ]
+ },
+ "Indian/Reunion": {
+  "cities": [
+   "Saint-Denis",
+   "Saint-Paul"
+  ],
+  "countries": [
+   "RE"
+  ]
+ },
+ "Pacific/Apia": {
+  "countries": [
+   "WS"
+  ]
+ },
+ "Pacific/Auckland": {
+  "cities": [
+   "Christchurch",
+   "Wellington",
+   "Manukau City",
+   "North Shore",
+   "Hamilton",
+   "Tauranga",
+   "Dunedin",
+   "Lower Hutt"
+  ],
+  "countries": [
+   "NZ"
+  ]
+ },
+ "Pacific/Bougainville": {
+  "countries": [
+   "PG"
+  ]
+ },
+ "Pacific/Chatham": {
+  "countries": [
+   "NZ"
+  ]
+ },
+ "Pacific/Chuuk": {
+  "countries": [
+   "FM"
+  ]
+ },
+ "Pacific/Easter": {
+  "aliases": [
+   "Chile/EasterIsland"
+  ],
+  "countries": [
+   "CL"
+  ]
+ },
+ "Pacific/Efate": {
+  "countries": [
+   "VU"
+  ]
+ },
+ "Pacific/Fakaofo": {
+  "countries": [
+   "TK"
+  ]
+ },
+ "Pacific/Fiji": {
+  "countries": [
+   "FJ"
+  ]
+ },
+ "Pacific/Funafuti": {
+  "countries": [
+   "TV"
+  ]
+ },
+ "Pacific/Galapagos": {
+  "countries": [
+   "EC"
+  ]
+ },
+ "Pacific/Gambier": {
+  "countries": [
+   "PF"
+  ]
+ },
+ "Pacific/Guadalcanal": {
+  "countries": [
+   "SB"
+  ]
+ },
+ "Pacific/Guam": {
+  "countries": [
+   "GU"
+  ]
+ },
+ "Pacific/Honolulu": {
+  "aliases": [
+   "US/Hawaii"
+  ],
+  "countries": [
+   "US"
+  ]
+ },
+ "Pacific/Kanton": {
+  "countries": [
+   "KI"
+  ]
+ },
+ "Pacific/Kiritimati": {
+  "countries": [
+   "KI"
+  ]
+ },
+ "Pacific/Kosrae": {
+  "countries": [
+   "FM"
+  ]
+ },
+ "Pacific/Kwajalein": {
+  "countries": [
+   "MH"
+  ]
+ },
+ "Pacific/Majuro": {
+  "countries": [
+   "MH"
+  ]
+ },
+ "Pacific/Marquesas": {
+  "countries": [
+   "PF"
+  ]
+ },
+ "Pacific/Midway": {
+  "aliases": [
+   "Pacific/Samoa",
+   "US/Samoa"
+  ],
+  "countries": [
+   "UM"
+  ]
+ },
+ "Pacific/Nauru": {
+  "countries": [
+   "NR"
+  ]
+ },
+ "Pacific/Niue": {
+  "countries": [
+   "NU"
+  ]
+ },
+ "Pacific/Norfolk": {
+  "countries": [
+   "NF"
+  ]
+ },
+ "Pacific/Noumea": {
+  "countries": [
+   "NC"
+  ]
+ },
+ "Pacific/Pago_Pago": {
+  "countries": [
+   "AS"
+  ]
+ },
+ "Pacific/Palau": {
+  "countries": [
+   "PW"
+  ]
+ },
+ "Pacific/Pitcairn": {
+  "countries": [
+   "PN"
+  ]
+ },
+ "Pacific/Pohnpei": {
+  "countries": [
+   "FM"
+  ]
+ },
+ "Pacific/Port_Moresby": {
+  "countries": [
+   "PG"
+  ]
+ },
+ "Pacific/Rarotonga": {
+  "countries": [
+   "CK"
+  ]
+ },
+ "Pacific/Saipan": {
+  "countries": [
+   "MP"
+  ]
+ },
+ "Pacific/Tahiti": {
+  "countries": [
+   "PF"
+  ]
+ },
+ "Pacific/Tarawa": {
+  "countries": [
+   "KI"
+  ]
+ },
+ "Pacific/Tongatapu": {
+  "countries": [
+   "TO"
+  ]
+ },
+ "Pacific/Wake": {
+  "countries": [
+   "UM"
+  ]
+ },
+ "Pacific/Wallis": {
+  "countries": [
+   "WF"
+  ]
+ }
+}
