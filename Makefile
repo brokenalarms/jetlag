@@ -8,10 +8,10 @@
 #   make test-scripts  — run script tests (works on Linux and macOS)
 #   make test-macos    — run Swift unit tests (macOS only, requires Xcode)
 #   make test          — run all tests available on this platform
-#   make               — build the Release app into dist/Jetlag.app
-#   make build         — build Debug app into build/derived (quick iteration)
-#   make archive       — build Release archive (build/Jetlag.xcarchive)
-#   make dmg           — package dist/Jetlag.app into dist/Jetlag.dmg
+#   make               — build the Release app for this Mac into dist/Jetlag.app (unlocked)
+#   make build         — build Debug app into build/derived (quick iteration, unlocked)
+#   make archive       — build the shipping Release archive (build/Jetlag.xcarchive)
+#   make dmg           — package the shipping app (free-tier limit in place) into dist/Jetlag.dmg
 #   make clean         — remove build artifacts and dist/
 #
 # Code signing:
@@ -33,6 +33,10 @@ BUILD_DIR       := build
 DERIVED_DIR     := $(BUILD_DIR)/derived
 ARCHIVE         := $(BUILD_DIR)/$(APP_NAME).xcarchive
 ARCHIVED_APP    := $(ARCHIVE)/Products/Applications/$(APP_NAME).app
+LOCAL_ARCHIVE   := $(BUILD_DIR)/$(APP_NAME)-local.xcarchive
+LOCAL_ARCHIVED_APP := $(LOCAL_ARCHIVE)/Products/Applications/$(APP_NAME).app
+RELEASE_DIR     := $(BUILD_DIR)/release
+RELEASE_APP     := $(RELEASE_DIR)/$(APP_NAME).app
 EXPORT_DIR      := $(BUILD_DIR)/export
 EXPORT_PLIST    := $(MACOS_DIR)/ExportOptions.plist
 DIST_DIR        := dist
@@ -50,7 +54,12 @@ ifneq (,$(findstring /.ralph/,$(CURDIR)/))
 DEV_IDENTITY := JETLAG_BUNDLE_SUFFIX=.dev JETLAG_PRODUCT_SUFFIX=" Dev"
 endif
 
-.PHONY: all generate test test-scripts test-macos ralph-verify build archive app dmg clean
+# The app built by plain `make` is for the developer's own use: it compiles in
+# JETLAG_LOCAL_BUILD, which LicenseStore treats like a debug build. Only `make dmg`
+# produces the build that ships.
+LOCAL_UNLOCK := SWIFT_ACTIVE_COMPILATION_CONDITIONS='$$(inherited) JETLAG_LOCAL_BUILD'
+
+.PHONY: all generate test test-scripts test-macos ralph-verify build archive local-archive app release-app dmg clean
 
 all: app
 
@@ -110,7 +119,7 @@ build: generate
 		$(DEV_IDENTITY) \
 		build
 
-## Create a Release archive
+## Create the Release archive that ships, with the free-tier limit in place
 archive: generate
 	xcodebuild \
 		-scheme $(SCHEME) \
@@ -120,12 +129,32 @@ archive: generate
 		-quiet \
 		archive < /dev/null
 
-## Place the Release app at dist/Jetlag.app
+## Create a Release archive for this Mac, which starts unlocked
+local-archive: generate
+	xcodebuild \
+		-scheme $(SCHEME) \
+		-configuration Release \
+		-archivePath $(LOCAL_ARCHIVE) \
+		-project $(MACOS_DIR)/$(APP_NAME).xcodeproj \
+		-quiet \
+		$(LOCAL_UNLOCK) \
+		archive < /dev/null
+
+## Place this Mac's Release app at dist/Jetlag.app
 # ditto, not cp -r: it keeps the bundle's symlinks and extended attributes, which
 # the code signature covers.
-app: archive
-	@rm -rf "$(DIST_APP)" "$(EXPORT_DIR)"
+app: local-archive
+	@rm -rf "$(DIST_APP)"
 	@mkdir -p "$(DIST_DIR)"
+	@ditto "$(LOCAL_ARCHIVED_APP)" "$(DIST_APP)"
+	@codesign --verify --deep --strict "$(DIST_APP)"
+	@echo ""
+	@echo "App ready (unlocked, for this Mac only): $(DIST_APP)"
+
+## Export the shipping app to build/release/Jetlag.app
+release-app: archive
+	@rm -rf "$(RELEASE_APP)" "$(EXPORT_DIR)"
+	@mkdir -p "$(RELEASE_DIR)"
 	@if security find-identity -v -p codesigning | grep -q "Developer ID Application"; then \
 		xcodebuild \
 			-exportArchive \
@@ -133,21 +162,19 @@ app: archive
 			-exportPath $(EXPORT_DIR) \
 			-exportOptionsPlist $(EXPORT_PLIST) \
 			-quiet < /dev/null && \
-		ditto "$(EXPORT_DIR)/$(APP_NAME).app" "$(DIST_APP)"; \
+		ditto "$(EXPORT_DIR)/$(APP_NAME).app" "$(RELEASE_APP)"; \
 	else \
 		echo "No Developer ID Application certificate in the keychain: keeping the archive's local signing (runs on this Mac only)."; \
-		ditto "$(ARCHIVED_APP)" "$(DIST_APP)"; \
+		ditto "$(ARCHIVED_APP)" "$(RELEASE_APP)"; \
 	fi
-	@codesign --verify --deep --strict "$(DIST_APP)"
-	@echo ""
-	@echo "App ready: $(DIST_APP)"
+	@codesign --verify --deep --strict "$(RELEASE_APP)"
 
-## Package dist/Jetlag.app into a DMG
-dmg: app
+## Package the shipping app into a DMG
+dmg: release-app
 	@echo "Creating DMG..."
 	@rm -rf "$(DMG_STAGING)" "$(DMG_PATH)"
-	@mkdir -p "$(DMG_STAGING)"
-	@ditto "$(DIST_APP)" "$(DMG_STAGING)/$(APP_NAME).app"
+	@mkdir -p "$(DIST_DIR)" "$(DMG_STAGING)"
+	@ditto "$(RELEASE_APP)" "$(DMG_STAGING)/$(APP_NAME).app"
 	@ln -s /Applications "$(DMG_STAGING)/Applications"
 	hdiutil create \
 		-volname "$(APP_NAME)" \

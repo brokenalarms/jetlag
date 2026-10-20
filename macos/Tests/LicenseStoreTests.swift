@@ -1,9 +1,10 @@
 import XCTest
 @testable import Jetlag
 
-/// A debug build must never gate the developer's own runs, however it was
-/// launched — the scheme that carries JETLAG_PRO_UNLOCKED is generated and
-/// untracked, so it can be missing.
+/// A developer build (Debug, or the Release app `make` builds for this Mac) must
+/// never gate the developer's own runs, however it was launched — the scheme
+/// that carries JETLAG_PRO_UNLOCKED is generated and untracked, so it can be
+/// missing. The shipping build must keep the free-tier limit regardless.
 final class LicenseStoreTests: XCTestCase {
 
     private var defaults: UserDefaults!
@@ -34,6 +35,16 @@ final class LicenseStoreTests: XCTestCase {
         XCTAssertFalse(LicenseStore.initialUnlocked(
             environment: ["JETLAG_PRO_UNLOCKED": "0"],
             defaults: defaults
+        ))
+    }
+
+    /// The build customers get cannot be unlocked by an environment variable,
+    /// and starts on the free tier.
+    func testShippingBuildIgnoresEnvironmentAndStartsLocked() {
+        XCTAssertFalse(LicenseStore.initialUnlocked(
+            environment: ["JETLAG_PRO_UNLOCKED": "1"],
+            defaults: defaults,
+            developerBuild: false
         ))
     }
 }
