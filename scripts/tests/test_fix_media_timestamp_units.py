@@ -915,13 +915,17 @@ class TestLocationTimezone:
     """Test location-based timezone lookup"""
 
     def test_get_timezone_for_country_code(self):
-        """Test getting timezone for country code returns valid format"""
-        result = fmt.get_timezone_for_country("JP")
-        # Returns None if CSV files don't exist, or a timezone string
-        if result is not None:
-            # Should be in +HHMM or +HH:MM format
-            assert result[0] in ["+", "-"]
-            assert len(result) >= 5
+        """A country resolves to its UTC offset, not its DST flag.
+
+        The lookup read the CSV's dst column (0) instead of gmt_offset, so every
+        country without current DST resolved to +0000 — --country JP labelled
+        files UTC.
+        """
+        assert fmt.get_timezone_for_country("JP") == "+09:00", \
+            f"Actual: {fmt.get_timezone_for_country('JP')!r}, Expected: '+09:00'"
+        assert fmt.get_timezone_for_country("Japan") == "+09:00"
+        assert fmt.get_timezone_for_country("IN") == "+05:30"
+        assert fmt.get_timezone_for_country("IS") == "+00:00"
 
     def test_get_timezone_for_invalid_country(self):
         """Test that invalid country returns None"""
