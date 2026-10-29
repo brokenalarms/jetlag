@@ -2,20 +2,19 @@ import SwiftUI
 
 struct ProfilePicker: View {
     @Binding var selection: String
-    let names: [String]
     let state: AppState
 
     var body: some View {
         Picker("", selection: $selection) {
             Text(Strings.Workflow.selectProfile).tag("")
-            ForEach(names, id: \.self) { name in
-                Self.label(name: name, state: state).tag(name)
+            ForEach(state.sortedProfileNames, id: \.self) { name in
+                profileLabel(name: name).tag(name)
             }
         }
         .labelsHidden()
     }
 
-    static func label(name: String, state: AppState) -> some View {
+    private func profileLabel(name: String) -> some View {
         let profile = state.profile(named: name)
         let make = profile?.exif?.make
         let model = profile?.exif?.model

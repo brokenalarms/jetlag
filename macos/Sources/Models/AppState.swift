@@ -884,54 +884,6 @@ final class AppState {
         profilesConfig?.profiles[name]
     }
 
-    /// What each profile's source holds, as probe-camera read it, keyed by the
-    /// source. What that means for the profiles is derived from it on demand,
-    /// so a profile created or edited is reflected without reading again.
-    var sourceProbes: [String: [ProbedCamera]] = [:]
-
-    var sourceContents: SourceContents {
-        ProfileMatcher.contents(of: sourceProbes, profiles: profilesConfig?.profiles ?? [:])
-    }
-
-    /// Read the camera behind the media in each profile's source folder. Only
-    /// those folders are read: a source is where the user said a profile's media
-    /// is, so nothing has to be guessed about which drive is a camera card.
-    func scanProfileSources() async {
-        let sources = Set((profilesConfig?.profiles ?? [:]).values.compactMap(\.sourceDir))
-        var probes: [String: [ProbedCamera]] = [:]
-        for source in sources.sorted() where FileManager.default.fileExists(atPath: source) {
-            probes[source] = await CameraProbe.probe(path: source, scriptsDirectory: scriptsDirectory,
-                                                     profilesPath: resolvedProfilesPath)
-        }
-        sourceProbes = probes
-        selectProfileForSources()
-    }
-
-    /// Media in a source from a camera with a profile picks that profile. The
-    /// choice the user made among the profiles found stands; nothing else does.
-    func selectProfileForSources() {
-        guard !isRunning else { return }
-        let matched = sourceContents.matched
-        if matched.contains(where: { $0.profileName == workflowSession.profileName }) { return }
-        if let first = matched.first {
-            selectProfile(first.profileName)
-        }
-    }
-
-    /// Start a fresh workflow for a profile, reading from the source its
-    /// camera's media was found in when there is one.
-    func selectProfile(_ name: String) {
-        clearLog()
-        workflowSession = WorkflowSession(
-            profile: profilesConfig?.profiles[name],
-            profileName: name,
-            gyroflowAvailable: gyroflowStatus.isInstalled
-        )
-        if let source = sourceContents.matched.first(where: { $0.profileName == name })?.source {
-            workflowSession.sourceDir.value = source
-        }
-    }
-
     /// Create the profile for a camera found in the source chosen for it. Its
     /// camera, kind of media and file types come from that source's files.
     func createProfile(for found: SourceContents.NewCamera) -> String {

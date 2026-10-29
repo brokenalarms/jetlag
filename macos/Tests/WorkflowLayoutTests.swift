@@ -31,14 +31,14 @@ final class WorkflowLayoutTests: XCTestCase {
         return nil
     }
 
-    /// SwiftUI draws the form's controls itself rather than hosting AppKit views
-    /// for them, so they are found through the accessibility tree they expose.
-    /// Its nodes answer the accessibility methods without declaring the
-    /// protocol, so they are called dynamically.
-    private func firstElement(in element: AnyObject, where matches: (AnyObject) -> Bool) -> AnyObject? {
-        if matches(element) { return element }
+    /// SwiftUI draws the profile picker itself rather than hosting an
+    /// NSPopUpButton, so it is found through the accessibility tree it exposes. Its
+    /// nodes answer the accessibility methods without declaring the protocol, so
+    /// they are called dynamically.
+    private func firstPopUpButton(in element: AnyObject) -> AnyObject? {
+        if element.accessibilityRole?() == .popUpButton { return element }
         for child in (element.accessibilityChildren?() ?? nil) ?? [] {
-            if let match = firstElement(in: child as AnyObject, where: matches) { return match }
+            if let match = firstPopUpButton(in: child as AnyObject) { return match }
         }
         return nil
     }
@@ -104,8 +104,8 @@ final class WorkflowLayoutTests: XCTestCase {
         XCTAssertEqual(resolvedWidth(panelOpen: true, offered: 4000), cap, accuracy: 2, "open, the content stops at the cap")
     }
 
-    /// Columns are pinned to the top: a short form (no card, so no profile yet) sits
-    /// at the top of the window, not floating in the middle of it.
+    /// Columns are pinned to the top: a short form (no profile chosen yet) sits at the
+    /// top of the window, not floating in the middle of it.
     func testFormIsPinnedToTheTopOfTheWindow() {
         let state = AppState()
         state.selectedTab = .workflow
@@ -118,22 +118,14 @@ final class WorkflowLayoutTests: XCTestCase {
         host.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
 
-        // The accessibility tree is built on first request and filled in on the
-        // next pass of the run loop.
-        _ = host.accessibilityChildren()
-        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-        let valueSelector = #selector(NSAccessibilityProtocol.accessibilityValue)
-        guard let profileRow = firstElement(in: host, where: { element in
-            element.responds(to: valueSelector)
-                && element.perform(valueSelector)?.takeUnretainedValue() as? String == Strings.Workflow.profileLabel
-        }) else {
-            return XCTFail("the profile row was not hosted")
+        guard let picker = firstPopUpButton(in: host) else {
+            return XCTFail("the profile picker was not hosted")
         }
-        guard let frame = profileRow.accessibilityFrame?() else {
-            return XCTFail("the profile row reports no frame")
+        guard let frame = picker.accessibilityFrame?() else {
+            return XCTFail("the profile picker reports no frame")
         }
         let top = window.convertFromScreen(frame).maxY
-        XCTAssertGreaterThan(top, 900 - 120, "the profile row must sit within the top of the window, not mid-height")
+        XCTAssertGreaterThan(top, 900 - 120, "the profile picker must sit within the top of the window, not mid-height")
     }
 
 

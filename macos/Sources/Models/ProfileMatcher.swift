@@ -29,53 +29,43 @@ struct CameraKind: Hashable {
     var defaultProfileName: String { "\(camera.name) \(type.label)" }
 }
 
-/// What the profiles' sources hold, measured against the profiles there are.
+/// What the folder chosen as a new profile's source holds, measured against the
+/// profiles there are.
 struct SourceContents: Equatable {
-    struct Match: Equatable {
-        let profileName: String
-        let source: String
-    }
-
     struct NewCamera: Equatable {
         let kind: CameraKind
         let source: String
         let extensions: [String]
     }
 
-    /// Profiles whose camera's media is in a source, and the source it is in.
-    var matched: [Match] = []
-    /// Camera kinds found in a source that no profile has yet.
+    /// Profiles that already exist for a camera kind found in the source.
+    var existingProfiles: [String] = []
+    /// Camera kinds found in the source that no profile has yet.
     var newCameras: [NewCamera] = []
-    /// Sources holding media that records no camera at all.
-    var cameralessSources: [String] = []
-
-    var isEmpty: Bool { matched.isEmpty && newCameras.isEmpty && cameralessSources.isEmpty }
+    /// Whether some of the source's media records no camera at all.
+    var hasCameralessMedia = false
 }
 
 enum ProfileMatcher {
 
-    /// Probes are keyed by the source folder they read.
-    static func contents(of probes: [String: [ProbedCamera]], profiles: [String: MediaProfile]) -> SourceContents {
+    static func contents(of probes: [ProbedCamera], source: String,
+                         profiles: [String: MediaProfile]) -> SourceContents {
         var contents = SourceContents()
-        for source in probes.keys.sorted() {
-            for probe in probes[source]!.sorted(by: { $0.files > $1.files }) {
-                guard let kind = CameraKind(camera: probe.camera, type: probe.type) else {
-                    if !contents.cameralessSources.contains(source) {
-                        contents.cameralessSources.append(source)
-                    }
-                    continue
+        for probe in probes.sorted(by: { $0.files > $1.files }) {
+            guard let kind = CameraKind(camera: probe.camera, type: probe.type) else {
+                contents.hasCameralessMedia = true
+                continue
+            }
+            if let name = profileName(for: kind, in: profiles) {
+                if !contents.existingProfiles.contains(name) {
+                    contents.existingProfiles.append(name)
                 }
-                if let name = profileName(for: kind, in: profiles) {
-                    if !contents.matched.contains(where: { $0.profileName == name }) {
-                        contents.matched.append(.init(profileName: name, source: source))
-                    }
-                } else if let index = contents.newCameras.firstIndex(where: { $0.kind == kind && $0.source == source }) {
-                    let existing = contents.newCameras[index]
-                    contents.newCameras[index] = .init(kind: kind, source: source,
-                                                       extensions: (existing.extensions + [probe.fileExtension]).sorted())
-                } else {
-                    contents.newCameras.append(.init(kind: kind, source: source, extensions: [probe.fileExtension]))
-                }
+            } else if let index = contents.newCameras.firstIndex(where: { $0.kind == kind }) {
+                let existing = contents.newCameras[index]
+                contents.newCameras[index] = .init(kind: kind, source: source,
+                                                   extensions: (existing.extensions + [probe.fileExtension]).sorted())
+            } else {
+                contents.newCameras.append(.init(kind: kind, source: source, extensions: [probe.fileExtension]))
             }
         }
         return contents

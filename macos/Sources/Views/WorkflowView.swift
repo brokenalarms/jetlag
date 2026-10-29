@@ -275,52 +275,17 @@ struct WorkflowView: View {
                 }
             }
 
-            sourceProfiles
-
-        }
-    }
-
-    /// The profile is the one whose camera's media is in a profile's source: it
-    /// is selected, and the only choice offered is between the profiles found
-    /// (a camera's photos and videos) or, for media that records no camera,
-    /// among the profiles made by hand for it.
-    private var sourceProfiles: some View {
-        let contents = state.sourceContents
-        let profiles = state.profilesConfig?.profiles ?? [:]
-        let cameraless = contents.cameralessSources.isEmpty ? [] :
-            state.sortedProfileNames.filter { CameraKind(profile: profiles[$0]!) == nil }
-        let choices = contents.matched.map(\.profileName) + cameraless
-        let selection = Binding(
-            get: { state.workflowSession.profileName },
-            set: { state.selectProfile($0) })
-        return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text(Strings.Workflow.profileLabel)
-                if choices.count > 1 || !cameraless.isEmpty {
-                    ProfilePicker(selection: selection, names: choices, state: state)
-                } else if let only = choices.first {
-                    ProfilePicker.label(name: only, state: state)
-                } else {
-                    Text(Strings.Workflow.noSourceMediaLabel)
-                        .foregroundStyle(.secondary)
-                }
-                Button {
-                    Task { await state.scanProfileSources() }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .buttonStyle(.borderless)
-                .help(Strings.Workflow.rescanHelp)
-            }
-            ForEach(contents.newCameras, id: \.kind) { found in
-                Text(Strings.Workflow.noProfileForCamera(found.kind.defaultProfileName, source: found.source))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            if !contents.cameralessSources.isEmpty && cameraless.isEmpty {
-                Text(Strings.Workflow.cameralessNote)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                ProfilePicker(selection: $session.profileName, state: state)
+                    .onChange(of: session.profileName) { _, newValue in
+                        state.clearLog()
+                        state.workflowSession = WorkflowSession(
+                            profile: state.profilesConfig?.profiles[newValue],
+                            profileName: newValue,
+                            gyroflowAvailable: state.gyroflowStatus.isInstalled
+                        )
+                    }
             }
         }
     }
@@ -471,8 +436,6 @@ struct WorkflowView: View {
 
     private var tagOptions: some View {
         @Bindable var session = state.workflowSession
-        let device = FileCamera(make: session.workingProfile.exif?.make,
-                                model: session.workingProfile.exif?.model)?.name ?? ""
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
                 Text(Strings.Workflow.tagsLabel)
@@ -486,6 +449,9 @@ struct WorkflowView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(width: optionLabelWidth, alignment: .trailing)
+                let make = session.workingProfile.exif?.make ?? ""
+                let model = session.workingProfile.exif?.model ?? ""
+                let device = [make, model].filter { !$0.isEmpty }.joined(separator: " ")
                 Text(device.isEmpty ? "—" : device)
                     .font(.caption)
                     .foregroundStyle(device.isEmpty ? .tertiary : .primary)

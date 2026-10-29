@@ -153,16 +153,16 @@ struct ProfilesView: View {
             let probes = await CameraProbe.probe(
                 path: url.path, scriptsDirectory: state.scriptsDirectory,
                 profilesPath: state.resolvedProfilesPath)
-            let contents = ProfileMatcher.contents(of: [url.path: probes],
+            let contents = ProfileMatcher.contents(of: probes, source: url.path,
                                                    profiles: state.profilesConfig?.profiles ?? [:])
             if contents.newCameras.count == 1 {
                 createProfile(for: contents.newCameras[0])
             } else if contents.newCameras.count > 1 {
                 newCameraChoices = contents.newCameras
-            } else if let existing = contents.matched.first,
-                      let profile = state.profile(named: existing.profileName) {
-                requestProfileLoad(ProfileEditingSession(name: existing.profileName, profile: profile))
-            } else if contents.cameralessSources.contains(url.path) {
+            } else if let existing = contents.existingProfiles.first,
+                      let profile = state.profile(named: existing) {
+                requestProfileLoad(ProfileEditingSession(name: existing, profile: profile))
+            } else if contents.hasCameralessMedia {
                 let type = probes.first { $0.camera == nil }?.type
                 requestProfileLoad(ProfileEditingSession(
                     name: "new-profile",

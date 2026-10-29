@@ -221,17 +221,6 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
                          defaultValue: "\(count) files were shot on \(found), not this profile's \(expected). Applying asks first.")
         }
 
-        static let noSourceMediaLabel = String(localized: "workflow.noSourceMedia.label",
-            defaultValue: "No media in the profiles' sources")
-        static let rescanHelp = String(localized: "workflow.rescan.help",
-            defaultValue: "Read the profiles' sources again")
-        static func noProfileForCamera(_ name: String, source: String) -> String {
-            String(localized: "workflow.noProfileForCamera",
-                   defaultValue: "\(source) holds \(name) media, which no profile is for. Create one in Profiles from that source.")
-        }
-        static let cameralessNote = String(localized: "workflow.cameraless.note",
-            defaultValue: "Some media in the sources records no camera. Create a profile for it in Profiles.")
-
         // Run completion popup
         static let runCompleteAppliedTitle = String(localized: "workflow.runComplete.applied.title",
             defaultValue: "Run Complete")
