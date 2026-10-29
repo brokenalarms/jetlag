@@ -3,6 +3,7 @@ import SwiftUI
 struct WorkflowView: View {
     @Bindable var state: AppState
     @State private var upgradePrompt: UpgradePrompt?
+    @FocusState private var editingSource: Bool
     private var licenseStore: LicenseStore { LicenseStore.shared }
 
     private struct UpgradePrompt: Identifiable {
@@ -406,6 +407,11 @@ struct WorkflowView: View {
                         .textFieldStyle(.roundedBorder)
                         .truncationMode(.head)
                         .help(session.sourceDir.current)
+                        .focused($editingSource)
+                        .onSubmit { session.chooseSource() }
+                        .onChange(of: editingSource) { _, editing in
+                            if !editing { session.chooseSource() }
+                        }
                     Button(Strings.Common.browse) { pickSourceDir() }
                         .controlSize(.small)
                 }
@@ -494,7 +500,7 @@ struct WorkflowView: View {
                 Spacer()
             }
             .fieldError(session.validateTimezone())
-            let parseable = hasParseableFilenames()
+            let parseable = session.sourceHasTimestampedNames
             if parseable {
                 HStack(spacing: 4) {
                     Text(Strings.Workflow.timestampSourceLabel)
@@ -532,11 +538,21 @@ struct WorkflowView: View {
             }
         }
         .padding(10)
-        .onChange(of: session.sourceDir.value) { _, _ in
-            if !hasParseableFilenames() && session.inferFromFilenames {
-                session.inferFromFilenames = false
-            }
+        .task(id: SourceRead(session: ObjectIdentifier(session), source: session.chosenSource)) {
+            let source = session.chosenSource
+            let found = await FilenamePatterns.sourceHasTimestampedNames(
+                source,
+                extensions: session.workingProfile.fileExtensions ?? [],
+                scriptsDirectory: state.scriptsDirectory)
+            guard !Task.isCancelled else { return }
+            session.noteTimestampedNames(found, in: source)
         }
+    }
+
+    /// A new session (a profile picked) or a newly chosen source is read afresh.
+    private struct SourceRead: Hashable {
+        let session: ObjectIdentifier
+        let source: String
     }
 
     var fixTimestampPreview: String? {
@@ -699,30 +715,6 @@ struct WorkflowView: View {
 
     // MARK: - Actions
 
-    private func hasParseableFilenames() -> Bool {
-        let session = state.workflowSession
-        let extensions = (session.workingProfile.fileExtensions ?? []).map {
-            $0.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
-        }
-        guard !extensions.isEmpty else { return false }
-        let dir = session.sourceDir.current
-        guard !dir.isEmpty else { return false }
-        guard let enumerator = FileManager.default.enumerator(
-            at: URL(fileURLWithPath: dir),
-            includingPropertiesForKeys: nil,
-            options: [.skipsHiddenFiles]
-        ) else { return false }
-        for item in enumerator {
-            guard let url = item as? URL,
-                  extensions.contains(url.pathExtension.lowercased())
-            else { continue }
-            if FilenamePatterns.hasParseableTimestamp(url.lastPathComponent, scriptsDirectory: state.scriptsDirectory) {
-                return true
-            }
-        }
-        return false
-    }
-
     private func countMediaFiles() -> Int {
         let session = state.workflowSession
         let extensions = (session.workingProfile.fileExtensions ?? []).map {
@@ -743,6 +735,7 @@ struct WorkflowView: View {
     }
 
     private func runWorkflow() {
+        state.workflowSession.chooseSource()
         guard state.canRunPipeline() else { return }
 
         // An apply the user never previewed, and applying over the files the last
@@ -789,6 +782,7 @@ struct WorkflowView: View {
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             state.workflowSession.sourceDir.value = url.path
+            state.workflowSession.chooseSource()
         }
     }
 

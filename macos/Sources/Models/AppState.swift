@@ -296,6 +296,13 @@ final class WorkflowSession {
             timezone = Dirtyable("")
         }
     }
+    /// The source as last chosen — the profile's own, a folder browsed to, or a
+    /// typed path once it is entered — not each keystroke on the way to it.
+    /// Whatever reads the source keys on this, so a half-typed path is never walked.
+    private(set) var chosenSource: String
+    /// Whether the chosen source holds files with a timestamp in their names;
+    /// false until it has been read.
+    private(set) var sourceHasTimestampedNames = false
     var readyDir: Dirtyable<String>
     var tags: Dirtyable<[String]?>
     var timezone: Dirtyable<String>
@@ -375,6 +382,7 @@ final class WorkflowSession {
         self.profileName = profileName
         self.workingProfile = profile ?? MediaProfile()
         self.sourceDir = Dirtyable(profile?.sourceDir ?? "")
+        self.chosenSource = profile?.sourceDir ?? ""
         self.readyDir = Dirtyable(profile?.readyDir ?? "")
         self.tags = Dirtyable(profile?.tags)
         self.timezone = Dirtyable("")
@@ -479,6 +487,22 @@ final class WorkflowSession {
     func startDryRunInstead() {
         applyMode = false
         showDryRunStale = false
+    }
+
+    func chooseSource() {
+        guard chosenSource != sourceDir.current else { return }
+        chosenSource = sourceDir.current
+        sourceHasTimestampedNames = false
+    }
+
+    /// What reading the chosen source found. Filenames cannot be the timestamp
+    /// source for files whose names carry none.
+    func noteTimestampedNames(_ found: Bool, in source: String) {
+        guard source == chosenSource else { return }
+        sourceHasTimestampedNames = found
+        if !found {
+            inferFromFilenames = false
+        }
     }
 
     /// A dry run counts as the preview only once it has been through every

@@ -15,11 +15,10 @@ its video one. A readable summary goes to stderr.
 import argparse
 import importlib
 import json
+import os
 import sys
 from collections import Counter
 from pathlib import Path
-
-from lib.filesystem import find_media_files
 
 _tag_mod = importlib.import_module("tag-media")
 
@@ -29,18 +28,49 @@ VIDEO_EXTENSIONS = [".mp4", ".mov"]
 PHOTO_EXTENSIONS = sorted(set(_tag_mod.CAMERA_EXIF_EXTENSIONS) - set(VIDEO_EXTENSIONS))
 DEFAULT_EXTENSIONS = PHOTO_EXTENSIONS + VIDEO_EXTENSIONS
 
+# Folders macOS presents as a single file. Their contents are another app's data,
+# not a camera's originals, and reading into a Photos library asks the user for
+# Photos access they never meant to give.
+PACKAGE_SUFFIXES = {".photoslibrary", ".app", ".bundle", ".fcpbundle", ".imovielibrary",
+                    ".tvlibrary", ".lrlibrary", ".lrdata", ".cocatalog"}
+
+
+def _is_walked(name: str) -> bool:
+    return not name.startswith(".") and Path(name).suffix.lower() not in PACKAGE_SUFFIXES
+
+
+def sample_files(root: Path, extensions: list[str], sample: int) -> dict[str, list[Path]]:
+    """The first `sample` files of each extension under root, in path order.
+
+    One walk of the tree, ending as soon as every extension has its sample: a
+    source can be a whole drive. Hidden entries are skipped, which includes the
+    ._ files exFAT cards gain beside each clip, as are packages.
+    """
+    wanted = set(extensions)
+    by_extension: dict[str, list[Path]] = {}
+    for directory, dirs, files in os.walk(root):
+        dirs[:] = sorted((d for d in dirs if _is_walked(d)), key=str.lower)
+        for name in sorted(files, key=str.lower):
+            extension = Path(name).suffix.lower()
+            if extension not in wanted or name.startswith("."):
+                continue
+            kept = by_extension.setdefault(extension, [])
+            if len(kept) < sample:
+                kept.append(Path(directory) / name)
+        if len(by_extension) == len(wanted) and all(len(k) >= sample for k in by_extension.values()):
+            break
+    return by_extension
+
 
 def probe(path: Path, extensions: list[str], sample: int) -> list[dict]:
     if path.is_file():
         by_extension = {path.suffix.lower(): [path]}
     else:
-        by_extension: dict[str, list[Path]] = {}
-        for file in find_media_files(str(path), extensions):
-            by_extension.setdefault(file.suffix.lower(), []).append(file)
+        by_extension = sample_files(path, extensions, sample)
 
     found = []
     for extension, files in sorted(by_extension.items()):
-        cameras = Counter(_tag_mod.file_camera(str(f)) for f in files[:sample])
+        cameras = Counter(_tag_mod.file_camera(str(f)) for f in files)
         for (make, model), count in cameras.most_common():
             entry = {"extension": extension,
                      "type": "photo" if extension in PHOTO_EXTENSIONS else "video",
