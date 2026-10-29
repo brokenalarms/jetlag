@@ -38,6 +38,22 @@ final class DiffTableViewLabelTests: XCTestCase {
         XCTAssertEqual(text, "+09:00")
     }
 
+    /// A file whose time was already right and only gains fields it never had must
+    /// not be badged as a fix — that told the user a correct Sony clip was broken.
+    func testWouldAddCorrectionShowsAddMetadataBadgeNotFix() {
+        let text = view.changeBadgeText(row(timestampAction: "would_add"))
+
+        XCTAssertEqual(text, Strings.DiffTable.wouldAddChange)
+        XCTAssertNotEqual(text, Strings.DiffTable.wouldFixChange)
+    }
+
+    func testAddedCorrectionShowsAddedMetadataBadgeNotFixed() {
+        let text = view.changeBadgeText(row(timestampAction: "added"))
+
+        XCTAssertEqual(text, Strings.DiffTable.addedChange)
+        XCTAssertNotEqual(text, Strings.DiffTable.fixedChange)
+    }
+
     func testNoChangeCorrectionShowsNoChangeBadge() {
         XCTAssertEqual(view.changeBadgeText(row(timestampAction: "no_change")),
                        Strings.DiffTable.noChangeChange)

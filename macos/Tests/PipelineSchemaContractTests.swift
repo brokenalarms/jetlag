@@ -264,6 +264,21 @@ final class RowOutcomeTests: XCTestCase {
             Strings.DiffTable.wouldFixStatus, Strings.DiffTable.wouldMoveStatusAfterFix))
     }
 
+    /// A row that only gains missing fields keeps its own wording when combined with
+    /// its organize outcome, rather than reading as "Would fix + copy".
+    func testPlannedAdditionReadsAsAddingMetadataNotAFix() {
+        let planned = row(timestamp: "would_add", organize: "would_copy",
+                          dest: "/Volumes/Media/Ready/2026/2026-10-28/C0307.MP4",
+                          result: "would_change")
+
+        let label = planned.outcome.statusLabel
+
+        XCTAssertEqual(label, Strings.DiffTable.combinedStatus(
+            Strings.DiffTable.wouldAddStatus, Strings.DiffTable.wouldCopyStatusAfterFix))
+        XCTAssertNotEqual(label, Strings.DiffTable.combinedStatus(
+            Strings.DiffTable.wouldFixStatus, Strings.DiffTable.wouldCopyStatusAfterFix))
+    }
+
     func testAppliedRunReportsWhatWasDone() {
         let applied = row(timestamp: "fixed", organize: "moved",
                           dest: "/Volumes/Media/Ready/2025/2025-08-15/DJI_0001.MP4",

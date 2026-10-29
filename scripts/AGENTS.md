@@ -27,7 +27,7 @@ These behaviors are not in our code — they're observed from external tools and
 ### Final Cut Pro
 
 - FCP uses file birth date to populate "Content Created" on the import screen, but `Keys:CreationDate` for "Content Created" once imported. Falls back to file birth time if `Keys:CreationDate` is not set.
-- Birth time is therefore essential. `setfile -d` sets it. Modification time is NOT set — it naturally reflects when the file was last modified (e.g., by exiftool metadata writes).
+- Birth time is therefore essential. It is written as `FileCreateDate` in the same exiftool call as the metadata (exiftool runs `setfile` itself on macOS, after rewriting the file — any metadata write otherwise resets birth time to now). Modification time is NOT set — it naturally reflects when the file was last modified (e.g., by exiftool metadata writes).
 - `Keys:CreationDate` can be written with `Z` for UTC or with timezone. iPhone files are saved with TZ. FCP converts the field's timezone to UTC, then displays in current system timezone. So `08:07:22+08:00` becomes `00:07:22 UTC`, then displays as `09:07:22` in Japan (+09:00).
 - iPhone footage records `Keys:CreationDate` with timezone, so it should match `DateTimeOriginal`.
 

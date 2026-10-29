@@ -78,7 +78,9 @@ events:
       file: { type: string }
       action:
         type: string
-        enum: [fixed, would_fix, no_change, error]
+        # added / would_add: every field written was empty and the file times
+        # already agree — the stored time is not wrong, only incomplete.
+        enum: [fixed, would_fix, added, would_add, no_change, error]
       original_time: { type: string, optional: true }
       corrected_time: { type: string, optional: true }
       source: { type: string, optional: true }
