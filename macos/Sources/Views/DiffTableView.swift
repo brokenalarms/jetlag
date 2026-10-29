@@ -317,6 +317,8 @@ struct DiffTableView: View {
             }
             return row.outcome.correction == .wouldFix
                 ? Strings.DiffTable.wouldFixChange : Strings.DiffTable.fixedChange
+        case .wouldAdd: return Strings.DiffTable.wouldAddChange
+        case .added: return Strings.DiffTable.addedChange
         case .noChange: return Strings.DiffTable.noChangeChange
         case .error: return row.timestampError ?? Strings.DiffTable.errorChange
         case nil: return "—"
@@ -402,7 +404,7 @@ struct DiffTableView: View {
     private func changeBadge(_ row: DiffTableRow) -> some View {
         let text = changeBadgeText(row)
         switch row.outcome.correction {
-        case .wouldFix:
+        case .wouldFix, .wouldAdd:
             HStack(spacing: 4) {
                 if row.requiresForceTimezone {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -414,7 +416,7 @@ struct DiffTableView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Color("NeonCyan").opacity(0.7))
             }
-        case .fixed:
+        case .fixed, .added:
             Text(text)
                 .font(.system(size: 11))
                 .foregroundStyle(Color("NeonCyan"))

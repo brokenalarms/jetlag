@@ -49,15 +49,12 @@ from lib.timestamp_source import (
 if sys.platform == "darwin":
     from lib.file_timestamps import (
         get_file_system_timestamps,
-        set_file_system_timestamps,
         check_file_system_timestamps_need_update,
         get_expected_file_system_time,
     )
 else:
     def get_file_system_timestamps(file_path: str) -> Dict[str, str]:
         return {"birth": "", "modify": ""}
-    def set_file_system_timestamps(file_path: str, timestamp_str: str) -> bool:
-        return False
     def check_file_system_timestamps_need_update(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False) -> bool:
         return False
     def get_expected_file_system_time(datetime_original: datetime, preserve_wallclock: bool = False) -> str:
@@ -66,7 +63,7 @@ else:
 @dataclass
 class TimestampFixResult:
     file: str
-    timestamp_action: str  # "fixed" | "would_fix" | "no_change" | "error"
+    timestamp_action: str  # "fixed" | "would_fix" | "added" | "would_add" | "no_change" | "error"
     original_time: Optional[str] = None
     corrected_time: Optional[str] = None
     timestamp_source: Optional[str] = None
@@ -412,6 +409,19 @@ def stale_clock_fields(exif: Dict[str, str], targets: Dict[str, str]) -> list:
     return stale
 
 
+def missing_clock_fields(exif: Dict[str, str], stale: list) -> list:
+    """The stale write tags the file holds no value for at all.
+
+    A missing field is not evidence against the file's time: a camera that never
+    writes Keys:CreationDate has nothing wrong with it, only something to add.
+    """
+    stored = {
+        field.write_tag: stored_zone(exif) if field.holds_zone else exif.get(field.read_key, "")
+        for field in CLOCK_FIELDS
+    }
+    return [tag for tag in stale if not stored.get(tag)]
+
+
 def quicktime_createdate_args(utc_time: str) -> list:
     """Write args setting every QuickTime clock atom to the same UTC instant.
 
@@ -603,10 +613,12 @@ def determine_needed_changes(file_path: str, datetime_original: datetime, preser
     """
     exif = read_exif_data(file_path)
     targets = clock_field_targets(exif, datetime_original, write_datetime_original, write_zone)
+    stale = stale_clock_fields(exif, targets)
 
     return {
         "clock_targets": targets,
-        "stale_clock_fields": stale_clock_fields(exif, targets),
+        "stale_clock_fields": stale,
+        "missing_clock_fields": missing_clock_fields(exif, stale),
         "file_timestamps": (
             check_file_system_timestamps_need_update(file_path, datetime_original, preserve_wallclock)
             if sys.platform == "darwin" else False
@@ -1048,6 +1060,13 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
 
     # Build common result fields
     correction_mode = "time" if (time_offset_seconds is not None and time_offset_seconds != 0) else "timezone"
+    # Writing only into fields the file left empty fills in what it never had; any
+    # stored value or file time that disagrees, or a moved time, is a fix.
+    only_adds_fields = (
+        correction_mode == "timezone"
+        and not changes["file_timestamps"]
+        and len(changes["missing_clock_fields"]) == len(changes["stale_clock_fields"])
+    )
     result_base = dict(
         file=filename,
         original_time=_machine_original_time(current_data),
@@ -1067,7 +1086,8 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
 
     if dry_run and has_changes:
         print(f"📊 Change   : {change_desc} (DRY RUN)", file=sys.stderr)
-        return TimestampFixResult(**result_base, timestamp_action="would_fix")
+        return TimestampFixResult(**result_base,
+                                  timestamp_action="would_add" if only_adds_fields else "would_fix")
     else:
         print(f"📊 Change   : {change_desc}", file=sys.stderr)
 
@@ -1097,22 +1117,27 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
     ] if changes["stale_clock_fields"] else []
 
     field_args = provenance_args + correction_args
-    if field_args:
-        if not write_exif_fields(file_path, field_args):
+
+    # Rewriting the file for any field resets its birth time, so the birth time rides
+    # in the same exiftool call, which applies file system tags after the rewrite —
+    # whether or not the correction found it stale.
+    file_time_args = [
+        f"-FileCreateDate={get_expected_file_system_time(datetime_original, preserve_wallclock=preserve_wallclock)}"
+    ] if sys.platform == "darwin" and (changes["file_timestamps"] or field_args) else []
+
+    if field_args or file_time_args:
+        if not write_exif_fields(file_path, field_args + file_time_args):
             if provenance_args:
                 print("   ⚠️  Failed to record original timestamps for recovery", file=sys.stderr)
             if correction_args:
                 print(f"   ❌ Failed to write clock fields: {', '.join(changes['clock_targets'])}", file=sys.stderr)
-                success = False
+            if file_time_args:
+                print("   ❌ Failed to apply file timestamps", file=sys.stderr)
+            success = not (correction_args or file_time_args)
 
-    # Update file system timestamps if needed
-    if changes["file_timestamps"]:
-        expected_file_timestamp = get_expected_file_system_time(datetime_original, preserve_wallclock=preserve_wallclock)
-        if not set_file_system_timestamps(file_path, expected_file_timestamp):
-            print("   ❌ Failed to apply file timestamps", file=sys.stderr)
-            success = False
-
-    return TimestampFixResult(**result_base, timestamp_action="fixed" if success else "error")
+    if not success:
+        return TimestampFixResult(**result_base, timestamp_action="error")
+    return TimestampFixResult(**result_base, timestamp_action="added" if only_adds_fields else "fixed")
 
 VALUE_OPTIONS_ACCEPTING_NEGATIVES = ('--timezone', '--time-offset')
 

@@ -418,6 +418,8 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let wouldCopyStatus = String(localized: "diffTable.wouldCopy.status", defaultValue: "Would copy")
         static let wouldMoveStatus = String(localized: "diffTable.wouldMove.status", defaultValue: "Would move")
         static let fixedStatus = String(localized: "diffTable.fixed.status", defaultValue: "Fixed")
+        static let wouldAddStatus = String(localized: "diffTable.wouldAdd.status", defaultValue: "Would add metadata")
+        static let addedStatus = String(localized: "diffTable.added.status", defaultValue: "Added metadata")
         static let copiedStatus = String(localized: "diffTable.copied.status", defaultValue: "Copied")
         static let movedStatus = String(localized: "diffTable.moved.status", defaultValue: "Moved")
         static let moveSkippedStatus = String(localized: "diffTable.moveSkipped.status", defaultValue: "Move skipped")
@@ -493,6 +495,8 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
 
         static let wouldFixChange = String(localized: "diffTable.wouldFix.change", defaultValue: "Would fix")
         static let fixedChange = String(localized: "diffTable.fixed.change", defaultValue: "Fixed")
+        static let wouldAddChange = String(localized: "diffTable.wouldAdd.change", defaultValue: "Would add metadata")
+        static let addedChange = String(localized: "diffTable.added.change", defaultValue: "Added metadata")
         static let noChangeChange = String(localized: "diffTable.noChange.change", defaultValue: "No change")
         static let errorChange = String(localized: "diffTable.error.change", defaultValue: "Error")
         static func cameraMismatchHelp(_ camera: String) -> String {

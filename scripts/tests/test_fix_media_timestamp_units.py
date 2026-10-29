@@ -28,6 +28,8 @@ spec = importlib.util.spec_from_file_location(
 fmt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fmt)
 from lib.timestamp_source import SOURCE_UTC_BY_SPEC, SOURCE_UTC_CORROBORATED
+if sys.platform == "darwin":
+    from lib.file_timestamps import get_file_system_timestamps, set_file_system_timestamps
 
 
 class TestTimestampParsing:
@@ -1312,6 +1314,103 @@ class TestStaleFieldsNamesWhatWouldBeWritten:
 
         assert second.timestamp_action == "no_change"
         assert second.stale_fields == []
+
+
+class TestAddingMissingFieldsIsNotAFix:
+    """A camera that stores a correct UTC clock but never writes Keys:CreationDate,
+    DateTimeOriginal or a zone (a Sony clip straight off the card) has nothing wrong
+    with its time — the correction only fills fields the file left empty. That is
+    reported as would_add/added, so the row does not claim the source was broken;
+    any stored value that disagrees, or a wrong birth time, still makes it a fix.
+    """
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        fmt._exif_cache.clear()
+        self.video = os.path.join(self.temp_dir, "C0001.MP4")
+        create_test_video(
+            self.video,
+            **{"QuickTime:CreateDate": "2026:10:28 06:08:08",
+               "QuickTime:MediaCreateDate": "2026:10:28 06:08:08",
+               "QuickTime:TrackCreateDate": "2026:10:28 06:08:08"},
+        )
+        self.expected_birth = fmt.get_expected_file_system_time(
+            datetime(2026, 10, 28, 6, 8, 8, tzinfo=timezone.utc))
+        if sys.platform == "darwin":
+            set_file_system_timestamps(self.video, self.expected_birth)
+        fmt._exif_cache.clear()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+        fmt._exif_cache.clear()
+
+    @pytest.mark.skipif(sys.platform != "darwin", reason="birth time is only corrected on macOS")
+    def test_only_empty_fields_to_write_is_would_add(self):
+        result = fmt.fix_media_timestamps(self.video, dry_run=True, timezone_spec="+05:30")
+
+        assert result.timestamp_action == "would_add"
+        assert result.stale_fields == ["DateTimeOriginal", "OffsetTimeOriginal", "Keys:CreationDate"]
+        assert result.stale_file_times == []
+
+    @pytest.mark.skipif(sys.platform != "darwin", reason="birth time is only corrected on macOS")
+    def test_applying_reports_added_then_nothing_left(self):
+        """The exiftool write rewrites the file and resets its birth time, so the
+        birth time is written in that same call, applied after the rewrite — or the
+        next run finds it stale."""
+        applied = fmt.fix_media_timestamps(self.video, timezone_spec="+05:30")
+        fmt._exif_cache.clear()
+        again = fmt.fix_media_timestamps(self.video, dry_run=True, timezone_spec="+05:30")
+
+        assert applied.timestamp_action == "added"
+        assert get_file_system_timestamps(self.video)["birth"] == self.expected_birth
+        assert again.timestamp_action == "no_change"
+
+    @pytest.mark.skipif(sys.platform != "darwin", reason="birth time is only corrected on macOS")
+    def test_metadata_and_birth_time_are_one_exiftool_write(self, monkeypatch):
+        """The file is read once and written once: the birth time is not a separate
+        SetFile call after exiftool, but part of the same write."""
+        writes = []
+        real_write = fmt.exiftool.write_tags
+        monkeypatch.setattr(fmt.exiftool, "write_tags",
+                            lambda path, args: writes.append(args) or real_write(path, args))
+
+        fmt.fix_media_timestamps(self.video, timezone_spec="+05:30")
+
+        assert len(writes) == 1
+        assert f"-FileCreateDate={self.expected_birth}" in writes[0]
+
+    def test_a_stored_value_that_disagrees_is_still_a_fix(self):
+        """The movie header is an hour out while the track atoms are right: the
+        correction overwrites a value the file holds, not just an empty one."""
+        create_test_video(
+            self.video,
+            **{"QuickTime:CreateDate": "2026:10:28 07:08:08",
+               "QuickTime:MediaCreateDate": "2026:10:28 06:08:08",
+               "QuickTime:TrackCreateDate": "2026:10:28 06:08:08"},
+        )
+        fmt._exif_cache.clear()
+
+        result = fmt.fix_media_timestamps(self.video, dry_run=True, timezone_spec="+05:30")
+
+        assert result.timestamp_action == "would_fix"
+        assert "QuickTime:CreateDate" in result.stale_fields
+
+    @pytest.mark.skipif(sys.platform != "darwin", reason="birth time is only corrected on macOS")
+    def test_a_wrong_birth_time_is_still_a_fix(self):
+        set_file_system_timestamps(self.video, "2026:10:28 23:59:59")
+        fmt._exif_cache.clear()
+
+        result = fmt.fix_media_timestamps(self.video, dry_run=True, timezone_spec="+05:30")
+
+        assert result.timestamp_action == "would_fix"
+        assert result.stale_file_times == ["FileCreateDate"]
+
+    def test_a_time_offset_is_still_a_fix(self):
+        """Moving the time is a fix even when every field it lands in was empty."""
+        result = fmt.fix_media_timestamps(self.video, dry_run=True, timezone_spec="+05:30",
+                                          time_offset_seconds=3600)
+
+        assert result.timestamp_action == "would_fix"
 
 
 class TestStaleFileTimesNamesFileTimeWrites:

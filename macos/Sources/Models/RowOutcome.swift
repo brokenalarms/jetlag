@@ -15,10 +15,13 @@ struct RowOutcome {
     let reason: SkipReason?
     let dryRun: Bool
 
-    /// The `timestamp_result.action` tokens.
+    /// The `timestamp_result.action` tokens. `added` / `wouldAdd` fill only fields
+    /// the file left empty: its time was not wrong, so the row must not say "fix".
     enum Correction: String, CaseIterable {
         case fixed
         case wouldFix = "would_fix"
+        case added
+        case wouldAdd = "would_add"
         case noChange = "no_change"
         case error
     }
@@ -83,6 +86,8 @@ extension RowOutcome.Correction {
         switch self {
         case .fixed: return Strings.DiffTable.fixedStatus
         case .wouldFix: return Strings.DiffTable.wouldFixStatus
+        case .added: return Strings.DiffTable.addedStatus
+        case .wouldAdd: return Strings.DiffTable.wouldAddStatus
         case .noChange, .error: return nil
         }
     }

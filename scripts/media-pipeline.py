@@ -476,7 +476,7 @@ def process_file(
             emit_event("pipeline_result", file=file_path.name, result="failed")
             return result
 
-        if ts_result.timestamp_action in ("would_fix", "fixed"):
+        if ts_result.timestamp_action in ("would_fix", "fixed", "would_add", "added"):
             file_changed = True
         emit_event("stage_complete", stage="fix-timestamp")
 
