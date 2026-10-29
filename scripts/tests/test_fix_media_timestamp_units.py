@@ -1044,7 +1044,9 @@ class TestTimestampFixResult:
 
 
 class TestProvenanceRecord:
-    """A file's pre-correction clock fields are recorded once, before jetlag first writes."""
+    """A file's original name and pre-correction clock fields are recorded once, before
+    jetlag first writes, as one XMP property per value: the card name in the standard
+    xmpMM:PreservedFileName and the clock fields in jetlag's own namespace."""
 
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
@@ -1066,14 +1068,14 @@ class TestProvenanceRecord:
         result = fmt.fix_media_timestamps(self.video, timezone_spec="+08:00")
         assert result.timestamp_action == "fixed"
 
-        record = json.loads(fmt.read_provenance_record(self.video))
-        assert record["filename"] == "VID_20250618_072521.mp4"
-        assert record["DateTimeOriginal"] == "2025:06:18 07:25:21"
-        assert record["CreateDate"] == "2025:06:17 23:25:21"
-        assert record["MediaCreateDate"] == "2025:06:17 23:25:21"
+        record = fmt.read_provenance_record(self.video)
+        assert record["PreservedFileName"] == "VID_20250618_072521.mp4"
+        assert record["OriginalDateTimeOriginal"] == "2025:06:18 07:25:21"
+        assert record["OriginalCreateDate"] == "2025:06:17 23:25:21"
+        assert record["OriginalMediaCreateDate"] == "2025:06:17 23:25:21"
 
     def test_provenance_unchanged_by_later_corrections(self):
-        """Re-correcting an already-tagged file leaves the record byte-identical, so it
+        """Re-correcting an already-recorded file leaves the record identical, so it
         keeps describing the state before jetlag's first write, not the previous run's."""
         fmt.fix_media_timestamps(self.video, timezone_spec="+08:00")
         first = fmt.read_provenance_record(self.video)
@@ -1088,10 +1090,10 @@ class TestProvenanceRecord:
         assert fmt.read_provenance_record(self.video) == first
 
     def test_dry_run_writes_no_provenance(self):
-        """A dry run previews without touching the file, the provenance tag included."""
+        """A dry run previews without touching the file, the provenance included."""
         result = fmt.fix_media_timestamps(self.video, dry_run=True, timezone_spec="+08:00")
         assert result.timestamp_action == "would_fix"
-        assert fmt.read_provenance_record(self.video) == ""
+        assert fmt.read_provenance_record(self.video) == {}
 
     def test_provenance_omits_fields_the_file_never_had(self):
         """A file carrying none of the recorded clock fields still corrects, and its
@@ -1102,9 +1104,26 @@ class TestProvenanceRecord:
         result = fmt.fix_media_timestamps(bare, timezone_spec="+08:00")
         assert result.timestamp_action == "fixed"
 
-        record = json.loads(fmt.read_provenance_record(bare))
-        assert record["filename"] == "VID_20250618_072521_bare.mp4"
-        assert "DateTimeOriginal" not in record
+        record = fmt.read_provenance_record(bare)
+        assert record["PreservedFileName"] == "VID_20250618_072521_bare.mp4"
+        assert "OriginalDateTimeOriginal" not in record
+
+    def test_legacy_logcomment_record_counts_as_recorded(self):
+        """A file imported before the namespace carries its record as JSON in
+        LogComment, and its clock fields are already corrected. Recording it again
+        would store corrected values as originals, so nothing new is written."""
+        legacy = os.path.join(self.temp_dir, "VID_20250618_072521_legacy.mp4")
+        create_test_video(
+            legacy,
+            DateTimeOriginal="2025:06:18 07:25:21",
+            **{"XMP-xmpDM:LogComment":
+               '{"version":1,"filename":"VID_20250618_062521.mp4"}'},
+        )
+
+        result = fmt.fix_media_timestamps(legacy, timezone_spec="+08:00")
+        assert result.timestamp_action == "fixed"
+
+        assert fmt.read_provenance_record(legacy) == {}
 
 
 class TestCorrectionWritesTheWholeClockTable:

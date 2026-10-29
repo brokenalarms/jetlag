@@ -6,7 +6,6 @@ Ensures file system timestamps match EXIF data for both photos and videos
 """
 
 import argparse
-import json
 import os
 import re
 import signal
@@ -27,8 +26,8 @@ from lib.results import emit_result
 from lib.timestamp_source import (
     read_exif_data,
     _exif_cache,
-    PROVENANCE_TAG,
-    PROVENANCE_KEY,
+    PRESERVED_FILENAME_TAG,
+    LEGACY_PROVENANCE_TAG,
     is_valid_timestamp,
     parse_datetime_original,
     ensure_colon_tz,
@@ -195,23 +194,22 @@ def write_exif_fields(file_path: str, field_args: list) -> bool:
         return False
 
 
-PROVENANCE_VERSION = 1
-PROVENANCE_SOURCE_TAGS = [
-    "DateTimeOriginal",
-    "CreateDate",
-    "MediaCreateDate",
-    "TrackCreateDate",
-    "CreationDate",
-]
+PROVENANCE_CLOCK_TAGS = {
+    "DateTimeOriginal": "XMP-jetlag:OriginalDateTimeOriginal",
+    "CreateDate": "XMP-jetlag:OriginalCreateDate",
+    "MediaCreateDate": "XMP-jetlag:OriginalMediaCreateDate",
+    "TrackCreateDate": "XMP-jetlag:OriginalTrackCreateDate",
+    "CreationDate": "XMP-jetlag:OriginalCreationDate",
+}
 
 
-def read_provenance_record(file_path: str) -> str:
-    """Return the raw provenance record stored in the file, or "" if there is none."""
+def read_provenance_record(file_path: str) -> Dict[str, str]:
+    """Return the provenance properties stored in the file, keyed by tag name."""
     try:
-        return exiftool.read_tags(file_path, [PROVENANCE_TAG]).get(PROVENANCE_KEY, "")
+        return exiftool.read_tags(file_path, [PRESERVED_FILENAME_TAG, "XMP-jetlag:all"])
     except Exception as e:
         print(f"Error reading provenance record: {e}", file=sys.stderr)
-        return ""
+        return {}
 
 
 def provenance_field_args(file_path: str, exif: Dict[str, str]) -> list:
@@ -225,20 +223,19 @@ def provenance_field_args(file_path: str, exif: Dict[str, str]) -> list:
     Built from the fields already read for the correction and returned as args rather
     than written here, so recording costs neither an extra read nor an extra write.
     """
-    if exif.get(PROVENANCE_KEY):
+    already_recorded = (
+        exif.get(PRESERVED_FILENAME_TAG.split(":")[-1])
+        or exif.get(LEGACY_PROVENANCE_TAG.split(":")[-1])
+    )
+    if already_recorded:
         return []
 
-    record = {
-        "version": PROVENANCE_VERSION,
-        "filename": os.path.basename(file_path),
-    }
-    for tag in PROVENANCE_SOURCE_TAGS:
-        value = exif.get(tag, "")
-        if value:
-            record[tag] = value
-
-    payload = json.dumps(record, separators=(",", ":"))
-    return [f"-{PROVENANCE_TAG}={payload}"]
+    clock_args = [
+        f"-{record_tag}={exif[source]}"
+        for source, record_tag in PROVENANCE_CLOCK_TAGS.items()
+        if exif.get(source)
+    ]
+    return [f"-{PRESERVED_FILENAME_TAG}={os.path.basename(file_path)}"] + clock_args
 
 
 def write_keys_creationdate(file_path: str, datetime_original: datetime) -> bool:

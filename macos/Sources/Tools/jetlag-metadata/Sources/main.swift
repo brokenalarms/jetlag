@@ -68,6 +68,14 @@ final class ExifToolBackend {
     /// How long exiftool is given to exit after `-stay_open False` before it is killed.
     private static let shutdownGracePeriod: TimeInterval = 5
 
+    /// An exiftool config defining tags exiftool cannot otherwise write, such as a
+    /// custom XMP namespace. It has to precede every other exiftool argument.
+    private let configPath: String?
+
+    init(configPath: String?) {
+        self.configPath = configPath
+    }
+
     var isRunning: Bool {
         exited.lock()
         defer { exited.unlock() }
@@ -78,7 +86,8 @@ final class ExifToolBackend {
         if isRunning { return }
 
         let exiftoolPath = resolveExifToolPath()
-        let arguments = [exiftoolPath, "-stay_open", "True", "-@", "-"]
+        let configArguments = configPath.map { ["-config", $0] } ?? []
+        let arguments = [exiftoolPath] + configArguments + ["-stay_open", "True", "-@", "-"]
 
         var toChild: [Int32] = [-1, -1]
         var fromChild: [Int32] = [-1, -1]
@@ -376,7 +385,14 @@ private extension CharacterSet {
     static let carriageReturns = CharacterSet(charactersIn: "\r")
 }
 
-let backend = ExifToolBackend()
+func exifToolConfigArgument() -> String? {
+    let arguments = CommandLine.arguments
+    guard let flag = arguments.firstIndex(of: "--exiftool-config"),
+          arguments.indices.contains(flag + 1) else { return nil }
+    return arguments[flag + 1]
+}
+
+let backend = ExifToolBackend(configPath: exifToolConfigArgument())
 
 /// Shut exiftool down on the signals the app's Cancel sends, then exit with the
 /// status a signalled process reports.
