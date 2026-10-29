@@ -1161,16 +1161,19 @@ class TestCorrectionWritesTheWholeClockTable:
         assert quicktime_args == []
 
     def test_zoneless_still_gets_the_declared_zone_written(self, monkeypatch):
-        """A still whose DateTimeOriginal is bare, labelled by --timezone, is fixed:
+        """A still whose DateTimeOriginal is bare, labelled by --timezone, is corrected:
         OffsetTimeOriginal is written with the declared zone, DateTimeOriginal is not
-        rewritten, and a second run finds nothing left to do."""
+        rewritten, and a second run finds nothing left to do.
+
+        The empty offset alone makes it "added"; on macOS the fixture's birth time is
+        also wrong, which makes it "fixed" — either way the zone must land."""
         photo = os.path.join(self.temp_dir, "IMG_0001.jpg")
         create_test_photo(photo, DateTimeOriginal="2025:06:18 07:25:21")
         fmt._exif_cache.clear()
 
         result = fmt.fix_media_timestamps(photo, timezone_spec="+08:00")
 
-        assert result.timestamp_action == "fixed"
+        assert result.timestamp_action in ("added", "fixed")
         assert "OffsetTimeOriginal" in result.stale_fields
         assert "DateTimeOriginal" not in result.stale_fields
         fmt._exif_cache.clear()
