@@ -91,6 +91,11 @@ enum Strings {
         static let hideLogOutputHelp = String(localized: "workflow.hideLogOutput.help", defaultValue: "Hide output log")
         static let showLogOutputHelp = String(localized: "workflow.showLogOutput.help", defaultValue: "Show output log")
         static let inspectorEmptyLabel = String(localized: "workflow.inspectorEmpty.label", defaultValue: "Run a workflow to see results")
+        static func inspectorNoMediaLabel(extensions: [String]) -> String {
+            let list = extensions.joined(separator: ", ")
+            return String(localized: "workflow.inspectorNoMedia.label",
+                defaultValue: "No \(list) files found")
+        }
         static let inspectorStartingLabel = String(localized: "workflow.inspectorStarting.label", defaultValue: "Scanning files…")
 
         static let timezoneUnknown = String(localized: "workflow.timezoneUnknown", defaultValue: "Unrecognized timezone")

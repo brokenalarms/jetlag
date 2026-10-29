@@ -135,6 +135,7 @@ enum PipelineEvent: Decodable {
                           fileTimezones: [String: [String]])
     case organizeConflict(count: Int, files: [String])
     case protectedSources(files: [String])
+    case noMediaFiles(EmptySource)
     case pipelineError(message: String)
 
     private enum CodingKeys: String, CodingKey {
@@ -161,7 +162,7 @@ enum PipelineEvent: Decodable {
         case conflictType = "conflict_type"
         case providedTz = "provided_tz"
         case fileTimezones = "file_timezones"
-        case count, files
+        case count, files, extensions
         case processed, succeeded, changed, failed, mode
         case failedFiles = "failed_files"
     }
@@ -248,6 +249,10 @@ enum PipelineEvent: Decodable {
         case "protected_sources":
             self = .protectedSources(
                 files: try container.decode([String].self, forKey: .files))
+        case "no_media_files":
+            self = .noMediaFiles(EmptySource(
+                source: try container.decode(String.self, forKey: .source),
+                extensions: try container.decode([String].self, forKey: .extensions)))
         case "pipeline_error":
             self = .pipelineError(
                 message: try container.decode(String.self, forKey: .message))
@@ -774,6 +779,9 @@ final class AppState {
     /// What the last run reported when it reached the end of the batch. A
     /// cancelled run never produces one: the pipeline is killed before it reports.
     private(set) var runSummary: PipelineSummary?
+    /// Set when the last run found nothing to process, so the inspector can say
+    /// where it looked instead of showing the never-run placeholder.
+    private(set) var emptySource: EmptySource?
     var showRunSummary: Bool = false
     private(set) var currentDiffRow: DiffTableRow?
     private(set) var liveRow: DiffTableRow?
@@ -844,6 +852,7 @@ final class AppState {
         currentDiffRow = nil
         liveRow = nil
         runSummary = nil
+        emptySource = nil
         showRunSummary = false
         workflowSession.clearConflictReport()
     }
@@ -948,6 +957,9 @@ final class AppState {
 
         case .pipelineSummary(let summary):
             runSummary = summary
+
+        case .noMediaFiles(let empty):
+            emptySource = empty
 
         case .pipelineError(let message):
             logOutput.append(LogLine(text: "ERROR: \(message)", stream: .stderr))

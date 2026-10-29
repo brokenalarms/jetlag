@@ -54,6 +54,7 @@ final class PipelineSchemaContractTests: XCTestCase {
         case .timezoneConflict: return "timezone_conflict"
         case .organizeConflict: return "organize_conflict"
         case .protectedSources: return "protected_sources"
+        case .noMediaFiles: return "no_media_files"
         case .pipelineError: return "pipeline_error"
         }
     }
