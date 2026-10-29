@@ -29,7 +29,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.filesystem import find_media_files
-from lib.metadata import metadata_service
+from lib.exiftool import exiftool
 from lib.profiles import resolve_profiles_file
 from lib.timestamp_source import (
     build_filename, carry_exif_cache, extract_metadata_timezone, is_zone_name,
@@ -133,17 +133,16 @@ def clean_working_dir_on_cancel() -> None:
 
 
 def signal_handler(sig, frame):
-    """Shut the metadata service down, clean the working dir, then exit.
+    """Shut exiftool down, clean the working dir, then exit.
 
-    The metadata service owns a persistent jetlag-metadata process, which in
-    turn owns an ``exiftool -stay_open`` process. Under the default SIGTERM
-    disposition the interpreter dies without unwinding, so both are re-parented
-    to launchd and keep running; closing the service here walks that chain down
-    in order instead. Only once it has returned is the working directory quiet
-    enough to clear.
+    The pipeline owns a persistent ``exiftool -stay_open`` process. Under the
+    default SIGTERM disposition the interpreter dies without unwinding, so it
+    is re-parented to launchd and keeps running; closing it here stops it
+    instead. Only once it has returned is the working directory quiet enough
+    to clear.
     """
     print(SIGNAL_MESSAGES[sig], file=sys.stderr)
-    metadata_service.close()
+    exiftool.close()
     clean_working_dir_on_cancel()
     sys.exit(128 + sig)
 

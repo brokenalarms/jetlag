@@ -4,12 +4,10 @@ Cancelling a pipeline run must not leave anything behind.
 
 The app cancels a run by signalling the pipeline's whole process group, so the
 run has to end the way Ctrl+C ends a foreground job. First, the subprocesses:
-the signal has to shut the metadata service down in order — jetlag-metadata,
-and the ``exiftool -stay_open`` process it owns — so that nothing outlives the
-run. Killed outright, both are re-parented to launchd and keep running, holding
-the vendored binaries and stale exiftool state open. Both metadata backends are
-covered, because they leave different trees behind and the app uses the Swift
-one. Second, the working directory:
+the signal has to shut the pipeline's ``exiftool -stay_open`` process down, so
+that nothing outlives the run. Killed outright, it is re-parented to launchd and
+keeps running, holding the vendored binary and stale exiftool state open.
+Second, the working directory:
 the in-flight staged copy, exiftool's interrupted scratch files and the
 directory itself all go with the run, because the working directory is an
 implementation detail that only a *failed* run preserves, for inspection.
@@ -109,25 +107,15 @@ def source_with_videos(tmp_path_factory):
     return source
 
 
-@pytest.fixture(params=["python-backend", "swift-backend"])
-def running_pipeline(request, tmp_path, source_with_videos):
+@pytest.fixture
+def running_pipeline(tmp_path, source_with_videos):
     """A pipeline mid-run, as its own process-group leader — the shape the app
-    launches it in — with the metadata service already spun up, an --apply
-    working directory of its own and an interrupted exiftool scratch file in it.
-
-    Run once per metadata backend, because they leave different process trees to
-    tear down: the Python backend owns exiftool directly, while the Swift one
-    owns jetlag-metadata, which owns exiftool. The app uses the Swift backend, so
-    covering only the Python one is how an exiftool that escaped the process
-    group went unnoticed.
+    launches it in — with exiftool already spun up, an --apply working directory
+    of its own and an interrupted exiftool scratch file in it.
 
     Yields (process, pgid, working_dir, descendants).
     """
     environment = dict(os.environ)
-    if request.param == "swift-backend":
-        environment["JETLAG_METADATA_BINARY"] = str(request.getfixturevalue("jetlag_metadata_binary"))
-    else:
-        environment["JETLAG_METADATA_BINARY"] = ""
 
     working_dir = Path(tempfile.mkdtemp(prefix="pipeline_cancel_"))
     pipeline = subprocess.Popen(
@@ -179,7 +167,7 @@ def _entries(working_dir: Path) -> list[str]:
                          ids=["sigint", "sigterm"])
 def test_cancelled_pipeline_leaves_no_metadata_processes(running_pipeline, sig):
     """A cancelled run leaves nothing behind: every process descended from the
-    pipeline — jetlag-metadata and the exiftool it owns — is gone once the
+    pipeline — the exiftool it owns — is gone once the
     handler has exited, for the interrupt the app sends and for SIGTERM."""
     pipeline, pgid, _, descendants = running_pipeline
     assert descendants, "nothing to clean up — the fixture handed over an empty tree"

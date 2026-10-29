@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Dict, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from lib.metadata import metadata_service as exiftool
+from lib.exiftool import exiftool
 
 # ---------------------------------------------------------------------------
 # EXIF cache — shared across all callers within a process

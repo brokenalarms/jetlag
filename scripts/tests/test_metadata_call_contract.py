@@ -8,7 +8,7 @@ shared machine can resolve. These counts are exact; changing one means changing 
 contract here, with the reason in the commit.
 
 Calls are counted by running the pipeline against tests/metadata_call_counter.py,
-which logs each request and serves it with the real exiftool.
+a stand-in exiftool that logs each command and passes it to the real one.
 """
 
 import json
@@ -26,6 +26,7 @@ from conftest import create_test_video
 SCRIPT_DIR = Path(__file__).parent.parent
 MEDIA_PIPELINE = SCRIPT_DIR / "media-pipeline.sh"
 COUNTER = Path(__file__).parent / "metadata_call_counter.py"
+EXIFTOOL = SCRIPT_DIR / "tools" / "exiftool"
 FILE_COUNT = 3
 
 
@@ -68,7 +69,8 @@ def metadata_calls(workspace, tasks: list[str], apply: bool) -> dict:
     ] + (["--apply"] if apply else [])
     env = dict(
         os.environ,
-        JETLAG_METADATA_BINARY=str(COUNTER),
+        JETLAG_EXIFTOOL=str(COUNTER),
+        REAL_EXIFTOOL=str(EXIFTOOL),
         METADATA_CALL_LOG=str(log),
         JETLAG_PROFILES_FILE=str(workspace["profiles"]),
     )

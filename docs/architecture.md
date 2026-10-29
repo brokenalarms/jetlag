@@ -103,16 +103,11 @@ All user-facing text in the macOS app is centralized in `macos/Sources/Strings.s
 
 ---
 
-## Metadata abstraction layer
+## Metadata: one exiftool client
 
-All EXIF/metadata operations go through a two-layer abstraction:
+Every metadata read and write goes through `scripts/lib/exiftool.py`, the single exiftool client. It keeps one `exiftool -stay_open` process per script run and talks to it over stdin/stdout; scripts import its `exiftool` instance and never start exiftool themselves. It runs the exiftool on PATH — the vendored `scripts/tools/exiftool`, which the `.sh` wrappers put first — unless `JETLAG_EXIFTOOL` names another (tests use that to count calls).
 
-1. **`jetlag-metadata`** (`macos/Sources/CLI/`) — Swift CLI that wraps ExifTool behind a JSON protocol using batch mode (`-stay_open`). Accepts JSON commands on stdin, returns JSON results on stdout.
-2. **`scripts/lib/metadata.py`** — Python module that wraps the `jetlag-metadata` CLI. All scripts import from `lib.metadata` rather than calling ExifTool directly.
-
-This separation means the underlying metadata engine (currently ExifTool) can be swapped without touching any calling code.
-
-Both backends start exiftool with `scripts/lib/exiftool-jetlag.config`, which declares jetlag's own XMP namespace (`XMP-jetlag`, `http://ns.jetlag.app/1.0/`). Exiftool refuses to write a tag it has no definition for, so a backend started without the config silently drops every provenance write. `lib/metadata.py` passes the path to `jetlag-metadata` as `--exiftool-config`.
+It starts exiftool with `scripts/lib/exiftool-jetlag.config`, which declares jetlag's own XMP namespace (`XMP-jetlag`, `http://ns.jetlag.app/1.0/`). Exiftool refuses to write a tag it has no definition for, so a client started without the config silently drops every provenance write.
 
 ---
 
