@@ -101,7 +101,9 @@ struct DiffTableView: View {
     /// what the cache avoids repeating for rows that have not changed.
     func cellTexts(_ row: DiffTableRow) -> [CellText] {
         [
-            CellText([(row.file, Self.monoFont)], maxWidth: Self.fileColumnMaxWidth),
+            CellText([(row.file, Self.monoFont)],
+                     extraWidth: row.fileCamera != nil ? Self.iconWidth : 0,
+                     maxWidth: Self.fileColumnMaxWidth),
             CellText(fixedWidth: Self.timelineColumnWidth),
             CellText([(row.originalTimeDisplay ?? "", Self.monoFont),
                       (row.timestampSource?.label ?? "", Self.detailFont)]),
@@ -167,10 +169,18 @@ struct DiffTableView: View {
 
             Table(rows, selection: $selection) {
                 TableColumn(Strings.DiffTable.fileColumn) { row in
-                    Text(row.file)
-                        .font(.system(size: 11, design: .monospaced))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    HStack(spacing: 3) {
+                        if let camera = row.fileCamera {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.orange)
+                                .help(Strings.DiffTable.cameraMismatchHelp(camera.name))
+                        }
+                        Text(row.file)
+                            .font(.system(size: 11, design: .monospaced))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
                 }
                 .width(min: 80)
 

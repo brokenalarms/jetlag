@@ -495,6 +495,10 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let fixedChange = String(localized: "diffTable.fixed.change", defaultValue: "Fixed")
         static let noChangeChange = String(localized: "diffTable.noChange.change", defaultValue: "No change")
         static let errorChange = String(localized: "diffTable.error.change", defaultValue: "Error")
+        static func cameraMismatchHelp(_ camera: String) -> String {
+            String(localized: "diffTable.cameraMismatch.help",
+                defaultValue: "Shot on \(camera), not this profile's camera. Its camera fields are left as they are — check this is the right profile.")
+        }
         static let requiresForceTimezoneHelp = String(
             localized: "diffTable.requiresForceTimezone.help",
             defaultValue: "This file already carries a timezone from the camera. Applying relabels it, and needs confirmation.")

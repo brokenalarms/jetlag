@@ -289,6 +289,34 @@ class TestAddCameraToExif:
         assert "Model" in fields_updated
         assert "Make" not in fields_updated
 
+    def test_add_camera_never_relabels_the_camera_that_shot_the_file(self):
+        """A profile picked for the wrong body must not rewrite the file's camera.
+
+        The sony-a7iv-photo profile rewrote 143 A7V stills to Model=ILCE-7M4 (and
+        SONY to Sony). What the camera wrote is the record of what shot the file,
+        so a differing Make or Model is left exactly as it was.
+        """
+        subprocess.run([
+            "exiftool", "-P", "-overwrite_original",
+            "-Make=SONY", "-Model=ILCE-7M5",
+            self.test_video
+        ], capture_output=True, check=True)
+
+        success, fields_updated = tm.add_camera_to_exif(
+            self.test_video,
+            make="Sony",
+            model="ILCE-7M4",
+            dry_run=False
+        )
+
+        tm.clear_exif_cache(self.test_video)
+        after = tm.get_existing_exif_camera(self.test_video)
+        assert success is True
+        assert fields_updated == [], \
+            f"Actual: would update {fields_updated}, Expected: nothing (the camera's values stand)"
+        assert after == {"Make": "SONY", "Model": "ILCE-7M5"}, \
+            f"Actual: {after}, Expected: Make=SONY, Model=ILCE-7M5 unchanged"
+
     def test_add_camera_dry_run(self):
         """Test that dry run returns data but doesn't modify file"""
         success, fields_updated = tm.add_camera_to_exif(

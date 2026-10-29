@@ -52,6 +52,18 @@ events:
       tags_added: { type: "list[string]" }
       exif_make: { type: string }
       exif_model: { type: string }
+      file_make:
+        type: string
+        optional: true
+        description: >-
+          The Make the file already carries, present only when it differs
+          (ignoring case) from the profile's. The file's value is never
+          overwritten; a mismatch means the profile was likely picked for
+          the wrong camera.
+      file_model:
+        type: string
+        optional: true
+        description: "As file_make, for the Model"
     example:
       event: tag_result
       file: DJI_20250815_101112_0001.MP4

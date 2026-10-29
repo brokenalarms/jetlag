@@ -25,6 +25,10 @@ class TagResult:
     exif_make: str
     exif_model: str
     action: str  # "tagged" | "already_correct"
+    # The camera the file says shot it, where that differs from the profile's:
+    # the profile was likely picked for the wrong body. Absent when they agree.
+    file_make: Optional[str] = None
+    file_model: Optional[str] = None
 
 # Handle Ctrl-C gracefully
 def signal_handler(sig, frame):  # noqa: ARG001
@@ -80,6 +84,25 @@ def get_existing_exif_camera(file_path: str) -> dict:
     data = read_exif_data(file_path)
     return {key: data[key] for key in ("Make", "Model") if key in data}
 
+def supports_camera_exif(file_path: str) -> bool:
+    """Whether the camera fields are read and written for this file type
+    (skips .lrv, .insv and other sidecars exiftool cannot handle)."""
+    supported_extensions = {'.mp4', '.mov', '.jpg', '.jpeg', '.png', '.dng', '.arw', '.cr2', '.nef'}
+    return Path(file_path).suffix.lower() in supported_extensions
+
+def camera_mismatch(file_path: str, make: Optional[str], model: Optional[str]) -> dict:
+    """The file's own Make/Model wherever it carries one that differs from the
+    profile's. Case is ignored: cameras write SONY where profiles say Sony."""
+    if not supports_camera_exif(file_path):
+        return {}
+    existing = get_existing_exif_camera(file_path)
+    mismatch = {}
+    for field, wanted in (('Make', make), ('Model', model)):
+        present = str(existing.get(field) or '').strip()
+        if wanted and present and present.casefold() != wanted.casefold():
+            mismatch[field] = present
+    return mismatch
+
 def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Optional[str] = None, dry_run: bool = False) -> Tuple[bool, List[str]]:
     """Add camera info to EXIF Make and Model fields
 
@@ -89,13 +112,8 @@ def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Option
     if not make and not model:
         return True, []
 
-    # Only apply EXIF tags to supported file types (skip .lrv, .insv, etc.)
-    # exiftool can handle these extensions without errors
-    supported_extensions = {'.mp4', '.mov', '.jpg', '.jpeg', '.png', '.dng', '.arw', '.cr2', '.nef'}
-    file_ext = Path(file_path).suffix.lower()
-
-    if file_ext not in supported_extensions:
-        return True, []  # Skip unsupported types silently
+    if not supports_camera_exif(file_path):
+        return True, []
 
     try:
         existing = get_existing_exif_camera(file_path)
@@ -103,13 +121,13 @@ def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Option
         fields_to_update = []
         tag_args = []
 
-        if make and existing.get('Make') != make:
-            tag_args.append(f'-Make={make}')
-            fields_to_update.append('Make')
-
-        if model and existing.get('Model') != model:
-            tag_args.append(f'-Model={model}')
-            fields_to_update.append('Model')
+        # The profile's camera only fills in what the file lacks. A Make or Model
+        # the camera wrote is the record of what shot the file, so a profile
+        # picked for the wrong body never relabels it; camera_mismatch reports it.
+        for field, wanted in (('Make', make), ('Model', model)):
+            if wanted and not str(existing.get(field) or '').strip():
+                tag_args.append(f'-{field}={wanted}')
+                fields_to_update.append(field)
 
         if not fields_to_update:
             return True, []
@@ -137,6 +155,12 @@ def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], 
     all_tags_added: list[str] = []
     exif_make = ""
     exif_model = ""
+
+    mismatch = camera_mismatch(file_path, make, model) if (make or model) else {}
+    if mismatch:
+        shot_on = ' '.join(mismatch.get(f, '') for f in ('Make', 'Model')).strip()
+        print(f"⚠️  {filename} was shot on {shot_on}, not this profile's camera; "
+              "left unchanged — is this the right profile?", file=sys.stderr)
 
     # Apply camera EXIF (Make and Model)
     if make or model:
@@ -177,6 +201,8 @@ def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], 
         exif_make=exif_make,
         exif_model=exif_model,
         action=tag_action,
+        file_make=mismatch.get('Make'),
+        file_model=mismatch.get('Model'),
     )
 
 
