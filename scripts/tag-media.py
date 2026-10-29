@@ -10,7 +10,7 @@ import os
 import signal
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 import argparse
 
 from lib.metadata import metadata_service as exiftool
@@ -113,45 +113,43 @@ def camera_mismatch(file_path: str, make: Optional[str], model: Optional[str]) -
             mismatch[field] = present
     return mismatch
 
+def camera_exif_fields(file_path: str, make: Optional[str], model: Optional[str]) -> Dict[str, str]:
+    """The Make/Model fields the profile's camera fills in for this file.
+
+    The profile's camera only fills in what the file lacks. A Make or Model the
+    camera wrote is the record of what shot the file, so a profile picked for the
+    wrong body never relabels it; camera_mismatch reports it.
+    """
+    if not (make or model) or not supports_camera_exif(file_path):
+        return {}
+    existing = get_existing_exif_camera(file_path)
+    return {
+        field: wanted
+        for field, wanted in (('Make', make), ('Model', model))
+        if wanted and not str(existing.get(field) or '').strip()
+    }
+
 def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Optional[str] = None, dry_run: bool = False) -> Tuple[bool, List[str]]:
     """Add camera info to EXIF Make and Model fields
 
     Returns:
         (success, fields_updated): Success status and list of fields that were actually updated
     """
-    if not make and not model:
-        return True, []
-
-    if not supports_camera_exif(file_path):
-        return True, []
-
     try:
-        existing = get_existing_exif_camera(file_path)
-
-        fields_to_update = []
-        tag_args = []
-
-        # The profile's camera only fills in what the file lacks. A Make or Model
-        # the camera wrote is the record of what shot the file, so a profile
-        # picked for the wrong body never relabels it; camera_mismatch reports it.
-        for field, wanted in (('Make', make), ('Model', model)):
-            if wanted and not str(existing.get(field) or '').strip():
-                tag_args.append(f'-{field}={wanted}')
-                fields_to_update.append(field)
-
-        if not fields_to_update:
-            return True, []
-
-        if not dry_run:
-            exiftool.write_tags(file_path, tag_args)
+        fields = camera_exif_fields(file_path, make, model)
+        if fields and not dry_run:
+            exiftool.write_tags(file_path, [f'-{field}={value}' for field, value in fields.items()])
             clear_exif_cache(file_path)
-        return True, fields_to_update
+        return True, list(fields)
     except Exception as e:
         print(f"Warning: Failed to add camera info to {file_path}: {e}", file=sys.stderr)
         return False, []
 
-def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], model: Optional[str], dry_run: bool) -> Optional[TagResult]:
+def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], model: Optional[str], dry_run: bool, write_exif: bool = True) -> Optional[TagResult]:
     """Process a single file: apply tags and EXIF, return structured result.
+
+    write_exif=False leaves the camera fields for the caller to write in its own
+    exiftool call (camera_exif_fields gives them), so the file is rewritten once.
 
     Returns:
         TagResult on success, None if file not found or processing failed
@@ -174,7 +172,8 @@ def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], 
 
     # Apply camera EXIF (Make and Model)
     if make or model:
-        success, fields_updated = add_camera_to_exif(file_path, make=make, model=model, dry_run=dry_run)
+        success, fields_updated = add_camera_to_exif(
+            file_path, make=make, model=model, dry_run=dry_run or not write_exif)
         if not success:
             return None
 

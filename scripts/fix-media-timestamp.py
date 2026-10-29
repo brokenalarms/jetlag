@@ -233,7 +233,7 @@ def provenance_field_args(file_path: str, exif: Dict[str, str]) -> list:
     clock_args = [
         f"-{record_tag}={exif[source]}"
         for source, record_tag in PROVENANCE_CLOCK_TAGS.items()
-        if exif.get(source)
+        if is_valid_timestamp(exif.get(source, ""))
     ]
     return [f"-{PRESERVED_FILENAME_TAG}={os.path.basename(file_path)}"] + clock_args
 
@@ -913,8 +913,12 @@ def _source_to_machine_token(source: str) -> str:
     return source_lower
 
 
-def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None, force_timezone: bool = False) -> TimestampFixResult:
+def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None, force_timezone: bool = False, extra_write_fields: Optional[Dict[str, str]] = None) -> TimestampFixResult:
     """Fix media (photo/video) timestamps.
+
+    extra_write_fields are other steps' field writes, sent in this step's exiftool
+    call so the file is rewritten once. They are written even when the timestamps
+    need no change.
 
     Returns:
         TimestampFixResult with all machine-readable fields populated.
@@ -1088,10 +1092,8 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
     else:
         print(f"📊 Change   : {change_desc}", file=sys.stderr)
 
-    if not has_changes:
-        return TimestampFixResult(**result_base, timestamp_action="no_change")
-
-    if dry_run:
+    extra_write_fields = extra_write_fields or {}
+    if dry_run or not (has_changes or extra_write_fields):
         return TimestampFixResult(**result_base, timestamp_action="no_change")
 
     # Apply changes
@@ -1113,7 +1115,8 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
         f"-{tag}={value}" for tag, value in changes["clock_targets"].items()
     ] if changes["stale_clock_fields"] else []
 
-    field_args = provenance_args + correction_args
+    extra_args = [f"-{tag}={value}" for tag, value in extra_write_fields.items()]
+    field_args = provenance_args + correction_args + extra_args
 
     # Rewriting the file for any field resets its birth time, so the birth time rides
     # in the same exiftool call, which applies file system tags after the rewrite —
@@ -1128,12 +1131,16 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
                 print("   ⚠️  Failed to record original timestamps for recovery", file=sys.stderr)
             if correction_args:
                 print(f"   ❌ Failed to write clock fields: {', '.join(changes['clock_targets'])}", file=sys.stderr)
+            if extra_args:
+                print(f"   ❌ Failed to write {', '.join(extra_write_fields)}", file=sys.stderr)
             if file_time_args:
                 print("   ❌ Failed to apply file timestamps", file=sys.stderr)
-            success = not (correction_args or file_time_args)
+            success = not (correction_args or extra_args or file_time_args)
 
     if not success:
         return TimestampFixResult(**result_base, timestamp_action="error")
+    if not has_changes:
+        return TimestampFixResult(**result_base, timestamp_action="no_change")
     return TimestampFixResult(**result_base, timestamp_action="added" if only_adds_fields else "fixed")
 
 VALUE_OPTIONS_ACCEPTING_NEGATIVES = ('--timezone', '--time-offset')

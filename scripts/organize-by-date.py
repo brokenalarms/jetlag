@@ -36,19 +36,22 @@ MONTH_ABBREVS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
-def get_file_date_for_organization(file_path: str) -> Optional[str]:
+def get_file_date_for_organization(file_path: str, datetime_original: Optional[str] = None) -> Optional[str]:
     """Get date in YYYY-MM-DD format for file organization.
 
     Priority: DateTimeOriginal > filename patterns > file mtime
+
+    datetime_original is the file's DateTimeOriginal as a caller already holds it
+    ("" when the file has none); only when it is not given is the file read.
     """
-    try:
-        data = exiftool.read_tags(file_path, ["DateTimeOriginal"], extra_args=["-fast2"])
-        dt_str = data.get("DateTimeOriginal", "")
-        if dt_str:
-            date_part = dt_str.split(' ')[0]
-            return date_part.replace(':', '-')
-    except Exception:
-        pass
+    if datetime_original is None:
+        try:
+            data = exiftool.read_tags(file_path, ["DateTimeOriginal"], extra_args=["-fast2"])
+            datetime_original = data.get("DateTimeOriginal", "")
+        except Exception:
+            datetime_original = ""
+    if datetime_original:
+        return datetime_original.split(' ')[0].replace(':', '-')
 
     # Try filename patterns
     base = os.path.basename(file_path)
@@ -173,7 +176,8 @@ def _handle_existing_target(file_path, target_file, target_path, abs_target,
 
 def process_file(file_path: str, target_dir: str, template: str,
                  copy_mode: bool, overwrite: bool, apply: bool,
-                 verbose: bool, dest_name: Optional[str] = None) -> OrganizeResult:
+                 verbose: bool, dest_name: Optional[str] = None,
+                 datetime_original: Optional[str] = None) -> OrganizeResult:
     """Process a single file for organization.
 
     Printed messages name file_path: they report the operation this function
@@ -184,6 +188,9 @@ def process_file(file_path: str, target_dir: str, template: str,
     dry run previewing a rename that has not happened, the destination carries
     the name apply will produce while every read still uses the real file_path.
 
+    datetime_original, when given, is the date the destination is built from in
+    place of reading the file.
+
     Returns:
         OrganizeResult with dest path and action taken
     """
@@ -192,7 +199,7 @@ def process_file(file_path: str, target_dir: str, template: str,
     if verbose:
         print(f"Processing: {file_path}", file=sys.stderr)
 
-    file_date = get_file_date_for_organization(file_path)
+    file_date = get_file_date_for_organization(file_path, datetime_original)
     if not file_date:
         print(f"ERROR: Cannot determine date for {base}", file=sys.stderr)
         return OrganizeResult(dest="", action="error")
