@@ -218,16 +218,16 @@ class TestExifReadSharedWithTimestampSource:
         """A file already read via read_exif_data() (the fix-timestamp step's
         per-file exiftool call) must not trigger a second exiftool subprocess
         when get_existing_exif_camera() is asked for the same file."""
-        from lib.metadata import metadata_service
+        from lib.exiftool import exiftool
 
-        real_read_tags = metadata_service.read_tags
+        real_read_tags = exiftool.read_tags
         call_count = {"n": 0}
 
         def counting_read_tags(*args, **kwargs):
             call_count["n"] += 1
             return real_read_tags(*args, **kwargs)
 
-        monkeypatch.setattr(metadata_service, "read_tags", counting_read_tags)
+        monkeypatch.setattr(exiftool, "read_tags", counting_read_tags)
 
         # Simulate the fix-timestamp step reading this file first.
         tm.read_exif_data(self.test_video)

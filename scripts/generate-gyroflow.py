@@ -25,7 +25,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.results import emit_result
 from lib.profiles import resolve_profiles_file
-from lib.metadata import metadata_service as exiftool
+from lib.exiftool import exiftool
 
 
 SCRIPT_DIR = Path(__file__).parent

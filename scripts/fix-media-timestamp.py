@@ -21,7 +21,7 @@ def signal_handler(sig, frame):
     print("\n\nInterrupted by user", file=sys.stderr)
     sys.exit(130)
 
-from lib.metadata import metadata_service as exiftool
+from lib.exiftool import exiftool
 from lib.results import emit_result
 from lib.timestamp_source import (
     read_exif_data,
@@ -78,34 +78,7 @@ class TimestampFixResult:
     stale_file_times: list = field(default_factory=list)
 
 
-def same_as_original(dt_with_tz: datetime) -> str:
-    """Keep same as DateTimeOriginal with timezone"""
-    return dt_with_tz.strftime('%Y:%m:%d %H:%M:%S%z')
-
-def utc_from_date(dt_with_tz: datetime) -> str:
-    """Convert datetime with timezone to UTC (no timezone suffix)"""
-    return dt_with_tz.astimezone(timezone.utc).strftime('%Y:%m:%d %H:%M:%S')
-
-def remove_field(dt_with_tz: datetime) -> None:
-    """Mark field for removal"""
-    return None
-
-def same_local_time_current_tz(dt_with_tz: datetime) -> str:
-    """Keep same local time as DateTimeOriginal"""
-    # File system timestamps can't store timezone, so just use the local time
-    # Applications will interpret this as local time in whatever timezone they're running
-    return dt_with_tz.strftime('%Y:%m:%d %H:%M:%S')
-
-# File system timestamp functions - these are the only timestamps we modify
-def to_utc(datetime_str: str) -> str:
-    """Convert local time with timezone to UTC (equivalent to bash to_utc function)"""
-    try:
-        dt = datetime.strptime(datetime_str, '%Y:%m:%d %H:%M:%S%z')
-        return dt.astimezone(timezone.utc).strftime('%Y:%m:%d %H:%M:%S')
-    except ValueError:
-        return ""
-
-def get_timezone_for_country(input_country: str, date_str: Optional[str] = None) -> Optional[str]:
+def get_timezone_for_country(input_country: str) -> Optional[str]:
     """Get timezone for country using CSV lookup (lines 536-604 from bash)"""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     timezone_dir = os.path.join(script_dir, "lib", "timezones")

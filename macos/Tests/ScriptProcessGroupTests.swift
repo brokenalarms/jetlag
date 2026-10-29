@@ -1,8 +1,8 @@
 import XCTest
 @testable import Jetlag
 
-/// A launched pipeline is a tree — bash execs Python, which owns jetlag-metadata,
-/// which owns `exiftool -stay_open`. Signalling only the script leaves the rest
+/// A launched pipeline is a tree — bash execs Python, which owns
+/// `exiftool -stay_open`. Signalling only the script leaves the rest
 /// re-parented to launchd and still running, so the app puts every run in its own
 /// process group and cancel signals the group.
 final class ScriptProcessGroupTests: XCTestCase {
@@ -38,7 +38,7 @@ final class ScriptProcessGroupTests: XCTestCase {
     }
 
     /// Cancelling reaches the descendants, not just the script: a child that
-    /// outlives its parent — as jetlag-metadata and exiftool do — is signalled too.
+    /// outlives its parent — as exiftool does — is signalled too.
     func testTerminateGroupStopsDescendantsThatOutliveTheScript() async throws {
         let temp = try makeTemporaryDirectory()
         // The script exits immediately, leaving the sleep re-parented — exactly the

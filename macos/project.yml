@@ -47,9 +47,6 @@ targets:
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         GENERATE_INFOPLIST_FILE: YES
-        # Suppress xcodegen's Info.plist auto-detection, which otherwise picks up
-        # the jetlag-metadata dSYM build artifact under Sources/Tools/.build.
-        INFOPLIST_FILE: ""
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.video
         INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 Daniel Lawrence"
         CODE_SIGN_ENTITLEMENTS: Sources/App.entitlements
@@ -95,17 +92,10 @@ targets:
             fi
           done
 
-          # Build jetlag-metadata Swift CLI and install into bundle
-          METADATA_PKG="${SRCROOT}/Sources/Tools/jetlag-metadata"
-          if [ -d "$METADATA_PKG" ]; then
-            swift build -c release --package-path "$METADATA_PKG" 2>&1
-            cp "$METADATA_PKG/.build/release/jetlag-metadata" "$DEST/tools/jetlag-metadata"
-          fi
-
           # Verify vendored tools are present (copied by cp -r above)
-          for tool in exiftool tag jetlag-metadata; do
+          for tool in exiftool tag; do
             if [ ! -f "$DEST/tools/$tool" ]; then
-              echo "error: scripts/tools/$tool missing — run scripts/tools/download-${tool}.sh or scripts/tools/build-jetlag-metadata.sh or see scripts/tools/README" >&2
+              echo "error: scripts/tools/$tool missing — see scripts/tools/README" >&2
               exit 1
             fi
           done

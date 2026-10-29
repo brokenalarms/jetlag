@@ -1,34 +1,33 @@
 #!/usr/bin/env python3
-"""A stand-in for jetlag-metadata that logs every request before answering it.
+"""A stand-in exiftool that logs every -stay_open command before passing it on.
 
-Selected through JETLAG_METADATA_BINARY. Each request is appended as one JSON line
-(op, file) to the file named by METADATA_CALL_LOG, then served by the Python
-exiftool backend, so the pipeline behaves exactly as it does with the real one.
+Selected through JETLAG_EXIFTOOL. Runs the real exiftool (REAL_EXIFTOOL) with the
+same arguments and relays stdin to it line by line; its stdout goes straight back
+to the caller, so the pipeline behaves exactly as it does with the real one. Each
+command — the lines up to an -executeN — is appended to METADATA_CALL_LOG as one
+JSON line (op, file): a write when it carries -overwrite_original, else a read.
 """
 
 import json
 import os
+import subprocess
 import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from lib.exiftool import ExifTool
 
 log_path = os.environ["METADATA_CALL_LOG"]
-exiftool = ExifTool()
+real = subprocess.Popen([os.environ["REAL_EXIFTOOL"], *sys.argv[1:]], stdin=subprocess.PIPE)
 
-for line in sys.stdin:
-    request = json.loads(line)
-    with open(log_path, "a") as log:
-        log.write(json.dumps({"op": request["op"], "file": request["file"]}) + "\n")
-    if request["op"] == "read":
-        extra_args = (["-fast2"] if request.get("fast") else []) + \
-                     (["-a", "-G4"] if request.get("duplicates") else [])
-        response = exiftool.read_tags(request["file"], request["tags"], extra_args)
+command: list[str] = []
+for raw in sys.stdin.buffer:
+    real.stdin.write(raw)
+    real.stdin.flush()
+    line = raw.decode().strip()
+    if line.startswith("-execute"):
+        op = "write" if "-overwrite_original" in command else "read"
+        with open(log_path, "a") as log:
+            log.write(json.dumps({"op": op, "file": command[-1]}) + "\n")
+        command = []
     else:
-        tag_args = [f"-{key}={value}" for key, value in request["tags"].items()]
-        response = {"updated": exiftool.write_tags(request["file"], tag_args)}
-    sys.stdout.write(json.dumps(response) + "\n")
-    sys.stdout.flush()
+        command.append(line)
 
-exiftool.close()
+real.stdin.close()
+sys.exit(real.wait())

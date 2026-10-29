@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Tag media files with Finder tags and camera EXIF metadata
-Extracted from import-media.py for reuse in media-pipeline
 """
 
 import subprocess
@@ -13,7 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import argparse
 
-from lib.metadata import metadata_service as exiftool
+from lib.exiftool import exiftool
 from lib.results import emit_result
 from lib.timestamp_source import clear_exif_cache, read_exif_data
 

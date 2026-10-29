@@ -16,7 +16,7 @@ from conftest import create_test_photo, create_test_video
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from lib.metadata import metadata_service as exiftool
+from lib.exiftool import exiftool
 from lib.timestamp_source import (
     parse_filename_timestamp,
     build_filename,

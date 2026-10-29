@@ -1,9 +1,9 @@
 import XCTest
 @testable import Jetlag
 
-/// A run has to finish when the script finishes. The pipeline's descendants —
-/// jetlag-metadata and the `exiftool -stay_open` it owns — inherit the script's
-/// stdout and stderr, so one that outlives the script holds the pipe write ends
+/// A run has to finish when the script finishes. The pipeline's descendant —
+/// the `exiftool -stay_open` it owns — inherits the script's stdout and stderr,
+/// so one that outlives the script holds the pipe write ends
 /// open and EOF never arrives. Completion therefore follows the script's exit:
 /// otherwise the log stream never ends, `finishRun` never runs, and the app is
 /// left with no completion popup, the mode stuck on Apply, and Run disabled.

@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-conftest.py tracks every exiftool -stay_open / jetlag-metadata child spawned
-by lib.exiftool / lib.metadata (lib/exiftool.py's and lib/metadata.py's
-_spawned_pids registries) and fails the session at pytest_sessionfinish if
+conftest.py tracks every exiftool -stay_open child spawned by lib.exiftool
+(its _spawned_pids registry) and fails the session at pytest_sessionfinish if
 any of them are still alive — the mechanism that catches a leaked -stay_open
 process. These tests exercise that mechanism directly rather than via a full
 nested pytest run.
@@ -59,15 +58,14 @@ time.sleep(30)
         exiftool_module._spawned_pids.remove(proc.pid)
 
 
-def test_module_level_metadata_service_is_registered_when_used():
-    """The shared metadata_service singleton (used by conftest's
+def test_module_level_exiftool_is_registered_when_used():
+    """The shared exiftool singleton (used by conftest's
     create_test_video/create_test_photo and every production script) records
     its own pid the same way a test-constructed client does, so the session
     close fixture's teardown is exactly what the leak check verifies."""
     from conftest import exiftool
-    import lib.metadata as metadata_module
 
     exiftool._ensure_running()
     pid = exiftool._process.pid
 
-    assert pid in exiftool_module._spawned_pids or pid in metadata_module._spawned_pids
+    assert pid in exiftool_module._spawned_pids

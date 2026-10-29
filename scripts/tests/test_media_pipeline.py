@@ -2851,7 +2851,7 @@ class TestCancelClearsTheWorkingDir:
         (working_dir / "VID_20251005_100000_00_001.mp4_exiftool_tmp").write_bytes(b"scratch")
 
         monkeypatch.setattr(pipeline, "_working_dir", str(working_dir))
-        monkeypatch.setattr(pipeline.metadata_service, "close", lambda: None)
+        monkeypatch.setattr(pipeline.exiftool, "close", lambda: None)
         pipeline.register_staged_paths([staged, companion])
         yield working_dir
         pipeline._staged_paths.clear()

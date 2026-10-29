@@ -2,14 +2,14 @@ import Foundation
 
 /// A launched script and the process group it leads.
 ///
-/// The pipeline is a tree — the script execs Python, which owns jetlag-metadata,
-/// which owns `exiftool -stay_open`. Signalling the direct child alone leaves the
-/// rest re-parented to launchd and still running, so the script is spawned as its
+/// The pipeline is a tree — the script execs Python, which owns
+/// `exiftool -stay_open`. Signalling the direct child alone leaves the rest
+/// re-parented to launchd and still running, so the script is spawned as its
 /// own process group leader and cancel signals the whole group.
 final class ScriptProcess: @unchecked Sendable {
     /// How long the group is given to shut down on the interrupt before it is killed.
-    /// The pipeline's handler closes jetlag-metadata, which drains exiftool's
-    /// pending command before sending it `-stay_open False`.
+    /// The pipeline's handler lets exiftool finish its pending command before
+    /// sending it `-stay_open False`.
     static let terminationGracePeriod: TimeInterval = 5
 
     let processIdentifier: pid_t
@@ -52,8 +52,8 @@ final class ScriptProcess: @unchecked Sendable {
     /// Ask the whole process group to stop, then kill whatever is left.
     ///
     /// Cancel is the app's Ctrl+C, so the group is interrupted exactly as a
-    /// terminal interrupts a foreground job: every member — the script, Python,
-    /// jetlag-metadata and its exiftool — sees SIGINT at once and shuts itself
+    /// terminal interrupts a foreground job: every member — the script, Python
+    /// and its exiftool — sees SIGINT at once and shuts itself
     /// down. Anything still alive after the grace period is killed so a wedged
     /// child cannot outlive the run.
     func terminateGroup(gracePeriod: TimeInterval = ScriptProcess.terminationGracePeriod) {

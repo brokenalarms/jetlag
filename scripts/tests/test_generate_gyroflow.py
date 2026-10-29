@@ -215,7 +215,6 @@ class TestMissingBinary:
             # Restrict PATH to tmpdir (exiftool) + essentials only,
             # so shutil.which("gyroflow") won't find a real install
             env["PATH"] = f"{tmpdir}:/usr/bin:/bin"
-            env["JETLAG_METADATA_BINARY"] = ""
             # Nor an installed Gyroflow.app, which resolution checks before PATH
             env["JETLAG_APPLICATIONS_DIR"] = tmpdir
             env["JETLAG_TOOLS_DIR"] = tmpdir

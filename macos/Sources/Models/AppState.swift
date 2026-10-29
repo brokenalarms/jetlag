@@ -1134,8 +1134,8 @@ final class AppState {
         workflowSession.noteRunCancelled()
         currentRunTask?.cancel()
         currentRunTask = nil
-        // The whole group, not just the script: the pipeline's jetlag-metadata and
-        // exiftool children would otherwise be re-parented to launchd and live on.
+        // The whole group, not just the script: the pipeline's exiftool child
+        // would otherwise be re-parented to launchd and live on.
         currentProcess?.terminateGroup()
         currentProcess = nil
         isRunning = false

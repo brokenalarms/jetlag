@@ -81,8 +81,8 @@ struct ScriptRunner {
     /// Spawn the script as the leader of a fresh process group.
     ///
     /// `Process` offers no way to do this, and it is what makes cancel able to
-    /// reach the pipeline's descendants — jetlag-metadata and the persistent
-    /// exiftool it owns — instead of only the script itself.
+    /// reach the pipeline's descendants — the persistent exiftool it owns —
+    /// instead of only the script itself.
     private static func spawnProcessGroupLeader(
         arguments: [String],
         environment: [String: String],

@@ -2,13 +2,6 @@ import Foundation
 
 struct FilenamePattern: Decodable {
     let regex: String
-    let name: String
-    let hasTime: Bool
-
-    private enum CodingKeys: String, CodingKey {
-        case regex, name
-        case hasTime = "has_time"
-    }
 }
 
 enum FilenamePatterns {

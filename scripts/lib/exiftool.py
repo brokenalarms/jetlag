@@ -14,13 +14,19 @@ Usage:
 from __future__ import annotations
 
 import atexit
-import re
 import collections
+import os
+import re
 import subprocess
 import threading
 from pathlib import Path
 
 EXIFTOOL_CONFIG = str(Path(__file__).parent / "exiftool-jetlag.config")
+
+# The exiftool to start: the one on PATH (scripts/tools first, via the .sh
+# wrappers) unless JETLAG_EXIFTOOL names another. Tests point it at a stand-in
+# that counts calls before passing them to the real one.
+EXIFTOOL_BINARY = os.environ.get("JETLAG_EXIFTOOL") or "exiftool"
 
 # pids of every exiftool -stay_open child this process has spawned, so a test
 # session can confirm none of them are still running at session end.
@@ -49,7 +55,7 @@ class ExifTool:
             return
         try:
             self._process = subprocess.Popen(
-                ["exiftool", "-config", EXIFTOOL_CONFIG, "-stay_open", "True", "-@", "-"],
+                [EXIFTOOL_BINARY, "-config", EXIFTOOL_CONFIG, "-stay_open", "True", "-@", "-"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,

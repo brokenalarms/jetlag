@@ -20,8 +20,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import lib.exiftool as _exiftool_module
-import lib.metadata as _metadata_module
-from lib.metadata import metadata_service as exiftool
+from lib.exiftool import exiftool
 
 _template_video: Path | None = None
 
@@ -92,64 +91,26 @@ def create_test_photo(path, **exif_tags):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _close_metadata_service_at_session_end():
-    """The module-level metadata_service is otherwise only closed via atexit,
-    which does not run when an xdist worker is torn down non-gracefully — the
-    exiftool -stay_open / jetlag-metadata child then outlives the suite."""
+def _close_exiftool_at_session_end():
+    """The module-level exiftool is otherwise only closed via atexit, which does
+    not run when an xdist worker is torn down non-gracefully — its -stay_open
+    child then outlives the suite."""
     yield
     exiftool.close()
 
 
-BUILD_JETLAG_METADATA = Path(__file__).parent.parent / "tools" / "build-jetlag-metadata.sh"
-
-
-@pytest.fixture(scope="session")
-def jetlag_metadata_binary(tmp_path_factory):
-    """The Swift metadata backend, built from source for the tests that need it.
-
-    The app ships jetlag-metadata but the repo does not, so tests that cover the
-    process tree it owns have to build it. It is built into a temporary directory
-    rather than scripts/tools/ so a test run never installs a binary the rest of
-    the suite would silently switch to.
-    """
-    if sys.platform != "darwin" or shutil.which("swift") is None:
-        pytest.skip("jetlag-metadata needs swift on macOS")
-    # basetemp's parent is shared by every xdist worker, so the build is done once
-    # and the result is published atomically for whichever workers come later.
-    destination = tmp_path_factory.getbasetemp().parent / "jetlag-metadata"
-    staged = destination.with_suffix(f".{os.getpid()}")
-    result = subprocess.run(
-        [str(BUILD_JETLAG_METADATA), str(staged)],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        pytest.fail(f"building jetlag-metadata failed:\n{result.stdout}\n{result.stderr}")
-    os.replace(staged, destination)
-    # jetlag-metadata resolves exiftool as its own sibling first, the way the app
-    # bundle lays the two out; the built binary needs the same neighbourhood.
-    sibling = destination.parent / "exiftool"
-    if not sibling.exists():
-        with contextlib.suppress(FileExistsError):
-            sibling.symlink_to(BUILD_JETLAG_METADATA.parent / "exiftool")
-    return destination
-
-
 @pytest.fixture
 def metadata_client():
-    """Registers a metadata client (ExifTool / _SwiftBackend) constructed by a
-    test for guaranteed close() via the context-manager protocol, even if the
-    test body raises."""
+    """Registers an ExifTool client constructed by a test for guaranteed close()
+    via the context-manager protocol, even if the test body raises."""
     with contextlib.ExitStack() as stack:
         yield stack.enter_context
 
 
 def _leaked_metadata_pids():
-    """Pids of exiftool -stay_open / jetlag-metadata children this process
-    spawned (via lib.exiftool / lib.metadata) that are still alive."""
-    tracked = (
-        [(pid, "exiftool") for pid in _exiftool_module._spawned_pids]
-        + [(pid, "jetlag-metadata") for pid in _metadata_module._spawned_pids]
-    )
+    """Pids of exiftool -stay_open children this process spawned (via
+    lib.exiftool) that are still alive."""
+    tracked = [(pid, "exiftool") for pid in _exiftool_module._spawned_pids]
     leaked = []
     for pid, name in tracked:
         result = subprocess.run(
