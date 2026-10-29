@@ -84,7 +84,7 @@ $(VENV_STAMP): scripts/requirements.txt scripts/requirements-dev.txt scripts/tes
 # inherited terminal gets the whole group SIGTTIN-suspended — the suite then
 # hangs frozen until the supervisor's timeout, looking like a test hang.
 test-scripts: $(VENV_STAMP)
-	$(PYTEST) scripts/tests/ -x -n auto --ignore=scripts/tests/test_performance.py < /dev/null
+	$(PYTEST) scripts/tests/ -x -n auto < /dev/null
 
 ## Run Swift unit tests (macOS only, requires Xcode)
 # No xcpretty pipe: when xcpretty is missing the old `| xcpretty || xcodebuild`

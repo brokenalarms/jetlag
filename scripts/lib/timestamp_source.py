@@ -90,6 +90,12 @@ def _complete_datetime_original(data: Dict[str, str]) -> None:
         data["DateTimeOriginal"] = f"{datetime_original}{offset}"
 
 
+def carry_exif_cache(from_path: str, to_path: str) -> None:
+    """Let a byte-identical copy of a file use the metadata already read from it."""
+    if from_path in _exif_cache:
+        _exif_cache[to_path] = _exif_cache[from_path]
+
+
 def clear_exif_cache(file_path: str = None):
     """Clear the EXIF cache for a specific file or all files."""
     if file_path:

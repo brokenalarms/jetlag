@@ -140,10 +140,8 @@ the whole process group down.
 - Profiles live in `~/Library/Application Support/<app name>/media-profiles.yaml`, seeded from
   the bundled yaml on first launch (#169); the Settings override points a dev build at the
   repo's `scripts/media-profiles.yaml`.
-- `scripts/tests/perf-gate.sh` records the Python perf baseline from `origin/main` and
-  compares — the only perf comparison that ever runs locally (the baseline file is gitignored,
-  so `test_performance.py` alone just prints). CI's 3-file comparison is noise-prone
-  (jetlag-3y8 landed to interleave runs and skip Swift-only PRs).
+- `scripts/tests/test_metadata_call_contract.py` holds the pipeline to one exiftool read
+  per file on a dry run and one read plus one write on an apply.
 - `StreamingPerformanceTests` asserts the second half of a streamed run costs no more than
   the first; it is what stands between the app and O(n²) per line/row.
 - The scripts test suite leaked `exiftool -stay_open` processes after a full run

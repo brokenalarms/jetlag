@@ -37,31 +37,5 @@ jobs:
       - name: Install Python deps
         run: pip install -r scripts/requirements.txt -r scripts/requirements-dev.txt
 
-      - name: Check for scripts changes
-        id: scripts-changed
-        run: |
-          git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}"
-          if git diff --quiet "${{ github.event.pull_request.base.sha }}" HEAD -- scripts/; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Prepare perf baseline from main
-        if: steps.scripts-changed.outputs.changed == 'true'
-        run: |
-          git fetch --depth=1 origin main
-          mkdir -p /tmp/perf_baseline
-          git archive origin/main scripts | tar -x -C /tmp/perf_baseline
-          ln -s "$GITHUB_WORKSPACE/scripts/tools" /tmp/perf_baseline/scripts/tools
-
       - name: Run tests
-        run: pytest scripts/tests/ -x --ignore=scripts/tests/test_performance.py
-
-      - name: Run perf comparison
-        if: steps.scripts-changed.outputs.changed == 'true'
-        run: pytest scripts/tests/test_performance.py -v -s --tb=short --perf-baseline-scripts-dir=/tmp/perf_baseline/scripts --perf-results-file=/tmp/perf_results.json
-
-      - name: Performance summary
-        if: always() && steps.scripts-changed.outputs.changed == 'true'
-        run: python3 .github/scripts/perf_summary.py
+        run: pytest scripts/tests/ -x

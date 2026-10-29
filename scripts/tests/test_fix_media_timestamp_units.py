@@ -1108,6 +1108,15 @@ class TestProvenanceRecord:
         assert record["PreservedFileName"] == "VID_20250618_072521_bare.mp4"
         assert "OriginalDateTimeOriginal" not in record
 
+    def test_provenance_omits_zero_date_placeholders(self):
+        """A camera's 0000:00:00 placeholder is not a time the file held, so it is
+        not recorded as an original value."""
+        result = fmt.fix_media_timestamps(self.video, timezone_spec="+08:00")
+        assert result.timestamp_action == "fixed"
+
+        record = fmt.read_provenance_record(self.video)
+        assert "OriginalTrackCreateDate" not in record
+
     def test_legacy_logcomment_record_counts_as_recorded(self):
         """A file imported before the namespace carries its record as JSON in
         LogComment, and its clock fields are already corrected. Recording it again

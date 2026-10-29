@@ -32,8 +32,9 @@ from lib.filesystem import find_media_files
 from lib.metadata import metadata_service
 from lib.profiles import resolve_profiles_file
 from lib.timestamp_source import (
-    build_filename, extract_metadata_timezone, is_zone_name, normalize_timezone_input,
-    parse_datetime_original, parse_filename_timestamp, resolve_file_timezone_offset,
+    build_filename, carry_exif_cache, extract_metadata_timezone, is_zone_name,
+    normalize_timezone_input, parse_datetime_original, parse_filename_timestamp,
+    read_exif_data, resolve_file_timezone_offset,
 )
 
 import importlib
@@ -235,7 +236,8 @@ def run_tag_media(
     tags: Optional[str],
     make: Optional[str],
     model: Optional[str],
-    apply: bool
+    apply: bool,
+    write_exif: bool = True,
 ):
     """Tag a file via direct module call.
 
@@ -244,7 +246,7 @@ def run_tag_media(
     """
     finder_tags = [t.strip() for t in tags.split(",")] if tags else []
     return _tag_mod.tag_media_file(
-        str(file_path), finder_tags, make, model, dry_run=not apply
+        str(file_path), finder_tags, make, model, dry_run=not apply, write_exif=write_exif,
     )
 
 
@@ -255,6 +257,7 @@ def run_fix_timestamp(
     infer_from_filename: bool = False,
     time_offset: Optional[int] = None,
     force_timezone: bool = False,
+    extra_write_fields: Optional[dict] = None,
 ):
     """Fix a file's timestamp via direct module call.
 
@@ -268,6 +271,7 @@ def run_fix_timestamp(
         infer_from_filename=infer_from_filename,
         time_offset_seconds=time_offset,
         force_timezone=force_timezone,
+        extra_write_fields=extra_write_fields,
     )
 
 
@@ -279,11 +283,13 @@ def run_organize_by_date(
     verbose: bool,
     overwrite: bool = False,
     dest_name: Optional[str] = None,
+    datetime_original: Optional[str] = None,
 ):
     """Organize a file into date-based folders via direct module call.
 
     dest_name carries a pending rename's would-be basename into the destination
-    path on a dry run; the file itself is read at file_path either way.
+    path on a dry run. datetime_original is the date the pipeline already holds
+    for the file, so organize does not read it again.
 
     Returns:
         OrganizeResult dataclass.
@@ -292,6 +298,7 @@ def run_organize_by_date(
         str(file_path), target_dir, template,
         copy_mode=False, overwrite=overwrite,
         apply=apply, verbose=verbose, dest_name=dest_name,
+        datetime_original=datetime_original,
     )
 
 
@@ -445,7 +452,16 @@ def process_file(
     if action == "copied":
         file_changed = True
         register_staged_paths([Path(dest)] + [Path(c) for c in companion_dests])
+        carry_exif_cache(str(file_path), dest)
     emit_event("stage_complete", stage="ingest")
+
+    # The file's one metadata read (or the pre-flight's, carried to the copy above).
+    # Taken before any step writes, so organize never reads the file again; a
+    # timestamp correction replaces it with the corrected value below.
+    organize_datetime_original = read_exif_data(str(active_file)).get("DateTimeOriginal", "")
+    # Every step's field writes go out in fix-timestamp's exiftool call, so the file
+    # is rewritten once.
+    fix_writes_fields = apply and bool(tasks) and "fix-timestamp" in tasks
 
     if copy_companion_files and companion_dests:
         source_dir = file_path.parent
@@ -455,6 +471,7 @@ def process_file(
             if companion_source.is_file():
                 result["source_files"].append(str(companion_source))
 
+    camera_fields: dict = {}
     # Tag media (if in tasks and profile has tags/make/model)
     if tasks and "tag" in tasks and profile:
         tags = ",".join(profile.get("tags", []))
@@ -464,7 +481,10 @@ def process_file(
 
         if tags or make or model:
             print("🏷️  Tagging...", file=sys.stderr)
-            tag_result = run_tag_media(active_file, tags or None, make or None, model or None, apply)
+            tag_result = run_tag_media(active_file, tags or None, make or None, model or None, apply,
+                                       write_exif=not fix_writes_fields)
+            if fix_writes_fields:
+                camera_fields = _tag_mod.camera_exif_fields(str(active_file), make or None, model or None)
             if tag_result is not None:
                 emit_event("tag_result",
                     file=active_file.name,
@@ -488,6 +508,7 @@ def process_file(
                 infer_from_filename=infer_from_filename,
                 time_offset=time_offset,
                 force_timezone=force_timezone,
+                extra_write_fields=camera_fields,
             )
         except Exception as e:
             error_msg = str(e)
@@ -531,6 +552,8 @@ def process_file(
 
         if ts_result.timestamp_action in ("would_fix", "fixed", "would_add", "added"):
             file_changed = True
+        if ts_result.corrected_time:
+            organize_datetime_original = ts_result.corrected_time
         emit_event("stage_complete", stage="fix-timestamp")
 
         # Inline rename when --update-filename-dates is set
@@ -578,7 +601,8 @@ def process_file(
     else:
         template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
     org_result = run_organize_by_date(active_file, target_dir, template, apply, verbose,
-                                      overwrite=overwrite, dest_name=pending_rename_name)
+                                      overwrite=overwrite, dest_name=pending_rename_name,
+                                      datetime_original=organize_datetime_original)
     staged_action = staged_organize_action(org_result.action)
     emit_event("organize_result",
         file=active_file.name,

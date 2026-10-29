@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import atexit
 import contextlib
-import json
 import os
 import shutil
 import subprocess
@@ -214,18 +213,6 @@ def _install_python_package(import_name, pip_name):
         )
 
 
-def pytest_addoption(parser):
-    """Register custom CLI flags."""
-    parser.addoption(
-        "--perf-baseline-scripts-dir", default=None,
-        help="Path to a checkout of the scripts/ dir to compare against (e.g. origin/main)",
-    )
-    parser.addoption(
-        "--perf-results-file", default=None,
-        help="Path to write perf results JSON for CI summaries",
-    )
-
-
 def pytest_configure(config):
     """Install missing tools and packages before tests run."""
     platform = "darwin" if sys.platform == "darwin" else "linux"
@@ -257,7 +244,6 @@ def pytest_configure(config):
                 f"SetFile: xcode-select --install"
             )
 
-    config._perf_results = []
     config._quiet_mode = not os.environ.get("CI")
     if config._quiet_mode:
         config.option.verbose = -1
@@ -299,13 +285,6 @@ def pytest_report_teststatus(report, config):
 
 
 def pytest_sessionfinish(session, exitstatus):
-    results_path = session.config.getoption("--perf-results-file", default=None)
-    results = getattr(session.config, "_perf_results", [])
-    if results_path and results:
-        path = Path(results_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(results, indent=2) + "\n")
-
     leaked = _leaked_metadata_pids()
     if leaked:
         message = "leaked metadata subprocess(es) survived the test session: " + ", ".join(leaked)
