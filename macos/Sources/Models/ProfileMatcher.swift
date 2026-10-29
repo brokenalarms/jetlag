@@ -29,50 +29,53 @@ struct CameraKind: Hashable {
     var defaultProfileName: String { "\(camera.name) \(type.label)" }
 }
 
-/// What a card holds, measured against the profiles there are.
-struct CardContents: Equatable {
+/// What the profiles' sources hold, measured against the profiles there are.
+struct SourceContents: Equatable {
     struct Match: Equatable {
         let profileName: String
-        let folder: String
+        let source: String
     }
 
     struct NewCamera: Equatable {
         let kind: CameraKind
-        let folder: String
+        let source: String
         let extensions: [String]
     }
 
-    /// Profiles whose camera shot media on the card, and the folder it is in.
+    /// Profiles whose camera's media is in a source, and the source it is in.
     var matched: [Match] = []
-    /// Camera kinds on the card that no profile has yet.
+    /// Camera kinds found in a source that no profile has yet.
     var newCameras: [NewCamera] = []
-    /// Folders holding media that records no camera at all.
-    var cameralessFolders: [String] = []
+    /// Sources holding media that records no camera at all.
+    var cameralessSources: [String] = []
 
-    var isEmpty: Bool { matched.isEmpty && newCameras.isEmpty && cameralessFolders.isEmpty }
+    var isEmpty: Bool { matched.isEmpty && newCameras.isEmpty && cameralessSources.isEmpty }
 }
 
 enum ProfileMatcher {
 
-    static func contents(of probes: [ProbedCamera], profiles: [String: MediaProfile]) -> CardContents {
-        var contents = CardContents()
-        for probe in probes.sorted(by: { $0.files > $1.files }) {
-            guard let kind = CameraKind(camera: probe.camera, type: probe.type) else {
-                if !contents.cameralessFolders.contains(probe.folder) {
-                    contents.cameralessFolders.append(probe.folder)
+    /// Probes are keyed by the source folder they read.
+    static func contents(of probes: [String: [ProbedCamera]], profiles: [String: MediaProfile]) -> SourceContents {
+        var contents = SourceContents()
+        for source in probes.keys.sorted() {
+            for probe in probes[source]!.sorted(by: { $0.files > $1.files }) {
+                guard let kind = CameraKind(camera: probe.camera, type: probe.type) else {
+                    if !contents.cameralessSources.contains(source) {
+                        contents.cameralessSources.append(source)
+                    }
+                    continue
                 }
-                continue
-            }
-            if let name = profileName(for: kind, in: profiles) {
-                if !contents.matched.contains(where: { $0.profileName == name }) {
-                    contents.matched.append(.init(profileName: name, folder: probe.folder))
+                if let name = profileName(for: kind, in: profiles) {
+                    if !contents.matched.contains(where: { $0.profileName == name }) {
+                        contents.matched.append(.init(profileName: name, source: source))
+                    }
+                } else if let index = contents.newCameras.firstIndex(where: { $0.kind == kind && $0.source == source }) {
+                    let existing = contents.newCameras[index]
+                    contents.newCameras[index] = .init(kind: kind, source: source,
+                                                       extensions: (existing.extensions + [probe.fileExtension]).sorted())
+                } else {
+                    contents.newCameras.append(.init(kind: kind, source: source, extensions: [probe.fileExtension]))
                 }
-            } else if let index = contents.newCameras.firstIndex(where: { $0.kind == kind }) {
-                let existing = contents.newCameras[index]
-                contents.newCameras[index] = .init(kind: kind, folder: existing.folder,
-                                                   extensions: (existing.extensions + [probe.fileExtension]).sorted())
-            } else {
-                contents.newCameras.append(.init(kind: kind, folder: probe.folder, extensions: [probe.fileExtension]))
             }
         }
         return contents

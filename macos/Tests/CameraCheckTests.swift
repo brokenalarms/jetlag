@@ -81,11 +81,11 @@ final class CameraCheckTests: XCTestCase {
     }
 }
 
-/// A profile is a camera and a kind of media, read from the card. These cover
-/// what a card's probe means against the profiles there are: the card's camera
-/// selects its profile, a camera without one is offered a new one built from the
-/// card, and only media that records no camera leaves a profile to pick by hand.
-final class CardProfilesTests: XCTestCase {
+/// A profile is a camera and a kind of media, read from its source. These cover
+/// what the profiles' sources hold against the profiles there are: a camera's
+/// media selects its profile, a camera without one is reported, and only media
+/// that records no camera leaves a profile to pick by hand.
+final class SourceProfilesTests: XCTestCase {
 
     private let a7vPhoto = MediaProfile(type: .photo, sourceDir: "/Volumes/Untitled/DCIM",
                                         exif: ExifConfig(make: "Sony", model: "ILCE-7M5"),
@@ -115,20 +115,19 @@ final class CardProfilesTests: XCTestCase {
         super.tearDown()
     }
 
-    private func probe(_ ext: String, _ type: MediaType, _ folder: String,
-                       _ make: String?, _ model: String?, files: Int = 10) -> ProbedCamera {
-        ProbedCamera(fileExtension: ext, type: type, folder: folder, files: files,
-                     camera: FileCamera(make: make, model: model))
+    private func probe(_ ext: String, _ type: MediaType, _ make: String?, _ model: String?,
+                       files: Int = 10) -> ProbedCamera {
+        ProbedCamera(fileExtension: ext, type: type, files: files, camera: FileCamera(make: make, model: model))
     }
 
-    /// The card's own camera picks its profile — never another body's profile
+    /// The source's camera picks its profile — never another body's profile
     /// reading the same folder, the mistake that relabelled 143 A7V stills.
-    func testTheCardsCameraMatchesItsProfileIgnoringCase() {
+    func testTheSourcesCameraMatchesItsProfileIgnoringCase() {
         let contents = ProfileMatcher.contents(
-            of: [probe(".arw", .photo, "/Volumes/CARD/DCIM", "SONY", "ILCE-7M5")],
+            of: ["/Volumes/Untitled/DCIM": [probe(".arw", .photo, "SONY", "ILCE-7M5")]],
             profiles: ["a7iv": a7ivPhoto, "a7v": a7vPhoto])
 
-        XCTAssertEqual(contents.matched, [.init(profileName: "a7v", folder: "/Volumes/CARD/DCIM")])
+        XCTAssertEqual(contents.matched, [.init(profileName: "a7v", source: "/Volumes/Untitled/DCIM")])
         XCTAssertEqual(contents.newCameras, [])
     }
 
@@ -136,20 +135,20 @@ final class CardProfilesTests: XCTestCase {
     /// claim the same camera's video.
     func testTheSameCamerasVideoIsANewKind() {
         let contents = ProfileMatcher.contents(
-            of: [probe(".mp4", .video, "/Volumes/CARD/PRIVATE", "SONY", "ILCE-7M5")],
+            of: ["/Volumes/Untitled/PRIVATE": [probe(".mp4", .video, "SONY", "ILCE-7M5")]],
             profiles: ["a7v": a7vPhoto])
 
         XCTAssertEqual(contents.matched, [])
         XCTAssertEqual(contents.newCameras.map(\.kind.defaultProfileName), ["SONY ILCE-7M5 Video"])
-        XCTAssertEqual(contents.newCameras.first?.folder, "/Volumes/CARD/PRIVATE")
+        XCTAssertEqual(contents.newCameras.first?.source, "/Volumes/Untitled/PRIVATE")
     }
 
     /// One new camera kind spread over several file types is one profile with
     /// all of them.
     func testOneCameraKindCollectsItsExtensions() {
         let contents = ProfileMatcher.contents(
-            of: [probe(".arw", .photo, "/Volumes/CARD/DCIM", "SONY", "ILCE-7M5"),
-                 probe(".jpg", .photo, "/Volumes/CARD/DCIM", "SONY", "ILCE-7M5", files: 3)],
+            of: ["/Volumes/Untitled/DCIM": [probe(".arw", .photo, "SONY", "ILCE-7M5"),
+                                            probe(".jpg", .photo, "SONY", "ILCE-7M5", files: 3)]],
             profiles: [:])
 
         XCTAssertEqual(contents.newCameras.count, 1)
@@ -157,12 +156,12 @@ final class CardProfilesTests: XCTestCase {
     }
 
     /// Only media that records no camera leaves a profile to be chosen by hand.
-    func testMediaWithoutACameraIsReportedByFolder() {
+    func testMediaWithoutACameraIsReportedBySource() {
         let contents = ProfileMatcher.contents(
-            of: [probe(".mp4", .video, "/Volumes/CARD/DCIM", nil, nil)],
+            of: ["/Volumes/Untitled/DCIM": [probe(".mp4", .video, nil, nil)]],
             profiles: ["hand": handNamed])
 
-        XCTAssertEqual(contents.cameralessFolders, ["/Volumes/CARD/DCIM"])
+        XCTAssertEqual(contents.cameralessSources, ["/Volumes/Untitled/DCIM"])
         XCTAssertEqual(contents.matched, [])
     }
 
@@ -175,10 +174,10 @@ final class CardProfilesTests: XCTestCase {
         XCTAssertEqual(duplicates, ["a7v", "a7v-copy"])
     }
 
-    /// A profile created for a camera found on a card takes everything it can
-    /// from the card and is written to the profiles file; selecting it reads
-    /// from the folder the card holds that camera's media in.
-    func testCreatingAProfileFromACardSavesItAndReadsFromTheCard() throws {
+    /// A profile created from the source chosen for it takes its camera, kind and
+    /// file types from that source's files, keeps that source exactly, and is
+    /// written to the profiles file.
+    func testCreatingAProfileFromASourceSavesIt() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -187,32 +186,49 @@ final class CardProfilesTests: XCTestCase {
         let state = AppState()
         state.profilesFilePath = path
         state.profilesConfig = ProfilesConfig(gyroflow: nil, profiles: [:])
-        state.cardProbes = [probe(".mp4", .video, "/Volumes/CARD/DCIM", "DJI", "Mini 4 Pro")]
-        let found = try XCTUnwrap(state.cardContents.newCameras.first)
+        let found = try XCTUnwrap(ProfileMatcher.contents(
+            of: ["/Volumes/Untitled/DCIM": [probe(".mp4", .video, "DJI", "Mini 4 Pro")]],
+            profiles: [:]).newCameras.first)
 
         let name = state.createProfile(for: found)
-        state.selectProfile(name)
 
         XCTAssertEqual(name, "DJI Mini 4 Pro Video")
         let saved = try XCTUnwrap(try ProfileService.load(from: path).profiles[name])
         XCTAssertEqual(saved.exif, ExifConfig(make: "DJI", model: "Mini 4 Pro"))
         XCTAssertEqual(saved.type, .video)
         XCTAssertEqual(saved.fileExtensions, [".mp4"])
-        XCTAssertEqual(state.cardContents.matched, [.init(profileName: name, folder: "/Volumes/CARD/DCIM")],
-                       "The card now matches the profile made from it")
-        XCTAssertEqual(state.workflowSession.profileName, name)
-        XCTAssertEqual(state.workflowSession.sourceDir.current, "/Volumes/CARD/DCIM")
+        XCTAssertEqual(saved.sourceDir, "/Volumes/Untitled/DCIM")
     }
 
-    /// A card from a camera with a profile selects it, with no choice offered.
-    func testACardSelectsItsProfile() {
+    /// Media in a source from a camera with a profile selects it, with no choice
+    /// offered.
+    func testASourcesCameraSelectsItsProfile() {
         let state = AppState()
         state.profilesConfig = ProfilesConfig(gyroflow: nil, profiles: ["a7v": a7vPhoto, "a7iv": a7ivPhoto])
-        state.cardProbes = [probe(".arw", .photo, "/Volumes/CARD/DCIM", "SONY", "ILCE-7M5")]
+        state.sourceProbes = ["/Volumes/Untitled/DCIM": [probe(".arw", .photo, "SONY", "ILCE-7M5")]]
 
-        state.selectProfileForCard()
+        state.selectProfileForSources()
 
         XCTAssertEqual(state.workflowSession.profileName, "a7v")
-        XCTAssertEqual(state.workflowSession.sourceDir.current, "/Volumes/CARD/DCIM")
+        XCTAssertEqual(state.workflowSession.sourceDir.current, "/Volumes/Untitled/DCIM")
+    }
+
+    /// Only the profiles' own sources are read — the scan never looks for
+    /// camera cards elsewhere on the system.
+    func testOnlyProfileSourcesAreRead() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let state = AppState()
+        state.profilesConfig = ProfilesConfig(gyroflow: nil, profiles: [
+            "here": MediaProfile(type: .photo, sourceDir: dir.path),
+            "missing": MediaProfile(type: .photo, sourceDir: "/Volumes/NotMounted/DCIM"),
+        ])
+
+        await state.scanProfileSources()
+
+        XCTAssertEqual(Array(state.sourceProbes.keys), [dir.path],
+                       "Only a profile source that exists is read")
     }
 }

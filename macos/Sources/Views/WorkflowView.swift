@@ -275,19 +275,19 @@ struct WorkflowView: View {
                 }
             }
 
-            cardProfiles
+            sourceProfiles
 
         }
     }
 
-    /// The profile is the card's: a camera with a profile selects it, and the
-    /// only choice offered is between the card's own profiles (a camera's photos
-    /// and videos) or, for files that record no camera, among the profiles made
-    /// by hand for such files.
-    private var cardProfiles: some View {
-        let contents = state.cardContents
+    /// The profile is the one whose camera's media is in a profile's source: it
+    /// is selected, and the only choice offered is between the profiles found
+    /// (a camera's photos and videos) or, for media that records no camera,
+    /// among the profiles made by hand for it.
+    private var sourceProfiles: some View {
+        let contents = state.sourceContents
         let profiles = state.profilesConfig?.profiles ?? [:]
-        let cameraless = contents.cameralessFolders.isEmpty ? [] :
+        let cameraless = contents.cameralessSources.isEmpty ? [] :
             state.sortedProfileNames.filter { CameraKind(profile: profiles[$0]!) == nil }
         let choices = contents.matched.map(\.profileName) + cameraless
         let selection = Binding(
@@ -301,11 +301,11 @@ struct WorkflowView: View {
                 } else if let only = choices.first {
                     ProfilePicker.label(name: only, state: state)
                 } else {
-                    Text(Strings.Workflow.noCardLabel)
+                    Text(Strings.Workflow.noSourceMediaLabel)
                         .foregroundStyle(.secondary)
                 }
                 Button {
-                    Task { await state.scanCards() }
+                    Task { await state.scanProfileSources() }
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
@@ -313,11 +313,11 @@ struct WorkflowView: View {
                 .help(Strings.Workflow.rescanHelp)
             }
             ForEach(contents.newCameras, id: \.kind) { found in
-                Button(Strings.Workflow.createProfileButton(found.kind.defaultProfileName)) {
-                    state.selectProfile(state.createProfile(for: found))
-                }
+                Text(Strings.Workflow.noProfileForCamera(found.kind.defaultProfileName, source: found.source))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            if !contents.cameralessFolders.isEmpty && cameraless.isEmpty {
+            if !contents.cameralessSources.isEmpty && cameraless.isEmpty {
                 Text(Strings.Workflow.cameralessNote)
                     .font(.caption)
                     .foregroundStyle(.secondary)

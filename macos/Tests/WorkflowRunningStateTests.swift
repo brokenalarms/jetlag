@@ -56,8 +56,8 @@ final class WorkflowRunningStateTests: XCTestCase {
         let state = AppState()
         state.selectedTab = .workflow
         state.profilesConfig = ProfilesConfig(gyroflow: nil, profiles: ["probe": MediaProfile(type: .video)])
-        state.cardProbes = [ProbedCamera(fileExtension: ".mp4", type: .video, folder: "/Volumes/CARD/DCIM",
-                                         files: 1, camera: nil)]
+        state.sourceProbes = ["/Volumes/Untitled/DCIM": [
+            ProbedCamera(fileExtension: ".mp4", type: .video, files: 1, camera: nil)]]
         state.workflowSession = WorkflowSession(profileName: "probe", gyroflowAvailable: false)
         return state
     }

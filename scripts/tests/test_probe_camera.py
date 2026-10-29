@@ -2,10 +2,10 @@
 """
 Tests for probe-camera.py, which tells the app what camera shot a folder's media.
 
-The app fills a profile's Make/Model from it and picks the profile matching an
-inserted card, so each extension has to report the camera its files carry —
-separately, since a card holds a camera's stills and videos under different
-profiles — and nothing it was not told by the files.
+The app builds a new profile's camera from the source chosen for it, and picks
+the profile whose camera's media is in a profile's source, so each extension has
+to report the camera its files carry — separately, since a camera's stills and
+videos belong to different profiles — and nothing it was not told by the files.
 """
 
 import json
@@ -26,7 +26,7 @@ def probe(*args) -> list[dict]:
 
 
 def test_each_extension_reports_the_camera_its_files_carry(tmp_path):
-    """A card with stills and video from one camera reports both, per extension."""
+    """A source with stills and video from one camera reports both, per extension."""
     create_test_photo(tmp_path / "DCIM" / "100MSDCF" / "A7V0001.JPG", Make="SONY", Model="ILCE-7M5")
     create_test_photo(tmp_path / "DCIM" / "101MSDCF" / "A7V0002.JPG", Make="SONY", Model="ILCE-7M5")
     create_test_video(tmp_path / "PRIVATE" / "C0001.MP4", Make="SONY", Model="ILCE-7M5")
@@ -34,11 +34,9 @@ def test_each_extension_reports_the_camera_its_files_carry(tmp_path):
     found = probe(tmp_path)
 
     assert found == [
-        {"extension": ".jpg", "type": "photo", "folder": str(tmp_path / "DCIM"),
-         "files": 2, "make": "SONY", "model": "ILCE-7M5"},
-        {"extension": ".mp4", "type": "video", "folder": str(tmp_path / "PRIVATE"),
-         "files": 1, "make": "SONY", "model": "ILCE-7M5"},
-    ], f"Actual: {found}, Expected: one SONY ILCE-7M5 entry per extension, with its folder"
+        {"extension": ".jpg", "type": "photo", "files": 2, "make": "SONY", "model": "ILCE-7M5"},
+        {"extension": ".mp4", "type": "video", "files": 1, "make": "SONY", "model": "ILCE-7M5"},
+    ], f"Actual: {found}, Expected: one SONY ILCE-7M5 entry per extension"
 
 
 def test_files_without_a_camera_report_none(tmp_path):
@@ -47,7 +45,7 @@ def test_files_without_a_camera_report_none(tmp_path):
 
     found = probe(tmp_path)
 
-    assert found == [{"extension": ".mp4", "type": "video", "folder": str(tmp_path), "files": 1}], \
+    assert found == [{"extension": ".mp4", "type": "video", "files": 1}], \
         f"Actual: {found}, Expected: an entry with no make or model"
 
 
@@ -58,5 +56,4 @@ def test_a_single_file_can_be_probed(tmp_path):
 
     found = probe(sample)
 
-    assert found == [{"extension": ".jpg", "type": "photo", "folder": str(tmp_path),
-                      "files": 1, "make": "SONY", "model": "ILCE-7M5"}]
+    assert found == [{"extension": ".jpg", "type": "photo", "files": 1, "make": "SONY", "model": "ILCE-7M5"}]

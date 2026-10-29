@@ -22,7 +22,7 @@ struct ProfilesView: View {
     @State private var showDeleteConfirmation = false
     @State private var showDiscardConfirmation = false
     @State private var pendingAction: PendingAction?
-    @State private var newCameraChoices: [CardContents.NewCamera] = []
+    @State private var newCameraChoices: [SourceContents.NewCamera] = []
     @State private var showNoMediaFound = false
 
     private enum PendingAction {
@@ -138,13 +138,14 @@ struct ProfilesView: View {
 
     // MARK: - New profiles come from media
 
-    /// A profile starts from the media it is for: its camera, kind and file types
-    /// are read from the card. A camera that already has a profile opens it;
-    /// media that records no camera starts a profile named by hand.
+    /// A profile starts from its source: the folder chosen becomes the source,
+    /// and its files give the camera, kind of media and file types. A camera that
+    /// already has a profile opens it; media that records no camera starts a
+    /// profile named by hand.
     private func newProfileFromCard() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
-        panel.canChooseFiles = true
+        panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.message = Strings.Profiles.newProfilePanelMessage
         guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -152,7 +153,8 @@ struct ProfilesView: View {
             let probes = await CameraProbe.probe(
                 path: url.path, scriptsDirectory: state.scriptsDirectory,
                 profilesPath: state.resolvedProfilesPath)
-            let contents = ProfileMatcher.contents(of: probes, profiles: state.profilesConfig?.profiles ?? [:])
+            let contents = ProfileMatcher.contents(of: [url.path: probes],
+                                                   profiles: state.profilesConfig?.profiles ?? [:])
             if contents.newCameras.count == 1 {
                 createProfile(for: contents.newCameras[0])
             } else if contents.newCameras.count > 1 {
@@ -160,18 +162,18 @@ struct ProfilesView: View {
             } else if let existing = contents.matched.first,
                       let profile = state.profile(named: existing.profileName) {
                 requestProfileLoad(ProfileEditingSession(name: existing.profileName, profile: profile))
-            } else if let folder = contents.cameralessFolders.first {
+            } else if contents.cameralessSources.contains(url.path) {
                 let type = probes.first { $0.camera == nil }?.type
                 requestProfileLoad(ProfileEditingSession(
                     name: "new-profile",
-                    profile: MediaProfile(type: type, sourceDir: folder)))
+                    profile: MediaProfile(type: type, sourceDir: url.path)))
             } else {
                 showNoMediaFound = true
             }
         }
     }
 
-    private func createProfile(for found: CardContents.NewCamera) {
+    private func createProfile(for found: SourceContents.NewCamera) {
         newCameraChoices = []
         let name = state.createProfile(for: found)
         guard let profile = state.profile(named: name) else { return }

@@ -884,41 +884,42 @@ final class AppState {
         profilesConfig?.profiles[name]
     }
 
-    /// What the inserted cards hold, as probe-camera read it. What that means
-    /// for the profiles is derived from it on demand, so a profile created or
-    /// edited is reflected without probing the card again.
-    var cardProbes: [ProbedCamera] = []
+    /// What each profile's source holds, as probe-camera read it, keyed by the
+    /// source. What that means for the profiles is derived from it on demand,
+    /// so a profile created or edited is reflected without reading again.
+    var sourceProbes: [String: [ProbedCamera]] = [:]
 
-    var cardContents: CardContents {
-        ProfileMatcher.contents(of: cardProbes, profiles: profilesConfig?.profiles ?? [:])
+    var sourceContents: SourceContents {
+        ProfileMatcher.contents(of: sourceProbes, profiles: profilesConfig?.profiles ?? [:])
     }
 
-    /// Read the cameras on every mounted card: removable media laid out the way
-    /// cameras write it (see CardVolume). The boot disk is never searched.
-    func scanCards() async {
-        var probes: [ProbedCamera] = []
-        for card in CardVolume.mountedCards() {
-            probes += await CameraProbe.probe(path: card.path, scriptsDirectory: scriptsDirectory,
-                                              profilesPath: resolvedProfilesPath)
+    /// Read the camera behind the media in each profile's source folder. Only
+    /// those folders are read: a source is where the user said a profile's media
+    /// is, so nothing has to be guessed about which drive is a camera card.
+    func scanProfileSources() async {
+        let sources = Set((profilesConfig?.profiles ?? [:]).values.compactMap(\.sourceDir))
+        var probes: [String: [ProbedCamera]] = [:]
+        for source in sources.sorted() where FileManager.default.fileExists(atPath: source) {
+            probes[source] = await CameraProbe.probe(path: source, scriptsDirectory: scriptsDirectory,
+                                                     profilesPath: resolvedProfilesPath)
         }
-        cardProbes = probes
-        selectProfileForCard()
+        sourceProbes = probes
+        selectProfileForSources()
     }
 
-    /// A card from a camera with a profile picks that profile. The choice the
-    /// user made among the card's own profiles stands; nothing else does.
-    func selectProfileForCard() {
+    /// Media in a source from a camera with a profile picks that profile. The
+    /// choice the user made among the profiles found stands; nothing else does.
+    func selectProfileForSources() {
         guard !isRunning else { return }
-        let matched = cardContents.matched
-        if let current = matched.first(where: { $0.profileName == workflowSession.profileName }) {
-            workflowSession.sourceDir.value = current.folder
-        } else if let first = matched.first {
+        let matched = sourceContents.matched
+        if matched.contains(where: { $0.profileName == workflowSession.profileName }) { return }
+        if let first = matched.first {
             selectProfile(first.profileName)
         }
     }
 
-    /// Start a fresh workflow for a profile, reading from the card folder where
-    /// its camera's media was found when there is one.
+    /// Start a fresh workflow for a profile, reading from the source its
+    /// camera's media was found in when there is one.
     func selectProfile(_ name: String) {
         clearLog()
         workflowSession = WorkflowSession(
@@ -926,19 +927,14 @@ final class AppState {
             profileName: name,
             gyroflowAvailable: gyroflowStatus.isInstalled
         )
-        let contents = cardContents
-        let isCameraless = profilesConfig?.profiles[name].map { CameraKind(profile: $0) == nil } ?? false
-        let folder = contents.matched.first { $0.profileName == name }?.folder
-            ?? (isCameraless ? contents.cameralessFolders.first : nil)
-        if let folder {
-            workflowSession.sourceDir.value = folder
+        if let source = sourceContents.matched.first(where: { $0.profileName == name })?.source {
+            workflowSession.sourceDir.value = source
         }
     }
 
-    /// Create the profile for a camera found on a card. Its camera, kind of media,
-    /// file types and source all come from the card; only where it imports to is
-    /// left to the user.
-    func createProfile(for found: CardContents.NewCamera) -> String {
+    /// Create the profile for a camera found in the source chosen for it. Its
+    /// camera, kind of media and file types come from that source's files.
+    func createProfile(for found: SourceContents.NewCamera) -> String {
         let base = found.kind.defaultProfileName
         var name = base
         var counter = 2
@@ -949,7 +945,7 @@ final class AppState {
         var profile = MediaProfile(type: found.kind.type)
         profile.exif = ExifConfig(make: found.kind.camera.make, model: found.kind.camera.model)
         profile.fileExtensions = found.extensions
-        profile.sourceDir = found.folder
+        profile.sourceDir = found.source
         if profilesConfig == nil {
             profilesConfig = ProfilesConfig(gyroflow: nil, profiles: [:])
         }

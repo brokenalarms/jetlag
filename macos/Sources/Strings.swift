@@ -221,15 +221,16 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
                          defaultValue: "\(count) files were shot on \(found), not this profile's \(expected). Applying asks first.")
         }
 
-        static let noCardLabel = String(localized: "workflow.noCard.label",
-            defaultValue: "No camera card found")
+        static let noSourceMediaLabel = String(localized: "workflow.noSourceMedia.label",
+            defaultValue: "No media in the profiles' sources")
         static let rescanHelp = String(localized: "workflow.rescan.help",
-            defaultValue: "Look for camera cards again")
-        static func createProfileButton(_ name: String) -> String {
-            String(localized: "workflow.createProfile.button", defaultValue: "Create Profile for \(name)")
+            defaultValue: "Read the profiles' sources again")
+        static func noProfileForCamera(_ name: String, source: String) -> String {
+            String(localized: "workflow.noProfileForCamera",
+                   defaultValue: "\(source) holds \(name) media, which no profile is for. Create one in Profiles from that source.")
         }
         static let cameralessNote = String(localized: "workflow.cameraless.note",
-            defaultValue: "Some files on this card record no camera. Create a profile for them in Profiles.")
+            defaultValue: "Some media in the sources records no camera. Create a profile for it in Profiles.")
 
         // Run completion popup
         static let runCompleteAppliedTitle = String(localized: "workflow.runComplete.applied.title",
@@ -309,13 +310,13 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let duplicateCameraHelp = String(localized: "profiles.duplicateCamera.help",
             defaultValue: "Another profile is for the same camera and kind of media. Delete one of them.")
         static let chooseCameraTitle = String(localized: "profiles.chooseCamera.title",
-            defaultValue: "Several cameras' media were found. Create a profile for:")
+            defaultValue: "This source holds several cameras' media. Create a profile for:")
         static let noMediaFoundTitle = String(localized: "profiles.noMediaFound.title",
             defaultValue: "No Media Found")
         static let noMediaFoundMessage = String(localized: "profiles.noMediaFound.message",
-            defaultValue: "Choose a camera card, a folder from one, or a single photo or video.")
+            defaultValue: "The folder chosen holds no photos or videos. Choose the folder the camera's media is in.")
         static let newProfilePanelMessage = String(localized: "profiles.newProfilePanel.message",
-            defaultValue: "Choose a camera card or some of its media. The profile's camera and file types are read from it.")
+            defaultValue: "Choose the profile's source: the folder its camera's media is in. The camera and file types are read from its files.")
         static let selectPrompt = String(localized: "profiles.selectPrompt", defaultValue: "Select a profile to edit")
         static let nameLabel = String(localized: "profiles.name.label", defaultValue: "Name")
         static let namePlaceholder = String(localized: "profiles.name.placeholder", defaultValue: "profile-name")
