@@ -1,21 +1,27 @@
 import XCTest
 @testable import Jetlag
 
-/// Looking for cards must never read the boot disk or a fixed drive: those hold
-/// Photos, Desktop and other apps' data, and reading them prompts for access.
+/// Looking for cards must never read the boot disk, a fixed drive or a network
+/// share: those hold Photos, Desktop and other apps' data, or are guarded as a
+/// whole, and reading them prompts for access.
 final class CardVolumeTests: XCTestCase {
 
     func testBootDiskIsNeverACard() {
-        XCTAssertFalse(CardVolume(isRootFileSystem: true, isRemovable: true, isEjectable: true).mayBeCard)
+        XCTAssertFalse(CardVolume(isRootFileSystem: true, isLocal: true, isRemovable: true, isEjectable: true).mayBeCard)
     }
 
     func testFixedDriveIsNeverACard() {
-        XCTAssertFalse(CardVolume(isRootFileSystem: false, isRemovable: false, isEjectable: false).mayBeCard)
+        XCTAssertFalse(CardVolume(isRootFileSystem: false, isLocal: true, isRemovable: false, isEjectable: false).mayBeCard)
+    }
+
+    /// A mounted share reports itself ejectable; it is still never listed.
+    func testNetworkShareIsNeverACard() {
+        XCTAssertFalse(CardVolume(isRootFileSystem: false, isLocal: false, isRemovable: false, isEjectable: true).mayBeCard)
     }
 
     func testRemovableOrEjectableMediaMayBeACard() {
-        XCTAssertTrue(CardVolume(isRootFileSystem: false, isRemovable: true, isEjectable: false).mayBeCard)
-        XCTAssertTrue(CardVolume(isRootFileSystem: false, isRemovable: false, isEjectable: true).mayBeCard)
+        XCTAssertTrue(CardVolume(isRootFileSystem: false, isLocal: true, isRemovable: true, isEjectable: false).mayBeCard)
+        XCTAssertTrue(CardVolume(isRootFileSystem: false, isLocal: true, isRemovable: false, isEjectable: true).mayBeCard)
     }
 
     func testCardLayoutIsDCIMOrPRIVATEAtTheRoot() {
