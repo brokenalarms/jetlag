@@ -69,8 +69,9 @@ class _SwiftBackend:
         # and blocks the writer, and this client only ever reads stdout lines.
         # jetlag-metadata writes nothing to stderr in normal operation; anything it
         # does write reaches the pipeline's own stderr, which the caller drains.
+        from lib.exiftool import EXIFTOOL_CONFIG
         self._process = subprocess.Popen(
-            [self._binary],
+            [self._binary, "--exiftool-config", EXIFTOOL_CONFIG],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=None,

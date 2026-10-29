@@ -318,7 +318,8 @@ class TestFixMediaTimestamp:
 _CLOCK_FIELDS = [
     "-DateTimeOriginal", "-XMP-exif:DateTimeOriginal", "-Keys:CreationDate",
     "-QuickTime:CreateDate", "-QuickTime:MediaCreateDate",
-    "-QuickTime:TrackCreateDate", "-XMP-xmpDM:LogComment", "-FileModifyDate",
+    "-QuickTime:TrackCreateDate", "-XMP-xmpMM:PreservedFileName", "-XMP-jetlag:all",
+    "-FileModifyDate",
 ]
 
 _IDEMPOTENCE_FIELDS = [

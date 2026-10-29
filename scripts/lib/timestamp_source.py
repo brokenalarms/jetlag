@@ -26,8 +26,10 @@ from lib.metadata import metadata_service as exiftool
 
 _exif_cache: Dict[str, Dict[str, str]] = {}
 
-PROVENANCE_TAG = "XMP-xmpDM:LogComment"
-PROVENANCE_KEY = PROVENANCE_TAG.split(":")[-1]
+PRESERVED_FILENAME_TAG = "XMP-xmpMM:PreservedFileName"
+# Files imported before the jetlag XMP namespace carry their provenance as JSON in
+# this tag instead; it is read only to know such a file is already recorded.
+LEGACY_PROVENANCE_TAG = "XMP-xmpDM:LogComment"
 
 
 def read_exif_data(file_path: str) -> Dict[str, str]:
@@ -41,7 +43,8 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
     fields = [
         "DateTimeOriginal", "OffsetTimeOriginal", "CreateDate", "ModifyDate",
         "CreationDate", "QuickTime:MediaCreateDate", "QuickTime:MediaModifyDate",
-        "QuickTime:TrackCreateDate", "Keys:CreationDate", PROVENANCE_TAG,
+        "QuickTime:TrackCreateDate", "Keys:CreationDate",
+        PRESERVED_FILENAME_TAG, LEGACY_PROVENANCE_TAG,
         "Make", "Model",
     ]
 

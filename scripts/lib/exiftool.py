@@ -18,8 +18,9 @@ import re
 import collections
 import subprocess
 import threading
+from pathlib import Path
 
-
+EXIFTOOL_CONFIG = str(Path(__file__).parent / "exiftool-jetlag.config")
 
 # pids of every exiftool -stay_open child this process has spawned, so a test
 # session can confirm none of them are still running at session end.
@@ -48,7 +49,7 @@ class ExifTool:
             return
         try:
             self._process = subprocess.Popen(
-                ["exiftool", "-stay_open", "True", "-@", "-"],
+                ["exiftool", "-config", EXIFTOOL_CONFIG, "-stay_open", "True", "-@", "-"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,

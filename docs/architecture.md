@@ -104,6 +104,8 @@ All EXIF/metadata operations go through a two-layer abstraction:
 
 This separation means the underlying metadata engine (currently ExifTool) can be swapped without touching any calling code.
 
+Both backends start exiftool with `scripts/lib/exiftool-jetlag.config`, which declares jetlag's own XMP namespace (`XMP-jetlag`, `http://ns.jetlag.app/1.0/`). Exiftool refuses to write a tag it has no definition for, so a backend started without the config silently drops every provenance write. `lib/metadata.py` passes the path to `jetlag-metadata` as `--exiftool-config`.
+
 ---
 
 ## Distribution
