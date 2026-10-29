@@ -8,11 +8,10 @@ import sys
 import os
 import signal
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import argparse
 
-from lib.exiftool import exiftool
+from lib.exiftool import MetadataWriteRefused, exiftool
 from lib.results import emit_result
 from lib.timestamp_source import clear_exif_cache, read_exif_data
 
@@ -83,17 +82,8 @@ def get_existing_exif_camera(file_path: str) -> dict:
     data = read_exif_data(file_path)
     return {key: data[key] for key in ("Make", "Model") if key in data}
 
-# Skips .lrv, .insv and other sidecars exiftool cannot handle.
-CAMERA_EXIF_EXTENSIONS = ('.mp4', '.mov', '.jpg', '.jpeg', '.png', '.dng', '.arw', '.cr2', '.nef')
-
-def supports_camera_exif(file_path: str) -> bool:
-    """Whether the camera fields are read and written for this file type."""
-    return Path(file_path).suffix.lower() in CAMERA_EXIF_EXTENSIONS
-
 def file_camera(file_path: str) -> Tuple[Optional[str], Optional[str]]:
     """The Make and Model the file carries, None for either it lacks."""
-    if not supports_camera_exif(file_path):
-        return None, None
     existing = get_existing_exif_camera(file_path)
     make = str(existing.get('Make') or '').strip() or None
     model = str(existing.get('Model') or '').strip() or None
@@ -102,8 +92,6 @@ def file_camera(file_path: str) -> Tuple[Optional[str], Optional[str]]:
 def camera_mismatch(file_path: str, make: Optional[str], model: Optional[str]) -> dict:
     """The file's own Make/Model wherever it carries one that differs from the
     profile's. Case is ignored: cameras write SONY where profiles say Sony."""
-    if not supports_camera_exif(file_path):
-        return {}
     existing = get_existing_exif_camera(file_path)
     mismatch = {}
     for field, wanted in (('Make', make), ('Model', model)):
@@ -119,7 +107,7 @@ def camera_exif_fields(file_path: str, make: Optional[str], model: Optional[str]
     camera wrote is the record of what shot the file, so a profile picked for the
     wrong body never relabels it; camera_mismatch reports it.
     """
-    if not (make or model) or not supports_camera_exif(file_path):
+    if not (make or model):
         return {}
     existing = get_existing_exif_camera(file_path)
     return {
@@ -128,21 +116,19 @@ def camera_exif_fields(file_path: str, make: Optional[str], model: Optional[str]
         if wanted and not str(existing.get(field) or '').strip()
     }
 
-def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Optional[str] = None, dry_run: bool = False) -> Tuple[bool, List[str]]:
-    """Add camera info to EXIF Make and Model fields
+def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Optional[str] = None, dry_run: bool = False) -> List[str]:
+    """Add camera info to EXIF Make and Model fields; return the fields written.
 
-    Returns:
-        (success, fields_updated): Success status and list of fields that were actually updated
+    Raises MetadataWriteRefused, with exiftool's reason, when the file cannot be
+    written.
     """
-    try:
-        fields = camera_exif_fields(file_path, make, model)
-        if fields and not dry_run:
+    fields = camera_exif_fields(file_path, make, model)
+    if fields and not dry_run:
+        try:
             exiftool.write_tags(file_path, [f'-{field}={value}' for field, value in fields.items()])
+        finally:
             clear_exif_cache(file_path)
-        return True, list(fields)
-    except Exception as e:
-        print(f"Warning: Failed to add camera info to {file_path}: {e}", file=sys.stderr)
-        return False, []
+    return list(fields)
 
 def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], model: Optional[str], dry_run: bool, write_exif: bool = True) -> Optional[TagResult]:
     """Process a single file: apply tags and EXIF, return structured result.
@@ -151,7 +137,8 @@ def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], 
     exiftool call (camera_exif_fields gives them), so the file is rewritten once.
 
     Returns:
-        TagResult on success, None if file not found or processing failed
+        TagResult on success, None if the file is not found. Raises
+        MetadataWriteRefused when the camera fields cannot be written.
     """
     if not os.path.exists(file_path):
         print(f"Warning: File not found: {file_path}", file=sys.stderr)
@@ -171,10 +158,8 @@ def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], 
 
     # Apply camera EXIF (Make and Model)
     if make or model:
-        success, fields_updated = add_camera_to_exif(
+        fields_updated = add_camera_to_exif(
             file_path, make=make, model=model, dry_run=dry_run or not write_exif)
-        if not success:
-            return None
 
         if fields_updated:
             exif_parts = []
@@ -234,7 +219,11 @@ def main():
 
     success_count = 0
     for file_path in file_paths:
-        result = tag_media_file(file_path, finder_tags, args.make, args.model, dry_run)
+        try:
+            result = tag_media_file(file_path, finder_tags, args.make, args.model, dry_run)
+        except MetadataWriteRefused as refusal:
+            print(f"❌ exiftool could not write {os.path.basename(file_path)}: {refusal}", file=sys.stderr)
+            continue
         if result is None:
             continue
 

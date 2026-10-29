@@ -21,7 +21,7 @@ def signal_handler(sig, frame):
     print("\n\nInterrupted by user", file=sys.stderr)
     sys.exit(130)
 
-from lib.exiftool import exiftool
+from lib.exiftool import MetadataWriteRefused, exiftool
 from lib.results import emit_result
 from lib.timestamp_source import (
     read_exif_data,
@@ -76,6 +76,7 @@ class TimestampFixResult:
     camera_zone_offset: Optional[str] = None
     stale_fields: list = field(default_factory=list)
     stale_file_times: list = field(default_factory=list)
+    error: Optional[str] = None
 
 
 def get_timezone_for_country(input_country: str) -> Optional[str]:
@@ -152,15 +153,15 @@ def get_country_name(input_country: str) -> str:
 
 
 def write_exif_fields(file_path: str, field_args: list) -> bool:
-    """Write multiple EXIF fields in a single exiftool call."""
+    """Write multiple EXIF fields in a single exiftool call.
+
+    Raises MetadataWriteRefused, with exiftool's reason, when the file cannot be
+    written.
+    """
     try:
-        result = exiftool.write_tags(file_path, field_args)
-        if file_path in _exif_cache:
-            del _exif_cache[file_path]
-        return result
-    except Exception as e:
-        print(f"Error writing EXIF fields: {e}", file=sys.stderr)
-        return False
+        return exiftool.write_tags(file_path, field_args)
+    finally:
+        _exif_cache.pop(file_path, None)
 
 
 PROVENANCE_CLOCK_TAGS = {
@@ -1094,8 +1095,14 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
         f"-FileCreateDate={get_expected_file_system_time(datetime_original, preserve_wallclock=preserve_wallclock)}"
     ] if sys.platform == "darwin" and (changes["file_timestamps"] or field_args) else []
 
+    write_error = None
     if field_args or file_time_args:
-        if not write_exif_fields(file_path, field_args + file_time_args):
+        try:
+            written = write_exif_fields(file_path, field_args + file_time_args)
+        except MetadataWriteRefused as refusal:
+            written, write_error = False, str(refusal)
+            print(f"   ❌ exiftool could not write this file: {write_error}", file=sys.stderr)
+        if not written:
             if provenance_args:
                 print("   ⚠️  Failed to record original timestamps for recovery", file=sys.stderr)
             if correction_args:
@@ -1107,7 +1114,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
             success = not (correction_args or extra_args or file_time_args)
 
     if not success:
-        return TimestampFixResult(**result_base, timestamp_action="error")
+        return TimestampFixResult(**result_base, timestamp_action="error", error=write_error)
     if not has_changes:
         return TimestampFixResult(**result_base, timestamp_action="no_change")
     return TimestampFixResult(**result_base, timestamp_action="added" if only_adds_fields else "fixed")

@@ -22,10 +22,8 @@ from pathlib import Path
 
 _tag_mod = importlib.import_module("tag-media")
 
-# The types whose camera tag-media can read; any other file would be reported as
-# recording no camera when it may well record one.
 VIDEO_EXTENSIONS = [".mp4", ".mov"]
-PHOTO_EXTENSIONS = sorted(set(_tag_mod.CAMERA_EXIF_EXTENSIONS) - set(VIDEO_EXTENSIONS))
+PHOTO_EXTENSIONS = [".arw", ".cr2", ".dng", ".jpeg", ".jpg", ".nef", ".png"]
 DEFAULT_EXTENSIONS = PHOTO_EXTENSIONS + VIDEO_EXTENSIONS
 
 # Folders macOS presents as a single file. Their contents are another app's data,

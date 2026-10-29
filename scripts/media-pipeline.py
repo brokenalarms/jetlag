@@ -29,7 +29,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).parent))
 from lib.filesystem import find_media_files
-from lib.exiftool import exiftool
+from lib.exiftool import MetadataWriteRefused, exiftool
 from lib.profiles import resolve_profiles_file
 from lib.timestamp_source import (
     build_filename, carry_exif_cache, extract_metadata_timezone, is_zone_name,
@@ -241,7 +241,8 @@ def run_tag_media(
     """Tag a file via direct module call.
 
     Returns:
-        TagResult on success, None on failure.
+        TagResult on success, None if the file is not found. Raises
+        MetadataWriteRefused when the camera fields cannot be written.
     """
     finder_tags = [t.strip() for t in tags.split(",")] if tags else []
     return _tag_mod.tag_media_file(
@@ -480,8 +481,16 @@ def process_file(
 
         if tags or make or model:
             print("🏷️  Tagging...", file=sys.stderr)
-            tag_result = run_tag_media(active_file, tags or None, make or None, model or None, apply,
-                                       write_exif=not fix_writes_fields)
+            try:
+                tag_result = run_tag_media(active_file, tags or None, make or None, model or None, apply,
+                                           write_exif=not fix_writes_fields)
+            except MetadataWriteRefused as refusal:
+                print(f"   ❌ exiftool could not write {active_file.name}: {refusal}", file=sys.stderr)
+                result["failed"] = True
+                result["error"] = str(refusal)
+                _staged_paths.clear()
+                emit_event("pipeline_result", file=file_path.name, result="failed")
+                return result
             if fix_writes_fields:
                 camera_fields = _tag_mod.camera_exif_fields(str(active_file), make or None, model or None)
             if tag_result is not None:
@@ -539,12 +548,13 @@ def process_file(
             camera_zone_offset=ts_result.camera_zone_offset,
             stale_fields=ts_result.stale_fields,
             stale_file_times=ts_result.stale_file_times,
+            error=ts_result.error,
         )
 
         if ts_result.timestamp_action == "error":
             print(f"   ❌ Timestamp fix failed for {file_path.name}", file=sys.stderr)
             result["failed"] = True
-            result["error"] = "Timestamp fix failed"
+            result["error"] = ts_result.error or "Timestamp fix failed"
             _staged_paths.clear()
             emit_event("pipeline_result", file=file_path.name, result="failed")
             return result
@@ -706,7 +716,9 @@ def print_summary(stats: dict, apply: bool):
         for f in stats["failed_files"]:
             print(f"  - {f}", file=sys.stderr)
 
-    if apply:
+    if apply and stats["failed"] > 0:
+        print(f"❌ Media pipeline complete - {stats['failed']} file(s) failed and were left in the working directory.", file=sys.stderr)
+    elif apply:
         print("✅ Media pipeline complete - changes applied.", file=sys.stderr)
     else:
         print("✅ Media pipeline complete - DRY RUN.", file=sys.stderr)

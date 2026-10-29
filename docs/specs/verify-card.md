@@ -26,7 +26,10 @@ Timezone corrections can also rename a file (`VID_20250619_042028_00_004` become
   footage read. An imported copy has exactly the card file's footage size and a few
   KB more metadata.
 - **Provenance in the file**: jetlag records, in the same write as its other metadata,
-  the file's original name and where it put the file. See "Provenance".
+  the file's original name. See "Provenance".
+- **No recorded location**: where a file lives is never stored in it. Files are
+  regrouped and moved after import (an import without a group, then moved into
+  one), so any stored path goes stale; a copy is found by its name wherever it is.
 
 Exiftool's `ImageDataHash` is not used: it hashes the video and audio tracks one at a
 time via the `moov` sample tables, which on a card come after the footage, so it can
@@ -41,13 +44,12 @@ written in the same exiftool call as the correction — no read or write of its 
 |---|---|
 | `XMP-xmpMM:PreservedFileName` | the name the file had on the card |
 | `XMP-jetlag:OriginalDateTimeOriginal` … `OriginalCreationDate` | each clock field as it was before jetlag's first write, for recovery outside the app |
-| `XMP-jetlag:Destination` | the full path organize moved the file to |
 | `XMP-jetlag:FootageSHA256`, `XMP-jetlag:FootageBytes` | hash and size of `mdat` + trailer, computed while ingest copies the file |
 
 `jetlag` is a custom XMP namespace (`http://ns.jetlag.app/1.0/`) declared in
 `scripts/lib/exiftool-jetlag.config`. Exiftool only writes tags it has a definition
 for, so both metadata backends load that config. One property per value, so each is
-readable directly (`exiftool -XMP-jetlag:Destination`) with nothing to parse.
+readable directly (`exiftool -XMP-jetlag:OriginalCreateDate`) with nothing to parse.
 
 Files imported before this namespace carry a JSON record in `XMP-xmpDM:LogComment`
 instead. That record also counts as "already recorded", because those files' clock
@@ -86,10 +88,10 @@ backups:
     path: nas-rsync:/volume1/Backup/Mirror/T9/Videos/Source Video
 ```
 
-A file's expected path on a backup location is its recorded `Destination` with the root
-of the location it was written under replaced by this location's root. A copy anywhere else —
-including a sync tool's archive of deleted items — does not count; when the expected
-path is missing, a same-named file elsewhere in the listing is shown as a hint.
+A file's copy on a backup location is looked for anywhere under that location's root,
+so it is found wherever it has been grouped or moved since import. A sync tool's archive
+of deleted items (`#recycle`, `@eaDir`, `.stversions`) is excluded: a copy there is on
+its way out, not backed up.
 
 Locations are never read over the network. A local one is walked; a remote one is
 listed with `rsync --list-only --recursive` (path, size, mtime), which the remote
@@ -118,9 +120,9 @@ any other.
 **Match** a card file to a file on a location when that file has the same name, or its
 `PreservedFileName` equals the card name. Nothing looser counts.
 
-**Verdict per location**: matched at the expected path with equal total size (an
-untouched copy) or equal footage size (a jetlag-written copy); otherwise missing,
-footage differs, or not at expected path.
+**Verdict per location**: matched with equal total size (an untouched copy) or equal
+footage size (a jetlag-written copy); otherwise missing or footage differs. Two
+matches on one location are listed as duplicates for the user to resolve.
 
 ## Verify screen
 
@@ -148,7 +150,7 @@ The right-hand panel reuses the table machinery with a row type of its own, not
    config loaded by both metadata backends.
 2. Footage-size reader for QuickTime-family files, with a regression test that footage
    size and hash are unchanged by tag + fix-timestamp on each profile's format.
-3. Footage hash during ingest; `Destination` and the hash join the provenance write;
+3. Footage hash during ingest; the hash joins the provenance write;
    provenance on every moved file.
 4. `verify-card.py`: source scan, location listings, matching, JSONL verdicts.
 5. Verify screen in the app; backup-location configuration screen.
