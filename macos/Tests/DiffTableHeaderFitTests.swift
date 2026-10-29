@@ -72,11 +72,13 @@ final class DiffTableHeaderFitTests: XCTestCase {
             "no seven-column NSTableView hosted")
     }
 
+    /// The header carries AppKit's own double-click recognizers too, which target the
+    /// header itself; the app's is the one whose target is anything else.
     private func installedDoubleClick(on table: NSTableView) throws -> NSClickGestureRecognizer {
         let header = try XCTUnwrap(table.headerView, "the table has no header view")
         return try XCTUnwrap(
             header.gestureRecognizers.compactMap { $0 as? NSClickGestureRecognizer }
-                .first { $0.numberOfClicksRequired == 2 },
+                .first { $0.numberOfClicksRequired == 2 && $0.target !== header },
             "the Files table's header must carry the double-click-to-fit recognizer")
     }
 

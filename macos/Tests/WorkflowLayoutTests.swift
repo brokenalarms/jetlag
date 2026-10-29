@@ -31,6 +31,18 @@ final class WorkflowLayoutTests: XCTestCase {
         return nil
     }
 
+    /// SwiftUI draws the profile picker itself rather than hosting an
+    /// NSPopUpButton, so it is found through the accessibility tree it exposes. Its
+    /// nodes answer the accessibility methods without declaring the protocol, so
+    /// they are called dynamically.
+    private func firstPopUpButton(in element: AnyObject) -> AnyObject? {
+        if element.accessibilityRole?() == .popUpButton { return element }
+        for child in (element.accessibilityChildren?() ?? nil) ?? [] {
+            if let match = firstPopUpButton(in: child as AnyObject) { return match }
+        }
+        return nil
+    }
+
     private func workflowState(panelOpen: Bool) -> AppState {
         let state = AppState()
         state.selectedTab = .workflow
@@ -106,10 +118,13 @@ final class WorkflowLayoutTests: XCTestCase {
         host.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
 
-        guard let picker = firstView(of: NSPopUpButton.self, in: host) else {
+        guard let picker = firstPopUpButton(in: host) else {
             return XCTFail("the profile picker was not hosted")
         }
-        let top = picker.convert(picker.bounds, to: nil).maxY
+        guard let frame = picker.accessibilityFrame?() else {
+            return XCTFail("the profile picker reports no frame")
+        }
+        let top = window.convertFromScreen(frame).maxY
         XCTAssertGreaterThan(top, 900 - 120, "the profile picker must sit within the top of the window, not mid-height")
     }
 
