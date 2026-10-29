@@ -52,18 +52,15 @@ private struct TimezonePickerSheet: View {
     @Binding var isPresented: Bool
     @State private var searchText = ""
 
-    private var filtered: [TimezoneOption] {
-        if searchText.isEmpty { return TimezoneCatalog.all }
-        let query = searchText.lowercased()
-        return TimezoneCatalog.all.filter {
-            $0.path.lowercased().contains(query)
-                || $0.region.lowercased().contains(query)
-                || $0.offsets.contains { $0.contains(query) }
+    private var filtered: [(option: TimezoneOption, match: TimezoneMatch)] {
+        TimezoneCatalog.all.compactMap { option in
+            let match = searchText.isEmpty ? TimezoneMatch(place: nil) : option.match(searchText)
+            return match.map { (option, $0) }
         }
     }
 
-    private var grouped: [(region: String, items: [TimezoneOption])] {
-        Dictionary(grouping: filtered, by: \.region)
+    private var grouped: [(region: String, items: [(option: TimezoneOption, match: TimezoneMatch)])] {
+        Dictionary(grouping: filtered, by: \.option.region)
             .sorted { $0.key < $1.key }
             .map { (region: $0.key, items: $0.value) }
     }
@@ -87,15 +84,24 @@ private struct TimezonePickerSheet: View {
             List {
                 ForEach(grouped, id: \.region) { group in
                     Section(group.region) {
-                        ForEach(group.items) { item in
+                        ForEach(group.items, id: \.option.id) { result in
+                            let item = result.option
                             Button {
                                 selectedTimezone = item.id
                                 isPresented = false
                             } label: {
                                 HStack {
-                                    Text(item.path)
-                                        .lineLimit(1)
-                                        .fontWeight(item.id == selectedTimezone ? .semibold : .regular)
+                                    VStack(alignment: .leading, spacing: 0) {
+                                        Text(item.path)
+                                            .lineLimit(1)
+                                            .fontWeight(item.id == selectedTimezone ? .semibold : .regular)
+                                        if let place = result.match.place {
+                                            Text(place)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                        }
+                                    }
                                     Spacer()
                                     Text(item.offsetLabel)
                                         .font(.system(.caption, design: .monospaced))
