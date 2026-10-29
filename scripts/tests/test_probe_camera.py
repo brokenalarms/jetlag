@@ -49,6 +49,39 @@ def test_files_without_a_camera_report_none(tmp_path):
         f"Actual: {found}, Expected: an entry with no make or model"
 
 
+def test_a_photos_library_inside_the_source_is_not_read(tmp_path):
+    """Reading into a Photos library prompts for Photos access; it holds another
+    app's copies, not a camera's originals."""
+    create_test_photo(tmp_path / "Photos Library.photoslibrary" / "originals" / "IMG_0001.JPG",
+                      Make="Apple", Model="iPhone 15")
+    create_test_photo(tmp_path / "Imports" / "A7V0001.JPG", Make="SONY", Model="ILCE-7M5")
+
+    found = probe(tmp_path)
+
+    assert found == [{"extension": ".jpg", "type": "photo", "files": 1, "make": "SONY", "model": "ILCE-7M5"}], \
+        f"Actual: {found}, Expected: only the SONY file outside the library"
+
+
+def test_hidden_files_beside_clips_are_not_sampled(tmp_path):
+    """exFAT cards gain a ._ file per clip; it carries no camera and is not media."""
+    create_test_video(tmp_path / "C0001.MP4", Make="SONY", Model="ILCE-7M5")
+    (tmp_path / "._C0001.MP4").write_bytes(b"\x00\x05\x16\x07")
+
+    found = probe(tmp_path)
+
+    assert found == [{"extension": ".mp4", "type": "video", "files": 1, "make": "SONY", "model": "ILCE-7M5"}], \
+        f"Actual: {found}, Expected: the clip alone"
+
+
+def test_each_extension_samples_at_most_the_limit(tmp_path):
+    for n in range(3):
+        create_test_photo(tmp_path / "DCIM" / f"A7V000{n}.JPG", Make="SONY", Model="ILCE-7M5")
+
+    found = probe(tmp_path, "--sample", 2)
+
+    assert found == [{"extension": ".jpg", "type": "photo", "files": 2, "make": "SONY", "model": "ILCE-7M5"}]
+
+
 def test_a_single_file_can_be_probed(tmp_path):
     """The profile editor can read the camera from one sample file."""
     sample = tmp_path / "A7V0001.JPG"
