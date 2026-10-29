@@ -9,17 +9,26 @@ struct JetlagApp: App {
         NSWindow.allowsAutomaticWindowTabbing = false
     }
 
+    /// The unit tests run inside the app: whatever card happens to be in the Mac
+    /// running them must not reach their state.
+    private static let isTestHost = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+
+    private func scanCardsUnlessTesting() async {
+        guard !Self.isTestHost else { return }
+        await state.scanCards()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView(state: state)
                 .onAppear { state.loadProfiles() }
                 .task { await state.refreshGyroflowStatus() }
-                .task { await state.scanCards() }
+                .task { await scanCardsUnlessTesting() }
                 .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didMountNotification)) { _ in
-                    Task { await state.scanCards() }
+                    Task { await scanCardsUnlessTesting() }
                 }
                 .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didUnmountNotification)) { _ in
-                    Task { await state.scanCards() }
+                    Task { await scanCardsUnlessTesting() }
                 }
         }
         // The window's resizable range is the content's own: with the panel closed the

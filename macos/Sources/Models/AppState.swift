@@ -893,19 +893,11 @@ final class AppState {
         ProfileMatcher.contents(of: cardProbes, profiles: profilesConfig?.profiles ?? [:])
     }
 
-    /// Read the cameras on every mounted card. A card is a volume laid out the
-    /// way cameras write them, with DCIM or PRIVATE at its root; other volumes
-    /// (a library drive, the boot disk) are never searched.
+    /// Read the cameras on every mounted card: removable media laid out the way
+    /// cameras write it (see CardVolume). The boot disk is never searched.
     func scanCards() async {
-        let volumes = FileManager.default.mountedVolumeURLs(
-            includingResourceValuesForKeys: nil, options: [.skipHiddenVolumes]) ?? []
-        let cards = volumes.filter { volume in
-            ["DCIM", "PRIVATE"].contains {
-                FileManager.default.fileExists(atPath: volume.appendingPathComponent($0).path)
-            }
-        }
         var probes: [ProbedCamera] = []
-        for card in cards {
+        for card in CardVolume.mountedCards() {
             probes += await CameraProbe.probe(path: card.path, scriptsDirectory: scriptsDirectory,
                                               profilesPath: resolvedProfilesPath)
         }

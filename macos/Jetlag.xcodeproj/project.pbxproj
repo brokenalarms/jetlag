@@ -56,6 +56,7 @@
 		8D5AEC4A3D748ADF6853E7C1 /* JetlagApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1EA0220A8EF5122DF196162 /* JetlagApp.swift */; };
 		8D73DAA303CE63DEDF874F35 /* InspectorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBCBF55CE9225F7CC1BE2FA /* InspectorPanel.swift */; };
 		8F979D129B6EF35BF9FA8BCB /* TimezoneCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 275EE4D58C8BFA72BF92B86F /* TimezoneCatalog.swift */; };
+		91DB4EF3B8476A16FFB05159 /* CardVolume.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A48E5B44E4F58C57B9A2E7 /* CardVolume.swift */; };
 		92322D3EA3904DAF001B3EA1 /* RunCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D237F58ECB778E9E70964A2E /* RunCompletionTests.swift */; };
 		92BA1490C431AC89A5646C85 /* FilenamePatterns.swift in Sources */ = {isa = PBXBuildFile; fileRef = A668F7E7A4F545637B636567 /* FilenamePatterns.swift */; };
 		932EB3F57E4BF42DBFA0EBF9 /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FFDD21FD1C478D8CFDF7FED /* ProfileService.swift */; };
@@ -63,6 +64,7 @@
 		93F68414D370D1F732929F16 /* FileCamera.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034BF6E27F46CF05971B2C69 /* FileCamera.swift */; };
 		9AC888CAC821E2B92C70DF8A /* RunSummaryFailedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3B9BCAD7467C7E09E56A843 /* RunSummaryFailedTests.swift */; };
 		A00FA545CCBD5C1CF868B312 /* PythonRuntimeCheckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33AF1E5DF4D368EB36EFB0EC /* PythonRuntimeCheckTests.swift */; };
+		A70C64C172D0E7955F892CC3 /* CardVolumeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2846D1096AC9FCE5E96A5589 /* CardVolumeTests.swift */; };
 		A782F8A1159D170B5CEB4C7E /* LicenseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D2EC9D00CD4EE5A754D59E /* LicenseStore.swift */; };
 		A87A9F7C3870DC8D634B2510 /* MediaProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC0210C9EE3BEF29E07C9DE6 /* MediaProfile.swift */; };
 		AAC3E4FC571BCF92D2EBA219 /* ScriptRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5FD29C41D642C67671FBAF /* ScriptRunner.swift */; };
@@ -123,6 +125,7 @@
 		2380F7D5A02B13D1DCAD0F23 /* TableTailFollowingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableTailFollowingTests.swift; sourceTree = "<group>"; };
 		275EE4D58C8BFA72BF92B86F /* TimezoneCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimezoneCatalog.swift; sourceTree = "<group>"; };
 		27CF0E7DB6265D0EAF8055CE /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
+		2846D1096AC9FCE5E96A5589 /* CardVolumeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardVolumeTests.swift; sourceTree = "<group>"; };
 		2A16A002850DD5DEAE8711B1 /* EmptySource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptySource.swift; sourceTree = "<group>"; };
 		2A5BADCA538054410A590FFD /* RowOutcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowOutcome.swift; sourceTree = "<group>"; };
 		2DB6E838E4C1827858BB004E /* DirtyableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirtyableTests.swift; sourceTree = "<group>"; };
@@ -166,6 +169,7 @@
 		A54A1E7104B0356A474B3968 /* TimezoneMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimezoneMapView.swift; sourceTree = "<group>"; };
 		A668F7E7A4F545637B636567 /* FilenamePatterns.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenamePatterns.swift; sourceTree = "<group>"; };
 		B098EAB2712A13202064D6F1 /* RowFileLocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowFileLocationTests.swift; sourceTree = "<group>"; };
+		B1A48E5B44E4F58C57B9A2E7 /* CardVolume.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardVolume.swift; sourceTree = "<group>"; };
 		B21FCFCD50D80CA46BC2F602 /* WindowTitlebarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTitlebarTests.swift; sourceTree = "<group>"; };
 		B3B9BCAD7467C7E09E56A843 /* RunSummaryFailedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunSummaryFailedTests.swift; sourceTree = "<group>"; };
 		B400B347B64B7BD6C4A6B368 /* LogPanelScrollTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogPanelScrollTests.swift; sourceTree = "<group>"; };
@@ -287,6 +291,7 @@
 				6E43F449C76E345D54125628 /* CameraCheckTests.swift */,
 				635D091FC0529942AFD4769F /* CameraMismatchTests.swift */,
 				DE9A71B38C9F152E65E2D2B8 /* CancelFeedbackTests.swift */,
+				2846D1096AC9FCE5E96A5589 /* CardVolumeTests.swift */,
 				E1F442622CEF248F5E277A97 /* ColumnFitTests.swift */,
 				0C24840ECE9B09D56FBEF3B9 /* DiffTableHeaderFitTests.swift */,
 				72241C254A690C5715578E66 /* DiffTableScrollerTests.swift */,
@@ -370,6 +375,7 @@
 			children = (
 				F559FB82EF7FBD0FD4101BE5 /* AppState.swift */,
 				1A15CC816BD1916AE324963F /* CameraMismatch.swift */,
+				B1A48E5B44E4F58C57B9A2E7 /* CardVolume.swift */,
 				73A67A68A82CC97A0B42F497 /* DiffTableRow.swift */,
 				2A16A002850DD5DEAE8711B1 /* EmptySource.swift */,
 				034BF6E27F46CF05971B2C69 /* FileCamera.swift */,
@@ -526,6 +532,7 @@
 				0D5AC61704A72A9FEF4D4DF3 /* AppState.swift in Sources */,
 				1D5CD971A833DB79B82F89DC /* CameraMismatch.swift in Sources */,
 				D2C051A1640C00817FD45094 /* CameraProbe.swift in Sources */,
+				91DB4EF3B8476A16FFB05159 /* CardVolume.swift in Sources */,
 				6565530211ECEF491334BDD9 /* ContentView.swift in Sources */,
 				1D23F4385E3C9080D63F95C1 /* DiffTableRow.swift in Sources */,
 				D4148DE34CA1305FAAEB74E7 /* DiffTableView.swift in Sources */,
@@ -578,6 +585,7 @@
 				FD1DBD75EEE88189E7E69A37 /* CameraCheckTests.swift in Sources */,
 				35539B79D4180FC8D411D82C /* CameraMismatchTests.swift in Sources */,
 				22E1D69B22D54B870B63505F /* CancelFeedbackTests.swift in Sources */,
+				A70C64C172D0E7955F892CC3 /* CardVolumeTests.swift in Sources */,
 				6212872C90240AF9DF48B4E0 /* ColumnFitTests.swift in Sources */,
 				6FD2B52C0EA545F22558821C /* DiffTableHeaderFitTests.swift in Sources */,
 				E429D831BA4132A2CC9027AF /* DiffTableScrollerTests.swift in Sources */,
