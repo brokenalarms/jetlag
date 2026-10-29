@@ -54,7 +54,7 @@ This dict-key-as-name constraint is shared between the Swift model and the Pytho
 
 A profile's identity is its `exif` camera (Make + Model) and its `type` (photo or video); the name is only a label. Both are read from media, never typed: a new profile starts from the source folder chosen for it, which `probe-camera` samples to report, per extension, the camera the files record and whether they are photos or video. That folder becomes the profile's source as chosen, and its ID defaults to camera + type. A camera therefore has at most one photo and one video profile; profiles that predate this and share a kind are flagged in the editor, not merged. Media that records no camera gets a profile named by hand, with no `exif`.
 
-Nothing reads a source on its own: `probe-camera` runs only on the folder chosen for a new profile. The workflow's profile is picked by hand, as ever.
+Nothing reads a source on its own: `probe-camera` runs only on the folder chosen for a new profile. The workflow's profile is picked by hand, as ever. The workflow reads its source once it is chosen (a profile picked, a folder browsed to, a typed path entered), never per keystroke or redraw, to learn whether its filenames carry timestamps. Every such read is a single walk that skips hidden entries and packages, so a Photos library inside a source is never opened.
 
 `media-pipeline` checks every file against the profile's camera before processing (case-insensitively: cameras write `SONY`, profiles may say `Sony`). A dry run reports files from another camera as `camera_mismatch` and previews them; an apply refuses without `--allow-camera-mismatch`. `tag-media` only fills a Make/Model a file lacks — a camera-written value is never overwritten.
 
