@@ -10,6 +10,8 @@ struct DiffTableRow: Identifiable {
     var sourcePath: String?
 
     var tagAction: String?
+    /// Set when the file's own camera differs from the profile's.
+    var fileCamera: FileCamera?
     var tagsAdded: String?
     var originalTime: String?
     var correctedTime: String?

@@ -112,7 +112,7 @@ enum PipelineEvent: Decodable {
     case pipelineFile(file: String, sourcePath: String?)
     case stageComplete(stage: String)
     case tagResult(file: String, action: String, tagsAdded: [String],
-                   exifMake: String, exifModel: String)
+                   exifMake: String, exifModel: String, fileCamera: FileCamera?)
     case timestampResult(file: String, action: String,
                          originalTime: String?, correctedTime: String?,
                          source: String?, timezone: String?,
@@ -144,6 +144,8 @@ enum PipelineEvent: Decodable {
         case tagsAdded = "tags_added"
         case exifMake = "exif_make"
         case exifModel = "exif_model"
+        case fileMake = "file_make"
+        case fileModel = "file_model"
         case originalTime = "original_time"
         case correctedTime = "corrected_time"
         case source, timezone
@@ -185,7 +187,10 @@ enum PipelineEvent: Decodable {
                 action: try container.decode(String.self, forKey: .action),
                 tagsAdded: try container.decode([String].self, forKey: .tagsAdded),
                 exifMake: try container.decode(String.self, forKey: .exifMake),
-                exifModel: try container.decode(String.self, forKey: .exifModel))
+                exifModel: try container.decode(String.self, forKey: .exifModel),
+                fileCamera: FileCamera(
+                    make: try container.decodeIfPresent(String.self, forKey: .fileMake),
+                    model: try container.decodeIfPresent(String.self, forKey: .fileModel)))
         case "timestamp_result":
             self = .timestampResult(
                 file: try container.decode(String.self, forKey: .file),
@@ -889,7 +894,8 @@ final class AppState {
                 liveRow = nil
             }
 
-        case .tagResult(_, let action, let tagsAdded, _, _):
+        case .tagResult(_, let action, let tagsAdded, _, _, let fileCamera):
+            currentDiffRow?.fileCamera = fileCamera
             currentDiffRow?.tagAction = action
             currentDiffRow?.tagsAdded = tagsAdded.joined(separator: ", ")
             liveRow = currentDiffRow

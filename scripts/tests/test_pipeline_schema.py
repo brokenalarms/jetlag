@@ -153,6 +153,29 @@ class TestEmittedEventsMatchSchema:
         assert empty["extensions"], \
             "Actual: no extensions reported, Expected: the profile's extensions the search used"
 
+    def test_file_shot_on_another_camera_is_flagged_not_relabelled(self, temp_workspace, test_profile):
+        """A file whose camera differs from the profile's reports its own camera.
+
+        The camera's Make/Model are the record of what shot the file; a profile
+        picked for the wrong body must not overwrite them, and the app needs the
+        mismatch as data to flag the row. A Make differing only in case (SONY vs
+        Sony) is the same camera and is not flagged.
+        """
+        video = temp_workspace["source"] / "other.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00",
+                          Make="TEST", Model="Other Body")
+
+        result = self._run(temp_workspace, test_profile)
+
+        events = validate_events(_events(result.stdout))
+        tag = next(e for e in events if e["event"] == "tag_result")
+        assert tag.get("file_model") == "Other Body", \
+            f"Actual: tag_result.file_model={tag.get('file_model')!r}, Expected: 'Other Body'"
+        assert "file_make" not in tag, \
+            f"Actual: tag_result.file_make={tag.get('file_make')!r}, Expected: absent (TEST is Test)"
+        assert tag["exif_model"] == "", \
+            f"Actual: tag_result.exif_model={tag['exif_model']!r}, Expected: '' (nothing written)"
+
     def test_run_emits_a_summary_of_the_whole_batch(self, temp_workspace, test_profile):
         """The app's completion popup reads this event, not print_summary's stderr text.
 

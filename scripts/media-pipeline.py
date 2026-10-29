@@ -419,6 +419,8 @@ def process_file(
                     tags_added=tag_result.tags_added,
                     exif_make=tag_result.exif_make,
                     exif_model=tag_result.exif_model,
+                    file_make=tag_result.file_make,
+                    file_model=tag_result.file_model,
                 )
                 if tag_result.action == "tagged":
                     file_changed = True
