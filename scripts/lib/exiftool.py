@@ -14,7 +14,6 @@ Usage:
 from __future__ import annotations
 
 import atexit
-import collections
 import os
 import re
 import subprocess
@@ -31,6 +30,12 @@ EXIFTOOL_BINARY = os.environ.get("JETLAG_EXIFTOOL") or "exiftool"
 # pids of every exiftool -stay_open child this process has spawned, so a test
 # session can confirm none of them are still running at session end.
 _spawned_pids: list[int] = []
+
+_STDERR_MARKER = re.compile(r"^\{stderr\d+\}$")
+
+
+class MetadataWriteRefused(Exception):
+    """exiftool left a file unwritten; the message is exiftool's own reason."""
 
 
 class ExifTool:
@@ -66,25 +71,41 @@ class ExifTool:
         _spawned_pids.append(self._process.pid)
         # Drain stderr continuously: a pipe nobody reads fills after ~16 KB and
         # exiftool then blocks on its next warning before printing the sentinel.
-        # Only the tail is kept, for diagnostics.
-        self._stderr_tail = collections.deque(maxlen=200)
+        # Each command's lines are handed to it at its marker; see _run.
+        self._stderr_lines: list[str] = []
+        self._stderr_closed = False
+        self._stderr_changed = threading.Condition()
         threading.Thread(
             target=self._drain_stderr, args=(self._process.stderr,), daemon=True,
         ).start()
 
     def _drain_stderr(self, stream):
         for raw in iter(stream.readline, b""):
-            self._stderr_tail.append(raw.decode(errors="replace").rstrip("\r\n"))
+            with self._stderr_changed:
+                self._stderr_lines.append(raw.decode(errors="replace").rstrip("\r\n"))
+                self._stderr_changed.notify_all()
+        with self._stderr_changed:
+            self._stderr_closed = True
+            self._stderr_changed.notify_all()
 
-    def execute(self, *args: str) -> str:
-        """Send a command and block until the sentinel line is returned."""
+    def _run(self, *args: str, wait_for_stderr: bool = False) -> tuple[str, list[str]]:
+        """Send a command; return its stdout and the stderr lines it produced.
+
+        stdout and stderr are separate pipes, so the stdout sentinel says nothing
+        about how much of the command's stderr has arrived. -echo4 has exiftool
+        print a marker to stderr once the command is processed, after its errors
+        and warnings; it goes first because it acts at the end wherever it is, and
+        the file stays the last argument. Only a caller that needs the command's
+        stderr waits for its marker; the rest return as soon as stdout is done.
+        """
         with self._lock:
             self._ensure_running()
             assert self._process is not None  # guaranteed by _ensure_running
             self._exec_id += 1
             sentinel = f"{{ready{self._exec_id}}}"
+            stderr_marker = f"{{stderr{self._exec_id}}}"
 
-            payload = "\n".join(args) + "\n" + f"-execute{self._exec_id}\n"
+            payload = "\n".join(["-echo4", stderr_marker, *args]) + "\n" + f"-execute{self._exec_id}\n"
             self._process.stdin.write(payload.encode())
             self._process.stdin.flush()
 
@@ -98,7 +119,34 @@ class ExifTool:
                     break
                 output_lines.append(decoded)
 
-            return "\n".join(output_lines)
+            with self._stderr_changed:
+                if wait_for_stderr:
+                    self._stderr_changed.wait_for(
+                        lambda: stderr_marker in self._stderr_lines or self._stderr_closed)
+                return "\n".join(output_lines), self._take_stderr(stderr_marker)
+
+    def _take_stderr(self, marker: str) -> list[str]:
+        """The stderr lines that came just before marker, dropping every finished
+        command's lines so the buffer never outgrows the commands still in flight.
+
+        Commands run one at a time, so each command's lines sit between the marker
+        before it and its own.
+        """
+        lines = self._stderr_lines
+        markers = [i for i, line in enumerate(lines) if _STDERR_MARKER.match(line)]
+        if not markers:
+            return []
+        own = lines.index(marker) if marker in lines else None
+        taken = []
+        if own is not None:
+            start = max((i for i in markers if i < own), default=-1) + 1
+            taken = lines[start:own]
+        del lines[:markers[-1] + 1]
+        return taken
+
+    def execute(self, *args: str) -> str:
+        """Send a command and block until the sentinel line is returned."""
+        return self._run(*args)[0]
 
     def read_tags(self, file_path: str, tags: list[str],
                   extra_args: list[str] | None = None) -> dict:
@@ -123,10 +171,18 @@ class ExifTool:
     def write_tags(self, file_path: str, tag_args: list[str]) -> bool:
         """Write tags with ``-P -overwrite_original``.
 
-        Returns True when exiftool reports files were updated.
+        Returns True when exiftool reports files were updated, False when it found
+        nothing to change. Raises MetadataWriteRefused when exiftool could not write
+        the file at all, so a refusal can never pass for a write.
         """
         args = ["-P", "-overwrite_original"] + tag_args + [str(file_path)]
-        output = self.execute(*args)
+        output, diagnostics = self._run(*args, wait_for_stderr=True)
+        if re.search(r"\d+ files? weren't updated due to errors", output):
+            errors = [
+                line.removeprefix("Error: ").removesuffix(f" - {file_path}")
+                for line in diagnostics if line.startswith("Error: ")
+            ]
+            raise MetadataWriteRefused("; ".join(errors) or output.strip())
         match = re.search(r"(\d+) image files? updated", output)
         return match is not None and int(match.group(1)) > 0
 

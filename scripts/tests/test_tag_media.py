@@ -351,31 +351,12 @@ class TestTagMedia:
             ], capture_output=True, text=True, check=True)
             assert "batch-tag" in tag_result.stdout
 
-    def test_unsupported_file_type(self, temp_dir):
-        """Test that unsupported file types are handled gracefully
-
-        Actual: .lrv file gets tags but not EXIF
-        Expected: Tags added, EXIF skipped for unsupported type
-        """
-        mp4_path = os.path.join(temp_dir, "test.mp4")
-        create_test_video(mp4_path)
-
-        # Rename to .lrv
+    def test_tags_and_camera_reach_a_file_whatever_its_extension(self, temp_dir):
+        """Tagging writes the camera and Finder tags to any file exiftool can write,
+        whatever it is called."""
         lrv_path = os.path.join(temp_dir, "test.lrv")
-        shutil.move(mp4_path, lrv_path)
+        create_test_video(lrv_path)
 
-        # Record before state
-        tag_result_before = subprocess.run([
-            "tag", "--list", "--no-name", lrv_path
-        ], capture_output=True, text=True)
-        has_tag_before = "test-tag" in tag_result_before.stdout
-
-        exif_result_before = subprocess.run([
-            "exiftool", "-s", "-Make", lrv_path
-        ], capture_output=True, text=True)
-        has_make_before = "GoPro" in exif_result_before.stdout
-
-        # Should skip EXIF for .lrv but still allow tags
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "tag-media.py"),
             lrv_path,
@@ -384,23 +365,27 @@ class TestTagMedia:
             "--apply"
         ], capture_output=True, text=True)
 
-        # Record after state
-        tag_result_after = subprocess.run([
-            "tag", "--list", "--no-name", lrv_path
-        ], capture_output=True, text=True, check=True)
-        has_tag_after = "test-tag" in tag_result_after.stdout
-
-        exif_result_after = subprocess.run([
-            "exiftool", "-s", "-Make", lrv_path
-        ], capture_output=True, text=True)
-        has_make_after = "GoPro" in exif_result_after.stdout
-
-        # Verify behavior: tags should be added, EXIF should be skipped for .lrv
+        tags = subprocess.run(["tag", "--list", "--no-name", lrv_path],
+                              capture_output=True, text=True, check=True).stdout
+        make = subprocess.run(["exiftool", "-s3", "-Make", lrv_path],
+                              capture_output=True, text=True).stdout.strip()
         assert result.returncode == 0, f"Script should succeed: {result.stderr}"
-        assert has_tag_before == False, "Tag should not exist before"
-        assert has_tag_after == True, f"Actual: tag not added to .lrv file, Expected: test-tag added despite unsupported type"
-        assert has_make_before == False, "Make should not exist before"
-        assert has_make_after == False, f"Actual: EXIF Make added to .lrv file, Expected: EXIF skipped for unsupported .lrv type"
+        assert "test-tag" in tags, f"Actual: tags {tags!r}, Expected: test-tag"
+        assert make == "GoPro", f"Actual: Make={make!r}, Expected: GoPro"
+
+    def test_file_exiftool_cannot_write_fails_with_its_reason(self, temp_dir):
+        """A file exiftool refuses to write is a failure naming exiftool's reason."""
+        unwritable = os.path.join(temp_dir, "test.mp4")
+        with open(unwritable, "w") as f:
+            f.write("not a video")
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            unwritable, "--make", "GoPro", "--apply"
+        ], capture_output=True, text=True)
+
+        assert result.returncode != 0, "Actual: exit 0, Expected: the refused write fails the run"
+        assert "Not a valid MP4" in result.stderr, f"Actual: {result.stderr}, Expected: exiftool's reason"
 
     def test_output_format(self, test_video):
         """Test that output follows presentation format"""

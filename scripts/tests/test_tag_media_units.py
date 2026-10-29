@@ -26,6 +26,8 @@ spec = importlib.util.spec_from_file_location(
 tm = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tm)
 
+from lib.exiftool import MetadataWriteRefused
+
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags don't exist on Linux")
 class TestGetExistingTags:
@@ -253,14 +255,13 @@ class TestAddCameraToExif:
 
     def test_add_camera_returns_fields_updated(self):
         """Test that function returns which fields were updated"""
-        success, fields_updated = tm.add_camera_to_exif(
+        fields_updated = tm.add_camera_to_exif(
             self.test_video,
             make="GoPro",
             model="HERO12 Black",
             dry_run=False
         )
 
-        assert success is True
         assert isinstance(fields_updated, list)
         assert len(fields_updated) == 2
         assert "Make" in fields_updated
@@ -276,14 +277,13 @@ class TestAddCameraToExif:
         ], capture_output=True, check=True)
 
         # Add both Make and Model
-        success, fields_updated = tm.add_camera_to_exif(
+        fields_updated = tm.add_camera_to_exif(
             self.test_video,
             make="GoPro",
             model="HERO12 Black",
             dry_run=False
         )
 
-        assert success is True
         # Should only update Model
         assert len(fields_updated) == 1
         assert "Model" in fields_updated
@@ -302,7 +302,7 @@ class TestAddCameraToExif:
             self.test_video
         ], capture_output=True, check=True)
 
-        success, fields_updated = tm.add_camera_to_exif(
+        fields_updated = tm.add_camera_to_exif(
             self.test_video,
             make="Sony",
             model="ILCE-7M4",
@@ -311,7 +311,6 @@ class TestAddCameraToExif:
 
         tm.clear_exif_cache(self.test_video)
         after = tm.get_existing_exif_camera(self.test_video)
-        assert success is True
         assert fields_updated == [], \
             f"Actual: would update {fields_updated}, Expected: nothing (the camera's values stand)"
         assert after == {"Make": "SONY", "Model": "ILCE-7M5"}, \
@@ -319,14 +318,13 @@ class TestAddCameraToExif:
 
     def test_add_camera_dry_run(self):
         """Test that dry run returns data but doesn't modify file"""
-        success, fields_updated = tm.add_camera_to_exif(
+        fields_updated = tm.add_camera_to_exif(
             self.test_video,
             make="GoPro",
             model="HERO12 Black",
             dry_run=True
         )
 
-        assert success is True
         # Should return what WOULD be updated
         assert len(fields_updated) == 2
 
@@ -336,27 +334,25 @@ class TestAddCameraToExif:
 
     def test_add_camera_make_only(self):
         """Test adding only Make"""
-        success, fields_updated = tm.add_camera_to_exif(
+        fields_updated = tm.add_camera_to_exif(
             self.test_video,
             make="GoPro",
             model=None,
             dry_run=False
         )
 
-        assert success is True
         assert len(fields_updated) == 1
         assert "Make" in fields_updated
 
     def test_add_camera_model_only(self):
         """Test adding only Model"""
-        success, fields_updated = tm.add_camera_to_exif(
+        fields_updated = tm.add_camera_to_exif(
             self.test_video,
             make=None,
             model="HERO12 Black",
             dry_run=False
         )
 
-        assert success is True
         assert len(fields_updated) == 1
         assert "Model" in fields_updated
 
@@ -371,43 +367,45 @@ class TestAddCameraToExif:
         ], capture_output=True, check=True)
 
         # Try to set same values
-        success, fields_updated = tm.add_camera_to_exif(
+        fields_updated = tm.add_camera_to_exif(
             self.test_video,
             make="GoPro",
             model="HERO12 Black",
             dry_run=False
         )
 
-        assert success is True
         assert len(fields_updated) == 0
 
     def test_add_camera_empty_params(self):
         """Test with no make or model"""
-        success, fields_updated = tm.add_camera_to_exif(
+        fields_updated = tm.add_camera_to_exif(
             self.test_video,
             make=None,
             model=None,
             dry_run=False
         )
 
-        assert success is True
         assert len(fields_updated) == 0
 
-    def test_add_camera_unsupported_extension(self):
-        """Test that unsupported file types are skipped"""
-        lrv_path = os.path.join(self.temp_dir, "test.lrv")
-        shutil.copy(self.test_video, lrv_path)
+    def test_add_camera_writes_whatever_the_extension(self):
+        """The camera is written to any file exiftool can write, whatever it is called."""
+        renamed = os.path.join(self.temp_dir, "test.lrv")
+        shutil.copy(self.test_video, renamed)
 
-        success, fields_updated = tm.add_camera_to_exif(
-            lrv_path,
-            make="GoPro",
-            model="HERO12",
-            dry_run=False
-        )
+        fields_updated = tm.add_camera_to_exif(renamed, make="GoPro", model="HERO12", dry_run=False)
 
-        assert success is True
-        # Should skip unsupported type
-        assert len(fields_updated) == 0
+        tm.clear_exif_cache(renamed)
+        assert fields_updated == ["Make", "Model"]
+        assert tm.get_existing_exif_camera(renamed) == {"Make": "GoPro", "Model": "HERO12"}
+
+    def test_add_camera_refused_write_raises_with_exiftool_reason(self):
+        """A file exiftool cannot write is an error carrying exiftool's reason, never a quiet skip."""
+        unwritable = os.path.join(self.temp_dir, "test.mp4")
+        with open(unwritable, "w") as f:
+            f.write("not a video")
+
+        with pytest.raises(MetadataWriteRefused, match="Not a valid MP4"):
+            tm.add_camera_to_exif(unwritable, make="GoPro", model="HERO12", dry_run=False)
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags don't exist on Linux")
@@ -447,28 +445,26 @@ class TestIdempotency:
     def test_exif_idempotent(self):
         """Test that applying EXIF twice is idempotent"""
         # First application
-        success1, updated1 = tm.add_camera_to_exif(
+        updated1 = tm.add_camera_to_exif(
             self.test_video,
             make="GoPro",
             model="HERO12",
             dry_run=False
         )
 
-        assert success1 is True
         assert len(updated1) == 2
 
         # Get mtime after first write
         mtime1 = os.stat(self.test_video).st_mtime
 
         # Second application
-        success2, updated2 = tm.add_camera_to_exif(
+        updated2 = tm.add_camera_to_exif(
             self.test_video,
             make="GoPro",
             model="HERO12",
             dry_run=False
         )
 
-        assert success2 is True
         assert len(updated2) == 0  # Nothing to update
 
         # File shouldn't be modified
@@ -502,14 +498,13 @@ class TestDataPresentation:
         # Not a formatted string
         assert all(isinstance(tag, str) for tag in tags_added)
 
-        # add_camera_to_exif returns (bool, List[str])
-        success, fields_updated = tm.add_camera_to_exif(
+        # add_camera_to_exif returns List[str]
+        fields_updated = tm.add_camera_to_exif(
             self.test_video,
             make="GoPro",
             dry_run=True
         )
 
-        assert isinstance(success, bool)
         assert isinstance(fields_updated, list)
         assert all(isinstance(field, str) for field in fields_updated)
 
