@@ -96,6 +96,25 @@ final class CardProfilesTests: XCTestCase {
     private let handNamed = MediaProfile(type: .video, sourceDir: "/Volumes/Untitled/DCIM",
                                          fileExtensions: [".mp4"])
 
+    /// Setting AppState.profilesFilePath persists it to UserDefaults, which the
+    /// test host shares with the Dev app: left behind, it points the app at a
+    /// deleted temporary file.
+    private var savedOverride: String?
+
+    override func setUp() {
+        super.setUp()
+        savedOverride = UserDefaults.standard.string(forKey: "profilesFilePath")
+    }
+
+    override func tearDown() {
+        if let savedOverride {
+            UserDefaults.standard.set(savedOverride, forKey: "profilesFilePath")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "profilesFilePath")
+        }
+        super.tearDown()
+    }
+
     private func probe(_ ext: String, _ type: MediaType, _ folder: String,
                        _ make: String?, _ model: String?, files: Int = 10) -> ProbedCamera {
         ProbedCamera(fileExtension: ext, type: type, folder: folder, files: files,
