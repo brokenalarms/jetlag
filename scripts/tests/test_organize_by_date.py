@@ -304,7 +304,7 @@ class TestOrganizeByDateEdgeCases:
 
 
 class TestCopyMode:
-    """Tests for --copy mode (used by import-media)."""
+    """Tests for --copy mode."""
 
     @pytest.fixture
     def temp_dir(self):

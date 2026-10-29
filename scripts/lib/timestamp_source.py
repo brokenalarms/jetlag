@@ -248,7 +248,7 @@ def normalize_exif_value(value: str) -> str:
 
 _PATTERNS_FILE = Path(__file__).parent / "filename-patterns.json"
 _FILENAME_PATTERNS = [
-    (re.compile(p["regex"]), p["name"], p["has_time"])
+    (re.compile(p["regex"]), p["name"])
     for p in json.loads(_PATTERNS_FILE.read_text())
 ]
 
@@ -261,7 +261,7 @@ def parse_filename_timestamp(file_path: str) -> tuple[Optional[str], Optional[st
     """
     base = os.path.splitext(os.path.basename(file_path))[0]
 
-    for pattern_re, pattern_name, has_time in _FILENAME_PATTERNS:
+    for pattern_re, pattern_name in _FILENAME_PATTERNS:
         match = pattern_re.search(base)
         if not match:
             continue
@@ -310,7 +310,7 @@ def build_filename(original_name: str, corrected_date: datetime) -> Optional[str
     """
     stem, ext = os.path.splitext(original_name)
 
-    for pattern_re, pattern_name, has_time in _FILENAME_PATTERNS:
+    for pattern_re, pattern_name in _FILENAME_PATTERNS:
         match = pattern_re.search(stem)
         if not match:
             continue

@@ -74,7 +74,6 @@ INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow]
 - **Output** moves processed files from the working directory to `ready_dir` via organize-by-date (date-based folder structure).
 - **Gyroflow** generates stabilization projects on the file now in `ready_dir`.
 - **Archive-source** acts on the source folder after all files are processed (archive/rename or delete processed files).
-- `import-media.py` is deprecated (still present, not called by the app).
 
 ## Scenario test specs
 

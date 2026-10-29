@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Tag media files with Finder tags and camera EXIF metadata
-Extracted from import-media.py for reuse in media-pipeline
 """
 
 import subprocess
