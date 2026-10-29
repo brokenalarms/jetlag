@@ -177,6 +177,59 @@ def check_exiftool_tmp(source_dir: str) -> list[Path]:
     return list(source.rglob("exiftool_tmp"))
 
 
+def check_source_camera(files: list[Path], profile: Optional[dict], apply: bool,
+                        allow_mismatch: bool) -> None:
+    """Hold every file to the profile's camera before anything is processed.
+
+    A file shot on another camera means the profile was picked for the wrong
+    body: a dry run reports it and previews anyway, an apply stops without
+    --allow-camera-mismatch. A profile with no camera (for media that records
+    none) is not checked.
+    """
+    expected = (profile or {}).get("exif") or {}
+    make, model = expected.get("make"), expected.get("model")
+
+    if not make and not model:
+        return
+
+    mismatched = {fp.name: _tag_mod.camera_mismatch(str(fp), make, model) for fp in files}
+    mismatched = {name: found for name, found in mismatched.items() if found}
+    if not mismatched:
+        return
+
+    found_makes = sorted({f["Make"] for f in mismatched.values() if "Make" in f})
+    found_models = sorted({f["Model"] for f in mismatched.values() if "Model" in f})
+    expected_name = " ".join(v for v in (make, model) if v)
+    print(f"📷 {len(mismatched)} file(s) were not shot on this profile's camera ({expected_name}):",
+          file=sys.stderr)
+    for name, found in mismatched.items():
+        print(f"   {name}: {' '.join(found.values())}", file=sys.stderr)
+    print("Their camera fields are left as the camera wrote them.", file=sys.stderr)
+    print(file=sys.stderr)
+    emit_event("camera_mismatch",
+        files=list(mismatched),
+        expected_make=make or None,
+        expected_model=model or None,
+        found_makes=found_makes,
+        found_models=found_models,
+    )
+    if apply and not allow_mismatch:
+        # Prompt only on a real terminal, for the reason given at the
+        # exiftool_tmp prompt.
+        if sys.stdin.isatty() and sys.stderr.isatty():
+            print("Import them anyway? (y/n) ", end="", file=sys.stderr, flush=True)
+            if sys.stdin.readline().strip().lower() != "y":
+                print("Cancelled.", file=sys.stderr)
+                sys.exit(1)
+        else:
+            print("ERROR: Cannot proceed without consent to import files from another camera.", file=sys.stderr)
+            print("Re-run with --allow-camera-mismatch, or pick the profile for this camera.", file=sys.stderr)
+            sys.exit(1)
+    elif not apply:
+        print("Previewing anyway; applying asks first (or pass --allow-camera-mismatch).", file=sys.stderr)
+        print(file=sys.stderr)
+
+
 def run_tag_media(
     file_path: Path,
     tags: Optional[str],
@@ -695,6 +748,10 @@ def build_parser():
         help="Replace files already at the organize destination. Without this flag, a destination already holding a different file is left alone and reported as a conflict."
     )
     parser.add_argument(
+        "--allow-camera-mismatch", action="store_true",
+        help="Import files whose camera Make/Model differs from the profile's. Their camera fields are left as the camera wrote them. Without this flag, an apply stops when such files are found."
+    )
+    parser.add_argument(
         "--unlock-protected", action="store_true",
         help="Import source files that are protected (locked, e.g. by a camera's Protect). Their copies in the target come out unlocked; the source files keep their lock. Without this flag, an apply stops when protected files are found."
     )
@@ -885,6 +942,8 @@ def main():
         elif not args.apply:
             print("Previewing anyway; applying asks first (or pass --unlock-protected).", file=sys.stderr)
             print(file=sys.stderr)
+
+    check_source_camera(files, profile, args.apply, args.allow_camera_mismatch)
 
     # Pre-flight timezone check (before processing any files)
     if "fix-timestamp" in args.tasks and not args.infer_from_filename:

@@ -122,6 +122,25 @@ struct WorkflowView: View {
                 count: state.workflowSession.organizeConflictCount))
         }
         .alert(
+            Strings.Workflow.cameraMismatchTitle,
+            isPresented: $state.workflowSession.showCameraMismatch
+        ) {
+            Button(Strings.Workflow.allowCameraMismatchButton, role: .destructive) {
+                state.workflowSession.grantCameraMismatchAssent()
+                runWorkflow()
+            }
+            Button(Strings.Common.cancel, role: .cancel) {
+                state.workflowSession.showCameraMismatch = false
+            }
+        } message: {
+            if let mismatch = state.workflowSession.cameraMismatch {
+                Text(Strings.Workflow.cameraMismatchMessage(
+                    count: mismatch.files.count,
+                    found: mismatch.foundName,
+                    expected: mismatch.expected?.name ?? ""))
+            }
+        }
+        .alert(
             Strings.Workflow.protectedSourcesTitle,
             isPresented: $state.workflowSession.showProtectedSources
         ) {
@@ -201,6 +220,12 @@ struct WorkflowView: View {
             lines.append(Strings.Workflow.runSummaryFailed(
                 count: summary.failed,
                 files: summary.failedFiles))
+        }
+        if summary.mode == .dryRun, let mismatch = state.workflowSession.cameraMismatch {
+            lines.append(Strings.Workflow.runSummaryCameraMismatch(
+                count: mismatch.files.count,
+                found: mismatch.foundName,
+                expected: mismatch.expected?.name ?? ""))
         }
         return lines.joined(separator: "\n\n")
     }

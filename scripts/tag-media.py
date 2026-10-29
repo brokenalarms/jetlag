@@ -84,11 +84,21 @@ def get_existing_exif_camera(file_path: str) -> dict:
     data = read_exif_data(file_path)
     return {key: data[key] for key in ("Make", "Model") if key in data}
 
+# Skips .lrv, .insv and other sidecars exiftool cannot handle.
+CAMERA_EXIF_EXTENSIONS = ('.mp4', '.mov', '.jpg', '.jpeg', '.png', '.dng', '.arw', '.cr2', '.nef')
+
 def supports_camera_exif(file_path: str) -> bool:
-    """Whether the camera fields are read and written for this file type
-    (skips .lrv, .insv and other sidecars exiftool cannot handle)."""
-    supported_extensions = {'.mp4', '.mov', '.jpg', '.jpeg', '.png', '.dng', '.arw', '.cr2', '.nef'}
-    return Path(file_path).suffix.lower() in supported_extensions
+    """Whether the camera fields are read and written for this file type."""
+    return Path(file_path).suffix.lower() in CAMERA_EXIF_EXTENSIONS
+
+def file_camera(file_path: str) -> Tuple[Optional[str], Optional[str]]:
+    """The Make and Model the file carries, None for either it lacks."""
+    if not supports_camera_exif(file_path):
+        return None, None
+    existing = get_existing_exif_camera(file_path)
+    make = str(existing.get('Make') or '').strip() or None
+    model = str(existing.get('Model') or '').strip() or None
+    return make, model
 
 def camera_mismatch(file_path: str, make: Optional[str], model: Optional[str]) -> dict:
     """The file's own Make/Model wherever it carries one that differs from the

@@ -135,6 +135,7 @@ enum PipelineEvent: Decodable {
                           fileTimezones: [String: [String]])
     case organizeConflict(count: Int, files: [String])
     case protectedSources(files: [String])
+    case cameraMismatch(CameraMismatch)
     case noMediaFiles(EmptySource)
     case pipelineError(message: String)
 
@@ -165,6 +166,10 @@ enum PipelineEvent: Decodable {
         case providedTz = "provided_tz"
         case fileTimezones = "file_timezones"
         case count, files, extensions
+        case expectedMake = "expected_make"
+        case expectedModel = "expected_model"
+        case foundMakes = "found_makes"
+        case foundModels = "found_models"
         case processed, succeeded, changed, failed, mode
         case failedFiles = "failed_files"
     }
@@ -254,6 +259,14 @@ enum PipelineEvent: Decodable {
         case "protected_sources":
             self = .protectedSources(
                 files: try container.decode([String].self, forKey: .files))
+        case "camera_mismatch":
+            self = .cameraMismatch(CameraMismatch(
+                files: try container.decode([String].self, forKey: .files),
+                expected: FileCamera(
+                    make: try container.decodeIfPresent(String.self, forKey: .expectedMake),
+                    model: try container.decodeIfPresent(String.self, forKey: .expectedModel)),
+                foundMakes: try container.decode([String].self, forKey: .foundMakes),
+                foundModels: try container.decode([String].self, forKey: .foundModels)))
         case "no_media_files":
             self = .noMediaFiles(EmptySource(
                 source: try container.decode(String.self, forKey: .source),
@@ -312,6 +325,10 @@ final class WorkflowSession {
     var protectedSourceFiles: [String] = []
     var showProtectedSources: Bool = false
     var unlockProtected: Bool = false
+
+    var cameraMismatch: CameraMismatch?
+    var showCameraMismatch: Bool = false
+    var allowCameraMismatch: Bool = false
 
     /// Whether the run a conflict alert asks about was an apply. A finished
     /// apply has dropped back to preview mode before the user answers, so the
@@ -412,6 +429,14 @@ final class WorkflowSession {
         showOverwriteConflict = false
     }
 
+    /// Record the user's answer, so the re-run imports the files shot on
+    /// another camera, their camera fields left as the camera wrote them.
+    func grantCameraMismatchAssent() {
+        allowCameraMismatch = true
+        showCameraMismatch = false
+        resumeConflictedRun()
+    }
+
     /// Record the user's answer, so the re-run carries the flag that imports
     /// the protected files as unlocked copies.
     func grantUnlockProtectedAssent() {
@@ -501,6 +526,9 @@ final class WorkflowSession {
         protectedSourceFiles = []
         showProtectedSources = false
         unlockProtected = false
+        cameraMismatch = nil
+        showCameraMismatch = false
+        allowCameraMismatch = false
         conflictedRunWasApply = false
         applyWithoutDryRun = false
         showDryRunStale = false
@@ -616,12 +644,14 @@ final class WorkflowSession {
     static let allowMixedTimezonesFlag = "--allow-mixed-timezones"
     static let overwriteFlag = "--overwrite"
     static let unlockProtectedFlag = "--unlock-protected"
+    static let allowCameraMismatchFlag = "--allow-camera-mismatch"
     static let applyFlag = "--apply"
 
     /// What the run carries because of an answer given for one click, rather
     /// than a setting the user chose — the same state `clearRunAssent()` drops.
     private static let assentFlags = [
-        forceTimezoneFlag, allowMixedTimezonesFlag, overwriteFlag, unlockProtectedFlag, applyFlag,
+        forceTimezoneFlag, allowMixedTimezonesFlag, overwriteFlag, unlockProtectedFlag,
+        allowCameraMismatchFlag, applyFlag,
     ]
 
     func buildPipelineArgs() -> (script: String, args: [String]) {
@@ -690,6 +720,9 @@ final class WorkflowSession {
         }
         if unlockProtected {
             args.append(Self.unlockProtectedFlag)
+        }
+        if allowCameraMismatch {
+            args.append(Self.allowCameraMismatchFlag)
         }
         if applyMode {
             args.append(Self.applyFlag)
@@ -851,6 +884,41 @@ final class AppState {
         profilesConfig?.profiles[name]
     }
 
+    /// Create the profile for a camera found in the source chosen for it. Its
+    /// camera, kind of media and file types come from that source's files.
+    func createProfile(for found: SourceContents.NewCamera) -> String {
+        let base = found.kind.defaultProfileName
+        var name = base
+        var counter = 2
+        while profilesConfig?.profiles[name] != nil {
+            name = "\(base) \(counter)"
+            counter += 1
+        }
+        var profile = MediaProfile(type: found.kind.type)
+        profile.exif = ExifConfig(make: found.kind.camera.make, model: found.kind.camera.model)
+        profile.fileExtensions = found.extensions
+        profile.sourceDir = found.source
+        if profilesConfig == nil {
+            profilesConfig = ProfilesConfig(gyroflow: nil, profiles: [:])
+        }
+        profilesConfig?.profiles[name] = profile
+        writeProfiles()
+        return name
+    }
+
+    func writeProfiles() {
+        guard let config = profilesConfig else { return }
+        do {
+            try ProfileService.write(config, to: resolvedProfilesPath)
+        } catch {
+            profileLoadError = ProfileLoadError(
+                message: Strings.Errors.profilesWriteFailed,
+                filePath: resolvedProfilesPath,
+                detail: error.localizedDescription
+            )
+        }
+    }
+
     func clearLog() {
         logOutput = []
         diffTableRows = []
@@ -960,6 +1028,13 @@ final class AppState {
             // A dry run previews the protected files anyway; only an apply is
             // refused, so only an apply asks.
             workflowSession.showProtectedSources = workflowSession.applyMode
+
+        case .cameraMismatch(let mismatch):
+            workflowSession.noteConflict()
+            workflowSession.cameraMismatch = mismatch
+            // A dry run previews files from another camera anyway; only an
+            // apply is refused, so only an apply asks.
+            workflowSession.showCameraMismatch = workflowSession.applyMode
 
         case .pipelineSummary(let summary):
             runSummary = summary
