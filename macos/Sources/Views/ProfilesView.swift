@@ -152,7 +152,7 @@ struct ProfilesView: View {
         Task {
             let probes = await CameraProbe.probe(
                 path: url.path, scriptsDirectory: state.scriptsDirectory,
-                profilesPath: state.resolvedProfilesPath)
+                profilesPath: state.profilesLocation.path)
             let contents = ProfileMatcher.contents(of: probes, source: url.path,
                                                    profiles: state.profilesConfig?.profiles ?? [:])
             if contents.newCameras.count == 1 {

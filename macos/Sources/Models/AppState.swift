@@ -794,12 +794,6 @@ final class AppState {
     /// The user-owned profiles file, and the bundled copy it is seeded from.
     let profilesLocation: ProfilesLocation
 
-    /// Settings override pointing the app at another profiles file — how a
-    /// development build is aimed at the repo's checked-in copy.
-    var profilesFilePath: String {
-        didSet { UserDefaults.standard.set(profilesFilePath, forKey: "profilesFilePath") }
-    }
-
     var profilesConfig: ProfilesConfig?
     var profileLoadError: ProfileLoadError?
 
@@ -862,37 +856,32 @@ final class AppState {
         logOutput.last { !$0.strippedText.isEmpty }?.strippedText
     }
 
-    init() {
+    /// Tests pass a location in a temporary directory: they run inside the app,
+    /// so the default is the user's own profiles file.
+    init(profilesLocation: ProfilesLocation? = nil) {
         let scriptsDirectory = (Bundle.main.resourcePath! as NSString)
             .appendingPathComponent("scripts")
         self.scriptsDirectory = scriptsDirectory
-        self.profilesLocation = ProfilesLocation.userDomain(scriptsDirectory: scriptsDirectory)
-        self.profilesFilePath = UserDefaults.standard.string(forKey: "profilesFilePath") ?? ""
-    }
-
-    var resolvedProfilesPath: String {
-        profilesFilePath.isEmpty ? profilesLocation.path : profilesFilePath
+        self.profilesLocation = profilesLocation
+            ?? ProfilesLocation.userDomain(scriptsDirectory: scriptsDirectory)
     }
 
     /// Seed the user's profiles file from the bundled defaults when it is not
-    /// there yet, then load it. An override points somewhere the user chose, so
-    /// nothing is ever written there on its behalf.
+    /// there yet, then load it.
     func loadProfiles() {
-        if profilesFilePath.isEmpty {
-            do {
-                try profilesLocation.seedIfNeeded()
-            } catch {
-                profilesConfig = nil
-                profileLoadError = ProfileLoadError(
-                    message: Strings.Errors.profilesSeedFailed,
-                    filePath: profilesLocation.path,
-                    detail: error.localizedDescription
-                )
-                return
-            }
+        do {
+            try profilesLocation.seedIfNeeded()
+        } catch {
+            profilesConfig = nil
+            profileLoadError = ProfileLoadError(
+                message: Strings.Errors.profilesSeedFailed,
+                filePath: profilesLocation.path,
+                detail: error.localizedDescription
+            )
+            return
         }
         do {
-            profilesConfig = try ProfileService.load(from: resolvedProfilesPath).normalized()
+            profilesConfig = try ProfileService.load(from: profilesLocation.path).normalized()
             profileLoadError = nil
         } catch {
             profilesConfig = nil
@@ -933,11 +922,11 @@ final class AppState {
     func writeProfiles() {
         guard let config = profilesConfig else { return }
         do {
-            try ProfileService.write(config, to: resolvedProfilesPath)
+            try ProfileService.write(config, to: profilesLocation.path)
         } catch {
             profileLoadError = ProfileLoadError(
                 message: Strings.Errors.profilesWriteFailed,
-                filePath: resolvedProfilesPath,
+                filePath: profilesLocation.path,
                 detail: error.localizedDescription
             )
         }
@@ -1090,7 +1079,7 @@ final class AppState {
             script: "tools/download-gyroflow.sh",
             args: args,
             workingDir: scriptsDirectory,
-            profilesPath: resolvedProfilesPath
+            profilesPath: profilesLocation.path
         )
         var presenceData: [String] = []
         for await line in stream {
