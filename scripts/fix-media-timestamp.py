@@ -119,20 +119,16 @@ def get_timezone_for_country(input_country: str) -> Optional[str]:
             if not timezone_line:
                 return None
 
-            # Step 3: Extract offset
+            # Step 3: Extract offset. Columns: zone, country, abbreviation,
+            # time_start, gmt_offset (seconds), dst flag.
             parts = timezone_line.split(',')
             if len(parts) >= 6:
-                offset_seconds = int(parts[5])
-
-                # Convert seconds to +HHMM format
-                if offset_seconds == 0:
-                    return "+0000"
-                else:
-                    abs_seconds = abs(offset_seconds)
-                    hours = abs_seconds // 3600
-                    minutes = (abs_seconds % 3600) // 60
-                    sign = "+" if offset_seconds >= 0 else "-"
-                    return f"{sign}{hours:02d}:{minutes:02d}"
+                offset_seconds = int(parts[4])
+                abs_seconds = abs(offset_seconds)
+                hours = abs_seconds // 3600
+                minutes = (abs_seconds % 3600) // 60
+                sign = "-" if offset_seconds < 0 else "+"
+                return f"{sign}{hours:02d}:{minutes:02d}"
     except:
         pass
 
