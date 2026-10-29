@@ -208,6 +208,33 @@ events:
       file_timezones:
         "+08:00": [DJI_20250815_101112_0001.MP4]
 
+  camera_mismatch:
+    description: >-
+      Emitted once before any file is processed when source files carry a
+      camera Make/Model (ignoring case) different from the profile's: the
+      profile was likely picked for the wrong camera. A dry run reports this
+      and previews anyway; an apply refuses without --allow-camera-mismatch.
+      The files' camera fields are never overwritten either way.
+    fields:
+      files:
+        type: "list[string]"
+        description: "Basenames of the files shot on another camera"
+      expected_make: { type: string, optional: true }
+      expected_model: { type: string, optional: true }
+      found_makes:
+        type: "list[string]"
+        description: "Distinct differing Makes those files carry; empty when only the Model differs"
+      found_models:
+        type: "list[string]"
+        description: "Distinct differing Models those files carry; empty when only the Make differs"
+    example:
+      event: camera_mismatch
+      files: [A7V00113.ARW]
+      expected_make: Sony
+      expected_model: ILCE-7M4
+      found_makes: []
+      found_models: [ILCE-7M5]
+
   protected_sources:
     description: >-
       Emitted once before any file is processed when source files carry the

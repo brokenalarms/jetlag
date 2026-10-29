@@ -2895,3 +2895,124 @@ class TestCancelClearsTheWorkingDir:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestSourceCameraIsCheckedAgainstTheProfile:
+    """Every source file is held to the profile's camera before anything runs.
+
+    A file the camera says was shot on another body means the profile was picked
+    for the wrong camera — the sony-a7iv-photo profile once relabelled 143 A7V
+    stills. The batch reports such files as one camera_mismatch event; a dry run
+    previews anyway, an apply refuses without --allow-camera-mismatch, and the
+    file's own camera fields are never overwritten. A profile with no camera —
+    for media that records none — is not checked.
+    """
+
+    VIDEO = "VID_20251005_100000_00_001.mp4"
+
+    def _run(self, workspace, profile, *extra):
+        return run_pipeline([
+            "--profile", profile,
+            "--source", str(workspace["source"]),
+            "--target", str(workspace["target"]),
+            "--timezone", "+0900",
+            "--group", "Test",
+            *extra,
+        ])
+
+    def _events(self, stdout: str) -> list[dict]:
+        events = [json.loads(line) for line in stdout.strip().split("\n") if line.strip()]
+        for event in events:
+            validate_event(event)
+        return events
+
+    def _video(self, workspace, **camera):
+        _create_video_raw(workspace["source"] / self.VIDEO,
+                          MediaCreateDate="2025:10:05 01:00:00",
+                          CreateDate="2025:10:05 01:00:00", **camera)
+
+    def _of(self, events, kind):
+        return [e for e in events if e["event"] == kind]
+
+    def _camera(self, path) -> tuple:
+        out = subprocess.run(["exiftool", "-s3", "-Make", "-Model", str(path)],
+                             capture_output=True, text=True).stdout.split("\n")
+        return out[0], out[1]
+
+    def _set_profile_exif(self, exif):
+        path = os.environ["JETLAG_PROFILES_FILE"]
+        with open(path) as f:
+            profiles = yaml.safe_load(f)
+        profiles["profiles"]["_test"]["exif"] = exif
+        with open(path, "w") as f:
+            yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
+
+    def test_apply_refuses_a_file_from_another_camera(self, temp_workspace, test_profile):
+        """Actual: the apply exits non-zero naming the file, with nothing organized
+        Expected: the wrong profile never imports a batch unasked
+        """
+        self._video(temp_workspace, Make="Test", Model="Other Body")
+
+        result = self._run(temp_workspace, test_profile, "--apply")
+
+        events = self._events(result.stdout)
+        mismatch = self._of(events, "camera_mismatch")
+        assert result.returncode != 0, f"Actual: {result.output}, Expected: the apply refused"
+        assert [(e["files"], e["found_models"], e["found_makes"]) for e in mismatch] == \
+            [([self.VIDEO], ["Other Body"], [])], \
+            f"Actual: {mismatch}, Expected: one camera_mismatch naming the file and its Model only"
+        assert self._of(events, "pipeline_file") == [], \
+            "Actual: files were processed, Expected: refused before the first file"
+        assert sorted(temp_workspace["target"].rglob("*.mp4")) == [], \
+            "Actual: a file reached the target, Expected: nothing organized"
+
+    def test_apply_with_assent_imports_with_the_camera_untouched(self, temp_workspace, test_profile):
+        """Actual: the organized file still names the camera that shot it
+        Expected: the override imports the file, never relabels it
+        """
+        self._video(temp_workspace, Make="Test", Model="Other Body")
+
+        result = self._run(temp_workspace, test_profile, "--apply", "--allow-camera-mismatch")
+
+        organized = sorted(temp_workspace["target"].rglob("*.mp4"))
+        assert result.returncode == 0, f"Actual: {result.output}, Expected: a clean run"
+        assert len(organized) == 1, f"Actual: {organized}, Expected: one organized file"
+        assert self._camera(organized[0]) == ("Test", "Other Body"), \
+            f"Actual: {self._camera(organized[0])}, Expected: ('Test', 'Other Body')"
+
+    def test_dry_run_reports_the_mismatch_and_previews_anyway(self, temp_workspace, test_profile):
+        """Actual: camera_mismatch is reported and the file is still previewed
+        Expected: the preview tells the user what the apply will ask about
+        """
+        self._video(temp_workspace, Make="Test", Model="Other Body")
+
+        result = self._run(temp_workspace, test_profile)
+
+        events = self._events(result.stdout)
+        assert result.returncode == 0, f"Actual: {result.output}, Expected: a full preview"
+        assert len(self._of(events, "camera_mismatch")) == 1
+        assert len(self._of(events, "pipeline_file")) == 1, \
+            "Actual: the file was not previewed, Expected: previewed anyway"
+
+    def test_matching_camera_differing_only_in_case_is_not_a_mismatch(
+            self, temp_workspace, test_profile):
+        """Cameras write SONY where profiles say Sony: the same camera."""
+        self._video(temp_workspace, Make="TEST", Model="CAMERA")
+
+        result = self._run(temp_workspace, test_profile, "--apply")
+
+        events = self._events(result.stdout)
+        assert result.returncode == 0, f"Actual: {result.output}, Expected: a clean run"
+        assert self._of(events, "camera_mismatch") == []
+
+    def test_profile_without_a_camera_checks_nothing(self, temp_workspace, test_profile):
+        """Media that records no camera gets a hand-named profile with none;
+        there is nothing to hold its files to, so nothing is refused."""
+        self._set_profile_exif({})
+        self._video(temp_workspace, Make="SONY", Model="ILCE-7M5")
+
+        result = self._run(temp_workspace, test_profile, "--apply")
+
+        events = self._events(result.stdout)
+        assert result.returncode == 0, f"Actual: {result.output}, Expected: a clean run"
+        assert self._of(events, "camera_mismatch") == []
