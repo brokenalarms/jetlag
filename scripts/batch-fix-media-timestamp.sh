@@ -13,7 +13,6 @@ args=()
 
 # Get script directory 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/lib/lib-timestamp.sh"
 
 # Check if main file exists
 SINGLE_SCRIPT="$SCRIPT_DIR/fix-media-timestamp.sh"
@@ -41,11 +40,11 @@ while [[ $# -gt 0 ]]; do
       echo ""
       echo "All other options are passed through to fix-media-timestamp.sh:"
       echo "  --timezone TZ   Use specific timezone (+HHMM format)"
-      echo "  --location NAME Use location name/code for timezone lookup"
+      echo "  --country NAME  Country code or name; fix-media-timestamp resolves its timezone"
       echo "  --force-timezone Override existing timezone metadata"
       echo "  --help, -h      Show this help"
       exit 0 ;;
-    --timezone|--location|--country)
+    --timezone|--country)
       # Arguments that need a value
       args+=("$1")
       shift
@@ -64,16 +63,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ---------- main ----------
-# Show timezone info if location/timezone args are provided
 for (( i=0; i<${#args[@]}; i++ )); do
-  if [[ "${args[i]}" == "--location" && $((i+1)) < ${#args[@]} ]]; then
-    location_code="${args[$((i+1))]}"
-    if timezone=$(get_timezone_for_country "$location_code" 2>/dev/null); then
-      location_display=$(get_location_display "$location_code")
-      echo "🌍 Using location: $location_display → Timezone: $timezone"
-    fi
-    break
-  elif [[ "${args[i]}" == "--timezone" && $((i+1)) < ${#args[@]} ]]; then
+  if [[ "${args[i]}" == "--timezone" && $((i+1)) < ${#args[@]} ]]; then
     echo "🕐 Using timezone: ${args[$((i+1))]}"
     break
   fi
