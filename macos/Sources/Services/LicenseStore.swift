@@ -20,19 +20,28 @@ final class LicenseStore {
         )
     }
 
-    static func initialUnlocked(environment: [String: String], defaults: UserDefaults) -> Bool {
-        #if DEBUG
+    /// Debug builds and the Release build `make` produces for this Mac belong to
+    /// the developer; only the build `make dmg` ships carries the free-tier limit.
+    #if DEBUG || JETLAG_LOCAL_BUILD
+    static let isDeveloperBuild = true
+    #else
+    static let isDeveloperBuild = false
+    #endif
+
+    static func initialUnlocked(
+        environment: [String: String],
+        defaults: UserDefaults,
+        developerBuild: Bool = isDeveloperBuild
+    ) -> Bool {
+        guard developerBuild else { return defaults.bool(forKey: unlockedKey) }
         // The Jetlag scheme sets JETLAG_PRO_UNLOCKED, but the scheme is a
-        // generated, untracked file that can be missing — so a debug build with
-        // no stored choice also starts unlocked rather than depending on how it
-        // was launched. Release builds cannot be unlocked this way.
+        // generated, untracked file that can be missing — so a developer build
+        // with no stored choice also starts unlocked rather than depending on how
+        // it was launched.
         if let override = environment["JETLAG_PRO_UNLOCKED"] {
             return (override as NSString).boolValue
         }
         return defaults.object(forKey: unlockedKey) as? Bool ?? true
-        #else
-        return defaults.bool(forKey: unlockedKey)
-        #endif
     }
 
     /// Maximum files per run. Free tier: 50. Unlocked: unlimited.
