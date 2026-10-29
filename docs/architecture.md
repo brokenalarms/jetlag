@@ -64,7 +64,7 @@ The live file the app reads and writes is `~/Library/Application Support/<app na
 
 The copy inside the bundle (`Contents/Resources/scripts/media-profiles.yaml`) is the shipped default and is only ever read. The `Bundle scripts` build phase replaces it on every build, so an edit written there would be discarded on the next build; an installed, signed app cannot write into its own bundle at all.
 
-Settings has a profiles-file override, empty by default. Set it to point the app at another file — typically a repository checkout's `scripts/media-profiles.yaml` during development. A non-empty override wins over the Application Support path, and nothing is ever seeded into the location it names.
+The location is not a setting. Settings shows the path read-only with Reveal in Finder; nothing about it is stored in preferences, so there is nothing to go stale. Unit tests run inside the app, so tests that read or write profiles through `AppState` hand it a `ProfilesLocation` in a temporary directory.
 
 Standalone scripts resolve their own path (`scripts/lib/profiles.py`): `JETLAG_PROFILES_FILE` if set, otherwise `scripts/media-profiles.yaml` beside them. The app therefore exports `JETLAG_PROFILES_FILE` into every script it launches, so the pipeline reads the same file the app writes rather than the bundled default.
 

@@ -374,12 +374,6 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let planLabel = String(localized: "settings.plan.label", defaultValue: "Plan")
         static let scriptsDirLabel = String(localized: "settings.scriptsDir.label", defaultValue: "Scripts directory")
         static let profilesFileLabel = String(localized: "settings.profilesFile.label", defaultValue: "Profiles file")
-        static func profilesFilePlaceholder(defaultPath: String) -> String {
-            String(localized: "settings.profilesFile.placeholder",
-                   defaultValue: "Default: \(defaultPath)")
-        }
-        static let profilesFileHelp = String(localized: "settings.profilesFile.help",
-            defaultValue: "Leave empty to use the file above. Set it to point the app at another profiles file, such as a repository checkout.")
         static let reloadProfilesButton = String(localized: "settings.reloadProfiles.button", defaultValue: "Reload Profiles")
         static let licenseKeyPlaceholder = String(localized: "settings.licenseKey.placeholder", defaultValue: "License key")
         static let activateButton = String(localized: "settings.activate.button", defaultValue: "Activate")

@@ -761,7 +761,7 @@ struct WorkflowView: View {
             script: script,
             args: args,
             workingDir: state.scriptsDirectory,
-            profilesPath: state.resolvedProfilesPath
+            profilesPath: state.profilesLocation.path
         )
         state.currentProcess = process
 

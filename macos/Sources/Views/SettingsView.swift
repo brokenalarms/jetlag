@@ -91,7 +91,7 @@ struct SettingsView: View {
 
                 LabeledContent(Strings.Settings.profilesFileLabel) {
                     HStack(spacing: 8) {
-                        Text(state.resolvedProfilesPath)
+                        Text(state.profilesLocation.path)
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
                             .truncationMode(.middle)
@@ -99,22 +99,6 @@ struct SettingsView: View {
                         Button(Strings.Common.revealInFinder) { revealProfilesFile() }
                             .buttonStyle(.link)
                     }
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        TextField(
-                            Strings.Settings.profilesFilePlaceholder(
-                                defaultPath: (state.profilesLocation.path as NSString)
-                                    .abbreviatingWithTildeInPath),
-                            text: $state.profilesFilePath
-                        )
-                        .textFieldStyle(.roundedBorder)
-                        Button(Strings.Common.browse) { pickFile() }
-                    }
-                    Text(Strings.Settings.profilesFileHelp)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -149,17 +133,6 @@ struct SettingsView: View {
 
     private func revealProfilesFile() {
         NSWorkspace.shared.activateFileViewerSelecting(
-            [URL(fileURLWithPath: state.resolvedProfilesPath)])
-    }
-
-    private func pickFile() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.allowedContentTypes = [.yaml]
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            state.profilesFilePath = url.path
-        }
+            [URL(fileURLWithPath: state.profilesLocation.path)])
     }
 }

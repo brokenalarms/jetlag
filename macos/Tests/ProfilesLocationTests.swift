@@ -7,25 +7,8 @@ import XCTest
 /// own bundle at all.
 final class ProfilesLocationTests: XCTestCase {
 
-    private var savedOverride: String?
-
-    override func setUp() {
-        super.setUp()
-        savedOverride = UserDefaults.standard.string(forKey: "profilesFilePath")
-        UserDefaults.standard.removeObject(forKey: "profilesFilePath")
-    }
-
-    override func tearDown() {
-        if let savedOverride {
-            UserDefaults.standard.set(savedOverride, forKey: "profilesFilePath")
-        } else {
-            UserDefaults.standard.removeObject(forKey: "profilesFilePath")
-        }
-        super.tearDown()
-    }
-
-    /// With no Settings override the app reads and writes the user-owned copy in
-    /// Application Support — never the read-only copy inside the app bundle.
+    /// The app reads and writes the user-owned copy in Application Support —
+    /// never the read-only copy inside the app bundle.
     func testDefaultProfilesPathIsInApplicationSupportNotTheBundle() throws {
         let state = AppState()
 
@@ -33,8 +16,8 @@ final class ProfilesLocationTests: XCTestCase {
             Bundle.main.object(forInfoDictionaryKey: kCFBundleNameKey as String) as? String)
         let expected = (NSHomeDirectory() as NSString)
             .appendingPathComponent("Library/Application Support/\(appName)/media-profiles.yaml")
-        XCTAssertEqual(state.resolvedProfilesPath, expected)
-        XCTAssertFalse(state.resolvedProfilesPath.hasPrefix(state.scriptsDirectory),
+        XCTAssertEqual(state.profilesLocation.path, expected)
+        XCTAssertFalse(state.profilesLocation.path.hasPrefix(state.scriptsDirectory),
                        "profiles must never resolve into the app bundle's scripts directory")
     }
 
@@ -60,15 +43,6 @@ final class ProfilesLocationTests: XCTestCase {
         let bundle = try makeBundle(infoPlist: ["CFBundleIdentifier": "com.daniellawrence.Jetlag.dev"])
 
         XCTAssertEqual(ProfilesLocation.applicationSupportFolderName(bundle: bundle), "dev")
-    }
-
-    /// The Settings override is how a developer points the app at the repo's
-    /// checked-in profiles file; a non-empty override still wins outright.
-    func testSettingsOverrideWins() {
-        let state = AppState()
-        state.profilesFilePath = "/tmp/jetlag-override/media-profiles.yaml"
-
-        XCTAssertEqual(state.resolvedProfilesPath, "/tmp/jetlag-override/media-profiles.yaml")
     }
 
     /// First launch has no profiles file, so the shipped defaults are copied out
