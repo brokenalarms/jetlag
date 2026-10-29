@@ -14,6 +14,8 @@ struct InspectorPanel: View {
                 startingUp
             } else if !state.visibleRows.isEmpty {
                 DiffTableView(rows: state.visibleRows)
+            } else if let empty = state.emptySource {
+                noMediaFiles(empty)
             } else if !state.showLogOutput {
                 Spacer()
                 Text(Strings.Workflow.inspectorEmptyLabel)
@@ -52,6 +54,25 @@ struct InspectorPanel: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
             }
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// A run over a source with nothing the profile matches has no rows to show,
+    /// and the never-run placeholder would read as the run not having happened.
+    private func noMediaFiles(_ empty: EmptySource) -> some View {
+        VStack(spacing: 6) {
+            Spacer()
+            Text(Strings.Workflow.inspectorNoMediaLabel(extensions: empty.extensions))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Text(empty.source)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.tertiary)
+                .textSelection(.enabled)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
             Spacer()
         }
         .frame(maxWidth: .infinity)

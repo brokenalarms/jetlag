@@ -208,6 +208,24 @@ events:
       event: protected_sources
       files: [A7V01670.ARW]
 
+  no_media_files:
+    description: >-
+      Emitted in place of a pipeline_summary when the source holds no file with
+      one of the profile's extensions, so the run ends before processing
+      anything. Without it the app has no rows and no summary, and cannot tell
+      an empty card from a run that never started.
+    fields:
+      source:
+        type: string
+        description: "The source directory that was searched"
+      extensions:
+        type: "list[string]"
+        description: "The extensions the profile matches, as written in the profile"
+    example:
+      event: no_media_files
+      source: /Volumes/Untitled/DCIM
+      extensions: [.arw, .jpg]
+
   pipeline_error:
     description: "Emitted when the run aborts before or during file processing"
     fields:

@@ -132,6 +132,27 @@ class TestEmittedEventsMatchSchema:
         assert organize.get("dest"), \
             "A skipped file still reports where it would have gone — the app must not read that as a move"
 
+    def test_empty_source_says_what_it_looked_for(self, temp_workspace, test_profile):
+        """A source with nothing to process still has to report an outcome.
+
+        The run ends before the first file, so there are no rows and no summary;
+        without this event the app shows its never-run placeholder and an empty
+        card looks like a run that never started.
+        """
+        (temp_workspace["source"] / "notes.txt").write_text("not media")
+
+        result = self._run(temp_workspace, test_profile)
+
+        events = validate_events(_events(result.stdout))
+        assert [e["event"] for e in events] == ["no_media_files"], \
+            f"Actual: {[e['event'] for e in events]}, Expected: only no_media_files"
+        empty = events[0]
+        assert empty["source"] == str(temp_workspace["source"]), \
+            f"Actual: no_media_files.source={empty['source']!r}, " \
+            f"Expected: {str(temp_workspace['source'])!r}"
+        assert empty["extensions"], \
+            "Actual: no extensions reported, Expected: the profile's extensions the search used"
+
     def test_run_emits_a_summary_of_the_whole_batch(self, temp_workspace, test_profile):
         """The app's completion popup reads this event, not print_summary's stderr text.
 

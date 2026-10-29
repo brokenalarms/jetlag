@@ -641,7 +641,7 @@ def build_parser():
         description="Orchestrates video timestamp fixing and organization into date-based folders."
     )
     parser.add_argument("--profile", help="Profile from media-profiles.yaml")
-    parser.add_argument("--source", help="Directory containing video files (default: current directory)")
+    parser.add_argument("--source", help="Directory containing media files (default: current directory)")
     parser.add_argument("--target", help="Target directory for organized files")
     parser.add_argument("--location", help="Location name/code for timezone lookup")
     parser.add_argument("--timezone", help="IANA zone name (e.g., Pacific/Auckland), resolved per file so a run spanning a DST changeover gets the right offset either side, or a fixed offset in +HHMM format (e.g., +0800)")
@@ -853,10 +853,11 @@ def main():
     total_files = len(files)
 
     if total_files == 0:
-        print(f"No video files found in {source_dir}", file=sys.stderr)
+        emit_event("no_media_files", source=source_dir, extensions=list(extensions))
+        print(f"No {', '.join(extensions)} files found in {source_dir}", file=sys.stderr)
         sys.exit(0)
 
-    print(f"📹 Found {total_files} video file(s) to process", file=sys.stderr)
+    print(f"Found {total_files} {', '.join(extensions)} file(s) to process", file=sys.stderr)
     print(file=sys.stderr)
 
     protected = [fp.name for fp in files if _ingest_mod.is_protected(str(fp))]

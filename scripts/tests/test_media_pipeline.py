@@ -172,7 +172,7 @@ class TestFileDiscovery:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
-        assert "Found 2 video file(s)" in result.stderr
+        assert "Found 2 .mp4 file(s)" in result.stderr
 
     def test_ignores_other_extensions(self, temp_workspace, test_profile):
         """Pipeline ignores files not matching profile extensions."""
@@ -185,7 +185,7 @@ class TestFileDiscovery:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
-        assert "Found 1 video file(s)" in result.stderr
+        assert "Found 1 .mp4 file(s)" in result.stderr
 
     def test_finds_files_in_subdirectories(self, temp_workspace, test_profile):
         """Pipeline recursively finds files in subdirectories."""
@@ -197,7 +197,7 @@ class TestFileDiscovery:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
-        assert "Found 2 video file(s)" in result.stderr
+        assert "Found 2 .mp4 file(s)" in result.stderr
 
     def test_processes_alphabetically(self, temp_workspace, test_profile):
         """Pipeline processes files in alphabetical order."""
@@ -739,7 +739,7 @@ class TestCLIArguments:
         )
 
         assert result.returncode == 0
-        assert "Found 1 video file(s)" in result.stderr
+        assert "Found 1 .mp4 file(s)" in result.stderr
 
     def test_source_defaults_to_profile_source_dir(self, temp_workspace, test_profile):
         """Without --source, uses profile's source_dir."""
@@ -751,7 +751,7 @@ class TestCLIArguments:
         )
 
         assert str(source) in result.stderr
-        assert "Found 1 video file(s)" in result.stderr
+        assert "Found 1 .mp4 file(s)" in result.stderr
 
     def test_target_from_profile_ready_dir(self, temp_workspace, test_profile):
         """--target defaults to profile's ready_dir."""

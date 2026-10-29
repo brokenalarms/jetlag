@@ -38,6 +38,18 @@ final class WorkflowRunningStateTests: XCTestCase {
         return found
     }
 
+    /// SwiftUI draws the profile picker itself rather than hosting an
+    /// NSPopUpButton, so it is found through the accessibility tree it exposes. Its
+    /// nodes answer the accessibility methods without declaring the protocol, so
+    /// they are called dynamically.
+    private func firstPopUpButton(in element: AnyObject) -> AnyObject? {
+        if element.accessibilityRole?() == .popUpButton { return element }
+        for child in (element.accessibilityChildren?() ?? nil) ?? [] {
+            if let match = firstPopUpButton(in: child as AnyObject) { return match }
+        }
+        return nil
+    }
+
     private func makeState() -> AppState {
         let state = AppState()
         state.selectedTab = .workflow
@@ -56,8 +68,12 @@ final class WorkflowRunningStateTests: XCTestCase {
     func testFormControlsDisableWhileRunning() {
         let state = makeState()
 
-        let idleControls = allControls(in: host(WorkflowView(state: state)))
-        XCTAssertTrue(idleControls.contains { $0 is NSPopUpButton }, "expected the profile picker to be hosted")
+        let idleHost = host(WorkflowView(state: state))
+        let idleControls = allControls(in: idleHost)
+        guard let idlePicker = firstPopUpButton(in: idleHost) else {
+            return XCTFail("expected the profile picker to be hosted")
+        }
+        XCTAssertTrue(idlePicker.isAccessibilityEnabled?() ?? false, "the profile picker must be usable before a run starts")
         XCTAssertTrue(idleControls.contains { $0 is NSSegmentedControl }, "expected the Dry Run/Apply picker to be hosted")
         guard let idleGroupField = groupField(in: idleControls) else {
             return XCTFail("expected the Group field to be hosted")
@@ -65,7 +81,12 @@ final class WorkflowRunningStateTests: XCTestCase {
         XCTAssertTrue(idleGroupField.isEnabled, "the Group field must accept typing before a run starts")
 
         state.isRunning = true
-        let runningControls = allControls(in: host(WorkflowView(state: state)))
+        let runningHost = host(WorkflowView(state: state))
+        let runningControls = allControls(in: runningHost)
+        guard let runningPicker = firstPopUpButton(in: runningHost) else {
+            return XCTFail("expected the profile picker to still be hosted while running")
+        }
+        XCTAssertFalse(runningPicker.isAccessibilityEnabled?() ?? true, "the profile picker must not change profile mid-run")
         guard let runningGroupField = groupField(in: runningControls) else {
             return XCTFail("expected the Group field to still be hosted while running")
         }
