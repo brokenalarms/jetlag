@@ -122,6 +122,25 @@ struct WorkflowView: View {
                 count: state.workflowSession.organizeConflictCount))
         }
         .alert(
+            Strings.Workflow.cameraMismatchTitle,
+            isPresented: $state.workflowSession.showCameraMismatch
+        ) {
+            Button(Strings.Workflow.allowCameraMismatchButton, role: .destructive) {
+                state.workflowSession.grantCameraMismatchAssent()
+                runWorkflow()
+            }
+            Button(Strings.Common.cancel, role: .cancel) {
+                state.workflowSession.showCameraMismatch = false
+            }
+        } message: {
+            if let mismatch = state.workflowSession.cameraMismatch {
+                Text(Strings.Workflow.cameraMismatchMessage(
+                    count: mismatch.files.count,
+                    found: mismatch.foundName,
+                    expected: mismatch.expected?.name ?? ""))
+            }
+        }
+        .alert(
             Strings.Workflow.protectedSourcesTitle,
             isPresented: $state.workflowSession.showProtectedSources
         ) {
@@ -202,6 +221,12 @@ struct WorkflowView: View {
                 count: summary.failed,
                 files: summary.failedFiles))
         }
+        if summary.mode == .dryRun, let mismatch = state.workflowSession.cameraMismatch {
+            lines.append(Strings.Workflow.runSummaryCameraMismatch(
+                count: mismatch.files.count,
+                found: mismatch.foundName,
+                expected: mismatch.expected?.name ?? ""))
+        }
         return lines.joined(separator: "\n\n")
     }
 
@@ -250,17 +275,52 @@ struct WorkflowView: View {
                 }
             }
 
+            cardProfiles
+
+        }
+    }
+
+    /// The profile is the card's: a camera with a profile selects it, and the
+    /// only choice offered is between the card's own profiles (a camera's photos
+    /// and videos) or, for files that record no camera, among the profiles made
+    /// by hand for such files.
+    private var cardProfiles: some View {
+        let contents = state.cardContents
+        let profiles = state.profilesConfig?.profiles ?? [:]
+        let cameraless = contents.cameralessFolders.isEmpty ? [] :
+            state.sortedProfileNames.filter { CameraKind(profile: profiles[$0]!) == nil }
+        let choices = contents.matched.map(\.profileName) + cameraless
+        let selection = Binding(
+            get: { state.workflowSession.profileName },
+            set: { state.selectProfile($0) })
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text(Strings.Workflow.profileLabel)
-                ProfilePicker(selection: $session.profileName, state: state)
-                    .onChange(of: session.profileName) { _, newValue in
-                        state.clearLog()
-                        state.workflowSession = WorkflowSession(
-                            profile: state.profilesConfig?.profiles[newValue],
-                            profileName: newValue,
-                            gyroflowAvailable: state.gyroflowStatus.isInstalled
-                        )
-                    }
+                if choices.count > 1 || !cameraless.isEmpty {
+                    ProfilePicker(selection: selection, names: choices, state: state)
+                } else if let only = choices.first {
+                    ProfilePicker.label(name: only, state: state)
+                } else {
+                    Text(Strings.Workflow.noCardLabel)
+                        .foregroundStyle(.secondary)
+                }
+                Button {
+                    Task { await state.scanCards() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .help(Strings.Workflow.rescanHelp)
+            }
+            ForEach(contents.newCameras, id: \.kind) { found in
+                Button(Strings.Workflow.createProfileButton(found.kind.defaultProfileName)) {
+                    state.selectProfile(state.createProfile(for: found))
+                }
+            }
+            if !contents.cameralessFolders.isEmpty && cameraless.isEmpty {
+                Text(Strings.Workflow.cameralessNote)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -411,6 +471,8 @@ struct WorkflowView: View {
 
     private var tagOptions: some View {
         @Bindable var session = state.workflowSession
+        let device = FileCamera(make: session.workingProfile.exif?.make,
+                                model: session.workingProfile.exif?.model)?.name ?? ""
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
                 Text(Strings.Workflow.tagsLabel)
@@ -424,9 +486,6 @@ struct WorkflowView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(width: optionLabelWidth, alignment: .trailing)
-                let make = session.workingProfile.exif?.make ?? ""
-                let model = session.workingProfile.exif?.model ?? ""
-                let device = [make, model].filter { !$0.isEmpty }.joined(separator: " ")
                 Text(device.isEmpty ? "—" : device)
                     .font(.caption)
                     .foregroundStyle(device.isEmpty ? .tertiary : .primary)

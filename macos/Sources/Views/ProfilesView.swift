@@ -22,6 +22,8 @@ struct ProfilesView: View {
     @State private var showDeleteConfirmation = false
     @State private var showDiscardConfirmation = false
     @State private var pendingAction: PendingAction?
+    @State private var newCameraChoices: [CardContents.NewCamera] = []
+    @State private var showNoMediaFound = false
 
     private enum PendingAction {
         case loadProfile(ProfileEditingSession)
@@ -106,6 +108,74 @@ struct ProfilesView: View {
         } message: {
             Text(Strings.Profiles.unsavedChangesMessage)
         }
+        .confirmationDialog(
+            Strings.Profiles.chooseCameraTitle,
+            isPresented: Binding(get: { !newCameraChoices.isEmpty },
+                                 set: { if !$0 { newCameraChoices = [] } })
+        ) {
+            ForEach(newCameraChoices, id: \.kind) { found in
+                Button(found.kind.defaultProfileName) { createProfile(for: found) }
+            }
+            Button(Strings.Common.cancel, role: .cancel) { newCameraChoices = [] }
+        }
+        .alert(Strings.Profiles.noMediaFoundTitle, isPresented: $showNoMediaFound) {
+            Button(Strings.Common.done, role: .cancel) {}
+        } message: {
+            Text(Strings.Profiles.noMediaFoundMessage)
+        }
+    }
+
+    private var duplicatedProfiles: Set<String> {
+        ProfileMatcher.duplicates(in: state.profilesConfig?.profiles ?? [:])
+    }
+
+    /// A profile is its camera and kind of media, so only one made by hand for
+    /// files that record no camera can be copied.
+    private var canDuplicateSelection: Bool {
+        guard let name = selectedProfile, let profile = state.profile(named: name) else { return false }
+        return CameraKind(profile: profile) == nil
+    }
+
+    // MARK: - New profiles come from media
+
+    /// A profile starts from the media it is for: its camera, kind and file types
+    /// are read from the card. A camera that already has a profile opens it;
+    /// media that records no camera starts a profile named by hand.
+    private func newProfileFromCard() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+        panel.message = Strings.Profiles.newProfilePanelMessage
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Task {
+            let probes = await CameraProbe.probe(
+                path: url.path, scriptsDirectory: state.scriptsDirectory,
+                profilesPath: state.resolvedProfilesPath)
+            let contents = ProfileMatcher.contents(of: probes, profiles: state.profilesConfig?.profiles ?? [:])
+            if contents.newCameras.count == 1 {
+                createProfile(for: contents.newCameras[0])
+            } else if contents.newCameras.count > 1 {
+                newCameraChoices = contents.newCameras
+            } else if let existing = contents.matched.first,
+                      let profile = state.profile(named: existing.profileName) {
+                requestProfileLoad(ProfileEditingSession(name: existing.profileName, profile: profile))
+            } else if let folder = contents.cameralessFolders.first {
+                let type = probes.first { $0.camera == nil }?.type
+                requestProfileLoad(ProfileEditingSession(
+                    name: "new-profile",
+                    profile: MediaProfile(type: type, sourceDir: folder)))
+            } else {
+                showNoMediaFound = true
+            }
+        }
+    }
+
+    private func createProfile(for found: CardContents.NewCamera) {
+        newCameraChoices = []
+        let name = state.createProfile(for: found)
+        guard let profile = state.profile(named: name) else { return }
+        requestProfileLoad(ProfileEditingSession(name: name, profile: profile))
     }
 
     private var profileList: some View {
@@ -139,6 +209,11 @@ struct ProfilesView: View {
                             Text(name).fontWeight(.medium)
                         }
                         Spacer()
+                        if duplicatedProfiles.contains(name) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                                .help(Strings.Profiles.duplicateCameraHelp)
+                        }
                     }
                     .tag(name)
                 }
@@ -155,11 +230,7 @@ struct ProfilesView: View {
             Divider()
             HStack {
                 Button {
-                    requestProfileLoad(
-                        ProfileEditingSession(
-                            name: "new-profile", profile: MediaProfile()
-                        )
-                    )
+                    newProfileFromCard()
                 } label: {
                     Image(systemName: "plus")
                         .frame(width: 24, height: 24)
@@ -200,7 +271,7 @@ struct ProfilesView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
-                .disabled(selectedProfile == nil)
+                .disabled(!canDuplicateSelection)
 
                 Spacer()
             }
@@ -257,14 +328,14 @@ struct ProfilesView: View {
         }
         state.profilesConfig?.profiles[editor.name] = editor.profile
 
-        writeProfiles()
+        state.writeProfiles()
         snapshot = editor
         selectedProfile = editor.name
     }
 
     private func deleteProfile(_ name: String) {
         state.profilesConfig?.profiles.removeValue(forKey: name)
-        writeProfiles()
+        state.writeProfiles()
         if state.workflowSession.profileName == name {
             state.workflowSession = WorkflowSession(
                 gyroflowAvailable: state.gyroflowStatus.isInstalled
@@ -290,19 +361,6 @@ struct ProfilesView: View {
         requestProfileLoad(
             ProfileEditingSession(name: duplicateName, profile: profile)
         )
-    }
-
-    private func writeProfiles() {
-        guard let config = state.profilesConfig else { return }
-        do {
-            try ProfileService.write(config, to: state.resolvedProfilesPath)
-        } catch {
-            state.profileLoadError = ProfileLoadError(
-                message: Strings.Errors.profilesWriteFailed,
-                filePath: state.resolvedProfilesPath,
-                detail: error.localizedDescription
-            )
-        }
     }
 }
 
@@ -345,6 +403,7 @@ struct ProfileEditorView: View {
                     .labelsHidden()
                     .pickerStyle(.segmented)
                     .frame(width: 160)
+                    .disabled(CameraKind(profile: session.profile) != nil)
                 }
 
                 Divider().gridCellUnsizedAxes(.horizontal)
@@ -361,20 +420,17 @@ struct ProfileEditorView: View {
                 Divider().gridCellUnsizedAxes(.horizontal)
 
                 GridRow {
-                    Text(Strings.Profiles.exifMakeLabel)
-                    TextField(
-                        Strings.Profiles.exifMakePlaceholder,
-                        text: exifBinding(\.make)
+                    HelpLabel(
+                        Strings.Profiles.cameraLabel,
+                        help: Strings.Profiles.cameraHelp
                     )
-                    .textFieldStyle(.roundedBorder)
-                }
-                GridRow {
-                    Text(Strings.Profiles.exifModelLabel)
-                    TextField(
-                        Strings.Profiles.exifModelPlaceholder,
-                        text: exifBinding(\.model)
-                    )
-                    .textFieldStyle(.roundedBorder)
+                    if let camera = FileCamera(make: session.profile.exif?.make,
+                                               model: session.profile.exif?.model) {
+                        Text(camera.name)
+                    } else {
+                        Text(Strings.Profiles.noCameraRecorded)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Divider().gridCellUnsizedAxes(.horizontal)
@@ -465,21 +521,6 @@ struct ProfileEditorView: View {
         Binding(
             get: { binding.wrappedValue ?? "" },
             set: { binding.wrappedValue = $0.isEmpty ? nil : $0 }
-        )
-    }
-
-    private func exifBinding(_ sub: WritableKeyPath<ExifConfig, String?>)
-        -> Binding<String>
-    {
-        Binding(
-            get: { session.profile.exif?[keyPath: sub] ?? "" },
-            set: { newValue in
-                if session.profile.exif == nil {
-                    session.profile.exif = ExifConfig()
-                }
-                session.profile.exif?[keyPath: sub] =
-                    newValue.isEmpty ? nil : newValue
-            }
         )
     }
 

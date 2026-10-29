@@ -14,6 +14,13 @@ struct JetlagApp: App {
             ContentView(state: state)
                 .onAppear { state.loadProfiles() }
                 .task { await state.refreshGyroflowStatus() }
+                .task { await state.scanCards() }
+                .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didMountNotification)) { _ in
+                    Task { await state.scanCards() }
+                }
+                .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didUnmountNotification)) { _ in
+                    Task { await state.scanCards() }
+                }
         }
         // The window's resizable range is the content's own: with the panel closed the
         // content has one width (sidebar + form) and so does the window; opening the

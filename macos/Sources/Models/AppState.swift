@@ -135,6 +135,7 @@ enum PipelineEvent: Decodable {
                           fileTimezones: [String: [String]])
     case organizeConflict(count: Int, files: [String])
     case protectedSources(files: [String])
+    case cameraMismatch(CameraMismatch)
     case noMediaFiles(EmptySource)
     case pipelineError(message: String)
 
@@ -165,6 +166,10 @@ enum PipelineEvent: Decodable {
         case providedTz = "provided_tz"
         case fileTimezones = "file_timezones"
         case count, files, extensions
+        case expectedMake = "expected_make"
+        case expectedModel = "expected_model"
+        case foundMakes = "found_makes"
+        case foundModels = "found_models"
         case processed, succeeded, changed, failed, mode
         case failedFiles = "failed_files"
     }
@@ -254,6 +259,14 @@ enum PipelineEvent: Decodable {
         case "protected_sources":
             self = .protectedSources(
                 files: try container.decode([String].self, forKey: .files))
+        case "camera_mismatch":
+            self = .cameraMismatch(CameraMismatch(
+                files: try container.decode([String].self, forKey: .files),
+                expected: FileCamera(
+                    make: try container.decodeIfPresent(String.self, forKey: .expectedMake),
+                    model: try container.decodeIfPresent(String.self, forKey: .expectedModel)),
+                foundMakes: try container.decode([String].self, forKey: .foundMakes),
+                foundModels: try container.decode([String].self, forKey: .foundModels)))
         case "no_media_files":
             self = .noMediaFiles(EmptySource(
                 source: try container.decode(String.self, forKey: .source),
@@ -312,6 +325,10 @@ final class WorkflowSession {
     var protectedSourceFiles: [String] = []
     var showProtectedSources: Bool = false
     var unlockProtected: Bool = false
+
+    var cameraMismatch: CameraMismatch?
+    var showCameraMismatch: Bool = false
+    var allowCameraMismatch: Bool = false
 
     /// Whether the run a conflict alert asks about was an apply. A finished
     /// apply has dropped back to preview mode before the user answers, so the
@@ -412,6 +429,14 @@ final class WorkflowSession {
         showOverwriteConflict = false
     }
 
+    /// Record the user's answer, so the re-run imports the files shot on
+    /// another camera, their camera fields left as the camera wrote them.
+    func grantCameraMismatchAssent() {
+        allowCameraMismatch = true
+        showCameraMismatch = false
+        resumeConflictedRun()
+    }
+
     /// Record the user's answer, so the re-run carries the flag that imports
     /// the protected files as unlocked copies.
     func grantUnlockProtectedAssent() {
@@ -501,6 +526,9 @@ final class WorkflowSession {
         protectedSourceFiles = []
         showProtectedSources = false
         unlockProtected = false
+        cameraMismatch = nil
+        showCameraMismatch = false
+        allowCameraMismatch = false
         conflictedRunWasApply = false
         applyWithoutDryRun = false
         showDryRunStale = false
@@ -616,12 +644,14 @@ final class WorkflowSession {
     static let allowMixedTimezonesFlag = "--allow-mixed-timezones"
     static let overwriteFlag = "--overwrite"
     static let unlockProtectedFlag = "--unlock-protected"
+    static let allowCameraMismatchFlag = "--allow-camera-mismatch"
     static let applyFlag = "--apply"
 
     /// What the run carries because of an answer given for one click, rather
     /// than a setting the user chose — the same state `clearRunAssent()` drops.
     private static let assentFlags = [
-        forceTimezoneFlag, allowMixedTimezonesFlag, overwriteFlag, unlockProtectedFlag, applyFlag,
+        forceTimezoneFlag, allowMixedTimezonesFlag, overwriteFlag, unlockProtectedFlag,
+        allowCameraMismatchFlag, applyFlag,
     ]
 
     func buildPipelineArgs() -> (script: String, args: [String]) {
@@ -690,6 +720,9 @@ final class WorkflowSession {
         }
         if unlockProtected {
             args.append(Self.unlockProtectedFlag)
+        }
+        if allowCameraMismatch {
+            args.append(Self.allowCameraMismatchFlag)
         }
         if applyMode {
             args.append(Self.applyFlag)
@@ -851,6 +884,101 @@ final class AppState {
         profilesConfig?.profiles[name]
     }
 
+    /// What the inserted cards hold, as probe-camera read it. What that means
+    /// for the profiles is derived from it on demand, so a profile created or
+    /// edited is reflected without probing the card again.
+    var cardProbes: [ProbedCamera] = []
+
+    var cardContents: CardContents {
+        ProfileMatcher.contents(of: cardProbes, profiles: profilesConfig?.profiles ?? [:])
+    }
+
+    /// Read the cameras on every mounted card. A card is a volume laid out the
+    /// way cameras write them, with DCIM or PRIVATE at its root; other volumes
+    /// (a library drive, the boot disk) are never searched.
+    func scanCards() async {
+        let volumes = FileManager.default.mountedVolumeURLs(
+            includingResourceValuesForKeys: nil, options: [.skipHiddenVolumes]) ?? []
+        let cards = volumes.filter { volume in
+            ["DCIM", "PRIVATE"].contains {
+                FileManager.default.fileExists(atPath: volume.appendingPathComponent($0).path)
+            }
+        }
+        var probes: [ProbedCamera] = []
+        for card in cards {
+            probes += await CameraProbe.probe(path: card.path, scriptsDirectory: scriptsDirectory,
+                                              profilesPath: resolvedProfilesPath)
+        }
+        cardProbes = probes
+        selectProfileForCard()
+    }
+
+    /// A card from a camera with a profile picks that profile. The choice the
+    /// user made among the card's own profiles stands; nothing else does.
+    func selectProfileForCard() {
+        guard !isRunning else { return }
+        let matched = cardContents.matched
+        if let current = matched.first(where: { $0.profileName == workflowSession.profileName }) {
+            workflowSession.sourceDir.value = current.folder
+        } else if let first = matched.first {
+            selectProfile(first.profileName)
+        }
+    }
+
+    /// Start a fresh workflow for a profile, reading from the card folder where
+    /// its camera's media was found when there is one.
+    func selectProfile(_ name: String) {
+        clearLog()
+        workflowSession = WorkflowSession(
+            profile: profilesConfig?.profiles[name],
+            profileName: name,
+            gyroflowAvailable: gyroflowStatus.isInstalled
+        )
+        let contents = cardContents
+        let isCameraless = profilesConfig?.profiles[name].map { CameraKind(profile: $0) == nil } ?? false
+        let folder = contents.matched.first { $0.profileName == name }?.folder
+            ?? (isCameraless ? contents.cameralessFolders.first : nil)
+        if let folder {
+            workflowSession.sourceDir.value = folder
+        }
+    }
+
+    /// Create the profile for a camera found on a card. Its camera, kind of media,
+    /// file types and source all come from the card; only where it imports to is
+    /// left to the user.
+    func createProfile(for found: CardContents.NewCamera) -> String {
+        let base = found.kind.defaultProfileName
+        var name = base
+        var counter = 2
+        while profilesConfig?.profiles[name] != nil {
+            name = "\(base) \(counter)"
+            counter += 1
+        }
+        var profile = MediaProfile(type: found.kind.type)
+        profile.exif = ExifConfig(make: found.kind.camera.make, model: found.kind.camera.model)
+        profile.fileExtensions = found.extensions
+        profile.sourceDir = found.folder
+        if profilesConfig == nil {
+            profilesConfig = ProfilesConfig(gyroflow: nil, profiles: [:])
+        }
+        profilesConfig?.profiles[name] = profile
+        writeProfiles()
+        return name
+    }
+
+    func writeProfiles() {
+        guard let config = profilesConfig else { return }
+        do {
+            try ProfileService.write(config, to: resolvedProfilesPath)
+        } catch {
+            profileLoadError = ProfileLoadError(
+                message: Strings.Errors.profilesWriteFailed,
+                filePath: resolvedProfilesPath,
+                detail: error.localizedDescription
+            )
+        }
+    }
+
     func clearLog() {
         logOutput = []
         diffTableRows = []
@@ -960,6 +1088,13 @@ final class AppState {
             // A dry run previews the protected files anyway; only an apply is
             // refused, so only an apply asks.
             workflowSession.showProtectedSources = workflowSession.applyMode
+
+        case .cameraMismatch(let mismatch):
+            workflowSession.noteConflict()
+            workflowSession.cameraMismatch = mismatch
+            // A dry run previews files from another camera anyway; only an
+            // apply is refused, so only an apply asks.
+            workflowSession.showCameraMismatch = workflowSession.applyMode
 
         case .pipelineSummary(let summary):
             runSummary = summary

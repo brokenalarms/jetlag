@@ -200,6 +200,37 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
                          defaultValue: "\(files.count) source files are protected (locked), usually by the camera's Protect setting:\n\n\(list)\n\nTheir imported copies will be unlocked. The files on the source stay locked.")
         }
 
+        static let cameraMismatchTitle = String(localized: "workflow.cameraMismatch.title",
+            defaultValue: "Different Camera")
+        static let allowCameraMismatchButton = String(localized: "workflow.allowCameraMismatch.button",
+            defaultValue: "Import Anyway")
+
+        static func cameraMismatchMessage(count: Int, found: String, expected: String) -> String {
+            count == 1
+                ? String(localized: "workflow.cameraMismatch.message.one",
+                         defaultValue: "1 file was shot on \(found), not this profile's \(expected). Check this is the right profile. Importing it leaves its camera fields as the camera wrote them.")
+                : String(localized: "workflow.cameraMismatch.message.many",
+                         defaultValue: "\(count) files were shot on \(found), not this profile's \(expected). Check this is the right profile. Importing them leaves their camera fields as the camera wrote them.")
+        }
+
+        static func runSummaryCameraMismatch(count: Int, found: String, expected: String) -> String {
+            count == 1
+                ? String(localized: "workflow.runSummary.cameraMismatch.one",
+                         defaultValue: "1 file was shot on \(found), not this profile's \(expected). Applying asks first.")
+                : String(localized: "workflow.runSummary.cameraMismatch.many",
+                         defaultValue: "\(count) files were shot on \(found), not this profile's \(expected). Applying asks first.")
+        }
+
+        static let noCardLabel = String(localized: "workflow.noCard.label",
+            defaultValue: "No camera card found")
+        static let rescanHelp = String(localized: "workflow.rescan.help",
+            defaultValue: "Look for camera cards again")
+        static func createProfileButton(_ name: String) -> String {
+            String(localized: "workflow.createProfile.button", defaultValue: "Create Profile for \(name)")
+        }
+        static let cameralessNote = String(localized: "workflow.cameraless.note",
+            defaultValue: "Some files on this card record no camera. Create a profile for them in Profiles.")
+
         // Run completion popup
         static let runCompleteAppliedTitle = String(localized: "workflow.runComplete.applied.title",
             defaultValue: "Run Complete")
@@ -270,6 +301,21 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
     // MARK: - Profiles
 
     enum Profiles {
+        static let cameraLabel = String(localized: "profiles.camera.label", defaultValue: "Camera")
+        static let cameraHelp = String(localized: "profiles.camera.help",
+            defaultValue: "Read from the media the profile was made from. A profile is its camera and kind of media, so each camera has one photo profile and one video profile, and every file imported is checked against it.")
+        static let noCameraRecorded = String(localized: "profiles.noCameraRecorded",
+            defaultValue: "None recorded by these files")
+        static let duplicateCameraHelp = String(localized: "profiles.duplicateCamera.help",
+            defaultValue: "Another profile is for the same camera and kind of media. Delete one of them.")
+        static let chooseCameraTitle = String(localized: "profiles.chooseCamera.title",
+            defaultValue: "Several cameras' media were found. Create a profile for:")
+        static let noMediaFoundTitle = String(localized: "profiles.noMediaFound.title",
+            defaultValue: "No Media Found")
+        static let noMediaFoundMessage = String(localized: "profiles.noMediaFound.message",
+            defaultValue: "Choose a camera card, a folder from one, or a single photo or video.")
+        static let newProfilePanelMessage = String(localized: "profiles.newProfilePanel.message",
+            defaultValue: "Choose a camera card or some of its media. The profile's camera and file types are read from it.")
         static let selectPrompt = String(localized: "profiles.selectPrompt", defaultValue: "Select a profile to edit")
         static let nameLabel = String(localized: "profiles.name.label", defaultValue: "Name")
         static let namePlaceholder = String(localized: "profiles.name.placeholder", defaultValue: "profile-name")
@@ -278,10 +324,6 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let photoOption = String(localized: "profiles.photo.option", defaultValue: "Photo")
         static let sourceDirLabel = String(localized: "profiles.sourceDir.label", defaultValue: "Source dir")
         static let readyDirLabel = String(localized: "profiles.readyDir.label", defaultValue: "Ready dir")
-        static let exifMakeLabel = String(localized: "profiles.exifMake.label", defaultValue: "EXIF Make")
-        static let exifModelLabel = String(localized: "profiles.exifModel.label", defaultValue: "EXIF Model")
-        static let exifMakePlaceholder = String(localized: "profiles.exifMake.placeholder", defaultValue: "e.g. Sony")
-        static let exifModelPlaceholder = String(localized: "profiles.exifModel.placeholder", defaultValue: "e.g. ILCE-7M4")
         static let fileTypesLabel = String(localized: "profiles.fileTypes.label", defaultValue: "File types")
         static let companionLabel = String(localized: "profiles.companion.label", defaultValue: "Companion")
         static let tagsLabel = String(localized: "profiles.tags.label", defaultValue: "Tags")

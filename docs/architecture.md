@@ -50,6 +50,14 @@ profiles:
 
 This dict-key-as-name constraint is shared between the Swift model and the Python scripts. Neither side should add a `name` field inside the profile — the key is the name.
 
+### A profile is a camera and a kind of media
+
+A profile's identity is its `exif` camera (Make + Model) and its `type` (photo or video); the name is only a label. Both are read from media, never typed: `probe-camera` samples a card (or a folder or file) and reports, per extension, the camera the files record, whether they are photos or video, and the top-level folder (`DCIM`, `PRIVATE`, …) holding them. The app builds new profiles from that, so a camera has at most one photo and one video profile; profiles that predate this and share a kind are flagged in the editor, not merged.
+
+The workflow selects the profile from the inserted card rather than offering every profile: a mounted volume with `DCIM` or `PRIVATE` at its root is probed, its camera's profile selected (reading from the card's folder, whatever the volume is called), and a camera with no profile is offered one built from the card. A picker appears only to choose between the card's own profiles (a camera's photos and videos) or, for media that records no camera, among the profiles made by hand for it — the only profiles with no `exif`.
+
+`media-pipeline` checks every file against the profile's camera before processing (case-insensitively: cameras write `SONY`, profiles may say `Sony`). A dry run reports files from another camera as `camera_mismatch` and previews them; an apply refuses without `--allow-camera-mismatch`. `tag-media` only fills a Make/Model a file lacks — a camera-written value is never overwritten.
+
 ### Where the file lives
 
 The live file the app reads and writes is `~/Library/Application Support/<app name>/media-profiles.yaml`, where `<app name>` is `Jetlag` for the installed app and `Jetlag Dev` for a suffixed worktree build (`ProfilesLocation.applicationSupportFolderName` derives it from the bundle name). It is created on first launch by copying `scripts/media-profiles.yaml` out of the app bundle, and is the user's from then on — a later launch never overwrites it.

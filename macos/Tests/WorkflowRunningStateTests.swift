@@ -51,8 +51,13 @@ final class WorkflowRunningStateTests: XCTestCase {
     }
 
     private func makeState() -> AppState {
+        // Media recording no camera is the one case with a profile picker: the
+        // profile for it is chosen by hand.
         let state = AppState()
         state.selectedTab = .workflow
+        state.profilesConfig = ProfilesConfig(gyroflow: nil, profiles: ["probe": MediaProfile(type: .video)])
+        state.cardProbes = [ProbedCamera(fileExtension: ".mp4", type: .video, folder: "/Volumes/CARD/DCIM",
+                                         files: 1, camera: nil)]
         state.workflowSession = WorkflowSession(profileName: "probe", gyroflowAvailable: false)
         return state
     }
