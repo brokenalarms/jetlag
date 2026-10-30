@@ -1,14 +1,10 @@
 import SwiftUI
-import Quartz
 
 struct DiffTableView: View {
     let rows: [DiffTableRow]
 
-    @State private var selection: Set<DiffTableRow.ID> = []
-    @State private var previewCoordinator = QuickLookCoordinator()
     @State private var measurements = RowMeasurements()
 
-    private static let cellPadding: CGFloat = 20
     private static let iconWidth: CGFloat = 18
     private static let timelineColumnWidth: CGFloat = 120
     /// A camera filename can run to 40+ characters, and past this it is truncated
@@ -24,27 +20,12 @@ struct DiffTableView: View {
     static let writesColumnMaxWidth: CGFloat = {
         let threeFields = Strings.DiffTable.wouldWrite(
             "Keys:CreationDate, QuickTime:CreateDate, QuickTime:TrackCreateDate")
-        return (threeFields as NSString).size(withAttributes: [.font: detailFont]).width + cellPadding
+        return (threeFields as NSString).size(withAttributes: [.font: detailFont]).width + CellText.padding
     }()
 
-    /// What the auto-fitter applies: the cell's content width held to the column's cap.
-    static func idealWidth(of cell: CellText) -> CGFloat {
-        min(contentFitWidth(of: cell), cell.maxWidth)
-    }
+    static func idealWidth(of cell: CellText) -> CGFloat { cell.idealWidth }
 
-    /// The width that shows the cell's widest content untruncated, ignoring the cap —
-    /// what double-clicking a header divider snaps the column to. Kept alongside the
-    /// capped width rather than replacing it: the cap keeps a long writes subtitle from
-    /// stretching the table, and this is the width that shows the user the whole thing.
-    static func contentFitWidth(of cell: CellText) -> CGFloat {
-        if let fixed = cell.fixedWidth { return fixed }
-        let widest = cell.parts
-            .filter { !$0.text.isEmpty }
-            .map { ($0.text as NSString).size(withAttributes: [.font: $0.font]).width }
-            .max() ?? 0
-        guard widest > 0 else { return 0 }
-        return widest + cell.extraWidth + cellPadding
-    }
+    static func contentFitWidth(of cell: CellText) -> CGFloat { cell.contentFitWidth }
 
     struct TimelineScale {
         let rangeStart: Double
@@ -65,15 +46,9 @@ struct DiffTableView: View {
         }
     }
 
-    /// The scale is a function of every row's epochs, so it is computed once per
-    /// change to the rows rather than once per rendered cell.
-    private var timelineScale: TimelineScale {
-        measurements.timelineScale(for: rows)
-    }
-
     /// The row's status: what the pipeline said it did, composed from the emitted
     /// action tokens. `dest` never contributes — a skipped file carries one too.
-    private func statusText(_ row: DiffTableRow) -> String {
+    func statusText(_ row: DiffTableRow) -> String {
         switch row.pipelineResult {
         case "changed":
             return row.outcome.statusLabel ?? Strings.DiffTable.changedStatus
@@ -87,50 +62,30 @@ struct DiffTableView: View {
         }
     }
 
-    /// One width per table column, in the order the columns are declared: a
-    /// mismatch here resizes the wrong column. Measured incrementally: a row's cells
-    /// are measured when they first appear and again only when their text changes
-    /// (a live row fills in as its events arrive), and the widths are folded into a
-    /// running maximum instead of every row being re-measured per update.
-    private var columnWidths: ColumnWidths {
-        measurements.columnWidths(for: rows, texts: cellTexts)
+    func statusState(_ row: DiffTableRow) -> StatusBadgeState {
+        switch row.pipelineResult {
+        case "changed": .done
+        case "unchanged": .unchanged
+        case "failed": .failed
+        case "would_change": .wouldDo
+        case nil: .pending
+        default: .plain
+        }
     }
 
     /// What each of a row's cells would draw, in column order: the text, its font
     /// and any icon allowance. Building this is string work only; measuring it is
     /// what the cache avoids repeating for rows that have not changed.
     func cellTexts(_ row: DiffTableRow) -> [CellText] {
-        [
-            CellText([(row.file, Self.monoFont)],
-                     extraWidth: row.fileCamera != nil ? Self.iconWidth : 0,
-                     maxWidth: Self.fileColumnMaxWidth),
-            CellText(fixedWidth: Self.timelineColumnWidth),
-            CellText([(row.originalTimeDisplay ?? "", Self.monoFont),
-                      (row.timestampSource?.label ?? "", Self.detailFont)]),
-            CellText([(row.correctedTime ?? "", Self.monoFont)]),
-            CellText([(changeBadgeText(row), Self.systemFont),
-                      (staleFieldsText(row).map(Strings.DiffTable.wouldWrite) ?? "", Self.detailFont)],
-                     extraWidth: row.requiresForceTimezone ? Self.iconWidth : 0,
-                     maxWidth: Self.writesColumnMaxWidth),
-            CellText([(row.dest.map { ($0 as NSString).lastPathComponent } ?? "", Self.monoFont),
-                      (row.skipReason?.explanation ?? "", Self.detailFont)],
-                     extraWidth: row.hasDestinationConflict ? Self.iconWidth : 0),
-            CellText([(statusText(row), Self.systemFont),
-                      (staleFieldsText(row).map(Strings.DiffTable.wouldWrite) ?? "", Self.detailFont)],
-                     extraWidth: Self.iconWidth,
-                     maxWidth: Self.writesColumnMaxWidth),
-        ]
+        columns(timeline: TimelineScale(range: nil)).map { $0.measure(row) }
     }
 
-    /// The rows selected by the given ids, resolved to the file URLs Show in
-    /// Finder / Quick Look act on. Every row the pipeline reported resolves to
-    /// a path, so the menu items stay enabled: whether that path still holds a
-    /// file is Finder's answer to give, not a reason to withhold the command.
     func availableFileURLs(for ids: Set<DiffTableRow.ID>) -> [URL] {
-        rows
-            .filter { ids.contains($0.id) }
-            .compactMap { RowFileLocation.path(for: $0) }
-            .map { URL(fileURLWithPath: $0) }
+        ResultsTable<DiffTableRow>.fileURLs(for: ids, in: rows, locating: Self.fileURL)
+    }
+
+    private static func fileURL(of row: DiffTableRow) -> URL? {
+        RowFileLocation.path(for: row).map { URL(fileURLWithPath: $0) }
     }
 
     /// The destination file a row's own conflicting file is blocking — only rows
@@ -142,129 +97,124 @@ struct DiffTableView: View {
     /// acting on the conflicting subset — the alternative is a menu that silently
     /// loses a command because one extra row was selected.
     func conflictingDestinationURLs(for ids: Set<DiffTableRow.ID>) -> [URL] {
+        Self.conflictingDestinationURLs(in: rows.filter { ids.contains($0.id) })
+    }
+
+    private static func conflictingDestinationURLs(in rows: [DiffTableRow]) -> [URL] {
         rows
-            .filter { ids.contains($0.id) && $0.hasDestinationConflict }
+            .filter { $0.hasDestinationConflict }
             .compactMap { $0.dest }
             .filter { FileManager.default.fileExists(atPath: $0) }
             .map { URL(fileURLWithPath: $0) }
     }
 
+    /// One column per entry, in the order the table draws them; the cell and the text
+    /// it is measured from sit side by side so the two cannot drift apart.
+    private func columns(timeline: TimelineScale) -> [ResultsColumn<DiffTableRow>] {
+        [
+            ResultsColumn(Strings.DiffTable.fileColumn, minWidth: 80,
+                          measure: { row in
+                              CellText([(row.file, Self.monoFont)],
+                                       extraWidth: row.fileCamera != nil ? Self.iconWidth : 0,
+                                       maxWidth: Self.fileColumnMaxWidth)
+                          }, cell: fileCell),
+
+            ResultsColumn(Strings.DiffTable.timelineColumn, minWidth: 50, idealWidth: 80,
+                          measure: { _ in CellText(fixedWidth: Self.timelineColumnWidth) },
+                          cell: { timelineCell($0, scale: timeline) }),
+
+            ResultsColumn(Strings.DiffTable.originalColumn, minWidth: 130,
+                          measure: { row in
+                              CellText([(row.originalTimeDisplay ?? "", Self.monoFont),
+                                        (row.timestampSource?.label ?? "", Self.detailFont)])
+                          }, cell: originalCell),
+
+            ResultsColumn(Strings.DiffTable.correctedColumn, minWidth: 130,
+                          measure: { row in CellText([(row.correctedTime ?? "", Self.monoFont)]) },
+                          cell: { row in
+                              Text(row.correctedTime ?? "—")
+                                  .font(Theme.Typography.fileMono)
+                                  .foregroundStyle(row.correctedTime != nil ? Theme.Text.primary : Theme.Text.tertiary)
+                          }),
+
+            ResultsColumn(Strings.DiffTable.timestampColumn, minWidth: 70,
+                          measure: { row in
+                              CellText([(changeBadgeText(row), Self.systemFont),
+                                        (staleFieldsText(row).map(Strings.DiffTable.wouldWrite) ?? "", Self.detailFont)],
+                                       extraWidth: row.requiresForceTimezone ? Self.iconWidth : 0,
+                                       maxWidth: Self.writesColumnMaxWidth)
+                          }, cell: timestampCell),
+
+            ResultsColumn(Strings.DiffTable.destinationColumn, minWidth: 80,
+                          measure: { row in
+                              CellText([(row.dest.map { ($0 as NSString).lastPathComponent } ?? "", Self.monoFont),
+                                        (row.skipReason?.explanation ?? "", Self.detailFont)],
+                                       extraWidth: row.hasDestinationConflict ? Self.iconWidth : 0)
+                          }, cell: destinationCell),
+
+            ResultsColumn(Strings.DiffTable.statusColumn, minWidth: 80,
+                          measure: { row in
+                              CellText([(statusText(row), Self.systemFont),
+                                        (staleFieldsText(row).map(Strings.DiffTable.wouldWrite) ?? "", Self.detailFont)],
+                                       extraWidth: Self.iconWidth,
+                                       maxWidth: Self.writesColumnMaxWidth)
+                          }, cell: statusCell),
+        ]
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: Theme.Space.md) {
-                Image(systemName: "tablecells")
-                    .foregroundStyle(Theme.Text.secondary)
-                Text(Strings.DiffTable.title)
-                    .font(Theme.Typography.subheadlineMedium)
-                    .foregroundStyle(Theme.Text.secondary)
-                Spacer()
-                if !rows.isEmpty {
-                    Text(Strings.DiffTable.fileCount(rows.count))
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Text.tertiary)
-                }
+        ResultsTable(rows: rows,
+                     columns: columns(timeline: measurements.timelineScale(for: rows)),
+                     measurements: measurements,
+                     fileURL: Self.fileURL,
+                     extraMenuItems: { selected in
+                         let urls = Self.conflictingDestinationURLs(in: selected)
+                         return urls.isEmpty
+                             ? [] : [ResultsMenuItem(title: Strings.DiffTable.showExistingAtDestination, urls: urls)]
+                     })
+    }
+
+    private func fileCell(_ row: DiffTableRow) -> some View {
+        HStack(spacing: Theme.Space.xs) {
+            if let camera = row.fileCamera {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(Theme.Typography.detail)
+                    .foregroundStyle(Theme.Status.warning)
+                    .help(Strings.DiffTable.cameraMismatchHelp(camera.name))
             }
-            .padding(.horizontal, Theme.Space.xxl)
-            .padding(.vertical, Theme.Space.md)
+            Text(row.file)
+                .font(Theme.Typography.fileMono)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+    }
 
-            Table(rows, selection: $selection) {
-                TableColumn(Strings.DiffTable.fileColumn) { row in
-                    HStack(spacing: Theme.Space.xs) {
-                        if let camera = row.fileCamera {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(Theme.Typography.detail)
-                                .foregroundStyle(Theme.Status.warning)
-                                .help(Strings.DiffTable.cameraMismatchHelp(camera.name))
-                        }
-                        Text(row.file)
-                            .font(Theme.Typography.fileMono)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                }
-                .width(min: 80)
-
-                TableColumn(Strings.DiffTable.timelineColumn) { row in
-                    timelineCell(row, scale: timelineScale)
-                }
-                .width(min: 50, ideal: 80)
-
-                TableColumn(Strings.DiffTable.originalColumn) { row in
-                    VStack(alignment: .leading, spacing: Theme.Space.hairline) {
-                        Text(row.originalTimeDisplay ?? "—")
-                            .font(Theme.Typography.fileMono)
-                            .foregroundStyle(row.originalTime != nil ? Theme.Text.primary : Theme.Text.tertiary)
-                        if let label = row.timestampSource?.label {
-                            Text(label)
-                                .font(Theme.Typography.detail)
-                                .foregroundStyle(Theme.Text.tertiary)
-                                .lineLimit(1)
-                        }
-                    }
-                    .help(rowExplanation(row))
-                }
-                .width(min: 130)
-
-                TableColumn(Strings.DiffTable.correctedColumn) { row in
-                    Text(row.correctedTime ?? "—")
-                        .font(Theme.Typography.fileMono)
-                        .foregroundStyle(row.correctedTime != nil ? Theme.Text.primary : Theme.Text.tertiary)
-                }
-                .width(min: 130)
-
-                TableColumn(Strings.DiffTable.timestampColumn) { row in
-                    timestampCell(row)
-                }
-                .width(min: 70)
-
-                TableColumn(Strings.DiffTable.destinationColumn) { row in
-                    destinationCell(row)
-                }
-                .width(min: 80)
-
-                TableColumn(Strings.DiffTable.statusColumn) { row in
-                    VStack(alignment: .leading, spacing: Theme.Space.hairline) {
-                        statusBadge(row)
-                        if let fields = staleFieldsText(row) {
-                            Text(Strings.DiffTable.wouldWrite(fields))
-                                .font(Theme.Typography.detail)
-                                .foregroundStyle(Theme.Text.tertiary)
-                                .lineLimit(1)
-                        }
-                    }
-                    .help(rowExplanation(row))
-                }
-                .width(min: 80)
-            }
-            .contextMenu(forSelectionType: DiffTableRow.ID.self) { ids in
-                let urls = availableFileURLs(for: ids)
-                Button(Strings.DiffTable.showInFinder) {
-                    NSWorkspace.shared.activateFileViewerSelecting(urls)
-                }
-
-                Button(Strings.DiffTable.quickLook) {
-                    previewCoordinator.show(urls)
-                }
-
-                let conflictingURLs = conflictingDestinationURLs(for: ids)
-                if !conflictingURLs.isEmpty {
-                    Button(Strings.DiffTable.showExistingAtDestination) {
-                        NSWorkspace.shared.activateFileViewerSelecting(conflictingURLs)
-                    }
-                }
-            }
-            .onKeyPress(.space) {
-                let urls = availableFileURLs(for: selection)
-                guard !urls.isEmpty else { return .ignored }
-                previewCoordinator.show(urls)
-                return .handled
-            }
-            .background {
-                ColumnAutoSizer(widths: columnWidths, rowCount: rows.count)
-                    .frame(width: 0, height: 0)
+    private func originalCell(_ row: DiffTableRow) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Space.hairline) {
+            Text(row.originalTimeDisplay ?? "—")
+                .font(Theme.Typography.fileMono)
+                .foregroundStyle(row.originalTime != nil ? Theme.Text.primary : Theme.Text.tertiary)
+            if let label = row.timestampSource?.label {
+                Text(label)
+                    .font(Theme.Typography.detail)
+                    .foregroundStyle(Theme.Text.tertiary)
+                    .lineLimit(1)
             }
         }
-        .frame(maxHeight: .infinity)
+        .help(rowExplanation(row))
+    }
+
+    private func statusCell(_ row: DiffTableRow) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Space.hairline) {
+            StatusBadge(state: statusState(row), label: statusText(row))
+            if let fields = staleFieldsText(row) {
+                Text(Strings.DiffTable.wouldWrite(fields))
+                    .font(Theme.Typography.detail)
+                    .foregroundStyle(Theme.Text.tertiary)
+                    .lineLimit(1)
+            }
+        }
+        .help(rowExplanation(row))
     }
 
     @ViewBuilder
@@ -435,346 +385,24 @@ struct DiffTableView: View {
                 .foregroundStyle(Theme.Text.tertiary)
         }
     }
-
-    @ViewBuilder
-    private func statusBadge(_ row: DiffTableRow) -> some View {
-        switch row.pipelineResult {
-        case "changed":
-            Label(statusText(row), systemImage: "checkmark.circle.fill")
-                .font(Theme.Typography.file)
-                .foregroundStyle(Theme.Accent.highlight)
-        case "unchanged":
-            Label(Strings.DiffTable.noChangeStatus, systemImage: "minus.circle.fill")
-                .font(Theme.Typography.file)
-                .foregroundStyle(Theme.Text.secondary)
-        case "failed":
-            Label(Strings.DiffTable.failedStatus, systemImage: "xmark.circle.fill")
-                .font(Theme.Typography.file)
-                .foregroundStyle(Theme.Status.failure)
-        case "would_change":
-            Label(statusText(row), systemImage: "arrow.triangle.2.circlepath.circle.fill")
-                .font(Theme.Typography.file)
-                .foregroundStyle(Theme.Accent.highlight.opacity(Theme.Tint.dimmedHighlight))
-        case nil:
-            HStack(spacing: Theme.Space.xxs) {
-                ProgressView()
-                    .controlSize(.small)
-                if let stage = row.lastCompletedStageLabel {
-                    Text(stage)
-                        .font(Theme.Typography.detailIcon)
-                        .foregroundStyle(Theme.Text.secondary)
-                }
-            }
-        default:
-            Text(row.pipelineResult ?? "")
-                .font(Theme.Typography.file)
-                .foregroundStyle(Theme.Text.secondary)
-        }
-    }
 }
 
-// MARK: - Quick Look
-
-/// Feeds the shared Quick Look panel the file(s) a context-menu or Space-key
-/// action picked. No custom previewer: a format with no Quick Look generator
-/// simply shows the panel's generic icon.
-final class QuickLookCoordinator: NSObject, QLPreviewPanelDataSource {
-    private var items: [URL] = []
-
-    func show(_ urls: [URL]) {
-        guard !urls.isEmpty, let panel = QLPreviewPanel.shared() else { return }
-        items = urls
-        panel.dataSource = self
-        panel.reloadData()
-        panel.makeKeyAndOrderFront(nil)
-    }
-
-    func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
-        items.count
-    }
-
-    func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> QLPreviewItem! {
-        items[index] as NSURL
-    }
-}
-
-// MARK: - NSTableView introspection
-
-/// Assigning a column width invalidates the table's layout, and `updateNSView` fires
-/// once per row appended during a streaming run. Writing a width that has not changed
-/// would therefore keep the window's update-constraints pass alive for as long as rows
-/// keep arriving, which AppKit eventually aborts as a constraint loop.
-enum TableColumnSizing {
-    /// Assigns each width only where it differs from what the column already resolves
-    /// to. The comparison uses the width clamped to the column's own min/max, since
-    /// that — not the requested value — is what the column will end up reporting.
-    @discardableResult
-    static func applyWidths(_ widths: [CGFloat], to tableView: NSTableView) -> [Int] {
-        var resized: [Int] = []
-        for (index, width) in widths.enumerated() where index < tableView.tableColumns.count {
-            let column = tableView.tableColumns[index]
-            let target = min(max(width, column.minWidth), column.maxWidth)
-            guard column.width != target else { continue }
-            column.width = target
-            resized.append(index)
-        }
-        return resized
-    }
-
-    /// How close to a column's right edge a click counts as landing on its divider.
-    static let dividerHitZone: CGFloat = 5
-
-    /// Snaps the column whose divider the click landed on to its unclamped content-fit
-    /// width — the width that shows its widest cell untruncated, past the cap
-    /// `applyWidths` holds it to. That cap lives in the measurement only, never as the
-    /// column's own `maxWidth`, or AppKit would clamp this width straight back down.
-    /// Returns the column it resized, or nil if the click missed every divider.
-    @discardableResult
-    static func fitColumn(atDividerX x: CGFloat, in tableView: NSTableView,
-                          to contentFitWidths: [CGFloat]) -> Int? {
-        for index in 0..<min(tableView.numberOfColumns, contentFitWidths.count)
-        where abs(x - tableView.rect(ofColumn: index).maxX) < dividerHitZone {
-            tableView.tableColumns[index].width = contentFitWidths[index]
-            return index
-        }
-        return nil
-    }
-
-    /// The table can be wider than the panel, so it needs a horizontal scroller.
-    /// Which style that scroller takes is the user's system preference, not the
-    /// app's: forcing the legacy style would override "Show scroll bars" for this one
-    /// view. Each flag is compared before assignment because this runs on every
-    /// update, and an unconditional write would re-invalidate the scroll view's
-    /// layout every pass (jetlag-m9a).
-    static func configureHorizontalScroller(for scrollView: NSScrollView) {
-        if !scrollView.hasHorizontalScroller {
-            scrollView.hasHorizontalScroller = true
-        }
-        if !scrollView.autohidesScrollers {
-            scrollView.autohidesScrollers = true
-        }
-    }
-
-    /// Overlay scrollers stay hidden until a scroll gesture, so a table that has just
-    /// grown past its panel gives no sign that columns lie off to the right. AppKit's
-    /// cue for exactly this is `flashScrollers()`, which reveals them briefly — what
-    /// Finder does when a view's content changes. Called only when a width actually
-    /// changed and the document now overflows, so idle updates never flash.
-    static func revealOverflow(in scrollView: NSScrollView, afterResizing resized: [Int]) {
-        guard !resized.isEmpty, let document = scrollView.documentView,
-              document.frame.width > scrollView.contentView.bounds.width else { return }
-        scrollView.flashScrollers()
-    }
-}
-
-
-private struct ColumnAutoSizer: NSViewRepresentable {
-    let widths: ColumnWidths
-    /// SwiftUI creates the `Table`'s `NSTableView` lazily and updates a representable
-    /// only when its value changes, so widths alone are not enough to reach AppKit: a
-    /// run over uniformly named files computes the same widths every time, and the
-    /// coordinator would never get an update in which the table exists to be found.
-    /// The row count changes on every append, which is exactly when it must look.
-    let rowCount: Int
-
-    final class Coordinator: NSObject {
-        weak var tableView: NSTableView?
-        var widths = ColumnWidths()
-        var gestureInstalled = false
-        var tailFollower: TableTailFollower?
-
-        @objc func headerDoubleClicked(_ gesture: NSClickGestureRecognizer) {
-            guard let headerView = gesture.view as? NSTableHeaderView,
-                  let tableView else { return }
-
-            TableColumnSizing.fitColumn(atDividerX: gesture.location(in: headerView).x,
-                                        in: tableView, to: widths.contentFit)
-        }
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeNSView(context: Context) -> NSView {
-        NSView(frame: .zero)
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        let coordinator = context.coordinator
-        coordinator.widths = widths
-
-        if coordinator.tableView == nil || coordinator.tableView?.window == nil {
-            coordinator.tableView = findTableView(from: nsView)
-        }
-
-        if let tableView = coordinator.tableView {
-            // SwiftUI's Table leaves the NSTableView on uniform autoresizing, which
-            // re-fits every column to the panel's width the moment the widths we set
-            // overflow it — the columns end up proportionally squeezed, not sized to
-            // their content. With autoresizing off the widths stand and the table
-            // overflows into its horizontal scroller instead.
-            if tableView.columnAutoresizingStyle != .noColumnAutoresizing {
-                tableView.columnAutoresizingStyle = .noColumnAutoresizing
-            }
-            let resized = TableColumnSizing.applyWidths(widths.fitted, to: tableView)
-            tableView.enclosingScrollView?.detachSizeFromContent()
-
-            if !coordinator.gestureInstalled, let headerView = tableView.headerView {
-                let gesture = NSClickGestureRecognizer(
-                    target: coordinator,
-                    action: #selector(Coordinator.headerDoubleClicked(_:)))
-                gesture.numberOfClicksRequired = 2
-                // A click recognizer delays the primary mouse button by default (it
-                // reports YES dynamically for its primary-button mask), which holds
-                // mouse-downs back from the header until the gesture fails — the
-                // divider's resize cursor and drag would then only engage after a
-                // first, discarded click. The action fires on the second click either
-                // way, so nothing here needs the delay.
-                gesture.delaysPrimaryMouseButtonEvents = false
-                headerView.addGestureRecognizer(gesture)
-                coordinator.gestureInstalled = true
-            }
-
-            if let scrollView = tableView.enclosingScrollView {
-                // The follower does its own work from AppKit's notifications; nothing
-                // here may scroll, because SwiftUI updates the table's rows in this same
-                // pass and the before/after ordering is undefined.
-                if coordinator.tailFollower?.scrollView !== scrollView {
-                    coordinator.tailFollower = TableTailFollower(scrollView: scrollView)
-                }
-                TableColumnSizing.configureHorizontalScroller(for: scrollView)
-                TableColumnSizing.revealOverflow(in: scrollView, afterResizing: resized)
-            }
-        }
-    }
-
-    /// The window holds more than one `NSTableView` — the sidebar `List` is an outline
-    /// view, and comes first in the window's subview order — so the search starts at
-    /// the nearest ancestor of this view and accepts only a table with this table's
-    /// column count.
-    private func findTableView(from view: NSView) -> NSTableView? {
-        var ancestor = view.superview
-        while let candidate = ancestor {
-            if let found = searchForTableView(in: candidate) { return found }
-            ancestor = candidate.superview
-        }
-        return nil
-    }
-
-    private func searchForTableView(in view: NSView) -> NSTableView? {
-        if let tableView = view as? NSTableView, tableView.tableColumns.count == widths.fitted.count {
-            return tableView
-        }
-        for subview in view.subviews {
-            if let found = searchForTableView(in: subview) {
-                return found
-            }
-        }
-        return nil
-    }
-}
-
-
-// MARK: - Incremental measurement
-
-/// The text a table cell would draw, each part with the font it draws in, and what
-/// else its measurement depends on.
-struct CellText: Equatable {
-    struct Part: Equatable {
-        let text: String
-        let font: NSFont
-    }
-
-    let parts: [Part]
-    let extraWidth: CGFloat
-    let fixedWidth: CGFloat?
-    let maxWidth: CGFloat
-
-    init(_ parts: [(String, NSFont)] = [], extraWidth: CGFloat = 0,
-         fixedWidth: CGFloat? = nil, maxWidth: CGFloat = .infinity) {
-        self.parts = parts.map { Part(text: $0.0, font: $0.1) }
-        self.extraWidth = extraWidth
-        self.fixedWidth = fixedWidth
-        self.maxWidth = maxWidth
-    }
-}
-
-/// The two widths every column has: `fitted` is what the auto-fitter applies — each
-/// column's content width held to its cap — and `contentFit` is the same content
-/// measured without that cap, which a header divider double-click snaps to.
-struct ColumnWidths: Equatable {
-    var fitted: [CGFloat] = []
-    var contentFit: [CGFloat] = []
-}
-
-/// Per-run caches of the quantities that depend on every row. Text measurement is
-/// the expensive part, so each row's cells are measured when the row first appears
-/// and again only when their text changes — a run's live row fills in as its events
-/// arrive and is then replaced by the finalised row at the same index — and the
-/// column widths are the running maxima. Comparing a row's cell text to what was
-/// measured is string work only. Without this each update re-measured every row,
-/// and the app fell behind the pipeline on a few hundred files.
-final class RowMeasurements {
-    private struct Measured {
-        let texts: [CellText]
-        let widths: ColumnWidths
-    }
-
-    private var measured: [DiffTableRow.ID: Measured] = [:]
-    private var widths = ColumnWidths()
+/// The column-width cache plus what only the pipeline's table needs: the timeline's
+/// range, the extent of every row's epochs, folded as rows arrive.
+final class RowMeasurements: ColumnMeasurements {
     private var epochRange: (lo: Double, hi: Double)?
     private var foldedEpochs: [DiffTableRow.ID: (Double?, Double?)] = [:]
-    /// How many rows have had their text measured, for tests that pin the cache.
-    private(set) var measurementCount = 0
 
-    func columnWidths(for rows: [DiffTableRow], texts: (DiffTableRow) -> [CellText]) -> ColumnWidths {
-        var seen = Set<DiffTableRow.ID>()
-        for row in rows {
-            seen.insert(row.id)
-            let cells = texts(row)
-            if let cached = measured[row.id], cached.texts == cells {
-                continue
-            }
-            let cellWidths = ColumnWidths(fitted: cells.map(DiffTableView.idealWidth(of:)),
-                                          contentFit: cells.map(DiffTableView.contentFitWidth(of:)))
-            measurementCount += 1
-            measured[row.id] = Measured(texts: cells, widths: cellWidths)
-            widths = Self.folding(cellWidths, into: widths)
-            fold(epochsOf: row)
-        }
-        if seen.count < measured.count {
-            // Rows were removed (a cleared table): drop what is no longer shown and
-            // rebuild the maxima from what remains.
-            measured = measured.filter { seen.contains($0.key) }
-            foldedEpochs = foldedEpochs.filter { seen.contains($0.key) }
-            widths = measured.values.reduce(ColumnWidths()) { Self.folding($1.widths, into: $0) }
+    func timelineScale(for rows: [DiffTableRow]) -> DiffTableView.TimelineScale {
+        if foldedEpochs.count > rows.count {
+            // Rows were removed (a cleared table): rebuild the range from what remains.
+            let remaining = Set(rows.map(\.id))
+            foldedEpochs = foldedEpochs.filter { remaining.contains($0.key) }
             epochRange = nil
             for (_, epochs) in foldedEpochs {
                 for epoch in [epochs.0, epochs.1].compactMap({ $0 }) { fold(epoch) }
             }
         }
-        return widths
-    }
-
-    /// A column is as wide as its widest row needs, so folding a row's widths into the
-    /// running maxima is a per-column max — growing the maxima to the row's column
-    /// count first, since a row can carry cells for columns nothing has filled yet.
-    private static func folding(_ row: ColumnWidths, into running: ColumnWidths) -> ColumnWidths {
-        ColumnWidths(fitted: folding(row.fitted, into: running.fitted),
-                     contentFit: folding(row.contentFit, into: running.contentFit))
-    }
-
-    private static func folding(_ row: [CGFloat], into running: [CGFloat]) -> [CGFloat] {
-        var maxima = running
-        if maxima.count < row.count {
-            maxima.append(contentsOf: repeatElement(0, count: row.count - maxima.count))
-        }
-        for (index, width) in row.enumerated() where width > maxima[index] {
-            maxima[index] = width
-        }
-        return maxima
-    }
-
-    func timelineScale(for rows: [DiffTableRow]) -> DiffTableView.TimelineScale {
         for row in rows where foldedEpochs[row.id]?.0 != row.originalEpoch || foldedEpochs[row.id]?.1 != row.correctedEpoch {
             fold(epochsOf: row)
         }
