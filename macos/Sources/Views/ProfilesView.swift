@@ -54,7 +54,7 @@ struct ProfilesView: View {
     var body: some View {
         HStack(spacing: 0) {
             profileList
-                .frame(width: 200)
+                .frame(width: Theme.Size.profileList)
 
             Divider()
 
@@ -191,7 +191,7 @@ struct ProfilesView: View {
                                     ?? "questionmark"
                             )
                             .foregroundStyle(Theme.Text.secondary)
-                            .frame(width: 14)
+                            .frame(width: Theme.Size.listIcon)
 
                             let device = [
                                 profile.exif?.make, profile.exif?.model,
@@ -235,7 +235,7 @@ struct ProfilesView: View {
                     newProfileFromCard()
                 } label: {
                     Image(systemName: "plus")
-                        .frame(width: 24, height: 24)
+                        .frame(width: Theme.Size.iconButton, height: Theme.Size.iconButton)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
@@ -244,7 +244,7 @@ struct ProfilesView: View {
                     showDeleteConfirmation = true
                 } label: {
                     Image(systemName: "minus")
-                        .frame(width: 24, height: 24)
+                        .frame(width: Theme.Size.iconButton, height: Theme.Size.iconButton)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
@@ -269,7 +269,7 @@ struct ProfilesView: View {
                     duplicateProfile()
                 } label: {
                     Image(systemName: "doc.on.doc")
-                        .frame(width: 24, height: 24)
+                        .frame(width: Theme.Size.iconButton, height: Theme.Size.iconButton)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
@@ -377,55 +377,41 @@ struct ProfileEditorView: View {
 
     var body: some View {
         ScrollView {
-            Grid(
-                alignment: .leadingFirstTextBaseline,
-                horizontalSpacing: 12,
-                verticalSpacing: 10
-            ) {
-                GridRow {
-                    Text(Strings.Profiles.nameLabel)
-                        .gridColumnAlignment(.trailing)
-                        .frame(minWidth: 110, alignment: .trailing)
-                    TextField(
-                        Strings.Profiles.namePlaceholder,
-                        text: $session.name
-                    )
-                    .textFieldStyle(.roundedBorder)
+            VStack(alignment: .leading, spacing: Theme.Space.xl) {
+                OptionRow(label: Strings.Profiles.nameLabel, labelWidth: Theme.Size.profileLabel) {
+                    TextField(Strings.Profiles.namePlaceholder, text: $session.name)
+                        .textFieldStyle(.roundedBorder)
                 }
 
-                GridRow {
-                    HelpLabel(
-                        Strings.Profiles.typeLabel,
-                        help: Strings.Profiles.typeHelp
-                    )
+                OptionRow(
+                    label: Strings.Profiles.typeLabel, help: Strings.Profiles.typeHelp,
+                    labelWidth: Theme.Size.profileLabel
+                ) {
                     Picker("", selection: typeBinding) {
                         Text(Strings.Profiles.videoOption).tag(MediaType.video)
                         Text(Strings.Profiles.photoOption).tag(MediaType.photo)
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(width: 160)
+                    .frame(width: Theme.Size.typePicker)
                     .disabled(CameraKind(profile: session.profile) != nil)
                 }
 
-                Divider().gridCellUnsizedAxes(.horizontal)
+                Divider()
 
-                GridRow {
-                    Text(Strings.Profiles.sourceDirLabel)
-                    dirField($session.profile.sourceDir)
+                OptionRow(label: Strings.Profiles.sourceDirLabel, labelWidth: Theme.Size.profileLabel) {
+                    directoryField($session.profile.sourceDir)
                 }
-                GridRow {
-                    Text(Strings.Profiles.readyDirLabel)
-                    dirField($session.profile.readyDir)
+                OptionRow(label: Strings.Profiles.readyDirLabel, labelWidth: Theme.Size.profileLabel) {
+                    directoryField($session.profile.readyDir)
                 }
 
-                Divider().gridCellUnsizedAxes(.horizontal)
+                Divider()
 
-                GridRow {
-                    HelpLabel(
-                        Strings.Profiles.cameraLabel,
-                        help: Strings.Profiles.cameraHelp
-                    )
+                OptionRow(
+                    label: Strings.Profiles.cameraLabel, help: Strings.Profiles.cameraHelp,
+                    labelWidth: Theme.Size.profileLabel
+                ) {
                     if let camera = FileCamera(make: session.profile.exif?.make,
                                                model: session.profile.exif?.model) {
                         Text(camera.name)
@@ -435,29 +421,26 @@ struct ProfileEditorView: View {
                     }
                 }
 
-                Divider().gridCellUnsizedAxes(.horizontal)
+                Divider()
 
-                GridRow {
-                    HelpLabel(
-                        Strings.Profiles.fileTypesLabel,
-                        help: Strings.Profiles.fileExtensionsHelp
-                    )
+                OptionRow(
+                    label: Strings.Profiles.fileTypesLabel, help: Strings.Profiles.fileExtensionsHelp,
+                    labelWidth: Theme.Size.profileLabel
+                ) {
                     ExtensionField(items: $session.profile.fileExtensions)
                 }
 
-                GridRow {
-                    HelpLabel(
-                        Strings.Profiles.companionLabel,
-                        help: Strings.Profiles.companionHelp
-                    )
+                OptionRow(
+                    label: Strings.Profiles.companionLabel, help: Strings.Profiles.companionHelp,
+                    labelWidth: Theme.Size.profileLabel
+                ) {
                     ExtensionField(items: $session.profile.companionExtensions)
                 }
 
-                GridRow {
-                    HelpLabel(
-                        Strings.Profiles.tagsLabel,
-                        help: Strings.Profiles.tagsHelp
-                    )
+                OptionRow(
+                    label: Strings.Profiles.tagsLabel, help: Strings.Profiles.tagsHelp,
+                    labelWidth: Theme.Size.profileLabel
+                ) {
                     CommaSeparatedField(
                         items: $session.profile.tags,
                         placeholder: Strings.Profiles.tagPlaceholder
@@ -465,25 +448,21 @@ struct ProfileEditorView: View {
                 }
 
                 if session.profile.type != .photo && gyroflowAvailable {
-                    Divider().gridCellUnsizedAxes(.horizontal)
+                    Divider()
 
-                    GridRow {
-                        Text("")
-                        HStack(spacing: Theme.Space.sm) {
-                            Toggle(
-                                Strings.Profiles.gyroflowToggle,
-                                isOn: gyroflowToggle
-                            )
-                            HelpButton(Strings.Profiles.gyroflowHelp)
-                        }
-                    }
+                    ToggleRow(
+                        title: Strings.Profiles.gyroflowToggle,
+                        isOn: gyroflowToggle,
+                        help: Strings.Profiles.gyroflowHelp
+                    )
+                    .padding(.leading, Theme.Size.profileLabel + Theme.Space.sm)
 
                     if session.profile.gyroflowEnabled == true {
                         gyroflowSettingsRows
                     }
                 }
             }
-            .padding()
+            .padding(Theme.Space.xxxl)
         }
         .safeAreaInset(edge: .bottom) {
             if hasUnsavedChanges {
@@ -496,26 +475,14 @@ struct ProfileEditorView: View {
                         .buttonStyle(.borderedProminent)
                         .disabled(session.name.isEmpty)
                 }
-                .padding()
+                .padding(Theme.Space.xxxl)
                 .background(Theme.Surface.bar)
             }
         }
     }
 
-    private func dirField(_ binding: Binding<String?>) -> some View {
-        HStack(spacing: Theme.Space.md) {
-            TextField("", text: optionalBinding(binding))
-                .textFieldStyle(.roundedBorder)
-            Button(Strings.Common.browse) {
-                let panel = NSOpenPanel()
-                panel.canChooseDirectories = true
-                panel.canChooseFiles = false
-                if panel.runModal() == .OK, let url = panel.url {
-                    binding.wrappedValue = url.path
-                }
-            }
-            .controlSize(.small)
-        }
+    private func directoryField(_ binding: Binding<String?>) -> some View {
+        PathField(placeholder: "", path: optionalBinding(binding), error: nil)
     }
 
     private func optionalBinding(_ binding: Binding<String?>) -> Binding<String>
@@ -557,39 +524,28 @@ struct ProfileEditorView: View {
 
     private var gyroflowSettingsRows: some View {
         Group {
-            GridRow {
-                HelpLabel(
-                    Strings.Profiles.maxZoomLabel,
-                    help: Strings.Profiles.maxZoomHelp
-                )
-                TextField(
-                    "",
-                    value: stabilizationBinding(\.maxZoom),
-                    format: .number
-                )
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 80)
+            OptionRow(
+                label: Strings.Profiles.maxZoomLabel, help: Strings.Profiles.maxZoomHelp,
+                labelWidth: Theme.Size.profileLabel
+            ) {
+                TextField("", value: stabilizationBinding(\.maxZoom), format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: Theme.Size.gyroflowNumberField)
             }
 
-            GridRow {
-                HelpLabel(
-                    Strings.Profiles.adaptiveZoomWindowLabel,
-                    help: Strings.Profiles.adaptiveZoomWindowHelp
-                )
-                TextField(
-                    "",
-                    value: stabilizationBinding(\.adaptiveZoomWindow),
-                    format: .number
-                )
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 80)
+            OptionRow(
+                label: Strings.Profiles.adaptiveZoomWindowLabel, help: Strings.Profiles.adaptiveZoomWindowHelp,
+                labelWidth: Theme.Size.profileLabel
+            ) {
+                TextField("", value: stabilizationBinding(\.adaptiveZoomWindow), format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: Theme.Size.gyroflowNumberField)
             }
 
-            GridRow {
-                HelpLabel(
-                    Strings.Profiles.adaptiveZoomMethodLabel,
-                    help: Strings.Profiles.adaptiveZoomMethodHelp
-                )
+            OptionRow(
+                label: Strings.Profiles.adaptiveZoomMethodLabel, help: Strings.Profiles.adaptiveZoomMethodHelp,
+                labelWidth: Theme.Size.profileLabel
+            ) {
                 Picker("", selection: zoomMethodBinding) {
                     ForEach(AdaptiveZoomMethod.allCases) { method in
                         Text(method.label).tag(method)
@@ -597,7 +553,7 @@ struct ProfileEditorView: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
-                .frame(width: 200)
+                .frame(width: Theme.Size.zoomMethodPicker)
             }
         }
     }
