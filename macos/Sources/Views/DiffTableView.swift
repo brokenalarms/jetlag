@@ -14,9 +14,9 @@ struct DiffTableView: View {
     /// A camera filename can run to 40+ characters, and past this it is truncated
     /// in the middle rather than pushing every other column off the panel.
     static let fileColumnMaxWidth: CGFloat = 320
-    private static let monoFont = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-    private static let systemFont = NSFont.systemFont(ofSize: 11)
-    private static let detailFont = NSFont.systemFont(ofSize: 9)
+    private static let monoFont = Theme.Typography.nsFileMono
+    private static let systemFont = Theme.Typography.nsFile
+    private static let detailFont = Theme.Typography.nsDetail
     /// The writes subtitle lists every stale field (e.g. "Writes Keys:CreationDate,
     /// QuickTime:CreateDate, QuickTime:TrackCreateDate, …"), which can grow past
     /// any reasonable column width. Capped to fit three fields untruncated; a
@@ -151,33 +151,33 @@ struct DiffTableView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.Space.md) {
                 Image(systemName: "tablecells")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Text.secondary)
                 Text(Strings.DiffTable.title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .font(Theme.Typography.subheadlineMedium)
+                    .foregroundStyle(Theme.Text.secondary)
                 Spacer()
                 if !rows.isEmpty {
                     Text(Strings.DiffTable.fileCount(rows.count))
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Text.tertiary)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, Theme.Space.xxl)
+            .padding(.vertical, Theme.Space.md)
 
             Table(rows, selection: $selection) {
                 TableColumn(Strings.DiffTable.fileColumn) { row in
-                    HStack(spacing: 3) {
+                    HStack(spacing: Theme.Space.xs) {
                         if let camera = row.fileCamera {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.orange)
+                                .font(Theme.Typography.detail)
+                                .foregroundStyle(Theme.Status.warning)
                                 .help(Strings.DiffTable.cameraMismatchHelp(camera.name))
                         }
                         Text(row.file)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(Theme.Typography.fileMono)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
@@ -190,14 +190,14 @@ struct DiffTableView: View {
                 .width(min: 50, ideal: 80)
 
                 TableColumn(Strings.DiffTable.originalColumn) { row in
-                    VStack(alignment: .leading, spacing: 1) {
+                    VStack(alignment: .leading, spacing: Theme.Space.hairline) {
                         Text(row.originalTimeDisplay ?? "—")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(row.originalTime != nil ? .primary : .tertiary)
+                            .font(Theme.Typography.fileMono)
+                            .foregroundStyle(row.originalTime != nil ? Theme.Text.primary : Theme.Text.tertiary)
                         if let label = row.timestampSource?.label {
                             Text(label)
-                                .font(.system(size: 9))
-                                .foregroundStyle(.tertiary)
+                                .font(Theme.Typography.detail)
+                                .foregroundStyle(Theme.Text.tertiary)
                                 .lineLimit(1)
                         }
                     }
@@ -207,8 +207,8 @@ struct DiffTableView: View {
 
                 TableColumn(Strings.DiffTable.correctedColumn) { row in
                     Text(row.correctedTime ?? "—")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(row.correctedTime != nil ? .primary : .tertiary)
+                        .font(Theme.Typography.fileMono)
+                        .foregroundStyle(row.correctedTime != nil ? Theme.Text.primary : Theme.Text.tertiary)
                 }
                 .width(min: 130)
 
@@ -223,12 +223,12 @@ struct DiffTableView: View {
                 .width(min: 80)
 
                 TableColumn(Strings.DiffTable.statusColumn) { row in
-                    VStack(alignment: .leading, spacing: 1) {
+                    VStack(alignment: .leading, spacing: Theme.Space.hairline) {
                         statusBadge(row)
                         if let fields = staleFieldsText(row) {
                             Text(Strings.DiffTable.wouldWrite(fields))
-                                .font(.system(size: 9))
-                                .foregroundStyle(.tertiary)
+                                .font(Theme.Typography.detail)
+                                .foregroundStyle(Theme.Text.tertiary)
                                 .lineLimit(1)
                         }
                     }
@@ -274,7 +274,7 @@ struct DiffTableView: View {
             let usable = geo.size.width - markSize
             ZStack(alignment: .leading) {
                 Rectangle()
-                    .fill(Color.primary.opacity(0.06))
+                    .fill(Theme.Text.primaryColor.opacity(Theme.Tint.stripe))
                     .frame(height: 1)
                     .frame(maxWidth: .infinity)
 
@@ -283,21 +283,21 @@ struct DiffTableView: View {
                     let oX = CGFloat(scale.fraction(for: oEpoch)) * usable
                     let cX = CGFloat(scale.fraction(for: cEpoch)) * usable
                     Rectangle()
-                        .fill(Color("NeonCyan").opacity(0.15))
+                        .fill(Theme.Accent.highlight.opacity(Theme.Tint.timelineSpan))
                         .frame(width: abs(cX - oX), height: 2)
                         .offset(x: min(oX, cX) + markSize / 2)
                 }
 
                 if let epoch = row.originalEpoch {
-                    RoundedRectangle(cornerRadius: 0.5)
-                        .fill(Color.primary.opacity(0.25))
+                    RoundedRectangle(cornerRadius: Theme.Radius.tick)
+                        .fill(Theme.Text.primaryColor.opacity(Theme.Tint.tick))
                         .frame(width: 2, height: 10)
                         .offset(x: CGFloat(scale.fraction(for: epoch)) * usable + (markSize - 2) / 2)
                 }
 
                 if let epoch = row.correctedEpoch {
                     Circle()
-                        .fill(Color("NeonCyan"))
+                        .fill(Theme.Accent.highlight)
                         .frame(width: markSize, height: markSize)
                         .offset(x: CGFloat(scale.fraction(for: epoch)) * usable)
                 }
@@ -358,28 +358,28 @@ struct DiffTableView: View {
     /// an apply would leave behind unless the user chooses to overwrite.
     @ViewBuilder
     private func destinationCell(_ row: DiffTableRow) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            HStack(spacing: 3) {
+        VStack(alignment: .leading, spacing: Theme.Space.hairline) {
+            HStack(spacing: Theme.Space.xs) {
                 if row.hasDestinationConflict {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.orange)
+                        .font(Theme.Typography.detail)
+                        .foregroundStyle(Theme.Status.warning)
                 }
                 if let dest = row.dest {
                     Text((dest as NSString).lastPathComponent)
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(Theme.Typography.fileMono)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 } else {
                     Text("—")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.tertiary)
+                        .font(Theme.Typography.fileMono)
+                        .foregroundStyle(Theme.Text.tertiary)
                 }
             }
             if let reason = row.skipReason {
                 Text(reason.explanation)
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
+                    .font(Theme.Typography.detail)
+                    .foregroundStyle(Theme.Text.tertiary)
                     .lineLimit(1)
             }
         }
@@ -388,12 +388,12 @@ struct DiffTableView: View {
 
     @ViewBuilder
     private func timestampCell(_ row: DiffTableRow) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .leading, spacing: Theme.Space.hairline) {
             changeBadge(row)
             if let fields = staleFieldsText(row) {
                 Text(Strings.DiffTable.wouldWrite(fields))
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
+                    .font(Theme.Typography.detail)
+                    .foregroundStyle(Theme.Text.tertiary)
                     .lineLimit(1)
             }
         }
@@ -405,34 +405,34 @@ struct DiffTableView: View {
         let text = changeBadgeText(row)
         switch row.outcome.correction {
         case .wouldFix, .wouldAdd:
-            HStack(spacing: 4) {
+            HStack(spacing: Theme.Space.sm) {
                 if row.requiresForceTimezone {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.orange)
+                        .font(Theme.Typography.detailIcon)
+                        .foregroundStyle(Theme.Status.warning)
                         .help(Strings.DiffTable.requiresForceTimezoneHelp)
                 }
                 Text(text)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color("NeonCyan").opacity(0.7))
+                    .font(Theme.Typography.file)
+                    .foregroundStyle(Theme.Accent.highlight.opacity(Theme.Tint.dimmedHighlight))
             }
         case .fixed, .added:
             Text(text)
-                .font(.system(size: 11))
-                .foregroundStyle(Color("NeonCyan"))
+                .font(Theme.Typography.file)
+                .foregroundStyle(Theme.Accent.highlight)
         case .noChange:
             Text(text)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .font(Theme.Typography.file)
+                .foregroundStyle(Theme.Text.secondary)
         case .error:
             Text(text)
-                .font(.system(size: 11))
-                .foregroundStyle(.red)
+                .font(Theme.Typography.file)
+                .foregroundStyle(Theme.Status.failure)
                 .help(row.timestampError ?? "")
         case nil:
             Text("—")
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
+                .font(Theme.Typography.file)
+                .foregroundStyle(Theme.Text.tertiary)
         }
     }
 
@@ -441,34 +441,34 @@ struct DiffTableView: View {
         switch row.pipelineResult {
         case "changed":
             Label(statusText(row), systemImage: "checkmark.circle.fill")
-                .font(.system(size: 11))
-                .foregroundStyle(Color("NeonCyan"))
+                .font(Theme.Typography.file)
+                .foregroundStyle(Theme.Accent.highlight)
         case "unchanged":
             Label(Strings.DiffTable.noChangeStatus, systemImage: "minus.circle.fill")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .font(Theme.Typography.file)
+                .foregroundStyle(Theme.Text.secondary)
         case "failed":
             Label(Strings.DiffTable.failedStatus, systemImage: "xmark.circle.fill")
-                .font(.system(size: 11))
-                .foregroundStyle(.red)
+                .font(Theme.Typography.file)
+                .foregroundStyle(Theme.Status.failure)
         case "would_change":
             Label(statusText(row), systemImage: "arrow.triangle.2.circlepath.circle.fill")
-                .font(.system(size: 11))
-                .foregroundStyle(Color("NeonCyan").opacity(0.7))
+                .font(Theme.Typography.file)
+                .foregroundStyle(Theme.Accent.highlight.opacity(Theme.Tint.dimmedHighlight))
         case nil:
-            HStack(spacing: 2) {
+            HStack(spacing: Theme.Space.xxs) {
                 ProgressView()
                     .controlSize(.small)
                 if let stage = row.lastCompletedStageLabel {
                     Text(stage)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                        .font(Theme.Typography.detailIcon)
+                        .foregroundStyle(Theme.Text.secondary)
                 }
             }
         default:
             Text(row.pipelineResult ?? "")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .font(Theme.Typography.file)
+                .foregroundStyle(Theme.Text.secondary)
         }
     }
 }

@@ -13,6 +13,7 @@ Where app changes require awareness of the scripts, and vice versa:
 - **Profile schema**: the app reads the same `media-profiles.yaml` the scripts use. Schema changes affect both Swift decoding and Python parsing.
 - **Script bundling**: scripts are copied into the app bundle at build time (postBuildScripts in project.yml). The app always runs bundled scripts, not the repo copy.
 - **Color tokens**: shared with the marketing site via `design/tokens.json` → `design/generate-colorsets.py` → Assets.xcassets color sets.
+- **Styles**: every colour role, tint opacity, corner radius, spacing step and font lives in `Sources/Theme.swift`; views reference `Theme.*` and never carry a style literal.
 
 ## Known gotchas
 

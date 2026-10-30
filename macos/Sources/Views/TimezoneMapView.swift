@@ -8,33 +8,33 @@ struct TimezonePickerView: View {
         Button {
             showingPicker = true
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.Space.md) {
                 Image(systemName: "globe")
                 if selectedTimezone.isEmpty {
                     Text(Strings.Workflow.selectTimezone)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Text.secondary)
 
                 } else if let option = TimezoneCatalog.option(selectedTimezone) {
                     Text(option.city)
                     Text(option.offsetLabel)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .font(Theme.Typography.bodyMono)
+                        .foregroundStyle(Theme.Text.secondary)
                 } else {
                     Text(selectedTimezone)
-                        .font(.system(.body, design: .monospaced))
+                        .font(Theme.Typography.bodyMono)
                 }
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
+                    .font(Theme.Typography.detail)
+                    .foregroundStyle(Theme.Text.secondary)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, Theme.Space.lg)
+            .padding(.vertical, Theme.Space.sm)
             .frame(minWidth: 180)
-            .background(.background)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .background(Theme.Surface.background)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.field))
             .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(.separator, lineWidth: 1)
+                RoundedRectangle(cornerRadius: Theme.Radius.field)
+                    .strokeBorder(Theme.Surface.separator, lineWidth: Theme.Stroke.hairline)
             )
         }
         .buttonStyle(.plain)
@@ -69,7 +69,7 @@ private struct TimezonePickerSheet: View {
         VStack(spacing: 0) {
             HStack {
                 Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Text.secondary)
                 TextField(Strings.Workflow.searchTimezones, text: $searchText)
                     .textFieldStyle(.plain)
                 Spacer()
@@ -77,7 +77,7 @@ private struct TimezonePickerSheet: View {
                     isPresented = false
                 }
             }
-            .padding(8)
+            .padding(Theme.Space.lg)
 
             Divider()
 
@@ -97,15 +97,15 @@ private struct TimezonePickerSheet: View {
                                             .fontWeight(item.id == selectedTimezone ? .semibold : .regular)
                                         if let place = result.match.place {
                                             Text(place)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
+                                                .font(Theme.Typography.caption)
+                                                .foregroundStyle(Theme.Text.secondary)
                                                 .lineLimit(1)
                                         }
                                     }
                                     Spacer()
                                     Text(item.offsetLabel)
-                                        .font(.system(.caption, design: .monospaced))
-                                        .foregroundStyle(.secondary)
+                                        .font(Theme.Typography.captionMono)
+                                        .foregroundStyle(Theme.Text.secondary)
                                 }
                                 .contentShape(Rectangle())
 

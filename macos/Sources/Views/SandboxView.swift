@@ -26,7 +26,7 @@ struct SandboxView: View {
                     canvas
                 default:
                     Text("Select an item")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Text.secondary)
                 }
             }
         }
@@ -37,8 +37,8 @@ struct SandboxView: View {
     private var canvas: some View {
         VStack {
             Text("Sandbox")
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
+                .font(Theme.Typography.largeTitle)
+                .foregroundStyle(Theme.Text.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("Canvas")

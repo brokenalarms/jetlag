@@ -49,12 +49,12 @@ enum PipelineStep: String, CaseIterable, Identifiable {
 
     var iconColor: Color {
         switch self {
-        case .ingest:        Color("NeonCyan")
-        case .tag:           Color("NeonPink")
-        case .fixTimestamps:   Color("NeonYellow")
-        case .organize:      Color.accentColor
-        case .gyroflow:      Color("NeonPurple")
-        case .archiveSource: Color("NeonCyan")
+        case .ingest:        Theme.Accent.ingest
+        case .tag:           Theme.Accent.tag
+        case .fixTimestamps:   Theme.Accent.fixTimestamps
+        case .organize:      Theme.Accent.organize
+        case .gyroflow:      Theme.Accent.gyroflow
+        case .archiveSource: Theme.Accent.archiveSource
         }
     }
 

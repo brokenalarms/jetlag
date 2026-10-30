@@ -90,9 +90,9 @@ final class LogScrollView: ContentAgnosticScrollView {
         textView.isEditable = false
         textView.isSelectable = true
         textView.font = LogTextView.font
-        textView.textColor = .labelColor
-        textView.backgroundColor = .clear
-        textView.textContainerInset = NSSize(width: 10, height: 6)
+        textView.textColor = Theme.Text.log
+        textView.backgroundColor = Theme.Surface.logTextView
+        textView.textContainerInset = NSSize(width: Theme.Space.xl, height: Theme.Space.md)
         textView.autoresizingMask = [.width]
 
         scrollView.documentView = textView

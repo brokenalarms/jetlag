@@ -37,6 +37,7 @@
 		5B1E92778017F81FED24A526 /* GyroflowStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F37A77F3E04133102C3B9228 /* GyroflowStatus.swift */; };
 		5C37852483245BC294545B2B /* WorkflowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC02EFEC0D85CEB6F137381 /* WorkflowView.swift */; };
 		5E3025BA5254CC95E71EFABA /* EmptySource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A16A002850DD5DEAE8711B1 /* EmptySource.swift */; };
+		5E5C5D346C229DE9863E415D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31648629214CCA8E239EA2C2 /* Theme.swift */; };
 		5F7869F0BEBB4DFB2BC2735F /* HostedViewSizing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3FDFFFE053527F6DAFF2443 /* HostedViewSizing.swift */; };
 		6212872C90240AF9DF48B4E0 /* ColumnFitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F442622CEF248F5E277A97 /* ColumnFitTests.swift */; };
 		6565530211ECEF491334BDD9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DCC75F647AA2A41BF2B17B9 /* ContentView.swift */; };
@@ -128,6 +129,7 @@
 		2A5BADCA538054410A590FFD /* RowOutcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowOutcome.swift; sourceTree = "<group>"; };
 		2DB6E838E4C1827858BB004E /* DirtyableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirtyableTests.swift; sourceTree = "<group>"; };
 		31610BDF5B254E8176367A1D /* TimestampSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimestampSourceTests.swift; sourceTree = "<group>"; };
+		31648629214CCA8E239EA2C2 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		3206229BC2E040E55BD1976D /* timezone-places.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "timezone-places.json"; sourceTree = "<group>"; };
 		33AF1E5DF4D368EB36EFB0EC /* PythonRuntimeCheckTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PythonRuntimeCheckTests.swift; sourceTree = "<group>"; };
 		3B7884EFEE29BD136A760320 /* FieldValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldValidation.swift; sourceTree = "<group>"; };
@@ -336,6 +338,7 @@
 				155795936E0AF78F19DDB808 /* Assets.xcassets */,
 				A1EA0220A8EF5122DF196162 /* JetlagApp.swift */,
 				886F8C8992B2C0546F301A05 /* Strings.swift */,
+				31648629214CCA8E239EA2C2 /* Theme.swift */,
 				FD274DA66633AB6A3C7629C3 /* Models */,
 				01516FB122AED4CC9F7C17FA /* Resources */,
 				0530905D99590674005A7361 /* Services */,
@@ -562,6 +565,7 @@
 				4FDCE64D99169FBCD837CF2B /* SettingsView.swift in Sources */,
 				CF708EB9D2E1C9376806BA71 /* Strings.swift in Sources */,
 				1023ABDDCDFA18D19F4B9D35 /* TableTailFollowing.swift in Sources */,
+				5E5C5D346C229DE9863E415D /* Theme.swift in Sources */,
 				F9B0E22DD5926D701DC7BB8B /* TimestampSource.swift in Sources */,
 				8F979D129B6EF35BF9FA8BCB /* TimezoneCatalog.swift in Sources */,
 				C61A796CA3B728982C946AD4 /* TimezoneMapView.swift in Sources */,

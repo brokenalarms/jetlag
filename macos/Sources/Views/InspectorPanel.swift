@@ -19,8 +19,8 @@ struct InspectorPanel: View {
             } else if !state.showLogOutput {
                 Spacer()
                 Text(Strings.Workflow.inspectorEmptyLabel)
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
+                    .font(Theme.Typography.subheadline)
+                    .foregroundStyle(Theme.Text.tertiary)
                 Spacer()
             }
 
@@ -39,20 +39,20 @@ struct InspectorPanel: View {
     /// Scanning a card takes a while before the first file lands in the table.
     /// Without the pipeline's own progress lines this reads as a hang.
     private var startingUp: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: Theme.Space.xl) {
             Spacer()
             ProgressView()
                 .controlSize(.small)
             Text(Strings.Workflow.inspectorStartingLabel)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(Theme.Typography.subheadline)
+                .foregroundStyle(Theme.Text.secondary)
             if let status = state.latestStatusLine {
                 Text(status)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.tertiary)
+                    .font(Theme.Typography.captionMono)
+                    .foregroundStyle(Theme.Text.tertiary)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, Theme.Space.page)
             }
             Spacer()
         }
@@ -62,17 +62,17 @@ struct InspectorPanel: View {
     /// A run over a source with nothing the profile matches has no rows to show,
     /// and the never-run placeholder would read as the run not having happened.
     private func noMediaFiles(_ empty: EmptySource) -> some View {
-        VStack(spacing: 6) {
+        VStack(spacing: Theme.Space.md) {
             Spacer()
             Text(Strings.Workflow.inspectorNoMediaLabel(extensions: empty.extensions))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(Theme.Typography.subheadline)
+                .foregroundStyle(Theme.Text.secondary)
             Text(empty.source)
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.tertiary)
+                .font(Theme.Typography.captionMono)
+                .foregroundStyle(Theme.Text.tertiary)
                 .textSelection(.enabled)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
+                .padding(.horizontal, Theme.Space.page)
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -84,13 +84,13 @@ struct InspectorPanel: View {
                 withAnimation { state.showLogOutput.toggle() }
             } label: {
                 Image(systemName: "terminal")
-                    .foregroundStyle(state.showLogOutput ? .primary : .secondary)
+                    .foregroundStyle(state.showLogOutput ? Theme.Text.primary : Theme.Text.secondary)
             }
             .buttonStyle(.borderless)
             .help(state.showLogOutput ? Strings.Workflow.hideLogOutputHelp : Strings.Workflow.showLogOutputHelp)
             Spacer()
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, Theme.Space.xxl)
+        .padding(.vertical, Theme.Space.md)
     }
 }
