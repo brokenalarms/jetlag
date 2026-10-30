@@ -76,6 +76,15 @@ enum Theme {
         static let page = 24.0
     }
 
+    enum Size {
+        static let form: CGFloat = 600
+        static let helpPopover = 240.0
+        static let headerIcon = 16.0
+        static let optionLabel = 52.0
+        static let numberField = 90.0
+        static let shortNumberField = 70.0
+    }
+
     enum Stroke {
         static let hairline = 1.0
     }

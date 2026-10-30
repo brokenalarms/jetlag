@@ -397,6 +397,15 @@ final class WorkflowSession {
         Self.computeAvailableSteps(profile: workingProfile, gyroflowAvailable: gyroflowAvailable)
     }
 
+    func toggle(_ step: PipelineStep) {
+        guard !step.isAlwaysOn else { return }
+        if enabledSteps.contains(step) {
+            enabledSteps.remove(step)
+        } else {
+            enabledSteps.insert(step)
+        }
+    }
+
     func noteConflict() {
         conflictedRunWasApply = applyMode
     }

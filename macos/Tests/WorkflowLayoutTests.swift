@@ -9,6 +9,14 @@ import AppKit
 /// rather than any number the views declare.
 final class WorkflowLayoutTests: XCTestCase {
 
+    override func setUp() {
+        AccessibilityTree.setBuilt(true)
+    }
+
+    override func tearDown() {
+        AccessibilityTree.setBuilt(false)
+    }
+
     private func host<V: View>(_ view: V, width: CGFloat) -> NSHostingView<V> {
         let host = NSHostingView(rootView: view)
         let window = NSWindow(
@@ -183,9 +191,10 @@ final class WorkflowLayoutTests: XCTestCase {
     /// With every step on, the pills overflowed the bar's width and SwiftUI squeezed
     /// each label until it wrapped mid-word ("Gyroflo / w"). The bar must stay one pill
     /// high however narrow it is: labels give way to icons rather than wrap.
-    func testStatusBarStaysOneLineWithEveryStep() {
+    func testChipBarStaysOneLineWithEveryChip() {
         func height(_ steps: [PipelineStep], width: CGFloat) -> CGFloat {
-            NSHostingController(rootView: PipelineStatusBar(steps: steps))
+            let chips = steps.map { Chip(id: $0.id, icon: $0.systemImage, label: $0.label, tint: $0.iconColor) }
+            return NSHostingController(rootView: ChipBar(chips: chips))
                 .sizeThatFits(in: NSSize(width: width, height: 1000)).height
         }
         let oneLine = height([.ingest], width: 1000)
