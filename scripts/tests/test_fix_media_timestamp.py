@@ -220,7 +220,7 @@ class TestFixMediaTimestamp:
         assert "📊 Change" in result.stderr or "Change" in result.stderr
 
     def test_quicktime_createdate_healing(self, test_video):
-        """Test that corrupted QuickTime CreateDate is healed"""
+        """A corrupted QuickTime CreateDate is healed and the whole clock table rewritten"""
         # Corrupt the QuickTime CreateDate
         subprocess.run([
             "exiftool", "-P", "-overwrite_original",
@@ -269,17 +269,17 @@ class TestFixMediaTimestamp:
 
         assert "2025:06:17 23:25:21" in exif_result.stdout
 
-    def test_stale_movie_header_is_corrected_when_tracks_are_already_right(self, temp_dir):
-        """The Korea import case: DateTimeOriginal and both track atoms already carry
-        the corrected instant while the mvhd movie header is 8 hours off. The run must
-        report a change, heal the header to the same instant as the track atoms, and
+    def test_one_stale_clock_atom_is_corrected_when_the_rest_are_already_right(self, temp_dir):
+        """DateTimeOriginal and two of the clock atoms already carry the corrected
+        instant while the third is 8 hours off. The run must
+        report a change, heal the atom to the same instant as the others, and
         leave the correct DateTimeOriginal alone."""
         video = os.path.join(temp_dir, "stale_header.mp4")
         create_test_video(video, DateTimeOriginal="2025:08:15 15:07:42+09:00")
         subprocess.run([
             "exiftool", "-P", "-overwrite_original",
-            "-QuickTime:CreateDate=2025:08:15 14:07:42",
-            "-QuickTime:MediaCreateDate=2025:08:15 06:07:42",
+            "-QuickTime:CreateDate=2025:08:15 06:07:42",
+            "-QuickTime:MediaCreateDate=2025:08:15 14:07:42",
             "-QuickTime:TrackCreateDate=2025:08:15 06:07:42",
             video
         ], capture_output=True, check=True)
@@ -289,7 +289,7 @@ class TestFixMediaTimestamp:
             video, "--timezone", "+09:00", "--force-timezone"
         ], capture_output=True, text=True)
         assert dry.returncode == 0, dry.stderr
-        assert "QuickTime:CreateDate" in dry.stderr
+        assert "QuickTime:MediaCreateDate" in dry.stderr
         assert "No change" not in dry.stderr
 
         applied = subprocess.run([
@@ -349,9 +349,9 @@ _RANKING_CASES = [
         id="creationdate-with-z-utc",
     ),
     pytest.param(
-        "VID_20260104_033532_00_001.mp4", {"QuickTime:MediaCreateDate": "2026:01:03 18:35:32"},
+        "VID_20260104_033532_00_001.mp4", {"QuickTime:CreateDate": "2026:01:03 18:35:32"},
         ["--timezone", "+13:00", "--apply"],
-        id="mediacreatedate-instant",
+        id="moviecreatedate-instant",
     ),
     pytest.param(
         "VID_20250618_072521_00_001.mp4", {},
@@ -364,9 +364,9 @@ _RANKING_CASES = [
         id="datetimeoriginal-naive",
     ),
     pytest.param(
-        "clip2.mp4", {"QuickTime:MediaCreateDate": "2025:06:18 07:25:21"},
+        "clip2.mp4", {"QuickTime:CreateDate": "2025:06:18 07:25:21"},
         ["--timezone", "+08:00", "--apply"],
-        id="mediacreatedate-no-crosscheck",
+        id="moviecreatedate-no-crosscheck",
     ),
 ]
 
@@ -486,7 +486,7 @@ class TestIdempotenceAcrossRanking:
         away from original_epoch."""
         filename = "VID_20260104_033532_00_001.mp4"
         video = os.path.join(temp_dir, filename)
-        create_test_video(video, **{"QuickTime:MediaCreateDate": "2026:01:03 18:35:32"})
+        create_test_video(video, **{"QuickTime:CreateDate": "2026:01:03 18:35:32"})
 
         cmd = [
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
@@ -634,7 +634,7 @@ class TestFixMediaTimestampMachineOutput:
         zero-offset zone".
         """
         video = os.path.join(temp_dir, "test.mp4")
-        create_test_video(video, **{"QuickTime:MediaCreateDate": "2025:06:17 23:25:21"})
+        create_test_video(video, **{"QuickTime:CreateDate": "2025:06:17 23:25:21"})
 
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
@@ -642,7 +642,7 @@ class TestFixMediaTimestampMachineOutput:
         ], capture_output=True, text=True)
 
         at_lines = _parse_at_lines(result.stdout)
-        assert at_lines.get("timestamp_source") == "mediacreatedate"
+        assert at_lines.get("timestamp_source") == "moviecreatedate"
         assert at_lines.get("original_time") == "2025:06:17 23:25:21Z"
         assert at_lines.get("corrected_time") == "2025:06:18 07:25:21+08:00"
 
@@ -668,15 +668,15 @@ class TestFixMediaTimestampMachineOutput:
         and corrected times are identical: it names the fields the write would touch,
         and is empty once they all match.
 
-        Actual: @@stale_fields=Keys:CreationDate,QuickTime:CreateDate then @@stale_fields=
-        Expected: only the missing Keys:CreationDate and the stale movie header, then nothing.
+        Actual: @@stale_fields=Keys:CreationDate,QuickTime:MediaCreateDate then @@stale_fields=
+        Expected: only the missing Keys:CreationDate and the stale atom, then nothing.
         """
         video = os.path.join(temp_dir, "test.mp4")
         create_test_video(
             video,
             DateTimeOriginal="2025:06:18 07:25:21+08:00",
-            **{"QuickTime:CreateDate": "2025:06:18 07:25:21",
-               "QuickTime:MediaCreateDate": "2025:06:17 23:25:21",
+            **{"QuickTime:CreateDate": "2025:06:17 23:25:21",
+               "QuickTime:MediaCreateDate": "2025:06:18 07:25:21",
                "QuickTime:TrackCreateDate": "2025:06:17 23:25:21"},
         )
 
@@ -686,7 +686,7 @@ class TestFixMediaTimestampMachineOutput:
         ], capture_output=True, text=True)
 
         assert _parse_at_lines(first.stdout).get("stale_fields") == \
-            "Keys:CreationDate,QuickTime:CreateDate"
+            "Keys:CreationDate,QuickTime:MediaCreateDate"
 
         second = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
@@ -706,7 +706,7 @@ class TestFixMediaTimestampMachineOutput:
         Expected: the camera's own zone offset surfaces independently of --timezone.
         """
         video = os.path.join(temp_dir, "VID_20260104_033532_00_001.mp4")
-        create_test_video(video, **{"QuickTime:MediaCreateDate": "2026:01:03 18:35:32"})
+        create_test_video(video, **{"QuickTime:CreateDate": "2026:01:03 18:35:32"})
 
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
@@ -714,7 +714,7 @@ class TestFixMediaTimestampMachineOutput:
         ], capture_output=True, text=True)
 
         at_lines = _parse_at_lines(result.stdout)
-        assert at_lines.get("timestamp_source") == "mediacreatedate"
+        assert at_lines.get("timestamp_source") == "moviecreatedate"
         assert at_lines.get("camera_zone_offset") == "+09:00", f"Actual: @@camera_zone_offset={at_lines.get('camera_zone_offset')}, Expected: +09:00"
 
     def test_camera_zone_offset_present_when_a_different_source_wins(self, temp_dir):
@@ -728,7 +728,7 @@ class TestFixMediaTimestampMachineOutput:
         """
         video = os.path.join(temp_dir, "VID_20260104_033532_00_001.mp4")
         create_test_video(video, DateTimeOriginal="2025:06:18 07:25:21+08:00",
-                           **{"QuickTime:MediaCreateDate": "2026:01:03 18:35:32"})
+                           **{"QuickTime:CreateDate": "2026:01:03 18:35:32"})
 
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,

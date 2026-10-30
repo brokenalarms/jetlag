@@ -10,7 +10,7 @@ import Foundation
 enum TimestampSource: String {
     case dateTimeOriginal = "datetimeoriginal"
     case creationDate = "creationdate"
-    case mediaCreateDate = "mediacreatedate"
+    case movieCreateDate = "moviecreatedate"
     case filename
     case fileBirth = "file_birth"
     case fileModified = "file_mtime"
@@ -24,7 +24,7 @@ enum TimestampSource: String {
         switch self {
         case .dateTimeOriginal: return Strings.DiffTable.sourceDateTimeOriginal
         case .creationDate: return Strings.DiffTable.sourceCreationDate
-        case .mediaCreateDate: return Strings.DiffTable.sourceClockUTC
+        case .movieCreateDate: return Strings.DiffTable.sourceClockUTC
         case .filename: return Strings.DiffTable.sourceFilename
         case .fileBirth, .fileModified: return Strings.DiffTable.sourceFileTime
         }
@@ -34,7 +34,7 @@ enum TimestampSource: String {
     /// The QuickTime clock atoms are UTC by specification; every other source the
     /// ranking can pick either states its own zone or has none.
     var isUTC: Bool {
-        self == .mediaCreateDate
+        self == .movieCreateDate
     }
 
     /// The original timestamp as the table shows it: a UTC instant reads as `UTC`,

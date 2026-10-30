@@ -172,7 +172,7 @@ class TestTimezoneScenarios:
         """
         SCENARIO: File has UTC timestamps, need to specify shooting timezone
 
-        MediaCreateDate: 2025:06:17 23:25:21 (UTC)
+        QuickTime:CreateDate: 2025:06:17 23:25:21 (UTC)
         User knows: Shot in Taiwan (+08:00)
         Local time: Should be 2025:06:18 07:25:21
 
@@ -180,7 +180,7 @@ class TestTimezoneScenarios:
         - DateTimeOriginal: 2025:06:18 07:25:21+08:00 (converted from UTC + TZ)
         """
         video_path = os.path.join(self.temp_dir, "utc_video.mp4")
-        create_test_video(video_path, **{"QuickTime:MediaCreateDate": "2025:06:17 23:25:21"})
+        create_test_video(video_path, **{"QuickTime:CreateDate": "2025:06:17 23:25:21"})
 
         # Run with timezone - should convert UTC to local time
         subprocess.run([

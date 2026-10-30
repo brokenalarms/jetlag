@@ -507,9 +507,9 @@ class TestGetAllTimestampData:
         assert data["datetime_original"].day == 18
         assert data["datetime_original"].utcoffset() == timedelta(hours=8)
 
-    def test_mediacreatedate_with_timezone_flag(self):
+    def test_moviecreatedate_with_timezone_flag(self):
         """MediaCreateDate (UTC) needs --timezone to convert to local time"""
-        video = self._create_video("test.mp4", ["-QuickTime:MediaCreateDate=2025:06:17 23:25:21"])
+        video = self._create_video("test.mp4", ["-QuickTime:CreateDate=2025:06:17 23:25:21"])
 
         data = fmt.get_all_timestamp_data(video, timezone_spec="+08:00")
 
@@ -524,7 +524,7 @@ class TestGetAllTimestampData:
         converted into the declared zone rather than the filename being labelled."""
         video = self._create_video(
             "VID_20260104_033532_00_001.mp4",
-            ["-QuickTime:MediaCreateDate=2026:01:03 18:35:32"],
+            ["-QuickTime:CreateDate=2026:01:03 18:35:32"],
         )
 
         data = fmt.get_all_timestamp_data(video, timezone_spec="+13:00")
@@ -1262,7 +1262,7 @@ class TestMachineOriginalTimeCarriesZoneSemantics:
         """A MediaCreateDate original is a UTC instant: emitted with a trailing Z so
         it is never mistaken for a +00:00 local-zone offset."""
         video = self._video("test.mp4",
-                            **{"QuickTime:MediaCreateDate": "2025:06:17 23:25:21"})
+                            **{"QuickTime:CreateDate": "2025:06:17 23:25:21"})
 
         result = fmt.fix_media_timestamps(video, dry_run=True, timezone_spec="+08:00")
 
@@ -1315,14 +1315,14 @@ class TestStaleFieldsNamesWhatWouldBeWritten:
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
         fmt._exif_cache.clear()
-        # Zoned DateTimeOriginal and track atoms already correct for +08:00; only the
-        # movie header is eight hours out and Keys:CreationDate is missing entirely.
+        # Zoned DateTimeOriginal and every clock atom but one already correct for +08:00;
+        # one atom is eight hours out and Keys:CreationDate is missing entirely.
         self.video = os.path.join(self.temp_dir, "test.mp4")
         create_test_video(
             self.video,
             DateTimeOriginal="2025:06:18 07:25:21+08:00",
-            **{"QuickTime:CreateDate": "2025:06:18 07:25:21",
-               "QuickTime:MediaCreateDate": "2025:06:17 23:25:21",
+            **{"QuickTime:CreateDate": "2025:06:17 23:25:21",
+               "QuickTime:MediaCreateDate": "2025:06:18 07:25:21",
                "QuickTime:TrackCreateDate": "2025:06:17 23:25:21"},
         )
         fmt._exif_cache.clear()
@@ -1332,12 +1332,12 @@ class TestStaleFieldsNamesWhatWouldBeWritten:
         fmt._exif_cache.clear()
 
     def test_lists_exactly_the_write_tags_that_differ(self):
-        """The correct track atoms are not listed; the missing Keys:CreationDate and
-        the stale movie header are."""
+        """The correct atoms are not listed; the missing Keys:CreationDate and
+        the stale atom are."""
         result = fmt.fix_media_timestamps(self.video, dry_run=True, timezone_spec="+08:00")
 
         assert result.timestamp_action == "would_fix"
-        assert result.stale_fields == ["Keys:CreationDate", "QuickTime:CreateDate"]
+        assert result.stale_fields == ["Keys:CreationDate", "QuickTime:MediaCreateDate"]
 
     def test_empty_once_the_correction_has_landed(self):
         """After applying, nothing differs from its target, so the list is empty and
@@ -1415,12 +1415,12 @@ class TestAddingMissingFieldsIsNotAFix:
         assert f"-FileCreateDate={self.expected_birth}" in writes[0]
 
     def test_a_stored_value_that_disagrees_is_still_a_fix(self):
-        """The movie header is an hour out while the track atoms are right: the
-        correction overwrites a value the file holds, not just an empty one."""
+        """A stored clock field that is an hour out is a fix: the correction
+        overwrites a value the file holds, not just an empty one."""
         create_test_video(
             self.video,
-            **{"QuickTime:CreateDate": "2026:10:28 07:08:08",
-               "QuickTime:MediaCreateDate": "2026:10:28 06:08:08",
+            **{"QuickTime:CreateDate": "2026:10:28 06:08:08",
+               "QuickTime:MediaCreateDate": "2026:10:28 07:08:08",
                "QuickTime:TrackCreateDate": "2026:10:28 06:08:08"},
         )
         fmt._exif_cache.clear()
@@ -1428,7 +1428,7 @@ class TestAddingMissingFieldsIsNotAFix:
         result = fmt.fix_media_timestamps(self.video, dry_run=True, timezone_spec="+05:30")
 
         assert result.timestamp_action == "would_fix"
-        assert "QuickTime:CreateDate" in result.stale_fields
+        assert "QuickTime:MediaCreateDate" in result.stale_fields
 
     @pytest.mark.skipif(sys.platform != "darwin", reason="birth time is only corrected on macOS")
     def test_a_wrong_birth_time_is_still_a_fix(self):

@@ -23,8 +23,8 @@ The ranking rules and the reasoning behind them live in
 | `Keys:CreationDate` | `com.apple.quicktime.creationdate` (Keys metadata) | text | self-describing: `Z` = digits are UTC; `±HH:MM` = digits are local in that zone; bare = naive | iPhone writes zoned local; trustworthy when zoned. FCP keys off this field | yes | yes — zoned local |
 | `DateTimeOriginal` | `XMP-exif` on video (where a bare exiftool write lands); UserData/`IDIT` natively; binary EXIF on stills | text | XMP is ISO-8601, zone may ride in the value; **binary EXIF is exactly 19 chars — no zone possible** (see `OffsetTimeOriginal`) | camera-written: local + camera's zone setting; jetlag-written: local + declared zone | yes | yes |
 | `OffsetTimeOriginal` | binary EXIF (stills), added in EXIF 2.31 | text `±HH:MM` | **always and only the zone** of `DateTimeOriginal`'s digits — never an instruction to shift time | cameras that set it are stating their zone setting | yes — completes a bare `DateTimeOriginal` into a zoned value at read time | yes — alongside `DateTimeOriginal`, same write |
-| `QuickTime:CreateDate`, `ModifyDate` | `mvhd` movie header atom | integer, seconds since 1904 | UTC by specification | devices vary; ecosystem docs (exiftool, PhotoPrism #1388) report local-time writers. Not observed on our devices — X4 writes true UTC. **Proof required per file** (below) | yes | yes — UTC, computed in Python, written raw |
-| `QuickTime:MediaCreateDate`, `MediaModifyDate` | `mdhd` per-track atom | integer, seconds since 1904 | UTC by specification | as above | yes | yes — UTC, written with the header and track atoms in one call |
+| `QuickTime:CreateDate`, `ModifyDate` | `mvhd` movie header atom | integer, seconds since 1904 | UTC by specification | devices vary; ecosystem docs (exiftool, PhotoPrism #1388) report local-time writers. Not observed on our devices — X4 writes true UTC. **Proof required per file** (below) | yes — read as `QuickTime:CreateDate` explicitly: an unqualified `CreateDate` in a QuickTime file prefers XMP, so a stray XMP `CreateDate` would win. **This is the clock the ranking uses** | yes — UTC, computed in Python, written raw |
+| `QuickTime:MediaCreateDate`, `MediaModifyDate` | `mdhd` per-track atom | integer, seconds since 1904 | UTC by specification | as above | yes — not the clock; camera originals write it identical to the header, but track dates are left empty or zeroed more often | yes — UTC, written with the header and track atoms in one call |
 | `TrackCreateDate`, `TrackModifyDate` | `tkhd` per-track atom | integer, seconds since 1904 | UTC by specification | written since corrections reached the track atoms; the provenance record, not these atoms, is what makes a damaged file recoverable | yes | yes — UTC, written with the header and media atoms in one call |
 | filename digits | the name itself | text | **never zoned** — no filename pattern carries a zone | the camera's own wall-clock display; first truth for local time absent disconfirming metadata | yes | renamed by `--update-filename-dates` |
 | file birth / mtime | filesystem | epoch | filesystem-dependent | changes with copies; last resort | yes (macOS) | yes |
@@ -73,9 +73,9 @@ The filename side of the subtraction is always local wall clock — the check wo
 | 1 | `DateTimeOriginal` with zone — inline, **or** completed by `OffsetTimeOriginal` | no (self-contained); declared zone converts it, gated by `--force-timezone` |
 | 2 | `Keys:CreationDate` with zone | no — same |
 | 3 | `Keys:CreationDate` ending `Z` | yes — UTC can't be labelled without one |
-| 4 | clock (`MediaCreateDate`), corroborated UTC | yes — same |
+| 4 | clock (`QuickTime:CreateDate`, the movie header), corroborated UTC | yes — same |
 | 5 | filename digits (camera patterns) | yes — digits are naive |
-| 6 | clock (`MediaCreateDate`), uncorroborated — UTC by specification only | yes |
+| 6 | clock (`QuickTime:CreateDate`, the movie header), uncorroborated — UTC by specification only | yes |
 | 7 | `DateTimeOriginal` bare **and** no `OffsetTimeOriginal`; bare `Keys:CreationDate` ranks here too | yes |
 | 8 | file birth / mtime | yes |
 

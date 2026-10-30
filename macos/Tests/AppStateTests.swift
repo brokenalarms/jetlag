@@ -169,7 +169,7 @@ final class TimezoneConflictTests: XCTestCase {
         feed(state, """
         {"event": "timestamp_result", "file": "test.mp4", "action": "would_fix", \
         "original_time": "2025:08:30 09:00:00Z", "corrected_time": "2025:08:30 18:00:00+09:00", \
-        "source": "mediacreatedate", "stale_fields": ["Keys:CreationDate"]}
+        "source": "moviecreatedate", "stale_fields": ["Keys:CreationDate"]}
         """)
         feed(state, #"{"event": "pipeline_result", "file": "test.mp4", "result": "would_change"}"#)
 

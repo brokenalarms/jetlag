@@ -101,7 +101,7 @@ events:
       action: would_fix
       original_time: "2025:08:15 10:11:12Z"
       corrected_time: "2025:08:15 19:11:12+09:00"
-      source: mediacreatedate
+      source: moviecreatedate
       timezone: "+09:00"
       correction_mode: timezone
       time_offset_seconds: 32400
