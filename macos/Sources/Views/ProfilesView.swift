@@ -78,7 +78,7 @@ struct ProfilesView: View {
                 .frame(maxWidth: .infinity)
             } else {
                 Text(Strings.Profiles.selectPrompt)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Text.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -184,25 +184,25 @@ struct ProfilesView: View {
         VStack(spacing: 0) {
             List(selection: $selectedProfile) {
                 ForEach(state.sortedProfileNames, id: \.self) { name in
-                    HStack(spacing: 6) {
+                    HStack(spacing: Theme.Space.md) {
                         if let profile = state.profile(named: name) {
                             Image(
                                 systemName: profile.type?.systemImage
                                     ?? "questionmark"
                             )
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.Text.secondary)
                             .frame(width: 14)
 
                             let device = [
                                 profile.exif?.make, profile.exif?.model,
                             ]
                             .compactMap { $0 }.joined(separator: " ")
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                                 if !device.isEmpty {
                                     Text(device).fontWeight(.medium)
                                     Text(name)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .font(Theme.Typography.caption)
+                                        .foregroundStyle(Theme.Text.secondary)
                                 } else {
                                     Text(name).fontWeight(.medium)
                                 }
@@ -213,7 +213,7 @@ struct ProfilesView: View {
                         Spacer()
                         if duplicatedProfiles.contains(name) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Theme.Status.warning)
                                 .help(Strings.Profiles.duplicateCameraHelp)
                         }
                     }
@@ -277,7 +277,7 @@ struct ProfilesView: View {
 
                 Spacer()
             }
-            .padding(6)
+            .padding(Theme.Space.md)
         }
     }
 
@@ -431,7 +431,7 @@ struct ProfileEditorView: View {
                         Text(camera.name)
                     } else {
                         Text(Strings.Profiles.noCameraRecorded)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.Text.secondary)
                     }
                 }
 
@@ -469,7 +469,7 @@ struct ProfileEditorView: View {
 
                     GridRow {
                         Text("")
-                        HStack(spacing: 4) {
+                        HStack(spacing: Theme.Space.sm) {
                             Toggle(
                                 Strings.Profiles.gyroflowToggle,
                                 isOn: gyroflowToggle
@@ -497,13 +497,13 @@ struct ProfileEditorView: View {
                         .disabled(session.name.isEmpty)
                 }
                 .padding()
-                .background(.bar)
+                .background(Theme.Surface.bar)
             }
         }
     }
 
     private func dirField(_ binding: Binding<String?>) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Theme.Space.md) {
             TextField("", text: optionalBinding(binding))
                 .textFieldStyle(.roundedBorder)
             Button(Strings.Common.browse) {
@@ -642,7 +642,7 @@ struct HelpLabel: View {
     }
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Theme.Space.sm) {
             Text(text)
             HelpButton(help)
         }
@@ -659,12 +659,12 @@ struct HelpButton: View {
 
     var body: some View {
         Image(systemName: "questionmark.circle")
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.Text.secondary)
             .onTapGesture { showHelp.toggle() }
             .popover(isPresented: $showHelp, arrowEdge: .bottom) {
                 Text(text)
-                    .font(.caption)
-                    .padding(10)
+                    .font(Theme.Typography.caption)
+                    .padding(Theme.Space.xl)
                     .frame(width: 240, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             }

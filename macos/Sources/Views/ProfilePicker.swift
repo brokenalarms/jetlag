@@ -21,15 +21,15 @@ struct ProfilePicker: View {
         let deviceName = [make, model].compactMap { $0 }.joined(separator: " ")
         let typeImage = profile?.type?.systemImage ?? "questionmark"
 
-        return HStack(spacing: 6) {
+        return HStack(spacing: Theme.Space.md) {
             Image(systemName: typeImage)
                 .frame(width: 14)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Text.secondary)
             if !deviceName.isEmpty {
                 Text(deviceName)
                 Text(name)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Text.secondary)
             } else {
                 Text(name)
             }

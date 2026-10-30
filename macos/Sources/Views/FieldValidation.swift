@@ -63,8 +63,8 @@ extension View {
         self
         if let error {
             Label(error, systemImage: "exclamationmark.triangle.fill")
-                .font(.caption)
-                .foregroundStyle(.red)
+                .font(Theme.Typography.caption)
+                .foregroundStyle(Theme.Status.failure)
         }
     }
 }

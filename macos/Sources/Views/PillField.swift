@@ -10,7 +10,7 @@ struct CommaSeparatedField: View {
     var body: some View {
         TextField(placeholder, text: $text)
             .textFieldStyle(.roundedBorder)
-            .font(.system(size: 11, design: .monospaced))
+            .font(Theme.Typography.fileMono)
             .onAppear { text = (items ?? []).joined(separator: ", ") }
             .onChange(of: text) { _, newValue in
                 let parsed = newValue

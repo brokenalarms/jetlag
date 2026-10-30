@@ -9,45 +9,45 @@ struct UpgradeView: View {
     @State private var licenseKey = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: Theme.Space.section) {
             // Header
-            HStack(spacing: 12) {
+            HStack(spacing: Theme.Space.xxl) {
                 Image(systemName: "lock.fill")
-                    .font(.system(size: 28))
-                    .foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 2) {
+                    .font(Theme.Typography.hero)
+                    .foregroundStyle(Theme.Text.secondary)
+                VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                     Text(Strings.Upgrade.title)
-                        .font(.title2.bold())
+                        .font(Theme.Typography.title)
                     Text(Strings.Upgrade.subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(Theme.Typography.subheadline)
+                        .foregroundStyle(Theme.Text.secondary)
                 }
             }
 
             Divider()
 
             // Limit message
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 Text(Strings.Upgrade.jobFileCount(fileCount))
-                    .font(.body)
+                    .font(Theme.Typography.body)
                 Text(Strings.Upgrade.freeLimit(fileLimit: store.fileLimit))
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                    .font(Theme.Typography.body)
+                    .foregroundStyle(Theme.Text.secondary)
             }
 
             // Value prop
             Text(Strings.Upgrade.valueProp)
-                .font(.body)
+                .font(Theme.Typography.body)
                 .fixedSize(horizontal: false, vertical: true)
 
             Divider()
 
             // License key entry
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Theme.Space.lg) {
                 Text(Strings.Upgrade.alreadyPurchased)
-                    .font(.subheadline.weight(.medium))
+                    .font(Theme.Typography.subheadlineMedium)
 
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.Space.lg) {
                     TextField(Strings.Settings.licenseKeyPlaceholder, text: $licenseKey)
                         .textFieldStyle(.roundedBorder)
                         .disabled(store.isActivating)
@@ -60,8 +60,8 @@ struct UpgradeView: View {
 
                 if let error = store.activationError {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Status.failure)
                 }
             }
 
@@ -77,7 +77,7 @@ struct UpgradeView: View {
                 Button(Strings.Common.cancel, role: .cancel) { onDismiss() }
             }
         }
-        .padding(24)
+        .padding(Theme.Space.page)
         .frame(width: 420)
     }
 

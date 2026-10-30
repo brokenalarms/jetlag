@@ -7,17 +7,17 @@ struct LogOutputView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.Space.md) {
                 Image(systemName: "terminal")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Text.secondary)
                 Text(Strings.LogOutput.title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .font(Theme.Typography.subheadlineMedium)
+                    .foregroundStyle(Theme.Text.secondary)
                 Spacer()
                 if !lines.isEmpty {
                     Text(Strings.LogOutput.lineCount(lines.count))
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Text.tertiary)
                 }
                 Button {
                     let text = LogTextView.displayText(for: lines)
@@ -30,19 +30,19 @@ struct LogOutputView: View {
                     )
                 }
                 .buttonStyle(.borderless)
-                .font(.caption)
+                .font(Theme.Typography.caption)
                 .disabled(lines.isEmpty)
 
                 Button(Strings.LogOutput.clearButton) { onClear() }
                     .buttonStyle(.borderless)
-                    .font(.caption)
+                    .font(Theme.Typography.caption)
                     .disabled(lines.isEmpty)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, Theme.Space.xxl)
+            .padding(.vertical, Theme.Space.md)
 
             LogTextView(lines: lines, holder: holder)
-                .background(Color(nsColor: .textBackgroundColor).opacity(0.5))
+                .background(Theme.Surface.log)
         }
         .frame(maxHeight: .infinity)
     }
@@ -56,10 +56,10 @@ struct LogTextView: NSViewRepresentable {
     let lines: [LogLine]
     let holder: LogViewHolder
 
-    static let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+    static let font = Theme.Typography.nsLog
 
     private static var textAttributes: [NSAttributedString.Key: Any] {
-        [.font: font, .foregroundColor: NSColor.labelColor]
+        [.font: font, .foregroundColor: Theme.Text.log]
     }
 
     func makeNSView(context: Context) -> LogScrollView {

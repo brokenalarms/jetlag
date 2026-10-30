@@ -10,14 +10,14 @@ struct SettingsView: View {
             Section(Strings.Settings.licenseSection) {
                 if licenseStore.isUnlocked {
                     Label(Strings.Settings.proActivated, systemImage: "checkmark.seal.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Theme.Status.success)
                 } else {
                     LabeledContent(Strings.Settings.planLabel) {
                         Text(Strings.Settings.freePlan(fileLimit: licenseStore.fileLimit))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.Text.secondary)
                     }
 
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.Space.lg) {
                         TextField(Strings.Settings.licenseKeyPlaceholder, text: $licenseKey)
                             .textFieldStyle(.roundedBorder)
                             .disabled(licenseStore.isActivating)
@@ -29,8 +29,8 @@ struct SettingsView: View {
 
                     if let error = licenseStore.activationError {
                         Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.red)
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Status.failure)
                     }
 
                     Button(Strings.Settings.buyProButton) {
@@ -46,18 +46,18 @@ struct SettingsView: View {
             Section(Strings.Settings.gyroflowSection) {
                 if state.gyroflowStatus.isInstalled {
                     Label(Strings.Settings.gyroflowInstalled, systemImage: "checkmark.circle")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Theme.Status.success)
                     LabeledContent(Strings.Settings.gyroflowSourceLabel) {
                         Text(state.gyroflowStatus.displayName)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.Text.secondary)
                             .textSelection(.enabled)
                     }
                 } else {
                     Label(Strings.Settings.gyroflowMissing, systemImage: "info.circle")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
+                        .foregroundStyle(Theme.Text.secondary)
+                        .font(Theme.Typography.caption)
 
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.Space.lg) {
                         Button(state.isInstallingGyroflow
                                ? Strings.Settings.gyroflowInstallingButton
                                : Strings.Settings.gyroflowInstallButton) {
@@ -69,14 +69,14 @@ struct SettingsView: View {
                             ProgressView()
                                 .controlSize(.small)
                             Text(state.gyroflowInstallProgress ?? "")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(Theme.Text.secondary)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                         } else {
                             Text(Strings.Settings.gyroflowDownloadNote)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(Theme.Text.secondary)
                         }
                     }
                 }
@@ -85,14 +85,14 @@ struct SettingsView: View {
             Section(Strings.Settings.scriptsSection) {
                 LabeledContent(Strings.Settings.scriptsDirLabel) {
                     Text(state.scriptsDirectory)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Text.secondary)
                         .textSelection(.enabled)
                 }
 
                 LabeledContent(Strings.Settings.profilesFileLabel) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.Space.lg) {
                         Text(state.profilesLocation.path)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.Text.secondary)
                             .textSelection(.enabled)
                             .truncationMode(.middle)
                             .lineLimit(1)
@@ -106,15 +106,15 @@ struct SettingsView: View {
                 HStack {
                     if let error = state.profileLoadError {
                         Label(error.displayMessage, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.red)
-                            .font(.caption)
+                            .foregroundStyle(Theme.Status.failure)
+                            .font(Theme.Typography.caption)
                     } else if let config = state.profilesConfig {
                         Label(
                             Strings.Settings.profilesLoaded(count: config.profiles.count),
                             systemImage: "checkmark.circle"
                         )
-                        .foregroundStyle(.green)
-                        .font(.caption)
+                        .foregroundStyle(Theme.Status.success)
+                        .font(Theme.Typography.caption)
                     }
                     Spacer()
                     Button(Strings.Settings.reloadProfilesButton) { loadProfiles() }
