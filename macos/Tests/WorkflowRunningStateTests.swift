@@ -11,6 +11,14 @@ import AppKit
 /// exact "Group field accepted typing" regression the bug reported.
 final class WorkflowRunningStateTests: XCTestCase {
 
+    override func setUp() {
+        AccessibilityTree.setBuilt(true)
+    }
+
+    override func tearDown() {
+        AccessibilityTree.setBuilt(false)
+    }
+
     private func host<V: View>(_ view: V, height: CGFloat = 1600) -> NSHostingView<V> {
         let host = NSHostingView(rootView: view)
         let window = NSWindow(

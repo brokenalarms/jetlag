@@ -3,7 +3,6 @@ import SwiftUI
 struct WorkflowView: View {
     @Bindable var state: AppState
     @State private var upgradePrompt: UpgradePrompt?
-    @FocusState private var editingSource: Bool
     private var licenseStore: LicenseStore { LicenseStore.shared }
 
     private struct UpgradePrompt: Identifiable {
@@ -15,9 +14,7 @@ struct WorkflowView: View {
     /// intrinsic width, so the form cannot be sized from its content; everything around
     /// it — the panel's share, the window's minimum — is derived from this by the layout
     /// system rather than declared again.
-    static let formWidth: CGFloat = 600
-
-    private let optionLabelWidth: CGFloat = 52
+    static let formWidth = Theme.Size.form
 
     private var companionExtensions: String {
         state.workflowSession.workingProfile.companionExtensions?.joined(separator: ", ") ?? ""
@@ -31,11 +28,13 @@ struct WorkflowView: View {
                     .disabled(state.isRunning)
                     .padding(.vertical)
                 if !session.profileName.isEmpty {
-                    pipelineStatusBar
+                    ChipBar(chips: session.availableSteps
+                        .filter { $0.isAlwaysOn || session.enabledSteps.contains($0) }
+                        .map { Chip(id: $0.id, icon: $0.systemImage, label: $0.label, tint: $0.iconColor) })
                         .padding(.vertical, Theme.Space.lg)
                     Rectangle()
                         .fill(Theme.Text.primaryColor.opacity(Theme.Tint.rule))
-                        .frame(height: 1)
+                        .frame(height: Theme.Stroke.hairline)
                         .shadow(color: Theme.Surface.shadow, radius: Theme.Shadow.radius, y: Theme.Shadow.offsetY)
                 }
             }
@@ -55,9 +54,6 @@ struct WorkflowView: View {
             .scrollBounceBehavior(.basedOnSize)
             if !session.profileName.isEmpty {
                 executionBar
-                    .padding(.horizontal, Theme.Space.xxxl)
-                    .padding(.vertical, Theme.Space.xl)
-                    .background(Theme.Surface.bar)
             }
         }
         .onAppear {
@@ -291,91 +287,25 @@ struct WorkflowView: View {
         }
     }
 
-    // MARK: - Pipeline status bar
-
-    private var pipelineStatusBar: some View {
-        let session = state.workflowSession
-        return PipelineStatusBar(
-            steps: session.availableSteps.filter { $0.isAlwaysOn || session.enabledSteps.contains($0) })
-    }
-
     // MARK: - Pipeline steps
 
     private var stepsPipeline: some View {
-        let steps = state.workflowSession.availableSteps
+        let session = state.workflowSession
         return VStack(spacing: Theme.Space.lg) {
-            ForEach(steps) { step in
-                stepCard(step)
-            }
-        }
-    }
-
-    private func stepCard(_ step: PipelineStep) -> some View {
-        let isActive = step.isAlwaysOn || state.workflowSession.enabledSteps.contains(step)
-        return VStack(spacing: 0) {
-            stepHeader(step, isActive: isActive)
-            if isActive {
-                Divider()
-                stepOptionsContent(step)
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card))
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.card)
-                .strokeBorder(
-                    isActive ? step.iconColor.opacity(step.isAlwaysOn ? Theme.Tint.borderAlwaysOn : Theme.Tint.border)
-                             : Theme.Text.secondaryColor.opacity(Theme.Tint.borderInactive),
-                    lineWidth: Theme.Stroke.hairline
-                )
-        )
-    }
-
-    @ViewBuilder
-    private func stepHeader(_ step: PipelineStep, isActive: Bool) -> some View {
-        if step.isAlwaysOn {
-            stepHeaderContent(step, isActive: isActive)
-        } else {
-            Button {
-                if isActive {
-                    state.workflowSession.enabledSteps.remove(step)
-                } else {
-                    state.workflowSession.enabledSteps.insert(step)
+            ForEach(session.availableSteps) { step in
+                Card(
+                    title: step.label,
+                    icon: step.systemImage,
+                    tint: step.iconColor,
+                    help: step.help,
+                    isRequired: step.isAlwaysOn,
+                    isActive: step.isAlwaysOn || session.enabledSteps.contains(step),
+                    onToggle: { session.toggle(step) }
+                ) {
+                    stepOptionsContent(step)
                 }
-            } label: {
-                stepHeaderContent(step, isActive: isActive)
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    private func stepHeaderContent(_ step: PipelineStep, isActive: Bool) -> some View {
-        HStack(spacing: Theme.Space.lg) {
-            Image(systemName: step.systemImage)
-                .font(Theme.Typography.step)
-                .foregroundStyle(isActive ? step.iconColor : Theme.Text.secondaryColor)
-                .frame(width: 16)
-
-            Text(step.label)
-                .font(Theme.Typography.stepMedium)
-
-            HelpButton(step.help)
-
-            Spacer()
-
-            if step.isAlwaysOn {
-                Text(Strings.Workflow.requiredLabel)
-                    .font(Theme.Typography.chip)
-                    .foregroundStyle(Theme.Text.tertiary)
-            } else {
-                Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(isActive ? step.iconColor : Theme.Text.secondaryColor)
             }
         }
-        .padding(.horizontal, Theme.Space.xl)
-        .padding(.vertical, Theme.Space.lg)
-        .background(isActive ? step.iconColor.opacity(step.isAlwaysOn ? Theme.Tint.headerAlwaysOn : Theme.Tint.header) : Theme.Surface.clear)
-        .foregroundStyle(isActive ? Theme.Text.primary : Theme.Text.secondary)
-        .contentShape(Rectangle())
     }
 
     @ViewBuilder
@@ -401,111 +331,65 @@ struct WorkflowView: View {
     private var ingestOptions: some View {
         @Bindable var session = state.workflowSession
         return VStack(alignment: .leading, spacing: Theme.Space.lg) {
-            VStack(alignment: .leading, spacing: Theme.Space.sm) {
-                HStack(spacing: Theme.Space.md) {
-                    TextField(Strings.Workflow.sourceDirPlaceholder, text: $session.sourceDir.value)
-                        .textFieldStyle(.roundedBorder)
-                        .truncationMode(.head)
-                        .help(session.sourceDir.current)
-                        .focused($editingSource)
-                        .onSubmit { session.chooseSource() }
-                        .onChange(of: editingSource) { _, editing in
-                            if !editing { session.chooseSource() }
-                        }
-                    Button(Strings.Common.browse) { pickSourceDir() }
-                        .controlSize(.small)
-                }
-                .fieldError(validateDirectory(session.sourceDir.current))
-            }
-
-            HStack(spacing: Theme.Space.sm) {
-                Toggle(isOn: $session.copyCompanionFiles) {
-                    VStack(alignment: .leading, spacing: Theme.Space.xxs) {
-                        Text(Strings.Workflow.copyCompanionToggle)
-                        if companionExtensions.isEmpty {
-                            Text(Strings.Workflow.noCompanionFiles)
-                                .font(Theme.Typography.caption)
-                                .foregroundStyle(Theme.Text.secondary)
-                        } else {
-                            Text(companionExtensions)
-                                .font(Theme.Typography.caption)
-                                .foregroundStyle(Theme.Text.secondary)
-                        }
-                    }
-                }
-                .disabled(companionExtensions.isEmpty)
-                HelpButton(Strings.Workflow.copyCompanionHelp)
-            }
+            PathField(
+                placeholder: Strings.Workflow.sourceDirPlaceholder,
+                path: $session.sourceDir.value,
+                error: validateDirectory(session.sourceDir.current),
+                onCommit: { session.chooseSource() })
+            ToggleRow(
+                title: Strings.Workflow.copyCompanionToggle,
+                caption: companionExtensions.isEmpty ? Strings.Workflow.noCompanionFiles : companionExtensions,
+                isOn: $session.copyCompanionFiles,
+                isEnabled: !companionExtensions.isEmpty,
+                help: Strings.Workflow.copyCompanionHelp)
         }
-        .padding(Theme.Space.xl)
     }
 
     private var tagOptions: some View {
         @Bindable var session = state.workflowSession
+        let make = session.workingProfile.exif?.make ?? ""
+        let model = session.workingProfile.exif?.model ?? ""
+        let device = [make, model].filter { !$0.isEmpty }.joined(separator: " ")
         return VStack(alignment: .leading, spacing: Theme.Space.md) {
-            HStack(spacing: Theme.Space.sm) {
-                Text(Strings.Workflow.tagsLabel)
-                    .font(Theme.Typography.caption)
-                    .foregroundStyle(Theme.Text.secondary)
-                    .frame(width: optionLabelWidth, alignment: .trailing)
+            OptionRow(label: Strings.Workflow.tagsLabel, labelWidth: Theme.Size.optionLabel) {
                 CommaSeparatedField(items: $session.tags.value, placeholder: Strings.Workflow.tagPlaceholder)
             }
-            HStack(spacing: Theme.Space.sm) {
-                Text(Strings.Workflow.cameraLabel)
-                    .font(Theme.Typography.caption)
-                    .foregroundStyle(Theme.Text.secondary)
-                    .frame(width: optionLabelWidth, alignment: .trailing)
-                let make = session.workingProfile.exif?.make ?? ""
-                let model = session.workingProfile.exif?.model ?? ""
-                let device = [make, model].filter { !$0.isEmpty }.joined(separator: " ")
+            OptionRow(label: Strings.Workflow.cameraLabel, labelWidth: Theme.Size.optionLabel) {
                 Text(device.isEmpty ? "—" : device)
                     .font(Theme.Typography.caption)
                     .foregroundStyle(device.isEmpty ? Theme.Text.tertiary : Theme.Text.primary)
             }
         }
-        .padding(Theme.Space.xl)
     }
 
     private var organizeOptions: some View {
         @Bindable var session = state.workflowSession
         return VStack(alignment: .leading, spacing: Theme.Space.md) {
-            VStack(alignment: .leading, spacing: Theme.Space.sm) {
-                HStack(spacing: Theme.Space.md) {
-                    TextField(Strings.Workflow.readyDirPlaceholder, text: $session.readyDir.value)
-                        .textFieldStyle(.roundedBorder)
-                        .truncationMode(.head)
-                        .help(session.readyDir.current)
-                    Button(Strings.Common.browse) { pickReadyDir() }
-                        .controlSize(.small)
-                }
-                .fieldError(validateDirectory(session.readyDir.current))
-            }
+            PathField(
+                placeholder: Strings.Workflow.readyDirPlaceholder,
+                path: $session.readyDir.value,
+                error: validateDirectory(session.readyDir.current))
             Text(session.readyDir.current.isEmpty ? Strings.Workflow.readyDirRequired : destinationPreview(readyDir: session.readyDir.current))
                 .font(Theme.Typography.caption)
                 .foregroundStyle(Theme.Text.secondary)
-            HStack(spacing: Theme.Space.sm) {
-                HelpLabel(Strings.Workflow.groupLabel, help: Strings.Workflow.groupHelp)
+            OptionRow(label: Strings.Workflow.groupLabel, help: Strings.Workflow.groupHelp) {
                 TextField(Strings.Workflow.groupPlaceholder, text: $session.group)
                     .textFieldStyle(.roundedBorder)
             }
         }
-        .padding(Theme.Space.xl)
     }
 
     private var fixTimestampsOptions: some View {
         @Bindable var session = state.workflowSession
+        let parseable = session.sourceHasTimestampedNames
         return VStack(alignment: .leading, spacing: Theme.Space.md) {
             HStack(spacing: Theme.Space.md) {
                 TimezonePickerView(selectedTimezone: $session.timezone.value)
                 Spacer()
             }
             .fieldError(session.validateTimezone())
-            let parseable = session.sourceHasTimestampedNames
             if parseable {
-                HStack(spacing: Theme.Space.sm) {
-                    Text(Strings.Workflow.timestampSourceLabel)
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Text.secondary)
+                OptionRow(label: Strings.Workflow.timestampSourceLabel) {
                     Picker("", selection: $session.inferFromFilenames) {
                         Text(Strings.Workflow.timestampSourceMetadata).tag(false)
                         Text(Strings.Workflow.timestampSourceFilenames).tag(true)
@@ -517,19 +401,18 @@ struct WorkflowView: View {
                 }
             }
 
-            HStack(spacing: Theme.Space.sm) {
-                HelpLabel(Strings.Workflow.timeOffsetLabel, help: Strings.Workflow.timeOffsetHelp)
+            OptionRow(label: Strings.Workflow.timeOffsetLabel, help: Strings.Workflow.timeOffsetHelp) {
                 TextField(Strings.Workflow.timeOffsetPlaceholder, value: $session.timeOffsetSeconds, format: .number)
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 90)
+                    .frame(width: Theme.Size.numberField)
                 Spacer()
             }
 
-            HStack(spacing: Theme.Space.sm) {
-                Toggle(Strings.Workflow.updateFilenameDatesToggle, isOn: $session.updateFilenameDates)
-                    .disabled(!parseable)
-                HelpButton(Strings.Workflow.updateFilenameDatesHelp)
-            }
+            ToggleRow(
+                title: Strings.Workflow.updateFilenameDatesToggle,
+                isOn: $session.updateFilenameDates,
+                isEnabled: parseable,
+                help: Strings.Workflow.updateFilenameDatesHelp)
 
             if let preview = fixTimestampPreview {
                 Text(preview)
@@ -537,7 +420,6 @@ struct WorkflowView: View {
                     .foregroundStyle(Theme.Text.tertiary)
             }
         }
-        .padding(Theme.Space.xl)
         .task(id: SourceRead(session: ObjectIdentifier(session), source: session.chosenSource)) {
             let source = session.chosenSource
             let found = await FilenamePatterns.sourceHasTimestampedNames(
@@ -587,18 +469,11 @@ struct WorkflowView: View {
     private var archiveSourceOptions: some View {
         @Bindable var session = state.workflowSession
         return VStack(alignment: .leading, spacing: Theme.Space.md) {
-            VStack(alignment: .leading, spacing: Theme.Space.sm) {
-                HStack(spacing: Theme.Space.md) {
-                    TextField(Strings.Workflow.archiveDestinationPlaceholder, text: $session.archiveDestination)
-                        .textFieldStyle(.roundedBorder)
-                        .truncationMode(.head)
-                        .help(session.archiveDestination)
-                    Button(Strings.Common.browse) { pickArchiveDestination() }
-                        .controlSize(.small)
-                    HelpButton(Strings.Workflow.archiveSourceHelp)
-                }
-                .fieldError(session.validateArchiveSource())
-            }
+            PathField(
+                placeholder: Strings.Workflow.archiveDestinationPlaceholder,
+                path: $session.archiveDestination,
+                error: session.validateArchiveSource(),
+                help: Strings.Workflow.archiveSourceHelp)
             HStack(spacing: Theme.Space.md) {
                 Toggle(Strings.Workflow.renameSourceDirToggle, isOn: $session.renameSourceDir)
                 TextField("", text: $session.archivedName)
@@ -607,27 +482,23 @@ struct WorkflowView: View {
                     .foregroundStyle(session.renameSourceDir ? Theme.Text.primary : Theme.Text.secondary)
             }
         }
-        .padding(Theme.Space.xl)
     }
 
     private var gyroflowOptions: some View {
         VStack(alignment: .leading, spacing: Theme.Space.md) {
-            HStack(spacing: Theme.Space.sm) {
-                HelpLabel(Strings.Profiles.maxZoomLabel, help: Strings.Profiles.maxZoomHelp)
+            OptionRow(label: Strings.Profiles.maxZoomLabel, help: Strings.Profiles.maxZoomHelp) {
                 TextField("", value: gyroflowBinding(\.maxZoom), format: .number)
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 70)
+                    .frame(width: Theme.Size.shortNumberField)
                 Spacer()
             }
-            HStack(spacing: Theme.Space.sm) {
-                HelpLabel(Strings.Profiles.adaptiveZoomWindowLabel, help: Strings.Profiles.adaptiveZoomWindowHelp)
+            OptionRow(label: Strings.Profiles.adaptiveZoomWindowLabel, help: Strings.Profiles.adaptiveZoomWindowHelp) {
                 TextField("", value: gyroflowBinding(\.adaptiveZoomWindow), format: .number)
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 70)
+                    .frame(width: Theme.Size.shortNumberField)
                 Spacer()
             }
-            HStack(spacing: Theme.Space.sm) {
-                HelpLabel(Strings.Profiles.adaptiveZoomMethodLabel, help: Strings.Profiles.adaptiveZoomMethodHelp)
+            OptionRow(label: Strings.Profiles.adaptiveZoomMethodLabel, help: Strings.Profiles.adaptiveZoomMethodHelp) {
                 Picker("", selection: gyroflowZoomMethodBinding) {
                     ForEach(AdaptiveZoomMethod.allCases) { method in
                         Text(method.label).tag(method)
@@ -639,7 +510,6 @@ struct WorkflowView: View {
                 Spacer()
             }
         }
-        .padding(Theme.Space.xl)
     }
 
     private func gyroflowBinding(_ keyPath: WritableKeyPath<StabilizationSettings, Double?>) -> Binding<Double?> {
@@ -672,34 +542,22 @@ struct WorkflowView: View {
 
     private var executionBar: some View {
         @Bindable var session = state.workflowSession
-        return HStack(spacing: Theme.Space.xxl) {
-            Picker("", selection: $session.applyMode) {
-                Text(Strings.Workflow.dryRunOption).tag(false)
-                Text(Strings.Workflow.applyOption).tag(true)
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .fixedSize()
-            .disabled(state.isRunning)
-
-            Button(state.isRunning ? Strings.Workflow.runningButton : Strings.Workflow.runButton) {
+        return ActionBar(
+            modes: [
+                ActionMode(title: Strings.Workflow.dryRunOption, value: false),
+                ActionMode(title: Strings.Workflow.applyOption, value: true),
+            ],
+            mode: $session.applyMode,
+            primaryTitle: state.isRunning ? Strings.Workflow.runningButton : Strings.Workflow.runButton,
+            cancelTitle: Strings.Common.cancel,
+            isRunning: state.isRunning,
+            canRun: session.allStepsReady,
+            onRun: {
                 state.workflowSession.clearRunAssent()
                 runWorkflow()
-            }
-                .disabled(state.isRunning || !session.allStepsReady)
-                .keyboardShortcut(.return, modifiers: .command)
-                .buttonStyle(.borderedProminent)
-
-            if state.isRunning {
-                Button(Strings.Common.cancel, role: .destructive) { state.cancelRunning() }
-            }
-
-            Spacer()
-        }
+            },
+            onCancel: { state.cancelRunning() })
     }
-
-    // MARK: - Inspector bars
-
 
     // MARK: - Helpers
 
@@ -773,85 +631,5 @@ struct WorkflowView: View {
             guard !Task.isCancelled else { return }
             await MainActor.run { state.finishRun() }
         }
-    }
-
-    private func pickSourceDir() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            state.workflowSession.sourceDir.value = url.path
-            state.workflowSession.chooseSource()
-        }
-    }
-
-    private func pickReadyDir() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            state.workflowSession.readyDir.value = url.path
-        }
-    }
-
-    private func pickArchiveDestination() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            state.workflowSession.archiveDestination = url.path
-        }
-    }
-}
-
-/// Labelled pills when the whole row fits on one line; otherwise icons only, named on
-/// hover. A pill's label never wraps: squeezed, every label broke mid-word.
-struct PipelineStatusBar: View {
-    let steps: [PipelineStep]
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            row(showsLabels: true)
-            row(showsLabels: false)
-        }
-    }
-
-    private func row(showsLabels: Bool) -> some View {
-        HStack(spacing: 0) {
-            ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
-                HStack(spacing: Theme.Space.sm) {
-                    Image(systemName: step.systemImage)
-                        .font(Theme.Typography.detail)
-                    if showsLabels {
-                        Text(step.label)
-                            .font(Theme.Typography.chip)
-                            .lineLimit(1)
-                            .fixedSize()
-                    }
-                }
-                .help(step.label)
-                .foregroundStyle(Theme.Text.primary)
-                .padding(.horizontal, Theme.Space.lg)
-                .padding(.vertical, Theme.Space.sm)
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.Radius.chip)
-                        .fill(step.iconColor.opacity(Theme.Tint.chip))
-                )
-                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.chip))
-
-                if index < steps.count - 1 {
-                    Image(systemName: "chevron.forward")
-                        .font(Theme.Typography.chipSeparator)
-                        .foregroundStyle(Theme.Text.secondaryColor.opacity(Theme.Tint.chipSeparator))
-                        .padding(.horizontal, Theme.Space.hairline)
-                }
-            }
-            Spacer()
-        }
-        .padding(.horizontal, Theme.Space.md)
-        .padding(.vertical, Theme.Space.sm)
     }
 }
