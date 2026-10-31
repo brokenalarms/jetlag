@@ -29,7 +29,7 @@ struct TimezonePickerView: View {
             }
             .padding(.horizontal, Theme.Space.lg)
             .padding(.vertical, Theme.Space.sm)
-            .frame(minWidth: 180)
+            .frame(minWidth: Theme.Size.timezoneListMin)
             .background(Theme.Surface.background)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.field))
             .overlay(
@@ -117,6 +117,6 @@ private struct TimezonePickerSheet: View {
             }
             .listStyle(.plain)
         }
-        .frame(width: 250, height: 380)
+        .frame(width: Theme.Size.timezonePopoverWidth, height: Theme.Size.timezonePopoverHeight)
     }
 }

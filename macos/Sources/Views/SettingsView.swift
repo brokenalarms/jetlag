@@ -122,7 +122,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 500)
+        .frame(width: Theme.Size.settingsWidth)
         .padding()
         .task { await state.refreshGyroflowStatus() }
     }
