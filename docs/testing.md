@@ -14,7 +14,7 @@
 
 - **Regression tests** — assert actual file state before and after, not just exit codes or stdout. Structured as "record before → run script → compare after" with human-readable expected vs actual diffs.
 - **Pipeline cost** — the pipeline's cost is its exiftool calls: each is a round-trip, and each write rewrites the whole file. `scripts/tests/test_metadata_call_contract.py` counts them exactly: a dry run reads each file once, an apply reads and writes each file once, with or without tagging. The counts are the contract; changing one means changing the test, with the reason in the commit. Wall-clock or CPU timing is not used: on a dev machine shared with other work the same code varies by more than any threshold worth holding, and a loose threshold lets real regressions through. Algorithmic cost (work that grows with the number of files) is a code-review concern, not a timing test.
-- **Streaming cost (app)** — `macos/Tests/StreamingPerformanceTests.swift` streams rows and log lines through the real window and asserts the second half of a run costs no more than the first. Any per-update work proportional to what is already shown fails it.
+- **Streaming cost (app)** — `macos/Tests/StreamingPerformanceTests.swift` counts the work a run does: streamed through the real window, every log character is rendered once, and every row is measured once however long the run. Any re-rendering or re-measuring of what is already shown fails it. As with pipeline cost, wall-clock timing is not used.
 
 Testing rules:
 - Testing `returncode == 0` is not testing behavior — it only confirms the script didn't crash.
