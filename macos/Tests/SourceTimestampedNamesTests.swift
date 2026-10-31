@@ -8,6 +8,7 @@ import XCTest
 final class SourceTimestampedNamesTests: XCTestCase {
 
     private var source: URL!
+    private let profilesPath = "/nonexistent/media-profiles.yaml"
     private let scriptsDirectory = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         .appendingPathComponent("scripts").path
@@ -30,8 +31,36 @@ final class SourceTimestampedNamesTests: XCTestCase {
     }
 
     private func hasTimestampedNames(_ extensions: [String] = [".mp4"]) async -> Bool {
-        await FilenamePatterns.sourceHasTimestampedNames(
-            source.path, extensions: extensions, scriptsDirectory: scriptsDirectory)
+        await SourceScan.hasTimestampedNames(
+            source: source.path, extensions: extensions,
+            scriptsDirectory: scriptsDirectory, profilesPath: profilesPath)
+    }
+
+    private func mediaFileCount(_ extensions: [String] = [".mp4"]) async -> Int? {
+        await SourceScan.mediaFileCount(
+            source: source.path, extensions: extensions,
+            scriptsDirectory: scriptsDirectory, profilesPath: profilesPath)
+    }
+
+    /// The count a run is checked against the free-tier limit with: the script's, so
+    /// hidden files and package contents are not counted.
+    func testTheMediaCountIsTheScriptsCount() async throws {
+        try touch("a/one.MP4")
+        try touch("two.mp4")
+        try touch("notes.txt")
+        try touch(".hidden.mp4")
+        try touch("Photos Library.photoslibrary/originals/three.mp4")
+
+        let count = await mediaFileCount()
+        XCTAssertEqual(count, 2)
+    }
+
+    /// A count that cannot be taken is nil, so the run is not blocked by it.
+    func testAMissingSourceHasNoCount() async {
+        try? FileManager.default.removeItem(at: source)
+
+        let count = await mediaFileCount()
+        XCTAssertNil(count)
     }
 
     func testATimestampedNameDeepInTheSourceIsFound() async throws {

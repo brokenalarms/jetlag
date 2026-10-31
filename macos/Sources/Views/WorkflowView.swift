@@ -421,10 +421,11 @@ struct WorkflowView: View {
         }
         .task(id: SourceRead(session: ObjectIdentifier(session), source: session.chosenSource)) {
             let source = session.chosenSource
-            let found = await FilenamePatterns.sourceHasTimestampedNames(
-                source,
+            let found = await SourceScan.hasTimestampedNames(
+                source: source,
                 extensions: session.workingProfile.fileExtensions ?? [],
-                scriptsDirectory: state.scriptsDirectory)
+                scriptsDirectory: state.scriptsDirectory,
+                profilesPath: state.profilesLocation.path)
             guard !Task.isCancelled else { return }
             session.noteTimestampedNames(found, in: source)
         }
@@ -525,25 +526,6 @@ struct WorkflowView: View {
 
     // MARK: - Actions
 
-    private func countMediaFiles() -> Int {
-        let session = state.workflowSession
-        let extensions = (session.workingProfile.fileExtensions ?? []).map {
-            $0.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
-        }
-        guard !extensions.isEmpty else { return 0 }
-        let dir = session.sourceDir.current
-        guard !dir.isEmpty else { return 0 }
-        guard let enumerator = FileManager.default.enumerator(
-            at: URL(fileURLWithPath: dir),
-            includingPropertiesForKeys: nil,
-            options: [.skipsHiddenFiles]
-        ) else { return 0 }
-        return enumerator.reduce(0) { count, item in
-            guard let url = item as? URL else { return count }
-            return extensions.contains(url.pathExtension.lowercased()) ? count + 1 : count
-        }
-    }
-
     private func runWorkflow() {
         state.workflowSession.chooseSource()
         guard state.canRunPipeline() else { return }
@@ -554,15 +536,23 @@ struct WorkflowView: View {
         if state.workflowSession.requestDryRunAssentIfNeeded() { return }
         if state.workflowSession.requestOverwriteAssentIfNeeded() { return }
 
-        let fileCount = countMediaFiles()
-        if licenseStore.exceedsLimit(fileCount: fileCount) {
-            upgradePrompt = UpgradePrompt(fileCount: fileCount)
-            return
-        }
+        let session = state.workflowSession
+        state.startRun(
+            afterCounting: { [state] in
+                await SourceScan.mediaFileCount(
+                    source: session.sourceDir.current,
+                    extensions: session.workingProfile.fileExtensions ?? [],
+                    scriptsDirectory: state.scriptsDirectory,
+                    profilesPath: state.profilesLocation.path)
+            },
+            exceedsLimit: { licenseStore.exceedsLimit(fileCount: $0) },
+            onOverLimit: { upgradePrompt = UpgradePrompt(fileCount: $0) },
+            start: startPipeline)
+    }
 
+    private func startPipeline() {
         state.clearLog()
         state.showInspector = true
-        state.isRunning = true
 
         let (script, args) = state.workflowSession.buildPipelineArgs()
         state.workflowSession.noteRunStarted()
