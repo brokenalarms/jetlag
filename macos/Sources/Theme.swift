@@ -80,11 +80,9 @@ enum Theme {
         static let form: CGFloat = 600
         static let helpPopover = 240.0
         static let headerIcon = 16.0
-        static let optionLabel = 52.0
         static let numberField = 90.0
         static let shortNumberField = 70.0
         static let profileList = 200.0
-        static let profileLabel = 110.0
         static let listIcon = 14.0
         static let iconButton = 24.0
         static let typePicker = 160.0

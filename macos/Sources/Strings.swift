@@ -50,8 +50,8 @@ enum Strings {
         static let profileLabel = String(localized: "workflow.profile.label", defaultValue: "Profile")
         static let requiredLabel = String(localized: "workflow.required.label", defaultValue: "Required")
         static let modeLabel = String(localized: "workflow.mode.label", defaultValue: "Mode")
-        static let tagsLabel = String(localized: "workflow.tags.label", defaultValue: "Tags:")
-        static let cameraLabel = String(localized: "workflow.camera.label", defaultValue: "Camera:")
+        static let tagsLabel = String(localized: "workflow.tags.label", defaultValue: "Tags")
+        static let cameraLabel = String(localized: "workflow.camera.label", defaultValue: "Camera")
         static let groupLabel = String(localized: "workflow.group.label", defaultValue: "Group")
 
         static let sourceDirPlaceholder = String(localized: "workflow.sourceDir.placeholder", defaultValue: "SD card or directory path")
@@ -120,10 +120,10 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
 """)
         static let timezoneHelp = String(localized: "workflow.timezone.help",
             defaultValue: "Timezone the footage was shot in, used to fix timestamps for your video editor")
-        static let timestampSourceLabel = String(localized: "workflow.timestampSource.label", defaultValue: "Source:")
+        static let timestampSourceLabel = String(localized: "workflow.timestampSource.label", defaultValue: "Source")
         static let timestampSourceMetadata = String(localized: "workflow.timestampSource.metadata", defaultValue: "Metadata")
         static let timestampSourceFilenames = String(localized: "workflow.timestampSource.filenames", defaultValue: "From filenames")
-        static let timeOffsetLabel = String(localized: "workflow.timeOffset.label", defaultValue: "Clock correction:")
+        static let timeOffsetLabel = String(localized: "workflow.timeOffset.label", defaultValue: "Clock correction")
         static let timeOffsetPlaceholder = String(localized: "workflow.timeOffset.placeholder", defaultValue: "seconds")
         static let timeOffsetHelp = String(localized: "workflow.timeOffset.help",
             defaultValue: "Shift all timestamps by this many seconds to correct camera clock drift. Positive = forward, negative = backward.")

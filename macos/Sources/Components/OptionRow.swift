@@ -1,17 +1,29 @@
 import SwiftUI
 
-/// A label and a control on one line. With `help` the label is a `HelpLabel`; without it,
-/// a caption. `labelWidth` right-aligns the label in a fixed column so stacked rows line up.
+/// Rows of an `OptionGroup` share one label column and one control column.
+struct OptionGroup<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        Grid(alignment: .leadingFirstTextBaseline,
+             horizontalSpacing: Theme.Space.xxl,
+             verticalSpacing: Theme.Space.xl) {
+            content
+        }
+    }
+}
+
+/// A label and a control on one row of an `OptionGroup`. With `help` the label is a `HelpLabel`.
+/// The control must be a single view so it occupies the group's one control column.
 struct OptionRow<Control: View>: View {
     let label: String
     var help: String?
-    var labelWidth: CGFloat?
     @ViewBuilder let control: Control
 
     var body: some View {
-        HStack(spacing: Theme.Space.sm) {
+        GridRow {
             labelView
-                .frame(width: labelWidth, alignment: .trailing)
+                .gridColumnAlignment(.trailing)
             control
         }
     }
@@ -22,8 +34,6 @@ struct OptionRow<Control: View>: View {
             HelpLabel(label, help: help)
         } else {
             Text(label)
-                .font(Theme.Typography.caption)
-                .foregroundStyle(Theme.Text.secondary)
         }
     }
 }
