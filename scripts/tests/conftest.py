@@ -11,6 +11,7 @@ import atexit
 import contextlib
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -45,6 +46,30 @@ def create_test_video(path, **exif_tags):
     if exif_tags:
         tag_args = [f"-{field}={value}" for field, value in exif_tags.items()]
         exiftool.write_tags(str(path), tag_args)
+
+
+INSTA360_MAGIC = b"8db42d694ccc418790edff439fe026bf"
+MAKER_NOTES_RECORD = 0x101
+MODEL_TAG = 0x12
+FOOTER_LENGTH = 78
+
+
+def insta360_trailer(model: str) -> bytes:
+    """A trailer holding one maker-notes record that names the camera model."""
+    value = model.encode()
+    record = bytes([MODEL_TAG, len(value)]) + value
+    record_header = struct.pack("<HI", MAKER_NOTES_RECORD, len(record))
+    trailer_length = len(record) + FOOTER_LENGTH
+    footer = record_header + bytes(32) + struct.pack("<I", trailer_length) + bytes(4) + INSTA360_MAGIC
+    assert len(footer) == FOOTER_LENGTH
+    return record + footer
+
+
+def create_insta360_file(path: Path, model: str) -> Path:
+    create_test_video(path)
+    with open(path, "ab") as f:
+        f.write(insta360_trailer(model))
+    return path
 
 
 def create_motion_video(path):

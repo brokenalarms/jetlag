@@ -35,6 +35,11 @@ MOVIE_HEADER_CREATE_DATE_TAG = "MovieHeaderCreateDate"
 # this tag instead; it is read only to know such a file is already recorded.
 LEGACY_PROVENANCE_TAG = "XMP-xmpDM:LogComment"
 
+# exiftool parses an Insta360 trailer, where these files record their camera Model,
+# only under ExtractEmbedded. On other video it reads every timed-metadata track,
+# which is cost nothing else here gains from.
+EMBEDDED_DATA_SUFFIXES = {".insv", ".insp"}
+
 
 def read_exif_data(file_path: str) -> Dict[str, str]:
     """Read all relevant EXIF timestamp fields with single exiftool call (cached)."""
@@ -54,7 +59,8 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
     ]
 
     try:
-        raw = exiftool.read_tags(file_path, fields)
+        embedded = ["-ee"] if Path(file_path).suffix.lower() in EMBEDDED_DATA_SUFFIXES else None
+        raw = exiftool.read_tags(file_path, fields, extra_args=embedded)
 
         data = dict(raw)
         _complete_datetime_original(data)
