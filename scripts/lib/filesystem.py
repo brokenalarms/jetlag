@@ -2,6 +2,7 @@
 
 import errno
 import os
+from collections.abc import Iterator
 from pathlib import Path
 
 
@@ -46,8 +47,33 @@ def cleanup_empty_parent_dirs(file_dir: str, stop_at: str) -> None:
             break
 
 
+# Folders macOS presents as a single file. Their contents are another app's data,
+# not a camera's originals, and reading into a Photos library asks the user for
+# Photos access they never meant to give.
+PACKAGE_SUFFIXES = {".photoslibrary", ".app", ".bundle", ".fcpbundle", ".imovielibrary",
+                    ".tvlibrary", ".lrlibrary", ".lrdata", ".cocatalog"}
+
+
+def _is_walked(name: str) -> bool:
+    return not name.startswith(".") and Path(name).suffix.lower() not in PACKAGE_SUFFIXES
+
+
+def iter_media_files(source_dir: str, extensions: list[str]) -> Iterator[Path]:
+    """Yield media files with the given extensions as one walk finds them.
+
+    Hidden entries are skipped, which includes the ._ files exFAT cards gain
+    beside each clip, as are packages. Extensions match in any case.
+    """
+    wanted = {ext.lower() for ext in extensions}
+    for directory, dirs, files in os.walk(source_dir):
+        dirs[:] = [d for d in dirs if _is_walked(d)]
+        for name in files:
+            if not name.startswith(".") and Path(name).suffix.lower() in wanted:
+                yield Path(directory) / name
+
+
 def find_media_files(source_dir: str, extensions: list[str]) -> list[Path]:
-    """Find all media files with given extensions, sorted alphabetically.
+    """Find all media files with given extensions, sorted case-insensitively by path.
 
     Args:
         source_dir: Directory to search recursively
@@ -56,17 +82,7 @@ def find_media_files(source_dir: str, extensions: list[str]) -> list[Path]:
     Returns:
         List of Path objects, deduplicated and sorted case-insensitively
     """
-    source = Path(source_dir)
-    files = []
-
-    for ext in extensions:
-        files.extend(source.rglob(f"*{ext}"))
-        files.extend(source.rglob(f"*{ext.upper()}"))
-
-    unique_files = list(set(files))
-    unique_files.sort(key=lambda p: str(p).lower())
-
-    return unique_files
+    return sorted(set(iter_media_files(source_dir, extensions)), key=lambda p: str(p).lower())
 
 
 def parse_machine_output(stdout: str) -> dict:

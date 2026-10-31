@@ -20,21 +20,13 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+from lib.filesystem import _is_walked
+
 _tag_mod = importlib.import_module("tag-media")
 
 VIDEO_EXTENSIONS = [".mp4", ".mov"]
 PHOTO_EXTENSIONS = [".arw", ".cr2", ".dng", ".jpeg", ".jpg", ".nef", ".png"]
 DEFAULT_EXTENSIONS = PHOTO_EXTENSIONS + VIDEO_EXTENSIONS
-
-# Folders macOS presents as a single file. Their contents are another app's data,
-# not a camera's originals, and reading into a Photos library asks the user for
-# Photos access they never meant to give.
-PACKAGE_SUFFIXES = {".photoslibrary", ".app", ".bundle", ".fcpbundle", ".imovielibrary",
-                    ".tvlibrary", ".lrlibrary", ".lrdata", ".cocatalog"}
-
-
-def _is_walked(name: str) -> bool:
-    return not name.startswith(".") and Path(name).suffix.lower() not in PACKAGE_SUFFIXES
 
 
 def sample_files(root: Path, extensions: list[str], sample: int) -> dict[str, list[Path]]:
