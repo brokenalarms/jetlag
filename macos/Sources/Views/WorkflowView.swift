@@ -330,7 +330,7 @@ struct WorkflowView: View {
 
     private var ingestOptions: some View {
         @Bindable var session = state.workflowSession
-        return VStack(alignment: .leading, spacing: Theme.Space.lg) {
+        return VStack(alignment: .leading, spacing: Theme.Space.xl) {
             PathField(
                 placeholder: Strings.Workflow.sourceDirPlaceholder,
                 path: $session.sourceDir.value,
@@ -350,21 +350,23 @@ struct WorkflowView: View {
         let make = session.workingProfile.exif?.make ?? ""
         let model = session.workingProfile.exif?.model ?? ""
         let device = [make, model].filter { !$0.isEmpty }.joined(separator: " ")
-        return VStack(alignment: .leading, spacing: Theme.Space.md) {
-            OptionRow(label: Strings.Workflow.tagsLabel, labelWidth: Theme.Size.optionLabel) {
-                CommaSeparatedField(items: $session.tags.value, placeholder: Strings.Workflow.tagPlaceholder)
-            }
-            OptionRow(label: Strings.Workflow.cameraLabel, labelWidth: Theme.Size.optionLabel) {
-                Text(device.isEmpty ? "—" : device)
-                    .font(Theme.Typography.caption)
-                    .foregroundStyle(device.isEmpty ? Theme.Text.tertiary : Theme.Text.primary)
+        return VStack(alignment: .leading, spacing: Theme.Space.xl) {
+            OptionGroup {
+                OptionRow(label: Strings.Workflow.tagsLabel) {
+                    CommaSeparatedField(items: $session.tags.value, placeholder: Strings.Workflow.tagPlaceholder)
+                }
+                OptionRow(label: Strings.Workflow.cameraLabel) {
+                    Text(device.isEmpty ? "—" : device)
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(device.isEmpty ? Theme.Text.tertiary : Theme.Text.primary)
+                }
             }
         }
     }
 
     private var organizeOptions: some View {
         @Bindable var session = state.workflowSession
-        return VStack(alignment: .leading, spacing: Theme.Space.md) {
+        return VStack(alignment: .leading, spacing: Theme.Space.xl) {
             PathField(
                 placeholder: Strings.Workflow.readyDirPlaceholder,
                 path: $session.readyDir.value,
@@ -372,9 +374,11 @@ struct WorkflowView: View {
             Text(session.readyDir.current.isEmpty ? Strings.Workflow.readyDirRequired : destinationPreview(readyDir: session.readyDir.current))
                 .font(Theme.Typography.caption)
                 .foregroundStyle(Theme.Text.secondary)
-            OptionRow(label: Strings.Workflow.groupLabel, help: Strings.Workflow.groupHelp) {
-                TextField(Strings.Workflow.groupPlaceholder, text: $session.group)
-                    .textFieldStyle(.roundedBorder)
+            OptionGroup {
+                OptionRow(label: Strings.Workflow.groupLabel, help: Strings.Workflow.groupHelp) {
+                    TextField(Strings.Workflow.groupPlaceholder, text: $session.group)
+                        .textFieldStyle(.roundedBorder)
+                }
             }
         }
     }
@@ -382,30 +386,30 @@ struct WorkflowView: View {
     private var fixTimestampsOptions: some View {
         @Bindable var session = state.workflowSession
         let parseable = session.sourceHasTimestampedNames
-        return VStack(alignment: .leading, spacing: Theme.Space.md) {
+        return VStack(alignment: .leading, spacing: Theme.Space.xl) {
             HStack(spacing: Theme.Space.md) {
                 TimezonePickerView(selectedTimezone: $session.timezone.value)
                 Spacer()
             }
             .fieldError(session.validateTimezone())
-            if parseable {
-                OptionRow(label: Strings.Workflow.timestampSourceLabel) {
-                    Picker("", selection: $session.inferFromFilenames) {
-                        Text(Strings.Workflow.timestampSourceMetadata).tag(false)
-                        Text(Strings.Workflow.timestampSourceFilenames).tag(true)
+            OptionGroup {
+                if parseable {
+                    OptionRow(label: Strings.Workflow.timestampSourceLabel) {
+                        Picker("", selection: $session.inferFromFilenames) {
+                            Text(Strings.Workflow.timestampSourceMetadata).tag(false)
+                            Text(Strings.Workflow.timestampSourceFilenames).tag(true)
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .fixedSize()
                     }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .fixedSize()
-                    Spacer()
                 }
-            }
 
-            OptionRow(label: Strings.Workflow.timeOffsetLabel, help: Strings.Workflow.timeOffsetHelp) {
-                TextField(Strings.Workflow.timeOffsetPlaceholder, value: $session.timeOffsetSeconds, format: .number)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: Theme.Size.numberField)
-                Spacer()
+                OptionRow(label: Strings.Workflow.timeOffsetLabel, help: Strings.Workflow.timeOffsetHelp) {
+                    TextField(Strings.Workflow.timeOffsetPlaceholder, value: $session.timeOffsetSeconds, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: Theme.Size.numberField)
+                }
             }
 
             ToggleRow(
@@ -468,7 +472,7 @@ struct WorkflowView: View {
 
     private var archiveSourceOptions: some View {
         @Bindable var session = state.workflowSession
-        return VStack(alignment: .leading, spacing: Theme.Space.md) {
+        return VStack(alignment: .leading, spacing: Theme.Space.xl) {
             PathField(
                 placeholder: Strings.Workflow.archiveDestinationPlaceholder,
                 path: $session.archiveDestination,
@@ -485,29 +489,28 @@ struct WorkflowView: View {
     }
 
     private var gyroflowOptions: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.md) {
-            OptionRow(label: Strings.Profiles.maxZoomLabel, help: Strings.Profiles.maxZoomHelp) {
-                TextField("", value: gyroflowBinding(\.maxZoom), format: .number)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: Theme.Size.shortNumberField)
-                Spacer()
-            }
-            OptionRow(label: Strings.Profiles.adaptiveZoomWindowLabel, help: Strings.Profiles.adaptiveZoomWindowHelp) {
-                TextField("", value: gyroflowBinding(\.adaptiveZoomWindow), format: .number)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: Theme.Size.shortNumberField)
-                Spacer()
-            }
-            OptionRow(label: Strings.Profiles.adaptiveZoomMethodLabel, help: Strings.Profiles.adaptiveZoomMethodHelp) {
-                Picker("", selection: gyroflowZoomMethodBinding) {
-                    ForEach(AdaptiveZoomMethod.allCases) { method in
-                        Text(method.label).tag(method)
-                    }
+        VStack(alignment: .leading, spacing: Theme.Space.xl) {
+            OptionGroup {
+                OptionRow(label: Strings.Profiles.maxZoomLabel, help: Strings.Profiles.maxZoomHelp) {
+                    TextField("", value: gyroflowBinding(\.maxZoom), format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: Theme.Size.shortNumberField)
                 }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .fixedSize()
-                Spacer()
+                OptionRow(label: Strings.Profiles.adaptiveZoomWindowLabel, help: Strings.Profiles.adaptiveZoomWindowHelp) {
+                    TextField("", value: gyroflowBinding(\.adaptiveZoomWindow), format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: Theme.Size.shortNumberField)
+                }
+                OptionRow(label: Strings.Profiles.adaptiveZoomMethodLabel, help: Strings.Profiles.adaptiveZoomMethodHelp) {
+                    Picker("", selection: gyroflowZoomMethodBinding) {
+                        ForEach(AdaptiveZoomMethod.allCases) { method in
+                            Text(method.label).tag(method)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                }
             }
         }
     }

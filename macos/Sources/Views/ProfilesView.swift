@@ -377,15 +377,14 @@ struct ProfileEditorView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Space.xl) {
-                OptionRow(label: Strings.Profiles.nameLabel, labelWidth: Theme.Size.profileLabel) {
+            OptionGroup {
+                OptionRow(label: Strings.Profiles.nameLabel) {
                     TextField(Strings.Profiles.namePlaceholder, text: $session.name)
                         .textFieldStyle(.roundedBorder)
                 }
 
                 OptionRow(
-                    label: Strings.Profiles.typeLabel, help: Strings.Profiles.typeHelp,
-                    labelWidth: Theme.Size.profileLabel
+                    label: Strings.Profiles.typeLabel, help: Strings.Profiles.typeHelp
                 ) {
                     Picker("", selection: typeBinding) {
                         Text(Strings.Profiles.videoOption).tag(MediaType.video)
@@ -398,19 +397,20 @@ struct ProfileEditorView: View {
                 }
 
                 Divider()
+                    .gridCellUnsizedAxes(.horizontal)
 
-                OptionRow(label: Strings.Profiles.sourceDirLabel, labelWidth: Theme.Size.profileLabel) {
+                OptionRow(label: Strings.Profiles.sourceDirLabel) {
                     directoryField($session.profile.sourceDir)
                 }
-                OptionRow(label: Strings.Profiles.readyDirLabel, labelWidth: Theme.Size.profileLabel) {
+                OptionRow(label: Strings.Profiles.readyDirLabel) {
                     directoryField($session.profile.readyDir)
                 }
 
                 Divider()
+                    .gridCellUnsizedAxes(.horizontal)
 
                 OptionRow(
-                    label: Strings.Profiles.cameraLabel, help: Strings.Profiles.cameraHelp,
-                    labelWidth: Theme.Size.profileLabel
+                    label: Strings.Profiles.cameraLabel, help: Strings.Profiles.cameraHelp
                 ) {
                     if let camera = FileCamera(make: session.profile.exif?.make,
                                                model: session.profile.exif?.model) {
@@ -422,24 +422,22 @@ struct ProfileEditorView: View {
                 }
 
                 Divider()
+                    .gridCellUnsizedAxes(.horizontal)
 
                 OptionRow(
-                    label: Strings.Profiles.fileTypesLabel, help: Strings.Profiles.fileExtensionsHelp,
-                    labelWidth: Theme.Size.profileLabel
+                    label: Strings.Profiles.fileTypesLabel, help: Strings.Profiles.fileExtensionsHelp
                 ) {
                     ExtensionField(items: $session.profile.fileExtensions)
                 }
 
                 OptionRow(
-                    label: Strings.Profiles.companionLabel, help: Strings.Profiles.companionHelp,
-                    labelWidth: Theme.Size.profileLabel
+                    label: Strings.Profiles.companionLabel, help: Strings.Profiles.companionHelp
                 ) {
                     ExtensionField(items: $session.profile.companionExtensions)
                 }
 
                 OptionRow(
-                    label: Strings.Profiles.tagsLabel, help: Strings.Profiles.tagsHelp,
-                    labelWidth: Theme.Size.profileLabel
+                    label: Strings.Profiles.tagsLabel, help: Strings.Profiles.tagsHelp
                 ) {
                     CommaSeparatedField(
                         items: $session.profile.tags,
@@ -449,13 +447,15 @@ struct ProfileEditorView: View {
 
                 if session.profile.type != .photo && gyroflowAvailable {
                     Divider()
+                        .gridCellUnsizedAxes(.horizontal)
 
-                    ToggleRow(
-                        title: Strings.Profiles.gyroflowToggle,
-                        isOn: gyroflowToggle,
-                        help: Strings.Profiles.gyroflowHelp
-                    )
-                    .padding(.leading, Theme.Size.profileLabel + Theme.Space.sm)
+                    OptionRow(label: "") {
+                        ToggleRow(
+                            title: Strings.Profiles.gyroflowToggle,
+                            isOn: gyroflowToggle,
+                            help: Strings.Profiles.gyroflowHelp
+                        )
+                    }
 
                     if session.profile.gyroflowEnabled == true {
                         gyroflowSettingsRows
@@ -525,8 +525,7 @@ struct ProfileEditorView: View {
     private var gyroflowSettingsRows: some View {
         Group {
             OptionRow(
-                label: Strings.Profiles.maxZoomLabel, help: Strings.Profiles.maxZoomHelp,
-                labelWidth: Theme.Size.profileLabel
+                label: Strings.Profiles.maxZoomLabel, help: Strings.Profiles.maxZoomHelp
             ) {
                 TextField("", value: stabilizationBinding(\.maxZoom), format: .number)
                     .textFieldStyle(.roundedBorder)
@@ -534,8 +533,7 @@ struct ProfileEditorView: View {
             }
 
             OptionRow(
-                label: Strings.Profiles.adaptiveZoomWindowLabel, help: Strings.Profiles.adaptiveZoomWindowHelp,
-                labelWidth: Theme.Size.profileLabel
+                label: Strings.Profiles.adaptiveZoomWindowLabel, help: Strings.Profiles.adaptiveZoomWindowHelp
             ) {
                 TextField("", value: stabilizationBinding(\.adaptiveZoomWindow), format: .number)
                     .textFieldStyle(.roundedBorder)
@@ -543,8 +541,7 @@ struct ProfileEditorView: View {
             }
 
             OptionRow(
-                label: Strings.Profiles.adaptiveZoomMethodLabel, help: Strings.Profiles.adaptiveZoomMethodHelp,
-                labelWidth: Theme.Size.profileLabel
+                label: Strings.Profiles.adaptiveZoomMethodLabel, help: Strings.Profiles.adaptiveZoomMethodHelp
             ) {
                 Picker("", selection: zoomMethodBinding) {
                     ForEach(AdaptiveZoomMethod.allCases) { method in

@@ -100,16 +100,18 @@ final class ComponentsTests: XCTestCase {
         XCTAssertNotNil(button(Strings.Common.browse, in: host(field(error: nil))))
     }
 
-    /// With a label width, rows with different labels line their controls up in one column.
-    func testOptionRowsLineUpTheirControlsAtAFixedLabelWidth() {
-        let hosted = host(VStack(alignment: .leading) {
-            OptionRow(label: "A", labelWidth: Theme.Size.optionLabel) { Button("First") {} }
-            OptionRow(label: "Camera", labelWidth: Theme.Size.optionLabel) { Button("Second") {} }
+    /// Rows in one group share a control column however long their labels are, with or
+    /// without help.
+    func testOptionGroupLinesUpControlsOfRowsWithDifferentLabels() {
+        let hosted = host(OptionGroup {
+            OptionRow(label: "A") { Button("First") {} }
+            OptionRow(label: "Clock correction", help: "Help") { Button("Second") {} }
+            OptionRow(label: "Camera") { Button("Third") {} }
         })
-        let first = button("First", in: hosted)?.accessibilityFrame?().minX
-        let second = button("Second", in: hosted)?.accessibilityFrame?().minX
-        XCTAssertNotNil(first)
-        XCTAssertEqual(first, second)
+        let edges = ["First", "Second", "Third"].map { button($0, in: hosted)?.accessibilityFrame?().minX }
+        XCTAssertNotNil(edges[0])
+        XCTAssertEqual(edges[0], edges[1])
+        XCTAssertEqual(edges[1], edges[2])
     }
 
     /// The checkbox writes its binding, unless the row is disabled.
