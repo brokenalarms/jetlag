@@ -1119,6 +1119,32 @@ final class AppState {
         }
     }
 
+    /// The run counts as started from the press of Run, not from the end of the media
+    /// count: the count launches a script, and until it answers a second press would
+    /// start a second pipeline and the form would still accept edits. A count that
+    /// could not be taken starts the run.
+    func startRun(
+        afterCounting count: @escaping () async -> Int?,
+        exceedsLimit: @escaping (Int) -> Bool,
+        onOverLimit: @escaping (Int) -> Void,
+        start: @escaping () -> Void
+    ) {
+        isRunning = true
+        currentRunTask = Task {
+            let fileCount = await count()
+            await MainActor.run {
+                guard !Task.isCancelled else { return }
+                if let fileCount, exceedsLimit(fileCount) {
+                    isRunning = false
+                    currentRunTask = nil
+                    onOverLimit(fileCount)
+                } else {
+                    start()
+                }
+            }
+        }
+    }
+
     /// The run reached the end of the pipeline's output. Its counterpart is
     /// cancelRunning: only a run that finished has an outcome to show, so the
     /// popup is raised from the summary the pipeline reported, or not at all.

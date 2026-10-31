@@ -70,11 +70,14 @@ generate:
 # Fresh checkouts and worktrees have no venv; bootstrap one so test runs are
 # self-contained instead of depending on whichever pytest PATH offers. The
 # stamp re-installs deps whenever a requirements file changes.
+# --clear because scripts/lib/ensure-venv.sh may already have built this venv with
+# a different Python: without it, venv keeps that interpreter's bin/python3, which
+# the wrappers exec, while pip and pytest move to the new one and its packages.
 PYTEST := scripts/.venv/bin/pytest
 VENV_STAMP := scripts/.venv/.deps-stamp
 
 $(VENV_STAMP): scripts/requirements.txt scripts/requirements-dev.txt scripts/tests/requirements.txt
-	python3 -m venv scripts/.venv
+	python3 -m venv --clear scripts/.venv
 	scripts/.venv/bin/pip install --quiet -r scripts/requirements.txt -r scripts/requirements-dev.txt -r scripts/tests/requirements.txt
 	touch $(VENV_STAMP)
 
