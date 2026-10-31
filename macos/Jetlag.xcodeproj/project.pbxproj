@@ -83,10 +83,12 @@
 		AF4D4132C54C04CF1A1ADDB7 /* DirtyableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DB6E838E4C1827858BB004E /* DirtyableTests.swift */; };
 		AF5DDC771125D006AA50AF71 /* GyroflowStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C76405E304A233D40E627ECD /* GyroflowStatusTests.swift */; };
 		B25856A7B42F269825A71DFE /* ChipBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1095441B9EBE8394D5EB85CE /* ChipBar.swift */; };
+		B75AB93F2A928003FC7DE661 /* GyroflowSettingsRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A768283DADDCCC4DED2BEB /* GyroflowSettingsRows.swift */; };
 		B7BA96BC7B36C876668721A8 /* ProbedCamera.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF93907E2384093705469E4 /* ProbedCamera.swift */; };
 		B9B58128D9827CE316EB4D34 /* DiffTableViewConflictingDestinationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6283F3F170C528DF8C57F0 /* DiffTableViewConflictingDestinationTests.swift */; };
 		BA110B4DD7D4A54646FFDBF0 /* DiffTableViewLabelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14C2F2F2C7D5476AAC832E64 /* DiffTableViewLabelTests.swift */; };
 		BB259FFA381D93470F135D63 /* ResultsTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDFB1187ACC64F103AEB52F8 /* ResultsTable.swift */; };
+		BB3FACAFD7403E5BC4AA61D8 /* GyroflowSettingsRowsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC8BD1BE7103AFB83858670A /* GyroflowSettingsRowsTests.swift */; };
 		BCBAB853A58D0989258EE4F5 /* RowFileLocationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B098EAB2712A13202064D6F1 /* RowFileLocationTests.swift */; };
 		BE595984FF6FA6421A8298E9 /* HostedWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6D7490C083C0BA8B009794 /* HostedWindow.swift */; };
 		BF60DE013EF7A4AF39FC15B8 /* WindowEdgeGrowth.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEAE0CBDBBA1FFAFBA4B392 /* WindowEdgeGrowth.swift */; };
@@ -206,6 +208,7 @@
 		B41D624A325EEBAC2CBD65CA /* WorktreeBundleIdentityGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeBundleIdentityGuardTests.swift; sourceTree = "<group>"; };
 		B68CD5F46C4AF7FAFE297AAE /* Jetlag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jetlag.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BA13B0A4EE78E6DBC6958CF4 /* ScriptProcessGroupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptProcessGroupTests.swift; sourceTree = "<group>"; };
+		BC8BD1BE7103AFB83858670A /* GyroflowSettingsRowsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroflowSettingsRowsTests.swift; sourceTree = "<group>"; };
 		BF3898B305A68235E14B3CFC /* LogViewHolder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogViewHolder.swift; sourceTree = "<group>"; };
 		C0371BC5F70C37892C2CFAD9 /* ArchiveSourceHelpTextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveSourceHelpTextTests.swift; sourceTree = "<group>"; };
 		C3CAB3FB148CDC0E0E19191A /* FixTimestampPreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixTimestampPreviewTests.swift; sourceTree = "<group>"; };
@@ -233,6 +236,7 @@
 		F3A384D1A78A845026DD9131 /* RunSummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunSummaryTests.swift; sourceTree = "<group>"; };
 		F5122F4BA350F64B8CB33F83 /* WindowEdgeGrowthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowEdgeGrowthTests.swift; sourceTree = "<group>"; };
 		F559FB82EF7FBD0FD4101BE5 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		F6A768283DADDCCC4DED2BEB /* GyroflowSettingsRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroflowSettingsRows.swift; sourceTree = "<group>"; };
 		F6F21C44D734C45A50C3CE7B /* FieldError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldError.swift; sourceTree = "<group>"; };
 		F713CD33E597A06A26576EC6 /* RowFileLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowFileLocation.swift; sourceTree = "<group>"; };
 		FDFB1187ACC64F103AEB52F8 /* ResultsTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsTable.swift; sourceTree = "<group>"; };
@@ -336,6 +340,7 @@
 				FF1FBD7A42B275AA5183D163 /* DryRunFreshnessTests.swift */,
 				4E11BFA91DF3A8F3A7831016 /* EmptySourceTests.swift */,
 				C3CAB3FB148CDC0E0E19191A /* FixTimestampPreviewTests.swift */,
+				BC8BD1BE7103AFB83858670A /* GyroflowSettingsRowsTests.swift */,
 				C76405E304A233D40E627ECD /* GyroflowStatusTests.swift */,
 				1B6D7490C083C0BA8B009794 /* HostedWindow.swift */,
 				C698B76B04834D4379CADAA4 /* InspectorHostedSizingTests.swift */,
@@ -393,6 +398,7 @@
 				1095441B9EBE8394D5EB85CE /* ChipBar.swift */,
 				76534C1BEFF8DD275688A478 /* ColumnMeasurements.swift */,
 				F6F21C44D734C45A50C3CE7B /* FieldError.swift */,
+				F6A768283DADDCCC4DED2BEB /* GyroflowSettingsRows.swift */,
 				4BAE9293F62438638E0F3F64 /* HelpButton.swift */,
 				9E8D7E5740C5723BCECCE691 /* OptionRow.swift */,
 				442BB6EDB827E46F97BEF75F /* PathField.swift */,
@@ -603,6 +609,7 @@
 				E6DEE560FAFDCFE9F48B205B /* FieldValidation.swift in Sources */,
 				93F68414D370D1F732929F16 /* FileCamera.swift in Sources */,
 				92BA1490C431AC89A5646C85 /* FilenamePatterns.swift in Sources */,
+				B75AB93F2A928003FC7DE661 /* GyroflowSettingsRows.swift in Sources */,
 				5B1E92778017F81FED24A526 /* GyroflowStatus.swift in Sources */,
 				90876F5EED7A76E7F4D28320 /* HelpButton.swift in Sources */,
 				5F7869F0BEBB4DFB2BC2735F /* HostedViewSizing.swift in Sources */,
@@ -669,6 +676,7 @@
 				30624E27385D5F145ECC1137 /* DryRunFreshnessTests.swift in Sources */,
 				8C81B07942DB4ADAF34AFAFD /* EmptySourceTests.swift in Sources */,
 				11DAC29BADCD9CB0EF3EB4F0 /* FixTimestampPreviewTests.swift in Sources */,
+				BB3FACAFD7403E5BC4AA61D8 /* GyroflowSettingsRowsTests.swift in Sources */,
 				AF5DDC771125D006AA50AF71 /* GyroflowStatusTests.swift in Sources */,
 				BE595984FF6FA6421A8298E9 /* HostedWindow.swift in Sources */,
 				54BF807828E4B1BF2A402E9F /* InspectorHostedSizingTests.swift in Sources */,
