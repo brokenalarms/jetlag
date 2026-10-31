@@ -12,7 +12,7 @@ final class TimestampSourceTests: XCTestCase {
     /// Every token the pipeline emits maps to a label a user can read, so the
     /// Timestamp column can always name the winning source.
     func testEveryEmittedTokenHasALabel() {
-        let tokens = ["datetimeoriginal", "creationdate", "mediacreatedate",
+        let tokens = ["datetimeoriginal", "creationdate", "moviecreatedate",
                       "filename", "file_birth", "file_mtime"]
 
         for token in tokens {
@@ -32,7 +32,7 @@ final class TimestampSourceTests: XCTestCase {
     /// The QuickTime clock stores a UTC instant, so its original reads as UTC —
     /// the word, not a trailing Z a reader has to decode.
     func testUTCSourceOriginalIsLabelledUTC() {
-        let display = TimestampSource.mediaCreateDate
+        let display = TimestampSource.movieCreateDate
             .originalDisplay("2025:08:30 09:00:00Z")
 
         XCTAssertEqual(display, "2025:08:30 09:00:00 UTC")
@@ -59,9 +59,9 @@ final class TimestampSourceTests: XCTestCase {
     /// is never promoted to UTC by its digits.
     func testUTCIsDecidedByTheSourceNotTheString() {
         XCTAssertEqual(
-            TimestampSource.mediaCreateDate.originalDisplay("2025:08:30 09:00:00"),
+            TimestampSource.movieCreateDate.originalDisplay("2025:08:30 09:00:00"),
             "2025:08:30 09:00:00 UTC")
-        XCTAssertTrue(TimestampSource.mediaCreateDate.isUTC)
+        XCTAssertTrue(TimestampSource.movieCreateDate.isUTC)
         XCTAssertFalse(TimestampSource.dateTimeOriginal.isUTC)
         XCTAssertFalse(TimestampSource.filename.isUTC)
     }

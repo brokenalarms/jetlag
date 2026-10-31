@@ -25,6 +25,7 @@ from lib.exiftool import MetadataWriteRefused, exiftool
 from lib.results import emit_result
 from lib.timestamp_source import (
     read_exif_data,
+    MOVIE_HEADER_CREATE_DATE_TAG,
     _exif_cache,
     PRESERVED_FILENAME_TAG,
     LEGACY_PROVENANCE_TAG,
@@ -166,6 +167,7 @@ def write_exif_fields(file_path: str, field_args: list) -> bool:
 
 PROVENANCE_CLOCK_TAGS = {
     "DateTimeOriginal": "XMP-jetlag:OriginalDateTimeOriginal",
+    MOVIE_HEADER_CREATE_DATE_TAG: "XMP-jetlag:OriginalCreateDate",
     "CreateDate": "XMP-jetlag:OriginalCreateDate",
     "MediaCreateDate": "XMP-jetlag:OriginalMediaCreateDate",
     "TrackCreateDate": "XMP-jetlag:OriginalTrackCreateDate",
@@ -200,11 +202,14 @@ def provenance_field_args(file_path: str, exif: Dict[str, str]) -> list:
     if already_recorded:
         return []
 
-    clock_args = [
-        f"-{record_tag}={exif[source]}"
-        for source, record_tag in PROVENANCE_CLOCK_TAGS.items()
+    # A still's bare CreateDate and a movie's header both record as OriginalCreateDate;
+    # the movie header wins so an XMP CreateDate cannot stand in for it.
+    recorded = {
+        record_tag: exif[source]
+        for source, record_tag in reversed(PROVENANCE_CLOCK_TAGS.items())
         if is_valid_timestamp(exif.get(source, ""))
-    ]
+    }
+    clock_args = [f"-{record_tag}={value}" for record_tag, value in recorded.items()]
     return [f"-{PRESERVED_FILENAME_TAG}={os.path.basename(file_path)}"] + clock_args
 
 
@@ -270,14 +275,16 @@ CLOCK_FIELDS = [
     ClockField("OffsetTimeOriginal", "OffsetTimeOriginal", quicktime=False,
                owned_with_datetime_original=True, holds_zone=True),
     ClockField("Keys:CreationDate", "CreationDate", quicktime=False, container_only=True),
-    ClockField("QuickTime:CreateDate", "CreateDate", quicktime=True, container_only=True),
+    ClockField("QuickTime:CreateDate", MOVIE_HEADER_CREATE_DATE_TAG, quicktime=True,
+               container_only=True, proves_container=True),
     ClockField("QuickTime:MediaCreateDate", "MediaCreateDate", quicktime=True,
                container_only=True, proves_container=True),
     ClockField("QuickTime:TrackCreateDate", "TrackCreateDate", quicktime=True,
                container_only=True, proves_container=True),
 ]
 
-QUICKTIME_CLOCK_TAGS = [field.read_key for field in CLOCK_FIELDS if field.quicktime]
+QUICKTIME_CLOCK_TAGS = [field.write_tag.removeprefix("QuickTime:")
+                        for field in CLOCK_FIELDS if field.quicktime]
 
 
 def is_quicktime_container(exif: Dict[str, str]) -> bool:
@@ -539,7 +546,7 @@ def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, 
                 data["datetime_original_str"] = datetime_with_tz
                 data["datetime_original"] = parse_datetime_original(datetime_with_tz)
                 data["timezone_source"] = f"--timezone flag ({timezone_offset})"
-        elif source.startswith("MediaCreateDate") and timezone_offset:
+        elif source.startswith("QuickTime CreateDate") and timezone_offset:
             utc_dt = datetime.strptime(best_timestamp, "%Y:%m:%d %H:%M:%S").replace(tzinfo=timezone.utc)
             tz_match = re.match(r'([+-])(\d{2}):?(\d{2})', timezone_offset)
             if tz_match:
@@ -632,13 +639,13 @@ def _stored_original_time(current_data: dict) -> str:
         val = exif.get("CreationDate", "")
         if val:
             return val
-    if "MediaCreateDate" in source:
-        val = exif.get("MediaCreateDate", "")
+    if source.startswith("QuickTime CreateDate"):
+        val = exif.get(MOVIE_HEADER_CREATE_DATE_TAG, "")
         if val:
             return val
 
     # Fallback: first non-empty common timestamp field
-    for field in ["DateTimeOriginal", "CreationDate", "MediaCreateDate", "CreateDate"]:
+    for field in ["DateTimeOriginal", "CreationDate", MOVIE_HEADER_CREATE_DATE_TAG, "CreateDate"]:
         val = exif.get(field, "")
         if val:
             return val
@@ -677,11 +684,11 @@ def format_original_timestamps(current_data: dict) -> str:
         creation_date = current_data["exif"].get("CreationDate", "")
         if creation_date:
             parts.append(f"{format_exif_timestamp_display(creation_date)} (Keys:CreationDate)")
-    elif source.startswith("MediaCreateDate"):
-        media_create = current_data["exif"].get("MediaCreateDate", "")
+    elif source.startswith("QuickTime CreateDate"):
+        media_create = current_data["exif"].get(MOVIE_HEADER_CREATE_DATE_TAG, "")
         birth_ts = current_data["file_system"].get("birth", "")
         if media_create:
-            parts.append(f"{format_exif_timestamp_display(media_create)} UTC (MediaCreateDate)")
+            parts.append(f"{format_exif_timestamp_display(media_create)} UTC (QuickTime:CreateDate)")
         if birth_ts:
             parts.append(f"{format_exif_timestamp_display(birth_ts)} local (file)")
     elif "filename" in source:
@@ -874,8 +881,8 @@ def _source_to_machine_token(source: str) -> str:
         return "datetimeoriginal"
     if "creationdate" in source_lower:
         return "creationdate"
-    if "mediacreatedate" in source_lower:
-        return "mediacreatedate"
+    if "quicktime createdate" in source_lower:
+        return "moviecreatedate"
     if "birthtime" in source_lower or "birth" in source_lower:
         return "file_birth"
     if "mtime" in source_lower:

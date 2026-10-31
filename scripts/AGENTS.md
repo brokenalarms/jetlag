@@ -57,7 +57,7 @@ Summary only:
 
 Diagnostic knowledge for understanding unexpected timestamp offsets:
 
-- **GoPro / FAT filesystem**: FAT stores modification time in the camera's local timezone with no TZ info. If the camera is set to +02:00 but the Mac is +09:00, birth/modify times will be ~7 hours off. `MediaCreateDate` is UTC and correct. A non-standard offset in birth vs EXIF time indicates camera TZ mismatch, not a bug.
+- **GoPro / FAT filesystem**: FAT stores modification time in the camera's local timezone with no TZ info. If the camera is set to +02:00 but the Mac is +09:00, birth/modify times will be ~7 hours off. `QuickTime:CreateDate` is UTC and correct. A non-standard offset in birth vs EXIF time indicates camera TZ mismatch, not a bug.
 - **macOS SD card copy**: birth time is often preserved from the source FAT filesystem rather than reset to copy time. This propagates the camera's wrong-TZ birth time to the Mac. The timestamp fix scripts correct this.
 
 ## Workflow design
@@ -84,7 +84,7 @@ Expected behaviors that regression tests must verify:
 - Source ranking follows the "Timestamp source of truth hierarchy" section above and `docs/timestamp-fields.md` — not restated here
 - If a file was shot in timezone +0800, with the script run in +0900, then `Keys:CreationDate` should end up with the +0800 timezone, and the birthdate should end up as one hour later
 - If a different `--timezone` is specified that doesn't match `DateTimeOriginal`, this is informational (shown in diff) — not blocking
-- If `DateTimeOriginal` is missing and we change timezones, the QuickTime UTC fields `MediaCreateDate`, file birth date, and `Keys:CreationDate` should all be updated
+- If `DateTimeOriginal` is missing and we change timezones, the QuickTime UTC fields `CreateDate`, file birth date, and `Keys:CreationDate` should all be updated
 - If `--preserve-wallclock-time` is specified, the file birthtime should be set back one hour to make the edited file appear in this timezone as if it was shot at the same time
 
 ### organize-by-date

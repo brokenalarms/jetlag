@@ -27,6 +27,10 @@ from lib.exiftool import exiftool
 _exif_cache: Dict[str, Dict[str, str]] = {}
 
 PRESERVED_FILENAME_TAG = "XMP-xmpMM:PreservedFileName"
+# The movie header (mvhd) clock, read through the composite in exiftool-jetlag.config
+# because an unqualified CreateDate in a QuickTime file prefers XMP.
+MOVIE_HEADER_CREATE_DATE_TAG = "MovieHeaderCreateDate"
+
 # Files imported before the jetlag XMP namespace carry their provenance as JSON in
 # this tag instead; it is read only to know such a file is already recorded.
 LEGACY_PROVENANCE_TAG = "XMP-xmpDM:LogComment"
@@ -42,7 +46,8 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
     # field in this list.
     fields = [
         "DateTimeOriginal", "OffsetTimeOriginal", "CreateDate", "ModifyDate",
-        "CreationDate", "QuickTime:MediaCreateDate", "QuickTime:MediaModifyDate",
+        "CreationDate", MOVIE_HEADER_CREATE_DATE_TAG, "QuickTime:MediaCreateDate",
+        "QuickTime:MediaModifyDate",
         "QuickTime:TrackCreateDate", "Keys:CreationDate",
         PRESERVED_FILENAME_TAG, LEGACY_PROVENANCE_TAG,
         "Make", "Model",
@@ -51,15 +56,7 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
     try:
         raw = exiftool.read_tags(file_path, fields)
 
-        data = {}
-        for key, value in raw.items():
-            if key == "MediaCreateDate":
-                data["MediaCreateDate"] = value
-            elif key == "MediaModifyDate":
-                data["MediaModifyDate"] = value
-            else:
-                data[key] = value
-
+        data = dict(raw)
         _complete_datetime_original(data)
         _exif_cache[file_path] = data
         return data
@@ -171,8 +168,8 @@ def normalize_timezone_format(value: str) -> str:
 # Source labels for the QuickTime clock. The digits are UTC by specification either
 # way; the label records whether the file itself corroborated that (see
 # docs/timestamp-fields.md, "A UTC-specified field is corroborated UTC only when the file shows it").
-SOURCE_UTC_CORROBORATED = "MediaCreateDate (corroborated UTC)"
-SOURCE_UTC_BY_SPEC = "MediaCreateDate (UTC by spec)"
+SOURCE_UTC_CORROBORATED = "QuickTime CreateDate (corroborated UTC)"
+SOURCE_UTC_BY_SPEC = "QuickTime CreateDate (UTC by spec)"
 
 _UTC_TIMESTAMP_SOURCES = {
     "CreationDate with Z (UTC)", SOURCE_UTC_CORROBORATED, SOURCE_UTC_BY_SPEC,
@@ -416,28 +413,28 @@ def _is_corroborated_utc(utc_timestamp: str, filename_timestamp: Optional[str]) 
     return camera_zone_offset(utc_timestamp, filename_timestamp) is not None
 
 
-def _media_create_date_timestamp(exif_data: Dict[str, str]) -> str:
-    """Normalize QuickTime:MediaCreateDate to 'YYYY:MM:DD HH:MM:SS', or '' if unusable."""
-    media_create_date = exif_data.get("MediaCreateDate", "")
-    if not (media_create_date and re.search(r'[0-9]', media_create_date)):
+def _movie_header_timestamp(exif_data: Dict[str, str]) -> str:
+    """Normalize QuickTime:CreateDate (mvhd) to 'YYYY:MM:DD HH:MM:SS', or '' if unusable."""
+    movie_header_date = exif_data.get(MOVIE_HEADER_CREATE_DATE_TAG, "")
+    if not (movie_header_date and re.search(r'[0-9]', movie_header_date)):
         return ""
     candidate = re.sub(
         r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1',
-        media_create_date)
+        movie_header_date)
     return candidate if is_valid_timestamp(candidate) else ""
 
 
 def camera_zone_offset_for_file(file_path: str) -> Optional[str]:
     """The camera's own zone offset for a file, independent of --timezone or priority.
 
-    Reads the raw QuickTime MediaCreateDate and filename timestamp directly, so it is
+    Reads the raw QuickTime movie header and filename timestamp directly, so it is
     available whenever both sources coexist and their delta is a legal zone offset —
     regardless of whether the QuickTime date wins get_best_timestamp()'s priority race.
     """
     exif_data = read_exif_data(file_path)
-    media_timestamp = _media_create_date_timestamp(exif_data)
+    movie_timestamp = _movie_header_timestamp(exif_data)
     filename_timestamp, _ = parse_filename_timestamp(file_path)
-    return camera_zone_offset(media_timestamp, filename_timestamp)
+    return camera_zone_offset(movie_timestamp, filename_timestamp)
 
 
 def get_best_timestamp(
@@ -473,7 +470,7 @@ def get_best_timestamp(
         if re.match(r'[0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}', timestamp):
             return timestamp, "CreationDate with Z (UTC)"
 
-    media_timestamp = _media_create_date_timestamp(exif_data)
+    movie_timestamp = _movie_header_timestamp(exif_data)
 
     ts, _ = parse_filename_timestamp(file_path)
 
@@ -481,8 +478,8 @@ def get_best_timestamp(
     # previous country's time writes a filename that is wrong for where it was shot;
     # the UTC value survives that, so it wins where the two contradict each other.
     # Without a declared timezone there is nothing to convert UTC into.
-    if timezone_offset and _is_corroborated_utc(media_timestamp, ts):
-        return media_timestamp, SOURCE_UTC_CORROBORATED
+    if timezone_offset and _is_corroborated_utc(movie_timestamp, ts):
+        return movie_timestamp, SOURCE_UTC_CORROBORATED
 
     # Priority 4: Filename for VID/IMG/LRV/DJI
     if ts and (re.match(r'^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6}', base) or
@@ -492,8 +489,8 @@ def get_best_timestamp(
     # Priority 5: a UTC-specified clock value with nothing to corroborate it. Still
     # ranks above the bare tags below: those are naive by definition, whereas this
     # field at least has a specification saying what its digits mean.
-    if media_timestamp:
-        return media_timestamp, SOURCE_UTC_BY_SPEC
+    if movie_timestamp:
+        return movie_timestamp, SOURCE_UTC_BY_SPEC
 
     # Priority 6: DateTimeOriginal without timezone
     if datetime_original and re.search(r'[0-9]', datetime_original):

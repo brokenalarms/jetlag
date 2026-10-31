@@ -1356,13 +1356,13 @@ class TestPipelineMachineOutput:
         so the app diff table can show camera zone vs embedded label vs declared zone.
 
         A camera left on Japan time while shooting in New Zealand: the filename
-        records local digits with no zone, and QuickTime:MediaCreateDate records the
+        records local digits with no zone, and QuickTime:CreateDate records the
         instant in UTC. Their delta is a legal zone offset (+09:00) — the camera's
         own setting — independent of the declared --timezone used to resolve the fix.
         """
         source = temp_workspace["source"]
         video = source / "VID_20260104_033532_00_001.mp4"
-        _create_video_raw(video, MediaCreateDate="2026:01:03 18:35:32")
+        _create_video_raw(video, CreateDate="2026:01:03 18:35:32")
 
         result = run_pipeline([
             "--profile", test_profile,
@@ -1383,16 +1383,16 @@ class TestPipelineMachineOutput:
         so a diff-table row can say what it will write even when its original and
         corrected times are the same string.
 
-        The fixture's DateTimeOriginal and track atoms are already right for +08:00;
-        only the movie header is eight hours out and Keys:CreationDate is missing.
+        The fixture's DateTimeOriginal and two clock atoms are already right for +08:00;
+        only the third atom is eight hours out and Keys:CreationDate is missing.
         """
         source = temp_workspace["source"]
         video = source / "test.mp4"
         _create_video_raw(
             video,
             DateTimeOriginal="2025:06:18 07:25:21+08:00",
-            **{"QuickTime:CreateDate": "2025:06:18 07:25:21",
-               "QuickTime:MediaCreateDate": "2025:06:17 23:25:21",
+            **{"QuickTime:CreateDate": "2025:06:17 23:25:21",
+               "QuickTime:MediaCreateDate": "2025:06:18 07:25:21",
                "QuickTime:TrackCreateDate": "2025:06:17 23:25:21"},
         )
 
@@ -1405,7 +1405,7 @@ class TestPipelineMachineOutput:
 
         files = self._parse_events(result.stdout)
         assert len(files) == 1
-        assert files[0].get("stale_fields") == ["Keys:CreationDate", "QuickTime:CreateDate"], \
+        assert files[0].get("stale_fields") == ["Keys:CreationDate", "QuickTime:MediaCreateDate"], \
             f"Expected the write tags that differ in the preview row, got: {files[0]}"
 
     def test_tz_mismatch_blocks_apply_without_force(self, temp_workspace, test_profile):

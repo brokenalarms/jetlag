@@ -290,7 +290,7 @@ class TestQuickTimeInstantVersusFilename:
     def _video(self, name, media_create_date=None):
         path = os.path.join(self.temp_dir, name)
         if media_create_date:
-            create_test_video(path, **{"QuickTime:MediaCreateDate": media_create_date})
+            create_test_video(path, **{"QuickTime:CreateDate": media_create_date})
         else:
             create_test_video(path)
         return path
@@ -396,7 +396,7 @@ class TestQuickTimeInstantVersusFilename:
         """A field specified as UTC says what its digits mean; a bare tag says nothing."""
         video = os.path.join(self.temp_dir, "clip.mp4")
         create_test_video(video, **{
-            "QuickTime:MediaCreateDate": "2026:01:03 18:35:32",
+            "QuickTime:CreateDate": "2026:01:03 18:35:32",
             "DateTimeOriginal": "2026:01:04 07:35:32",
         })
 
@@ -423,7 +423,7 @@ class TestCameraZoneOffsetForFile:
     def _video(self, name, media_create_date=None):
         path = os.path.join(self.temp_dir, name)
         if media_create_date:
-            create_test_video(path, **{"QuickTime:MediaCreateDate": media_create_date})
+            create_test_video(path, **{"QuickTime:CreateDate": media_create_date})
         else:
             create_test_video(path)
         return path
@@ -628,3 +628,30 @@ class TestExiftoolStillWritePathForZonedDateTimeOriginal:
                                          "EXIF:OffsetTimeOriginal"])
         assert raw.get("DateTimeOriginal") == "2025:06:18 07:25:21"
         assert "OffsetTimeOriginal" not in raw
+
+
+class TestMovieHeaderIsTheQuickTimeClock:
+    """The QuickTime clock is the movie header (mvhd), read as QuickTime:CreateDate so
+    a stray XMP CreateDate - which exiftool prefers for an unqualified CreateDate in a
+    QuickTime file - cannot shadow it."""
+
+    def test_an_xmp_createdate_does_not_override_the_movie_header(self, tmp_path):
+        path = str(tmp_path / "clip.mp4")
+        create_test_video(path, **{"QuickTime:CreateDate": "2025:06:17 23:25:21",
+                                   "XMP-xmp:CreateDate": "2001:01:01 00:00:00"})
+        clear_exif_cache()
+
+        timestamp, source = get_best_timestamp(path, "+08:00")
+
+        assert timestamp == "2025:06:17 23:25:21"
+        assert source == SOURCE_UTC_BY_SPEC
+
+    def test_the_track_header_is_not_the_clock(self, tmp_path):
+        path = str(tmp_path / "clip.mp4")
+        create_test_video(path, **{"QuickTime:CreateDate": "2025:06:17 23:25:21",
+                                   "QuickTime:MediaCreateDate": "2001:01:01 00:00:00"})
+        clear_exif_cache()
+
+        timestamp, _ = get_best_timestamp(path, "+08:00")
+
+        assert timestamp == "2025:06:17 23:25:21"
