@@ -412,13 +412,7 @@ struct ProfileEditorView: View {
                 OptionRow(
                     label: Strings.Profiles.cameraLabel, help: Strings.Profiles.cameraHelp
                 ) {
-                    if let camera = FileCamera(make: session.profile.exif?.make,
-                                               model: session.profile.exif?.model) {
-                        Text(camera.name)
-                    } else {
-                        Text(Strings.Profiles.noCameraRecorded)
-                            .foregroundStyle(Theme.Text.secondary)
-                    }
+                    CameraValue(make: session.profile.exif?.make, model: session.profile.exif?.model)
                 }
 
                 Divider()

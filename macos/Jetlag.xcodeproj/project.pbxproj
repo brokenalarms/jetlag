@@ -32,6 +32,7 @@
 		49521EA7D50F8FD80CA4EDFD /* PythonRuntimeCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA47C3147490D4D7AABA5169 /* PythonRuntimeCheck.swift */; };
 		49CB4585E7C6D1DC06062400 /* PipelineSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0DC9676D4668FC395DD2A0F /* PipelineSummary.swift */; };
 		4FDCE64D99169FBCD837CF2B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C503D6DF395CB0F0EE8674D /* SettingsView.swift */; };
+		53028501218AE6D4C01881C4 /* CameraValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA43E5E2024A16501875F1DC /* CameraValue.swift */; };
 		53E52584D7A0F04EBD764B7D /* LogOutputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93163EBEB8CD8B13330BAB7C /* LogOutputView.swift */; };
 		54BF807828E4B1BF2A402E9F /* InspectorHostedSizingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C698B76B04834D4379CADAA4 /* InspectorHostedSizingTests.swift */; };
 		56AF0F543D5915F80CFDA953 /* ResultsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C250AA451535CFA88C4C74B /* ResultsPanel.swift */; };
@@ -231,6 +232,7 @@
 		E1F442622CEF248F5E277A97 /* ColumnFitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColumnFitTests.swift; sourceTree = "<group>"; };
 		E3FDFFFE053527F6DAFF2443 /* HostedViewSizing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostedViewSizing.swift; sourceTree = "<group>"; };
 		E56A9B3882F3FE817ADD184B /* ArchiveSourceOptionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveSourceOptionsTests.swift; sourceTree = "<group>"; };
+		EA43E5E2024A16501875F1DC /* CameraValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraValue.swift; sourceTree = "<group>"; };
 		EAE7B2C33B83AA615CCA0EF3 /* ScriptProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptProcess.swift; sourceTree = "<group>"; };
 		F37A77F3E04133102C3B9228 /* GyroflowStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroflowStatus.swift; sourceTree = "<group>"; };
 		F3A384D1A78A845026DD9131 /* RunSummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunSummaryTests.swift; sourceTree = "<group>"; };
@@ -394,6 +396,7 @@
 			isa = PBXGroup;
 			children = (
 				B11438D17808EBE1CADAB47E /* ActionBar.swift */,
+				EA43E5E2024A16501875F1DC /* CameraValue.swift */,
 				7EA1BADD41A0FFA59BB66583 /* Card.swift */,
 				1095441B9EBE8394D5EB85CE /* ChipBar.swift */,
 				76534C1BEFF8DD275688A478 /* ColumnMeasurements.swift */,
@@ -598,6 +601,7 @@
 				0D5AC61704A72A9FEF4D4DF3 /* AppState.swift in Sources */,
 				1D5CD971A833DB79B82F89DC /* CameraMismatch.swift in Sources */,
 				D2C051A1640C00817FD45094 /* CameraProbe.swift in Sources */,
+				53028501218AE6D4C01881C4 /* CameraValue.swift in Sources */,
 				1B6C458C6849AAD3A0A0AF8A /* Card.swift in Sources */,
 				B25856A7B42F269825A71DFE /* ChipBar.swift in Sources */,
 				676407C1F0220F515E16006C /* ColumnMeasurements.swift in Sources */,

@@ -182,4 +182,13 @@ final class ComponentsTests: XCTestCase {
         session.toggle(.ingest)
         XCTAssertTrue(session.enabledSteps.contains(.ingest))
     }
+
+    /// A camera is shown by name; with none recorded the row says so, on both screens.
+    func testCameraValueShowsCameraNameOrNoneRecorded() {
+        let withCamera = host(CameraValue(make: "SONY", model: "ILCE-7M5"))
+        XCTAssertEqual(texts(in: withCamera), ["SONY ILCE-7M5"])
+
+        let without = host(CameraValue(make: nil, model: ""))
+        XCTAssertEqual(texts(in: without), [Strings.Common.noCameraRecorded])
+    }
 }
