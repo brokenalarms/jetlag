@@ -508,7 +508,7 @@ class TestGetAllTimestampData:
         assert data["datetime_original"].utcoffset() == timedelta(hours=8)
 
     def test_moviecreatedate_with_timezone_flag(self):
-        """MediaCreateDate (UTC) needs --timezone to convert to local time"""
+        """The movie header (UTC) needs --timezone to convert to local time"""
         video = self._create_video("test.mp4", ["-QuickTime:CreateDate=2025:06:17 23:25:21"])
 
         data = fmt.get_all_timestamp_data(video, timezone_spec="+08:00")
@@ -1174,7 +1174,8 @@ class TestCorrectionWritesTheWholeClockTable:
         result = fmt.fix_media_timestamps(video, timezone_spec="+08:00")
 
         assert result.timestamp_action == "fixed"
-        written = [arg.split("=", 1)[0].lstrip("-") for call in calls for arg in call]
+        assert len(calls) == 1, f"Expected one write, got {calls}"
+        written = [arg.split("=", 1)[0].lstrip("-") for arg in calls[0]]
         for tag in ["DateTimeOriginal", "Keys:CreationDate", "QuickTime:CreateDate",
                     "QuickTime:MediaCreateDate", "QuickTime:TrackCreateDate"]:
             assert tag in written, f"{tag} missing from write args {written}"
@@ -1259,7 +1260,7 @@ class TestMachineOriginalTimeCarriesZoneSemantics:
         return path
 
     def test_quicktime_clock_original_is_emitted_as_utc(self):
-        """A MediaCreateDate original is a UTC instant: emitted with a trailing Z so
+        """A movie header original is a UTC instant: emitted with a trailing Z so
         it is never mistaken for a +00:00 local-zone offset."""
         video = self._video("test.mp4",
                             **{"QuickTime:CreateDate": "2025:06:17 23:25:21"})

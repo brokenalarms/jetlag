@@ -234,16 +234,18 @@ class TestFixMediaTimestamp:
             test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
-        assert result.returncode == 0
-        assert "QuickTime:CreateDate" in result.stderr
+        assert result.returncode == 0, result.stderr
 
-        # Verify QuickTime CreateDate is now correct (in UTC)
+        # Read from the file itself: a write the movie header never received would
+        # still leave the track atoms right.
         exif_result = subprocess.run([
-            "exiftool", "-s", "-QuickTime:MediaCreateDate", test_video
+            "exiftool", "-s", "-s", "-s",
+            "-QuickTime:CreateDate", "-QuickTime:MediaCreateDate",
+            "-QuickTime:TrackCreateDate", test_video
         ], capture_output=True, text=True, check=True)
 
         # Should be UTC time (2025-06-17 23:25:21 for +08:00 timezone)
-        assert "2025:06:17 23:25:21" in exif_result.stdout
+        assert exif_result.stdout.split("\n")[:3] == ["2025:06:17 23:25:21"] * 3
 
 
     def test_quicktime_track_atom_healed(self, test_video):

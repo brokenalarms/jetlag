@@ -1383,8 +1383,8 @@ class TestPipelineMachineOutput:
         so a diff-table row can say what it will write even when its original and
         corrected times are the same string.
 
-        The fixture's DateTimeOriginal and track atoms are already right for +08:00;
-        only one clock atom is eight hours out and Keys:CreationDate is missing.
+        The fixture's DateTimeOriginal and two clock atoms are already right for +08:00;
+        only the third atom is eight hours out and Keys:CreationDate is missing.
         """
         source = temp_workspace["source"]
         video = source / "test.mp4"
