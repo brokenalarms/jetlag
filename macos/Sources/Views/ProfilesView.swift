@@ -5,6 +5,13 @@ struct ProfileEditingSession: Equatable {
     var profile: MediaProfile
     var globalStabilization: StabilizationSettings?
 
+    var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty
+            && profile.type != nil
+            && !(profile.sourceDir ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+            && !(profile.fileExtensions ?? []).isEmpty
+    }
+
     /// Edited since it was loaded, or never written at all — a new or duplicated
     /// profile is unchanged from its snapshot but still has to be saved. Save and
     /// Cancel only show while this holds, so their disappearing is the sign a save
@@ -467,7 +474,7 @@ struct ProfileEditorView: View {
                     Button(Strings.Profiles.saveButton) { onSave() }
                         .keyboardShortcut(.return, modifiers: .command)
                         .buttonStyle(.borderedProminent)
-                        .disabled(session.name.isEmpty)
+                        .disabled(!session.canSave)
                 }
                 .padding(Theme.Space.xxxl)
                 .background(Theme.Surface.bar)

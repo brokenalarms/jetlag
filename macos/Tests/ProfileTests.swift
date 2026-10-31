@@ -465,4 +465,51 @@ final class ProfileTests: XCTestCase {
         let session = ProfileEditingSession(name: "new-profile", profile: MediaProfile(type: .video))
         XCTAssertTrue(ProfileEditingSession.hasUnsavedChanges(editor: session, snapshot: session, isSaved: false))
     }
+
+    // MARK: - canSave
+
+    private func completeSession() -> ProfileEditingSession {
+        ProfileEditingSession(
+            name: "gopro",
+            profile: MediaProfile(type: .video, sourceDir: "/media/in", fileExtensions: [".mp4"]))
+    }
+
+    /// Save is offered only for a profile the pipeline will accept.
+    func testCompleteProfileCanSave() {
+        XCTAssertTrue(completeSession().canSave)
+    }
+
+    func testProfileWithoutNameCannotSave() {
+        var session = completeSession()
+        session.name = ""
+        XCTAssertFalse(session.canSave)
+    }
+
+    func testProfileWithWhitespaceOnlyNameCannotSave() {
+        var session = completeSession()
+        session.name = "   "
+        XCTAssertFalse(session.canSave)
+    }
+
+    func testProfileWithoutTypeCannotSave() {
+        var session = completeSession()
+        session.profile.type = nil
+        XCTAssertFalse(session.canSave)
+    }
+
+    func testProfileWithoutSourceDirCannotSave() {
+        var session = completeSession()
+        session.profile.sourceDir = nil
+        XCTAssertFalse(session.canSave)
+        session.profile.sourceDir = "  "
+        XCTAssertFalse(session.canSave)
+    }
+
+    func testProfileWithoutFileTypesCannotSave() {
+        var session = completeSession()
+        session.profile.fileExtensions = nil
+        XCTAssertFalse(session.canSave)
+        session.profile.fileExtensions = []
+        XCTAssertFalse(session.canSave)
+    }
 }
