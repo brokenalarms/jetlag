@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from conftest import create_test_video
+from conftest import create_insta360_file, create_test_video
 
 SCRIPT_DIR = Path(__file__).parent.parent
 MEDIA_PIPELINE = SCRIPT_DIR / "media-pipeline.sh"
@@ -96,3 +96,15 @@ def test_dry_run_reads_each_file_once(workspace, tasks):
 @pytest.mark.parametrize("tasks", [["fix-timestamp"], ["tag", "fix-timestamp"], ["tag"]])
 def test_apply_reads_and_writes_each_file_once(workspace, tasks):
     assert metadata_calls(workspace, tasks, apply=True) == {"read": FILE_COUNT, "write": FILE_COUNT}
+
+
+def test_insv_costs_one_read(workspace):
+    """An .insv's embedded-data read is the same single read, not an extra call."""
+    for mp4 in workspace["source"].glob("*.mp4"):
+        mp4.unlink()
+    create_insta360_file(workspace["source"] / "VID_20251001_100000.insv", "Insta360 X4")
+    profiles = yaml.safe_load(workspace["profiles"].read_text())
+    profiles["profiles"]["_contract"]["file_extensions"] = [".insv"]
+    workspace["profiles"].write_text(yaml.dump(profiles, sort_keys=False))
+
+    assert metadata_calls(workspace, ["tag", "fix-timestamp"], apply=False) == {"read": 1, "write": 0}
