@@ -10,6 +10,8 @@ enum Strings {
         static let browse = String(localized: "common.browse", defaultValue: "Browse...")
         static let done = String(localized: "common.done", defaultValue: "Done")
         static let revealInFinder = String(localized: "common.revealInFinder", defaultValue: "Reveal in Finder")
+        static let noCameraRecorded = String(localized: "profiles.noCameraRecorded",
+            defaultValue: "None recorded by these files")
     }
 
     // MARK: - Navigation
@@ -306,8 +308,6 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let cameraLabel = String(localized: "profiles.camera.label", defaultValue: "Camera")
         static let cameraHelp = String(localized: "profiles.camera.help",
             defaultValue: "Read from the media the profile was made from. A profile is its camera and kind of media, so each camera has one photo profile and one video profile, and every file imported is checked against it.")
-        static let noCameraRecorded = String(localized: "profiles.noCameraRecorded",
-            defaultValue: "None recorded by these files")
         static let duplicateCameraHelp = String(localized: "profiles.duplicateCamera.help",
             defaultValue: "Another profile is for the same camera and kind of media. Delete one of them.")
         static let chooseCameraTitle = String(localized: "profiles.chooseCamera.title",

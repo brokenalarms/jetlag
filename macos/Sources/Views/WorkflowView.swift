@@ -347,18 +347,13 @@ struct WorkflowView: View {
 
     private var tagOptions: some View {
         @Bindable var session = state.workflowSession
-        let make = session.workingProfile.exif?.make ?? ""
-        let model = session.workingProfile.exif?.model ?? ""
-        let device = [make, model].filter { !$0.isEmpty }.joined(separator: " ")
         return VStack(alignment: .leading, spacing: Theme.Space.xl) {
             OptionGroup {
                 OptionRow(label: Strings.Workflow.tagsLabel) {
                     CommaSeparatedField(items: $session.tags.value, placeholder: Strings.Workflow.tagPlaceholder)
                 }
                 OptionRow(label: Strings.Workflow.cameraLabel) {
-                    Text(device.isEmpty ? "—" : device)
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(device.isEmpty ? Theme.Text.tertiary : Theme.Text.primary)
+                    CameraValue(make: session.workingProfile.exif?.make, model: session.workingProfile.exif?.model)
                 }
             }
         }
