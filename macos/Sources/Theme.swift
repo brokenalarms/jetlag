@@ -86,6 +86,13 @@ enum Theme {
         static let iconButton = 24.0
         static let typePicker = 160.0
         static let zoomMethodPicker = 200.0
+        static let settingsWidth = 500.0
+        static let upgradeWidth = 420.0
+        static let timezoneListMin = 180.0
+        static let timezonePopoverWidth = 250.0
+        static let timezonePopoverHeight = 380.0
+        static let timelineTickWidth = 2.0
+        static let timelineTickHeight = 10.0
     }
 
     enum Stroke {

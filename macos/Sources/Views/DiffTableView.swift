@@ -225,7 +225,7 @@ struct DiffTableView: View {
             ZStack(alignment: .leading) {
                 Rectangle()
                     .fill(Theme.Text.primaryColor.opacity(Theme.Tint.stripe))
-                    .frame(height: 1)
+                    .frame(height: Theme.Stroke.hairline)
                     .frame(maxWidth: .infinity)
 
                 if let oEpoch = row.originalEpoch, let cEpoch = row.correctedEpoch,
@@ -241,7 +241,7 @@ struct DiffTableView: View {
                 if let epoch = row.originalEpoch {
                     RoundedRectangle(cornerRadius: Theme.Radius.tick)
                         .fill(Theme.Text.primaryColor.opacity(Theme.Tint.tick))
-                        .frame(width: 2, height: 10)
+                        .frame(width: Theme.Size.timelineTickWidth, height: Theme.Size.timelineTickHeight)
                         .offset(x: CGFloat(scale.fraction(for: epoch)) * usable + (markSize - 2) / 2)
                 }
 

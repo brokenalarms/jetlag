@@ -23,7 +23,7 @@ struct ProfilePicker: View {
 
         return HStack(spacing: Theme.Space.md) {
             Image(systemName: typeImage)
-                .frame(width: 14)
+                .frame(width: Theme.Size.listIcon)
                 .foregroundStyle(Theme.Text.secondary)
             if !deviceName.isEmpty {
                 Text(deviceName)

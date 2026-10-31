@@ -78,7 +78,7 @@ struct UpgradeView: View {
             }
         }
         .padding(Theme.Space.page)
-        .frame(width: 420)
+        .frame(width: Theme.Size.upgradeWidth)
     }
 
     private func activate() async {
