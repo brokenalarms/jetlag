@@ -124,6 +124,7 @@ def running_pipeline(tmp_path, source_with_videos):
             "--source", str(source_with_videos),
             "--target", str(tmp_path / "target"),
             "--working-dir", str(working_dir),
+            "--extensions", ".mp4", ".mov",
             "--timezone", "Pacific/Auckland",
             "--apply",
         ],

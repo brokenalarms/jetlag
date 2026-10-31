@@ -159,6 +159,55 @@ def test_profile(temp_workspace, monkeypatch):
     yield "_test"
 
 
+class TestFileTypesMustBeDeclared:
+    """A run processes only file types someone chose: from the profile or --extensions."""
+
+    NO_TYPES_ERROR = "file_extensions"
+
+    def _drop_file_extensions(self, profile_name):
+        profiles_path = Path(os.environ["JETLAG_PROFILES_FILE"])
+        profiles = yaml.safe_load(profiles_path.read_text())
+        del profiles["profiles"][profile_name]["file_extensions"]
+        profiles_path.write_text(yaml.dump(profiles, sort_keys=False))
+
+    def test_profile_without_file_extensions_is_refused_and_creates_nothing(self, temp_workspace, test_profile):
+        """A profile that declares no file types exits 1 naming file_extensions and leaves no target behind."""
+        self._drop_file_extensions(test_profile)
+        source = temp_workspace["source"]
+        create_test_video(source / "clip.mp4")
+        target = temp_workspace["root"] / "fresh-target"
+
+        result = run_pipeline(["--profile", test_profile, "--source", str(source),
+                               "--target", str(target), "--apply"])
+
+        assert result.returncode == 1, f"Actual: {result.returncode}, Expected: 1"
+        assert self.NO_TYPES_ERROR in result.stderr, f"Actual: {result.stderr}, Expected: it names file_extensions"
+        assert not target.exists(), f"Actual: {target} created, Expected: nothing created"
+
+    def test_run_without_profile_or_extensions_is_refused_and_creates_nothing(self, temp_workspace):
+        """A profile-less run that states no file types fails the same way."""
+        source = temp_workspace["source"]
+        create_test_video(source / "clip.mp4")
+        target = temp_workspace["root"] / "fresh-target"
+
+        result = run_pipeline(["--source", str(source), "--target", str(target), "--apply"])
+
+        assert result.returncode == 1, f"Actual: {result.returncode}, Expected: 1"
+        assert self.NO_TYPES_ERROR in result.stderr, f"Actual: {result.stderr}, Expected: it names file_extensions"
+        assert not target.exists(), f"Actual: {target} created, Expected: nothing created"
+
+    def test_run_without_profile_processes_the_extensions_it_is_given(self, temp_workspace):
+        """A profile-less run with --extensions .mp4 finds and processes the .mp4 file only."""
+        source = temp_workspace["source"]
+        create_test_video(source / "clip.mp4")
+        (source / "other.mov").write_bytes(b"fake")
+
+        result = run_pipeline(["--source", str(source), "--target", str(temp_workspace["target"]),
+                               "--extensions", ".mp4", "--timezone", "+0900", "--group", "Test"])
+
+        assert "Found 1 .mp4 file(s)" in result.stderr, f"Actual: {result.stderr}, Expected: one .mp4 found"
+
+
 class TestFileDiscovery:
     """Tests for file discovery based on profile extensions."""
 
@@ -2066,6 +2115,7 @@ class TestOverwriteDestination:
             "--profile", profile,
             "--source", str(workspace["source"]),
             "--target", str(workspace["target"]),
+            "--extensions", ".mp4", ".mov",
             "--timezone", "+0900",
             "--group", "Test",
             *extra,
@@ -2260,6 +2310,7 @@ class TestProtectedSources:
             "--profile", profile,
             "--source", str(workspace["source"]),
             "--target", str(workspace["target"]),
+            "--extensions", ".mp4", ".mov",
             "--timezone", "+0900",
             "--group", "Test",
             *extra,
@@ -2353,6 +2404,7 @@ class TestOrganizeReportsTheUserFacingOutcome:
             "--profile", profile,
             "--source", str(workspace["source"]),
             "--target", str(workspace["target"]),
+            "--extensions", ".mp4", ".mov",
             "--timezone", "+0900",
             "--group", "Test",
             *extra,
@@ -2522,6 +2574,7 @@ class TestDefaultWorkingDirIsOnTheTargetVolume:
         return [
             "--source", str(workspace["source"]),
             "--target", str(workspace["target"]),
+            "--extensions", ".mp4", ".mov",
             "--timezone", "+0900",
             "--group", "Test",
             *extra,
@@ -2915,6 +2968,7 @@ class TestSourceCameraIsCheckedAgainstTheProfile:
             "--profile", profile,
             "--source", str(workspace["source"]),
             "--target", str(workspace["target"]),
+            "--extensions", ".mp4", ".mov",
             "--timezone", "+0900",
             "--group", "Test",
             *extra,

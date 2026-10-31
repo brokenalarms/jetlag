@@ -733,6 +733,7 @@ def build_parser():
     parser.add_argument("--profile", help="Profile from media-profiles.yaml")
     parser.add_argument("--source", help="Directory containing media files (default: current directory)")
     parser.add_argument("--target", help="Target directory for organized files")
+    parser.add_argument("--extensions", nargs="+", help="File extensions to process (e.g. .mp4 .mov); overrides the profile's file_extensions")
     parser.add_argument("--location", help="Location name/code for timezone lookup")
     parser.add_argument("--timezone", help="IANA zone name (e.g., Pacific/Auckland), resolved per file so a run spanning a DST changeover gets the right offset either side, or a fixed offset in +HHMM format (e.g., +0800)")
     parser.add_argument("--group", help="Optional group folder name substituted for {{GROUP}} in the profile's folder_template, or inserted between year and date by default (e.g., 'Japan' → YYYY/Japan/YYYY-MM-DD)")
@@ -831,6 +832,11 @@ def main():
             profile.setdefault("exif", {})["make"] = args.make
         if args.model is not None:
             profile.setdefault("exif", {})["model"] = args.model
+
+    extensions = args.extensions or (profile or {}).get("file_extensions")
+    if not extensions:
+        print("ERROR: no file types to process; declare file_extensions in the profile or pass --extensions", file=sys.stderr)
+        sys.exit(1)
 
     # Determine source and target directories from profile or CLI args
     source_dir = args.source
@@ -933,15 +939,6 @@ def main():
         print(f"→ Source action: {args.source_action}", file=sys.stderr)
     print(f"→ Copy companions: {'yes' if args.copy_companion_files else 'no'}", file=sys.stderr)
     print(file=sys.stderr)
-
-    # Create target directory if needed
-    if args.apply:
-        os.makedirs(target_dir, exist_ok=True)
-
-    # Find media files
-    extensions = [".mp4", ".mov"]
-    if profile:
-        extensions = profile.get("file_extensions", extensions)
 
     files = find_media_files(source_dir, extensions)
     total_files = len(files)
