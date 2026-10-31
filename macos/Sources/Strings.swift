@@ -290,6 +290,18 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
 
     // MARK: - Profiles
 
+    enum Gyroflow {
+        static let maxZoomLabel = String(localized: "profiles.maxZoom.label", defaultValue: "Max zoom")
+        static let maxZoomHelp = String(localized: "profiles.maxZoom.help",
+            defaultValue: "Maximum zoom factor (percentage) Gyroflow can apply to stabilize footage. Higher values allow more aggressive stabilization but crop more of the frame.")
+        static let adaptiveZoomWindowLabel = String(localized: "profiles.adaptiveZoomWindow.label", defaultValue: "Zoom window")
+        static let adaptiveZoomWindowHelp = String(localized: "profiles.adaptiveZoomWindow.help",
+            defaultValue: "Time window in seconds over which adaptive zoom smooths its adjustments. Longer windows produce smoother zoom transitions.")
+        static let adaptiveZoomMethodLabel = String(localized: "profiles.adaptiveZoomMethod.label", defaultValue: "Zoom method")
+        static let adaptiveZoomMethodHelp = String(localized: "profiles.adaptiveZoomMethod.help",
+            defaultValue: "How Gyroflow adapts zoom level: None disables adaptive zoom, Dynamic adjusts zoom per-frame based on motion, Static uses a fixed crop.")
+    }
+
     enum Profiles {
         static let cameraLabel = String(localized: "profiles.camera.label", defaultValue: "Camera")
         static let cameraHelp = String(localized: "profiles.camera.help",
@@ -342,15 +354,6 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let tagsHelp = String(localized: "profiles.tags.help",
             defaultValue: "macOS Finder tags applied to imported files for organization")
 
-        static let maxZoomLabel = String(localized: "profiles.maxZoom.label", defaultValue: "Max zoom")
-        static let maxZoomHelp = String(localized: "profiles.maxZoom.help",
-            defaultValue: "Maximum zoom factor (percentage) Gyroflow can apply to stabilize footage. Higher values allow more aggressive stabilization but crop more of the frame.")
-        static let adaptiveZoomWindowLabel = String(localized: "profiles.adaptiveZoomWindow.label", defaultValue: "Zoom window")
-        static let adaptiveZoomWindowHelp = String(localized: "profiles.adaptiveZoomWindow.help",
-            defaultValue: "Time window in seconds over which adaptive zoom smooths its adjustments. Longer windows produce smoother zoom transitions.")
-        static let adaptiveZoomMethodLabel = String(localized: "profiles.adaptiveZoomMethod.label", defaultValue: "Zoom method")
-        static let adaptiveZoomMethodHelp = String(localized: "profiles.adaptiveZoomMethod.help",
-            defaultValue: "How Gyroflow adapts zoom level: None disables adaptive zoom, Dynamic adjusts zoom per-frame based on motion, Static uses a fixed crop.")
         static let zoomMethodNone = String(localized: "profiles.zoomMethod.none", defaultValue: "None")
         static let zoomMethodDynamic = String(localized: "profiles.zoomMethod.dynamic", defaultValue: "Dynamic")
         static let zoomMethodStatic = String(localized: "profiles.zoomMethod.static", defaultValue: "Static")

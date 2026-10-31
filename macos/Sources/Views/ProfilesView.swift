@@ -458,7 +458,7 @@ struct ProfileEditorView: View {
                     }
 
                     if session.profile.gyroflowEnabled == true {
-                        gyroflowSettingsRows
+                        GyroflowSettingsRows(settings: $session.profile.gyroflowSettings)
                     }
                 }
             }
@@ -518,65 +518,6 @@ struct ProfileEditorView: View {
                 } else {
                     session.profile.gyroflowSettings = nil
                 }
-            }
-        )
-    }
-
-    private var gyroflowSettingsRows: some View {
-        Group {
-            OptionRow(
-                label: Strings.Profiles.maxZoomLabel, help: Strings.Profiles.maxZoomHelp
-            ) {
-                TextField("", value: stabilizationBinding(\.maxZoom), format: .number)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: Theme.Size.gyroflowNumberField)
-            }
-
-            OptionRow(
-                label: Strings.Profiles.adaptiveZoomWindowLabel, help: Strings.Profiles.adaptiveZoomWindowHelp
-            ) {
-                TextField("", value: stabilizationBinding(\.adaptiveZoomWindow), format: .number)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: Theme.Size.gyroflowNumberField)
-            }
-
-            OptionRow(
-                label: Strings.Profiles.adaptiveZoomMethodLabel, help: Strings.Profiles.adaptiveZoomMethodHelp
-            ) {
-                Picker("", selection: zoomMethodBinding) {
-                    ForEach(AdaptiveZoomMethod.allCases) { method in
-                        Text(method.label).tag(method)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: Theme.Size.zoomMethodPicker)
-            }
-        }
-    }
-
-    private func stabilizationBinding(_ keyPath: WritableKeyPath<StabilizationSettings, Double?>) -> Binding<Double?> {
-        Binding(
-            get: { session.profile.gyroflowSettings?[keyPath: keyPath] },
-            set: { newValue in
-                if session.profile.gyroflowSettings == nil {
-                    session.profile.gyroflowSettings = StabilizationSettings()
-                }
-                session.profile.gyroflowSettings?[keyPath: keyPath] = newValue
-            }
-        )
-    }
-
-    private var zoomMethodBinding: Binding<AdaptiveZoomMethod> {
-        Binding(
-            get: {
-                AdaptiveZoomMethod(rawValue: session.profile.gyroflowSettings?.adaptiveZoomMethod ?? 1) ?? .dynamic
-            },
-            set: { newValue in
-                if session.profile.gyroflowSettings == nil {
-                    session.profile.gyroflowSettings = StabilizationSettings()
-                }
-                session.profile.gyroflowSettings?.adaptiveZoomMethod = newValue.rawValue
             }
         )
     }

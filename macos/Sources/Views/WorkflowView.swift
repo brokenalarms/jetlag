@@ -489,56 +489,10 @@ struct WorkflowView: View {
     }
 
     private var gyroflowOptions: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.xl) {
-            OptionGroup {
-                OptionRow(label: Strings.Profiles.maxZoomLabel, help: Strings.Profiles.maxZoomHelp) {
-                    TextField("", value: gyroflowBinding(\.maxZoom), format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: Theme.Size.shortNumberField)
-                }
-                OptionRow(label: Strings.Profiles.adaptiveZoomWindowLabel, help: Strings.Profiles.adaptiveZoomWindowHelp) {
-                    TextField("", value: gyroflowBinding(\.adaptiveZoomWindow), format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: Theme.Size.shortNumberField)
-                }
-                OptionRow(label: Strings.Profiles.adaptiveZoomMethodLabel, help: Strings.Profiles.adaptiveZoomMethodHelp) {
-                    Picker("", selection: gyroflowZoomMethodBinding) {
-                        ForEach(AdaptiveZoomMethod.allCases) { method in
-                            Text(method.label).tag(method)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .fixedSize()
-                }
-            }
+        @Bindable var session = state.workflowSession
+        return OptionGroup {
+            GyroflowSettingsRows(settings: $session.workingProfile.gyroflowSettings)
         }
-    }
-
-    private func gyroflowBinding(_ keyPath: WritableKeyPath<StabilizationSettings, Double?>) -> Binding<Double?> {
-        Binding(
-            get: { state.workflowSession.workingProfile.gyroflowSettings?[keyPath: keyPath] },
-            set: { newValue in
-                if state.workflowSession.workingProfile.gyroflowSettings == nil {
-                    state.workflowSession.workingProfile.gyroflowSettings = StabilizationSettings()
-                }
-                state.workflowSession.workingProfile.gyroflowSettings?[keyPath: keyPath] = newValue
-            }
-        )
-    }
-
-    private var gyroflowZoomMethodBinding: Binding<AdaptiveZoomMethod> {
-        Binding(
-            get: {
-                AdaptiveZoomMethod(rawValue: state.workflowSession.workingProfile.gyroflowSettings?.adaptiveZoomMethod ?? 1) ?? .dynamic
-            },
-            set: { newValue in
-                if state.workflowSession.workingProfile.gyroflowSettings == nil {
-                    state.workflowSession.workingProfile.gyroflowSettings = StabilizationSettings()
-                }
-                state.workflowSession.workingProfile.gyroflowSettings?.adaptiveZoomMethod = newValue.rawValue
-            }
-        )
     }
 
     // MARK: - Execution
