@@ -34,15 +34,42 @@ final class StreamingPerformanceTests: XCTestCase {
         return HostedWindow.make(state)
     }
 
+    private struct StreamCost {
+        var wall: TimeInterval
+        var cpu: TimeInterval
+    }
+
+    private struct StreamCostSample: Encodable {
+        let recordedAt: String
+        let firstWall: TimeInterval
+        let secondWall: TimeInterval
+        let firstCPU: TimeInterval
+        let secondCPU: TimeInterval
+        let loadBefore: Double
+        let loadAfter: Double
+    }
+
+    private func mainThreadCPUTime() -> TimeInterval {
+        var time = timespec()
+        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &time)
+        return TimeInterval(time.tv_sec) + TimeInterval(time.tv_nsec) / 1_000_000_000
+    }
+
+    private func oneMinuteLoad() -> Double {
+        var load = 0.0
+        getloadavg(&load, 1)
+        return load
+    }
+
     /// Streams `count` rows, each followed by eight log lines, through the hosted
-    /// window one update at a time, and returns the wall time of the first and second
-    /// halves.
-    private func streamHalves(count: Int) -> (first: TimeInterval, second: TimeInterval) {
+    /// window one update at a time, and returns the cost of the first and second halves.
+    private func streamHalves(count: Int) -> (first: StreamCost, second: StreamCost) {
         let state = AppState()
         let (host, _) = hostedWindow(state)
 
-        func stream(_ range: Range<Int>) -> TimeInterval {
-            let start = Date()
+        func stream(_ range: Range<Int>) -> StreamCost {
+            let wallStart = Date()
+            let cpuStart = mainThreadCPUTime()
             for i in range {
                 state.diffTableRows.append(row(i))
                 for k in 0..<8 {
@@ -53,7 +80,7 @@ final class StreamingPerformanceTests: XCTestCase {
                 }
                 host.layoutSubtreeIfNeeded()
             }
-            return Date().timeIntervalSince(start)
+            return StreamCost(wall: Date().timeIntervalSince(wallStart), cpu: mainThreadCPUTime() - cpuStart)
         }
         // Warm-up absorbs first-layout costs so neither half pays them.
         _ = stream(0..<8)
@@ -62,17 +89,90 @@ final class StreamingPerformanceTests: XCTestCase {
         return (first, second)
     }
 
+    /// One JSON line per run in ~/Library/Logs/Jetlag, outside the repo so it outlives
+    /// worktree resets. This test fails on some busy runs, and these samples are the
+    /// evidence for why: its measure and threshold stay as they are until they are read.
+    private func record(_ sample: StreamCostSample) throws {
+        let directory = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Logs/Jetlag", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = directory.appendingPathComponent("streaming-cost.jsonl")
+        if !FileManager.default.fileExists(atPath: file.path) {
+            FileManager.default.createFile(atPath: file.path, contents: nil)
+        }
+        let line = try JSONEncoder().encode(sample) + Data("\n".utf8)
+        let handle = try FileHandle(forWritingTo: file)
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        try handle.write(contentsOf: line)
+    }
+
     // MARK: - Linear cost
 
     /// The second half of a run must not cost materially more than the first. With
     /// per-update work proportional to the rows and lines already shown, the second
     /// half of 160 rows cost ~3× the first; linear rendering keeps the two equal
     /// within noise.
-    func testSecondHalfOfARunCostsNoMoreThanTheFirst() {
+    func testSecondHalfOfARunCostsNoMoreThanTheFirst() throws {
+        let loadBefore = oneMinuteLoad()
         let (first, second) = streamHalves(count: 160)
+        try record(StreamCostSample(
+            recordedAt: ISO8601DateFormatter().string(from: Date()),
+            firstWall: first.wall, secondWall: second.wall,
+            firstCPU: first.cpu, secondCPU: second.cpu,
+            loadBefore: loadBefore, loadAfter: oneMinuteLoad()))
         XCTAssertLessThanOrEqual(
-            second, first * 1.3 + 0.2,
-            String(format: "first half %.2fs, second half %.2fs — per-update cost is growing with the run", first, second))
+            second.wall, first.wall * 1.3 + 0.2,
+            String(format: "first half %.2fs, second half %.2fs — per-update cost is growing with the run", first.wall, second.wall))
+    }
+
+    /// Streams rows, each followed by eight log lines, through the real window one update
+    /// at a time. Re-rendering any earlier text makes the characters edited exceed the
+    /// characters shown, so the count pins the cost to linear on any machine, however
+    /// busy: comparing wall time failed whenever other work was running.
+    func testEveryLogCharacterIsRenderedOnceAcrossARun() throws {
+        let state = AppState()
+        let (host, _) = hostedWindow(state)
+        let textView = try XCTUnwrap(HostedWindow.logScrollView(in: host)?.documentView as? NSTextView)
+        let storage = try XCTUnwrap(textView.textStorage)
+
+        var editedCharacters = 0
+        let observer = NotificationCenter.default.addObserver(
+            forName: NSTextStorage.didProcessEditingNotification, object: storage, queue: nil
+        ) { _ in
+            // AppKit restyles text it already holds, which replaces no characters.
+            if storage.editedMask.contains(.editedCharacters) {
+                editedCharacters += storage.editedRange.length
+            }
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        for i in 0..<40 {
+            state.diffTableRows.append(row(i))
+            for k in 0..<8 {
+                state.logOutput.append(LogLine(
+                    text: "\u{1B}[36m🔍 line \(i).\(k)\u{1B}[0m 📊 Change: Keys:CreationDate (missing)",
+                    stream: .stderr))
+                RunLoop.main.run(until: Date())
+            }
+            host.layoutSubtreeIfNeeded()
+        }
+        HostedWindow.settle(host)
+
+        XCTAssertEqual(state.logViewHolder.renderedCount, state.logOutput.count)
+        XCTAssertEqual(editedCharacters, storage.length)
+    }
+
+    /// The table recomputes its column widths on every update, over every row so far.
+    /// Each row's text must still be measured once, whether it is the 10th or the 160th.
+    func testEveryRowIsMeasuredOnceAcrossARun() {
+        let cache = RowMeasurements()
+        var rows: [DiffTableRow] = []
+        for i in 0..<160 {
+            rows.append(row(i))
+            _ = cache.columnWidths(for: rows, texts: texts)
+        }
+        XCTAssertEqual(cache.measurementCount, rows.count)
     }
 
     // MARK: - Incremental log rendering
