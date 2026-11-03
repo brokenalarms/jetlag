@@ -108,8 +108,11 @@ stored: the same root can be a USB drive one day and an SMB mount the next.
   (`apfs`, `hfs`, `exfat`, `msdos`, `ntfs`; on Linux `ext4`, `xfs`, `btrfs`), the mount
   is flagged local (`MNT_LOCAL` from `statfs`, `volumeIsLocalKey` in the app), and the
   volume is not a disk image whose backing file is itself on a network volume.
-- `smbfs`, `afpfs`, `nfs` and `webdav` are network mounts by definition: those protocols
-  only reach a disk on another machine, however the share appears under `/Volumes`.
+- `smbfs`, `afpfs`, `nfs` and `webdav` mounts are network mounts, however the share
+  appears under `/Volumes` — unless the mount's server (`f_mntfromname`, e.g.
+  `//user@127.0.0.1/Media`) resolves to this machine. A share this machine (or a VM on
+  it) serves to itself over loopback is a local disk: it is treated as local, with a
+  hint that adding the drive's own path reads it faster.
 - FUSE mounts (`macfuse`, `fuse.*`) and unrecognised types cannot say where their data
   lives, so they are assumed to be network. Allowlisting local types means a misread
   only ever withholds the deep check's local level from a location; it never changes
