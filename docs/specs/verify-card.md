@@ -108,9 +108,12 @@ stored: the same root can be a USB drive one day and an SMB mount the next.
   (`apfs`, `hfs`, `exfat`, `msdos`, `ntfs`; on Linux `ext4`, `xfs`, `btrfs`), the mount
   is flagged local (`MNT_LOCAL` from `statfs`, `volumeIsLocalKey` in the app), and the
   volume is not a disk image whose backing file is itself on a network volume.
-- Everything else — `smbfs`, `afpfs`, `nfs`, `webdav`, FUSE mounts, unknown types — is a
-  network mount. Allowlisting local types means a misread only ever withholds the
-  deep check's local level from a location; it never changes the default verdict.
+- `smbfs`, `afpfs`, `nfs` and `webdav` are network mounts by definition: those protocols
+  only reach a disk on another machine, however the share appears under `/Volumes`.
+- FUSE mounts (`macfuse`, `fuse.*`) and unrecognised types cannot say where their data
+  lives, so they are assumed to be network. Allowlisting local types means a misread
+  only ever withholds the deep check's local level from a location; it never changes
+  the default verdict.
 
 Each location on the Verify screen shows what was detected, e.g. "Local · APFS",
 "Network · SMB", "Remote · ssh".
