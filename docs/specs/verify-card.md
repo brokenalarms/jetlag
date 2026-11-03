@@ -44,7 +44,7 @@ written in the same exiftool call as the correction — no read or write of its 
 |---|---|
 | `XMP-xmpMM:PreservedFileName` | the name the file had on the card |
 | `XMP-jetlag:OriginalDateTimeOriginal` … `OriginalCreationDate` | each clock field as it was before jetlag's first write, for recovery outside the app |
-| `XMP-jetlag:FootageSHA256`, `XMP-jetlag:FootageBytes` | hash and size of `mdat` + trailer, computed while ingest copies the file |
+| `XMP-jetlag:ContentSHA256`, `XMP-jetlag:ContentBytes` | sha256 and size of the file's content without its metadata (for QuickTime, `mdat` + trailer; for photos, see "Photo content hash"), computed while ingest copies the file |
 
 `jetlag` is a custom XMP namespace (`http://ns.jetlag.app/1.0/`) declared in
 `scripts/lib/exiftool-jetlag.config`. Exiftool only writes tags it has a definition
@@ -56,7 +56,7 @@ instead. That record also counts as "already recorded", because those files' clo
 fields are already corrected and recording them now would store corrected values as
 originals. Verify reads its `filename` key as the original name.
 
-### Footage hash during ingest
+### Content hash during ingest
 
 Ingest replaces `shutil.copy2` with a copy loop that feeds the `mdat` payload and any
 trailer into `hashlib.sha256` as the bytes pass, then applies `copystat`. Card reads
@@ -111,15 +111,16 @@ stored: the same root can be a USB drive one day and an SMB mount the next.
 - `smbfs`, `afpfs`, `nfs` and `webdav` mounts are network mounts, however the share
   appears under `/Volumes` — unless the mount's server (`f_mntfromname`, e.g.
   `//user@127.0.0.1/Media`) resolves to this machine. A share this machine (or a VM on
-  it) serves to itself over loopback is a local disk: it is treated as local, with a
-  hint that adding the drive's own path reads it faster.
+  it) serves to itself over loopback is a local disk, so it is local.
 - FUSE mounts (`macfuse`, `fuse.*`) and unrecognised types cannot say where their data
   lives, so they are assumed to be network. Allowlisting local types means a misread
-  only ever withholds the deep check's local level from a location; it never changes
-  the default verdict.
+  only ever moves a location from "Verify hashes" to "Include network locations"; it
+  never changes the default verdict.
 
-Each location on the Verify screen shows what was detected, e.g. "Local · APFS",
-"Network · SMB", "Remote · ssh".
+Each location on the Verify screen carries a small "Local" or "Network" label (a
+`host:/path` root is "Network"), so it is clear which locations each deep-check
+checkbox covers. The label is information only: no location gets a warning or note
+of its own.
 
 ## The check
 
@@ -169,22 +170,34 @@ The right-hand panel reuses the table machinery with a row type of its own, not
 
 ## Deep check
 
-Off by default, with two levels:
+Two checkboxes on the Verify screen, both off by default:
 
-1. **Hash local copies** — every matched copy on a local location has its `mdat` +
-   trailer hashed and compared with `XMP-jetlag:FootageSHA256`.
-2. **Also hash network copies** — adds network and remote locations, with a warning
-   that this is slow:
-   - a remote (`host:/path`) copy is hashed on its host over ssh
-     (`tail -c +OFFSET file | head -c LEN | sha256sum`), so only the digest crosses the
-     network. Offsets come from a matching local copy's box headers; without one, the
-     box headers are read on the host with small `dd` reads.
-   - a network-mounted copy can only be hashed by reading its footage across the
-     network; its row says so.
+- ☐ **Verify hashes** — every matched copy on a "Local" location has its content
+  hashed and compared with `XMP-jetlag:ContentSHA256`.
+  - ☐ **Include network locations (slow)** — enabled only while "Verify hashes" is
+    ticked; adds the "Network" locations.
 
-A copy whose hash differs is listed as "footage damaged" on that location. Files with
-no recorded hash (imported before phase 3) are reported as "no hash recorded", never
-as a pass or a failure.
+How a network copy is hashed is not shown to the user:
+
+- a `host:/path` copy is hashed on its host over ssh
+  (`tail -c +OFFSET file | head -c LEN | sha256sum`), so only the digest crosses the
+  network. Offsets come from a matching local copy's box headers; without one, the
+  box headers are read on the host with small `dd` reads.
+- a network-mounted copy is hashed by reading its content across the network.
+
+A copy whose hash differs from the recorded one is listed as "Hash mismatch" on that
+location — it says what was found, not why (bit rot, a bad copy, an edit outside
+jetlag). Files with no recorded hash (imported before phase 3) are reported as "No
+hash recorded", never as a pass or a failure.
+
+### Photo content hash
+
+Open: the content hash so far is defined only for QuickTime files. For photos,
+exiftool's `ImageDataHash` hashes the image data apart from metadata. It was ruled out
+for video only because a card's `moov` follows the footage; in a JPEG or RAW the image
+data follows the headers, so it may be computable as ingest streams the file. To
+confirm before phase 3: that it is computable during the copy and unchanged by
+jetlag's writes on each photo profile's format.
 
 ## Phases
 
@@ -192,10 +205,11 @@ as a pass or a failure.
    config loaded by both metadata backends.
 2. Footage-size reader for QuickTime-family files, with a regression test that footage
    size and hash are unchanged by tag + fix-timestamp on each profile's format.
-3. Footage hash during ingest; the hash joins the provenance write;
+3. Content hash during ingest; the hash joins the provenance write;
    provenance on every moved file.
 4. `verify-card.py`: source scan, location listings, matching, JSONL verdicts.
 5. Verify screen in the app; backup-location configuration screen.
 6. `archive-source` delete mode accepts only verified or user-accepted files.
-7. Local/network detection per location; two-level opt-in deep check against the
-   footage hash, hashing remote copies on their host.
+7. Local/network detection and label per location; "Verify hashes" and "Include
+   network locations (slow)" against the content hash, hashing ssh copies on their
+   host.
