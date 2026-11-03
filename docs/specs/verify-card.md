@@ -63,10 +63,10 @@ trailer into `hashlib.sha256` as the bytes pass, then applies `copystat`. Card r
 run at 100–300 MB/s and sha256 at several GB/s, so the copy stays at card speed; the
 performance gate confirms it. The pipeline carries the hash to the fix-timestamp write.
 
-The hash is never part of the default verdict. It backs an opt-in deep check that
-reads the local imported copy only — never the card or a network location — and catches
-damage to that copy after import. It cannot catch a bad card read, which is baked into
-the hash.
+The hash is never part of the default verdict. It backs an opt-in deep check (see
+"Deep check") that catches damage to a backup copy after import or a mirror copy that
+was cut short with its size intact. It never reads the card, and it cannot catch a bad
+card read, which is baked into the hash.
 
 ### Provenance on every file
 
@@ -93,10 +93,27 @@ so it is found wherever it has been grouped or moved since import. A sync tool's
 of deleted items (`#recycle`, `@eaDir`, `.stversions`) is excluded: a copy there is on
 its way out, not backed up.
 
-Locations are never read over the network. A local one is walked; a remote one is
-listed with `rsync --list-only --recursive` (path, size, mtime), which the remote
-host produces itself in seconds. Header reads for footage size and provenance happen on a
+The default check never reads a location over the network. A local one is walked; a
+remote one is listed with `rsync --list-only --recursive` (path, size, mtime), which the
+remote host produces itself in seconds. Header reads for footage size and provenance happen on a
 local copy; a remote copy with the same path, size and mtime shares its result.
+
+### Local or network
+
+Whether a location is local or network is detected on every run, never configured or
+stored: the same root can be a USB drive one day and an SMB mount the next.
+
+- A `host:/path` root is remote by its syntax and is reached over ssh.
+- Any other root is local only if its volume's filesystem type is on an allowlist
+  (`apfs`, `hfs`, `exfat`, `msdos`, `ntfs`; on Linux `ext4`, `xfs`, `btrfs`), the mount
+  is flagged local (`MNT_LOCAL` from `statfs`, `volumeIsLocalKey` in the app), and the
+  volume is not a disk image whose backing file is itself on a network volume.
+- Everything else — `smbfs`, `afpfs`, `nfs`, `webdav`, FUSE mounts, unknown types — is a
+  network mount. Allowlisting local types means a misread only ever withholds the
+  deep check's local level from a location; it never changes the default verdict.
+
+Each location on the Verify screen shows what was detected, e.g. "Local · APFS",
+"Network · SMB", "Remote · ssh".
 
 ## The check
 
@@ -144,6 +161,25 @@ The right-hand panel reuses the table machinery with a row type of its own, not
   recording)
 - "Show matched", off by default
 
+## Deep check
+
+Off by default, with two levels:
+
+1. **Hash local copies** — every matched copy on a local location has its `mdat` +
+   trailer hashed and compared with `XMP-jetlag:FootageSHA256`.
+2. **Also hash network copies** — adds network and remote locations, with a warning
+   that this is slow:
+   - a remote (`host:/path`) copy is hashed on its host over ssh
+     (`tail -c +OFFSET file | head -c LEN | sha256sum`), so only the digest crosses the
+     network. Offsets come from a matching local copy's box headers; without one, the
+     box headers are read on the host with small `dd` reads.
+   - a network-mounted copy can only be hashed by reading its footage across the
+     network; its row says so.
+
+A copy whose hash differs is listed as "footage damaged" on that location. Files with
+no recorded hash (imported before phase 3) are reported as "no hash recorded", never
+as a pass or a failure.
+
 ## Phases
 
 1. Provenance moves into the `jetlag` XMP namespace and `PreservedFileName`, with the
@@ -155,4 +191,5 @@ The right-hand panel reuses the table machinery with a row type of its own, not
 4. `verify-card.py`: source scan, location listings, matching, JSONL verdicts.
 5. Verify screen in the app; backup-location configuration screen.
 6. `archive-source` delete mode accepts only verified or user-accepted files.
-7. Opt-in deep check against the footage hash.
+7. Local/network detection per location; two-level opt-in deep check against the
+   footage hash, hashing remote copies on their host.
