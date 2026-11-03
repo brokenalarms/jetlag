@@ -109,6 +109,8 @@ Every metadata read and write goes through `scripts/lib/exiftool.py`, the single
 
 It starts exiftool with `scripts/lib/exiftool-jetlag.config`, which declares jetlag's own XMP namespace (`XMP-jetlag`, `http://ns.jetlag.app/1.0/`). Exiftool refuses to write a tag it has no definition for, so a client started without the config silently drops every provenance write.
 
+An exiftool write rebuilds a QuickTime file (`moov` moves ahead of `mdat`), so a copy jetlag has written never matches its card file byte for byte. `scripts/lib/footage.py` reads only the top-level box headers to find the footage — each `mdat` payload plus any trailer after the last box — which those writes leave unchanged; verify-card compares copies by its size and hash.
+
 ---
 
 ## Distribution
