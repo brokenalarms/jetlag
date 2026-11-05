@@ -44,7 +44,7 @@ written in the same exiftool call as the correction — no read or write of its 
 |---|---|
 | `XMP-xmpMM:PreservedFileName` | the name the file had on the card |
 | `XMP-jetlag:OriginalDateTimeOriginal` … `OriginalCreationDate` | each clock field as it was before jetlag's first write, for recovery outside the app |
-| `XMP-jetlag:FootageSHA256`, `XMP-jetlag:FootageBytes` | hash and size of `mdat` + trailer, computed while ingest copies the file |
+| `XMP-jetlag:ContentSHA256`, `XMP-jetlag:ContentBytes` | sha256 and size of the file's content without its metadata (for QuickTime, `mdat` + trailer; for photos, see "Photo content hash"), computed while ingest copies the file |
 
 `jetlag` is a custom XMP namespace (`http://ns.jetlag.app/1.0/`) declared in
 `scripts/lib/exiftool-jetlag.config`. Exiftool only writes tags it has a definition
@@ -56,17 +56,17 @@ instead. That record also counts as "already recorded", because those files' clo
 fields are already corrected and recording them now would store corrected values as
 originals. Verify reads its `filename` key as the original name.
 
-### Footage hash during ingest
+### Content hash during ingest
 
 Ingest replaces `shutil.copy2` with a copy loop that feeds the `mdat` payload and any
 trailer into `hashlib.sha256` as the bytes pass, then applies `copystat`. Card reads
 run at 100–300 MB/s and sha256 at several GB/s, so the copy stays at card speed; the
 performance gate confirms it. The pipeline carries the hash to the fix-timestamp write.
 
-The hash is never part of the default verdict. It backs an opt-in deep check that
-reads the local imported copy only — never the card or a network location — and catches
-damage to that copy after import. It cannot catch a bad card read, which is baked into
-the hash.
+The hash is never part of the default verdict. It backs an opt-in deep check (see
+"Deep check") that catches damage to a backup copy after import or a mirror copy that
+was cut short with its size intact. It never reads the card, and it cannot catch a bad
+card read, which is baked into the hash.
 
 ### Provenance on every file
 
@@ -93,10 +93,34 @@ so it is found wherever it has been grouped or moved since import. A sync tool's
 of deleted items (`#recycle`, `@eaDir`, `.stversions`) is excluded: a copy there is on
 its way out, not backed up.
 
-Locations are never read over the network. A local one is walked; a remote one is
-listed with `rsync --list-only --recursive` (path, size, mtime), which the remote
-host produces itself in seconds. Header reads for footage size and provenance happen on a
+The default check never reads a location over the network. A local one is walked; a
+remote one is listed with `rsync --list-only --recursive` (path, size, mtime), which the
+remote host produces itself in seconds. Header reads for footage size and provenance happen on a
 local copy; a remote copy with the same path, size and mtime shares its result.
+
+### Local or network
+
+Whether a location is local or network is detected on every run, never configured or
+stored: the same root can be a USB drive one day and an SMB mount the next.
+
+- A `host:/path` root is remote by its syntax and is reached over ssh.
+- Any other root is local only if its volume's filesystem type is on an allowlist
+  (`apfs`, `hfs`, `exfat`, `msdos`, `ntfs`; on Linux `ext4`, `xfs`, `btrfs`), the mount
+  is flagged local (`MNT_LOCAL` from `statfs`, `volumeIsLocalKey` in the app), and the
+  volume is not a disk image whose backing file is itself on a network volume.
+- `smbfs`, `afpfs`, `nfs` and `webdav` mounts are network mounts, however the share
+  appears under `/Volumes` — unless the mount's server (`f_mntfromname`, e.g.
+  `//user@127.0.0.1/Media`) resolves to this machine. A share this machine (or a VM on
+  it) serves to itself over loopback is a local disk, so it is local.
+- FUSE mounts (`macfuse`, `fuse.*`) and unrecognised types cannot say where their data
+  lives, so they are assumed to be network. Allowlisting local types means a misread
+  only ever moves a location from "Verify hashes" to "Include network locations"; it
+  never changes the default verdict.
+
+Each location on the Verify screen carries a small "Local" or "Network" label (a
+`host:/path` root is "Network"), so it is clear which locations each deep-check
+checkbox covers. The label is information only: no location gets a warning or note
+of its own.
 
 ## The check
 
@@ -144,15 +168,48 @@ The right-hand panel reuses the table machinery with a row type of its own, not
   recording)
 - "Show matched", off by default
 
+## Deep check
+
+Two checkboxes on the Verify screen, both off by default:
+
+- ☐ **Verify hashes** — every matched copy on a "Local" location has its content
+  hashed and compared with `XMP-jetlag:ContentSHA256`.
+  - ☐ **Include network locations (slow)** — enabled only while "Verify hashes" is
+    ticked; adds the "Network" locations.
+
+How a network copy is hashed is not shown to the user:
+
+- a `host:/path` copy is hashed on its host over ssh
+  (`tail -c +OFFSET file | head -c LEN | sha256sum`), so only the digest crosses the
+  network. Offsets come from a matching local copy's box headers; without one, the
+  box headers are read on the host with small `dd` reads.
+- a network-mounted copy is hashed by reading its content across the network.
+
+A copy whose hash differs from the recorded one is listed as "Hash mismatch" on that
+location — it says what was found, not why (bit rot, a bad copy, an edit outside
+jetlag). Files with no recorded hash (imported before phase 3) are reported as "No
+hash recorded", never as a pass or a failure.
+
+### Photo content hash
+
+Open: the content hash so far is defined only for QuickTime files. For photos,
+exiftool's `ImageDataHash` hashes the image data apart from metadata. It was ruled out
+for video only because a card's `moov` follows the footage; in a JPEG or RAW the image
+data follows the headers, so it may be computable as ingest streams the file. To
+confirm before phase 3: that it is computable during the copy and unchanged by
+jetlag's writes on each photo profile's format.
+
 ## Phases
 
 1. Provenance moves into the `jetlag` XMP namespace and `PreservedFileName`, with the
    config loaded by both metadata backends.
 2. Footage-size reader for QuickTime-family files, with a regression test that footage
    size and hash are unchanged by tag + fix-timestamp on each profile's format.
-3. Footage hash during ingest; the hash joins the provenance write;
+3. Content hash during ingest; the hash joins the provenance write;
    provenance on every moved file.
 4. `verify-card.py`: source scan, location listings, matching, JSONL verdicts.
 5. Verify screen in the app; backup-location configuration screen.
 6. `archive-source` delete mode accepts only verified or user-accepted files.
-7. Opt-in deep check against the footage hash.
+7. Local/network detection and label per location; "Verify hashes" and "Include
+   network locations (slow)" against the content hash, hashing ssh copies on their
+   host.
