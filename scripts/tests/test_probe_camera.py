@@ -39,6 +39,23 @@ def test_each_extension_reports_the_camera_its_files_carry(tmp_path):
     ], f"Actual: {found}, Expected: one SONY ILCE-7M5 entry per extension"
 
 
+def test_fujifilm_raw_and_heif_stills_are_found(tmp_path):
+    """A Fujifilm card shooting RAW+HEIF holds only .RAF and .HIF files."""
+    card = tmp_path / "DCIM" / "100_FUJI"
+    card.mkdir(parents=True)
+    for extension in ("RAF", "HIF"):
+        tagged = tmp_path / f"{extension}.JPG"
+        create_test_photo(tagged, Make="FUJIFILM", Model="X100VI")
+        tagged.rename(card / f"DSCF0001.{extension}")
+
+    found = probe(tmp_path)
+
+    assert found == [
+        {"extension": ".hif", "type": "photo", "files": 1, "make": "FUJIFILM", "model": "X100VI"},
+        {"extension": ".raf", "type": "photo", "files": 1, "make": "FUJIFILM", "model": "X100VI"},
+    ], f"Actual: {found}, Expected: a FUJIFILM X100VI entry for each of .hif and .raf"
+
+
 def test_files_without_a_camera_report_none(tmp_path):
     """A camera that records no Make/Model is reported as such, not guessed."""
     create_test_video(tmp_path / "clip.mp4")
