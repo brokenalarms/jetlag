@@ -127,7 +127,7 @@ profiles' extensions, then independent of them):
 
 | File | Verdict |
 |---|---|
-| media extension (`.mp4 .mov .insv .insp .jpg .arw .dng .mxf` …) | must be on every enabled location |
+| media extension (`.mp4 .mov .insv .insp .jpg .arw .dng` …) | must be on every enabled location |
 | companion extension (`.lrv .thm .lrf`, Sony clip `.XML`) | required only with "Include companion files" ticked |
 | under an ignored path (`MISC/` — Insta360's 468 KB `.insv` stubs that copy real clip names and are not video) | not checked |
 | hidden (`.dcf_reserved_space`, `._*`) | not checked |
@@ -234,7 +234,6 @@ it is located from the file's own structure with small header reads, like footag
 | Format | Data portion |
 |---|---|
 | QuickTime family (`.mp4 .mov .insv`, recognised by its first box as `scripts/lib/footage.py` does) | each `mdat` payload plus any trailer after the last box |
-| MXF (`.mxf`) | the essence (picture and sound) in its body partitions; header and footer partition metadata excluded |
 | HEIF (`.hif .heic`) | each `mdat` payload |
 | JPEG (`.jpg .insp`) | from the first start-of-scan marker to the end of the file, so images and camera trailers appended after the main image are included |
 | TIFF-based RAW (`.arw .dng`) | the strips or tiles of the full-size image |
