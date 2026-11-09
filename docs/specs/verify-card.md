@@ -31,9 +31,9 @@ Timezone corrections can also rename a file (`VID_20250619_042028_00_004` become
   regrouped and moved after import (an import without a group, then moved into
   one), so any stored path goes stale; a copy is found by its name wherever it is.
 
-The content hash (see "Deep check") is jetlag's own sha256 of the `mdat` payload plus
-trailer, not exiftool's `ImageDataHash`: a byte range can be hashed with standard tools
-on a `host:/path` location's host, which has no exiftool.
+The content hash (see "Deep check") is jetlag's own sha256 of the file's data portion
+(see "What is hashed"), not exiftool's `ImageDataHash`: a byte range can be hashed with
+standard tools on a `host:/path` location's host, which has no exiftool.
 
 ## Provenance
 
@@ -44,7 +44,7 @@ written in the same exiftool call as the correction — no read or write of its 
 |---|---|
 | `XMP-xmpMM:PreservedFileName` | the name the file had on the card |
 | `XMP-jetlag:OriginalDateTimeOriginal` … `OriginalCreationDate` | each clock field as it was before jetlag's first write, for recovery outside the app |
-| `XMP-jetlag:ContentSHA256`, `XMP-jetlag:ContentBytes` | sha256 and size of the file's content without its metadata (for QuickTime, `mdat` + trailer; for photos, see "Photo content hash"). Not written at import: added later by the deep check, as a cache (see "Hash cache") |
+| `XMP-jetlag:ContentSHA256`, `XMP-jetlag:ContentBytes` | sha256 and size of the file's content without its metadata (the data portion, see "What is hashed"). Not written at import: added later by the deep check, as a cache (see "Hash cache") |
 
 `jetlag` is a custom XMP namespace (`http://ns.jetlag.app/1.0/`) declared in
 `scripts/lib/exiftool-jetlag.config`. Exiftool only writes tags it has a definition
@@ -224,14 +224,26 @@ against a local disk's GB/s).
   mirroring that location copies the file again on its next run.
 - The card is never written.
 
-### Photo content hash
+### What is hashed
 
-Open: the content hash so far is defined only for QuickTime files. For photos it must
-be a byte range jetlag's writes leave unchanged (the image data apart from the
-metadata), so a `host:/path` copy can be hashed on its host the same way. Exiftool's
-`ImageDataHash` covers that data but cannot run on a host. To confirm before phase 7:
-the range for each photo profile's format, and that tag + fix-timestamp leave it
-unchanged.
+The hash always covers the file's data portion and never its metadata, which jetlag
+and other tools rewrite. The data portion is the same bytes on the card and on every
+copy, however its metadata has changed, so one hash compares them all. For each format
+it is located from the file's own structure with small header reads, like footage size:
+
+| Format | Data portion |
+|---|---|
+| QuickTime family (`.mp4 .mov .insv`, recognised by its first box as `scripts/lib/footage.py` does) | each `mdat` payload plus any trailer after the last box |
+| HEIF (`.hif .heic`) | each `mdat` payload |
+| JPEG (`.jpg .insp`) | from the first start-of-scan marker to the end of the file, so images and camera trailers appended after the main image are included |
+| TIFF-based RAW (`.arw .dng`) | the strips or tiles of the full-size image |
+| Fujifilm `.raf` | the raw data block the RAF header points to |
+
+A copy on a `host:/path` location is hashed over the same range, with offsets from a
+matching local copy or read on the host with small `dd` reads. A format not in the
+table is not hashed and is reported "Not hashable", never passed or failed. Before
+phase 7, the regression test from phase 2 is extended to each photo profile's format:
+its data portion is unchanged by tag + fix-timestamp.
 
 ## Phases
 
