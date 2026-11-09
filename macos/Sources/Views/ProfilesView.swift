@@ -30,7 +30,7 @@ struct ProfilesView: View {
     @State private var showDiscardConfirmation = false
     @State private var pendingAction: PendingAction?
     @State private var newCameraChoices: [SourceContents.NewCamera] = []
-    @State private var showNoMediaFound = false
+    @State private var noMediaSource: URL?
 
     private enum PendingAction {
         case loadProfile(ProfileEditingSession)
@@ -125,8 +125,15 @@ struct ProfilesView: View {
             }
             Button(Strings.Common.cancel, role: .cancel) { newCameraChoices = [] }
         }
-        .alert(Strings.Profiles.noMediaFoundTitle, isPresented: $showNoMediaFound) {
-            Button(Strings.Common.done, role: .cancel) {}
+        .alert(Strings.Profiles.noMediaFoundTitle,
+               isPresented: Binding(get: { noMediaSource != nil },
+                                    set: { if !$0 { noMediaSource = nil } })) {
+            Button(Strings.Profiles.createManually) {
+                if let source = noMediaSource {
+                    startHandNamedProfile(MediaProfile(sourceDir: source.path))
+                }
+            }
+            Button(Strings.Common.cancel, role: .cancel) {}
         } message: {
             Text(Strings.Profiles.noMediaFoundMessage)
         }
@@ -147,8 +154,8 @@ struct ProfilesView: View {
 
     /// A profile starts from its source: the folder chosen becomes the source,
     /// and its files give the camera, kind of media and file types. A camera that
-    /// already has a profile opens it; media that records no camera starts a
-    /// profile named by hand.
+    /// already has a profile opens it; media that records no camera, or a folder
+    /// whose media isn't recognised, starts a profile named by hand.
     private func newProfileFromCard() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -171,13 +178,15 @@ struct ProfilesView: View {
                 requestProfileLoad(ProfileEditingSession(name: existing, profile: profile))
             } else if contents.hasCameralessMedia {
                 let type = probes.first { $0.camera == nil }?.type
-                requestProfileLoad(ProfileEditingSession(
-                    name: "new-profile",
-                    profile: MediaProfile(type: type, sourceDir: url.path)))
+                startHandNamedProfile(MediaProfile(type: type, sourceDir: url.path))
             } else {
-                showNoMediaFound = true
+                noMediaSource = url
             }
         }
+    }
+
+    private func startHandNamedProfile(_ profile: MediaProfile) {
+        requestProfileLoad(ProfileEditingSession(name: "new-profile", profile: profile))
     }
 
     private func createProfile(for found: SourceContents.NewCamera) {

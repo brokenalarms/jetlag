@@ -315,7 +315,8 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let noMediaFoundTitle = String(localized: "profiles.noMediaFound.title",
             defaultValue: "No Media Found")
         static let noMediaFoundMessage = String(localized: "profiles.noMediaFound.message",
-            defaultValue: "The folder chosen holds no photos or videos. Choose the folder the camera's media is in.")
+            defaultValue: "No photos or videos were recognised in the folder chosen. Choose the folder the camera's media is in, or create the profile by hand.")
+        static let createManually = String(localized: "profiles.createManually", defaultValue: "Create Manually")
         static let newProfilePanelMessage = String(localized: "profiles.newProfilePanel.message",
             defaultValue: "Choose the profile's source: the folder its camera's media is in. The camera and file types are read from its files.")
         static let selectPrompt = String(localized: "profiles.selectPrompt", defaultValue: "Select a profile to edit")
