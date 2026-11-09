@@ -258,6 +258,7 @@ def run_fix_timestamp(
     time_offset: Optional[int] = None,
     force_timezone: bool = False,
     extra_write_fields: Optional[dict] = None,
+    record_provenance: bool = False,
 ):
     """Fix a file's timestamp via direct module call.
 
@@ -272,7 +273,38 @@ def run_fix_timestamp(
         time_offset_seconds=time_offset,
         force_timezone=force_timezone,
         extra_write_fields=extra_write_fields,
+        record_provenance=record_provenance,
     )
+
+
+def write_moved_file_fields(file_path: Path, camera_fields: dict) -> Optional[str]:
+    """Write the camera fields and provenance in one exiftool call, when fix-timestamp
+    is not running to carry them.
+
+    Every file the pipeline moves gets a provenance record, so verify-card can find a
+    copy by its card name after it has been renamed. Returns the error when the camera
+    fields could not be written; a failed provenance-only write is a warning, as it is
+    in fix-timestamp.
+    """
+    exif = read_exif_data(str(file_path))
+    provenance_args = _fix_ts_mod.provenance_field_args(str(file_path), exif)
+    camera_args = [f"-{tag}={value}" for tag, value in camera_fields.items()]
+    if not (provenance_args or camera_args):
+        return None
+    try:
+        written = _fix_ts_mod.write_exif_fields(str(file_path), provenance_args + camera_args)
+    except MetadataWriteRefused as refusal:
+        written, error = False, str(refusal)
+        print(f"   ❌ exiftool could not write this file: {error}", file=sys.stderr)
+    else:
+        error = None
+    if written:
+        return None
+    if camera_args:
+        print(f"   ❌ Failed to write {', '.join(camera_fields)}", file=sys.stderr)
+        return error or f"Failed to write {', '.join(camera_fields)}"
+    print("   ⚠️  Failed to record original filename and timestamps", file=sys.stderr)
+    return None
 
 
 def run_organize_by_date(
@@ -459,8 +491,9 @@ def process_file(
     # Taken before any step writes, so organize never reads the file again; a
     # timestamp correction replaces it with the corrected value below.
     organize_datetime_original = read_exif_data(str(active_file)).get("DateTimeOriginal", "")
-    # Every step's field writes go out in fix-timestamp's exiftool call, so the file
-    # is rewritten once.
+    # Every step's field writes, provenance included, go out in one exiftool call so
+    # the file is rewritten once: fix-timestamp's when it runs, the pipeline's own
+    # otherwise.
     fix_writes_fields = apply and bool(tasks) and "fix-timestamp" in tasks
 
     if copy_companion_files and companion_dests:
@@ -483,7 +516,7 @@ def process_file(
             print("🏷️  Tagging...", file=sys.stderr)
             try:
                 tag_result = run_tag_media(active_file, tags or None, make or None, model or None, apply,
-                                           write_exif=not fix_writes_fields)
+                                           write_exif=False)
             except MetadataWriteRefused as refusal:
                 print(f"   ❌ exiftool could not write {active_file.name}: {refusal}", file=sys.stderr)
                 result["failed"] = True
@@ -491,7 +524,7 @@ def process_file(
                 _staged_paths.clear()
                 emit_event("pipeline_result", file=file_path.name, result="failed")
                 return result
-            if fix_writes_fields:
+            if apply:
                 camera_fields = _tag_mod.camera_exif_fields(str(active_file), make or None, model or None)
             if tag_result is not None:
                 emit_event("tag_result",
@@ -507,6 +540,15 @@ def process_file(
                     file_changed = True
             emit_event("stage_complete", stage="tag")
 
+    if apply and not fix_writes_fields:
+        write_error = write_moved_file_fields(active_file, camera_fields)
+        if write_error:
+            result["failed"] = True
+            result["error"] = write_error
+            _staged_paths.clear()
+            emit_event("pipeline_result", file=file_path.name, result="failed")
+            return result
+
     # Fix video timestamp (if in tasks)
     if tasks and "fix-timestamp" in tasks:
         print("🔧 Fixing timestamp...", file=sys.stderr)
@@ -517,6 +559,7 @@ def process_file(
                 time_offset=time_offset,
                 force_timezone=force_timezone,
                 extra_write_fields=camera_fields,
+                record_provenance=True,
             )
         except Exception as e:
             error_msg = str(e)
