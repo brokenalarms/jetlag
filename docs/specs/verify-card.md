@@ -234,6 +234,7 @@ it is located from the file's own structure with small header reads, like footag
 | Format | Data portion |
 |---|---|
 | QuickTime family (`.mp4 .mov .insv`, recognised by its first box as `scripts/lib/footage.py` does) | each `mdat` payload plus any trailer after the last box |
+| MXF (`.mxf`) | the essence (picture and sound) in its body partitions; header and footer partition metadata excluded |
 | HEIF (`.hif .heic`) | each `mdat` payload |
 | JPEG (`.jpg .insp`) | from the first start-of-scan marker to the end of the file, so images and camera trailers appended after the main image are included |
 | TIFF-based RAW (`.arw .dng`) | the strips or tiles of the full-size image |
