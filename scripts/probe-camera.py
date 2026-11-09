@@ -25,7 +25,8 @@ from lib.filesystem import _is_walked
 _tag_mod = importlib.import_module("tag-media")
 
 VIDEO_EXTENSIONS = [".insv", ".mp4", ".mov"]
-PHOTO_EXTENSIONS = [".arw", ".cr2", ".dng", ".insp", ".jpeg", ".jpg", ".nef", ".png"]
+PHOTO_EXTENSIONS = [".arw", ".cr2", ".cr3", ".dng", ".heic", ".heif", ".hif", ".insp", ".jpeg", ".jpg",
+                    ".nef", ".orf", ".png", ".raf", ".rw2"]
 DEFAULT_EXTENSIONS = PHOTO_EXTENSIONS + VIDEO_EXTENSIONS
 
 
