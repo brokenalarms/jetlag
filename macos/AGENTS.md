@@ -10,7 +10,7 @@
 Where app changes require awareness of the scripts, and vice versa:
 
 - **CLI args**: the app builds command-line arguments for scripts. Changing a script's interface (adding/removing/renaming flags) requires updating how the app wires args.
-- **Profile schema**: the app reads the same `media-profiles.yaml` the scripts use. Schema changes affect both Swift decoding and Python parsing.
+- **Profile schema**: the app reads the same `media-profiles.yaml` the scripts use. Schema changes affect both Swift decoding and Python parsing. The app writes the file as an edit of the one it read (`ProfilesDocument`), so a key the scripts read that `MediaProfile` doesn't model survives a save; a key the app should show or edit still needs a model field.
 - **Script bundling**: scripts are copied into the app bundle at build time (postBuildScripts in project.yml). The app always runs bundled scripts, not the repo copy.
 - **Color tokens**: shared with the marketing site via `design/tokens.json` → `design/generate-colorsets.py` → Assets.xcassets color sets.
 - **Styles**: every colour role, tint opacity, corner radius, spacing step and font lives in `Sources/Theme.swift`; views reference `Theme.*` and never carry a style literal.

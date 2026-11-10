@@ -7,7 +7,7 @@ import Yams
 /// `folder_template`, the gyroflow preset's other settings) on the first save.
 enum ProfilesDocument {
     /// How much of a mapping the model owns.
-    indirect enum Shape {
+    enum Shape {
         /// The model holds the value whole: what it writes replaces the file's.
         case value
         /// The model owns these keys of the mapping. One the model no longer
