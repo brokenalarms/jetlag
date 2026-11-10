@@ -117,17 +117,21 @@ is all zeros; X4 clips (NZ, firmware v1.9.21) write normally. The camera produce
 table, not jetlag: no write ever succeeded on these files, and exiftool writes to a
 temporary file. The user is reporting it to ExifTool's author.
 
-Since #256 a refused write fails the file, so an X6 import fails outright. Decide with the
-user whether X6 `.insv` skips the metadata write (the birth time, filename and date folder
-are still corrected; `.insv` reaches Final Cut only through an Insta360 Studio export),
-and how that shows in the app.
+Since #256 a refused write fails the file, so an X6 import fails outright. The user's
+decision: a write exiftool refuses as a corrupted Insta360 trailer is skipped with a
+warning. The birth time, filename and date folder are still corrected (`.insv` reaches
+Final Cut only through an Insta360 Studio export), and the row shows its own outcome
+token rather than failing the file.
 
 ## 4. Fix Timestamps can be turned off in the app
 
 The user expects the timestamp step to always run, but only Ingest and Organize are
 always on (`PipelineStep.isAlwaysOn`); the workflow lets Fix Timestamps be tapped off.
-C0199 was organized without a correction on 10 Oct, most likely through this. Confirm the
-intent with the user before changing it.
+C0199 was organized without a correction on 10 Oct, most likely through this. The
+user's decision: the step becomes **Set Timestamps** and stays switchable, but turning
+it off is a batch check like a camera mismatch or a zone relabel, which warns on a dry
+run and asks before an apply. All the batch checks move into one sequence with one
+output: `preflight-checks.md`.
 
 ## 5. Writes that rewrite a file without its birth time
 
