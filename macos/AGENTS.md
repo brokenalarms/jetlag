@@ -1,5 +1,16 @@
 # macOS — Jetlag App
 
+## Layout
+
+Folders group code by feature; Swift ignores them within a target, and XcodeGen picks up `Sources/` and `Tests/` recursively, so a new file needs no project.yml change.
+
+- `Sources/` root: `JetlagApp`, `Strings`, `Theme`, the entitlements, `Assets.xcassets` (written by `design/`) and `Resources/` (written by `BuildScripts/`).
+- `Sources/Models/`: `AppState` and other app-wide state at the root; `Pipeline/` (events, the run transcript, table rows and their outcome, summary, log lines), `Profiles/` (`MediaProfile`, `ProfilesConfig`, matching and camera identity), `Workflow/` (`WorkflowSession`, `TimezoneCatalog`).
+- `Sources/Services/`: `Scripts/` (launching, running and reading scripts, the Python runtime check), `Profiles/` (loading, locating and writing the profiles file); one-off script queries and `LicenseStore` at the root.
+- `Sources/Components/`: form controls that take plain data; `Results/` holds the Files panel, its table, sizing and badges.
+- `Sources/Views/`: screens and their representables; `AppKit/` holds the AppKit helpers they host (sizing, tail following, window growth, the log's scroll view).
+- `Tests/` mirrors `Sources/`, with shared hosting helpers in `Support/`. Tests at the `Tests/` root are the `Strings` tests and those that find repo files by walking up from `#filePath` — moving one deeper changes how many levels it must walk.
+
 ## Architecture choices
 
 - **No per-view view models** — state is lifted to a single `@Observable` AppState; views bind directly to it. Don't introduce MVVM. Plain services and reducers that AppState owns (a script launcher, a value type that folds pipeline events into rows, profile CRUD on `ProfilesConfig`) are encouraged: they keep logic out of views and testable without a window.

@@ -11,6 +11,11 @@
 │   └── tests/            ← script test suite (belongs with the scripts)
 ├── macos/                ← macOS SwiftUI app (sibling to scripts/, not nested inside)
 │   ├── Sources/          ← Swift source files
+│   │   ├── Models/       ← AppState plus Pipeline/, Profiles/, Workflow/ state and value types
+│   │   ├── Services/     ← Scripts/ (launching, processes, line reading), Profiles/ (profiles file I/O)
+│   │   ├── Components/   ← reusable form controls; Results/ holds the Files panel and table
+│   │   └── Views/        ← screens; AppKit/ holds the AppKit bridges they host
+│   ├── Tests/            ← mirrors Sources/; Support/ holds the hosting helpers
 │   └── project.yml       ← XcodeGen project spec
 ├── web/                  ← Vite + Tailwind marketing site
 │   ├── src/page.js       ← SECTIONS list; renders and initialises the page
