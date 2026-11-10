@@ -1,8 +1,6 @@
 /** @type {import('tailwindcss').Config} */
-import { createRequire } from 'module'
-const require = createRequire(import.meta.url)
 // Color tokens sourced from design/tokens.json — run design/generate-colorsets.py to sync macOS app colors
-const tokens = require('../design/tokens.json')
+import { tokens, tokenVariables } from './tokens.js'
 
 export default {
   content: [
@@ -29,9 +27,9 @@ export default {
           purple: tokens.colors['neon-purple'],
         },
         neutral: {
-          850: '#1c1c1e',
-          925: '#111113',
-          950: '#0a0a0b',
+          850: tokens.colors['bg-elevated'],
+          925: tokens.colors['bg-secondary'],
+          950: tokens.colors['bg-primary'],
         },
       },
       keyframes: {
@@ -45,5 +43,5 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [tokenVariables],
 }
