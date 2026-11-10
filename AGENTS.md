@@ -3,7 +3,7 @@
   - scripts/ — Python/shell scripts, lib/, media-profiles.yaml, tests/. Work standalone with no knowledge of the app.
   - macos/ — SwiftUI app. Sibling to scripts/, NOT nested inside it. Reads media-profiles.yaml and launches scripts.
   - web/ — Vite + Tailwind marketing site. Sections live in web/src/sections/.
-  - docs/ — documentation. AGENTS.md, README.md, TODO.md live at repo root.
+  - docs/ — documentation. AGENTS.md and README.md live at repo root.
 - don't reference Claude or AGENTS.md
 
 - ARCHITECTURE
@@ -25,17 +25,11 @@
  - info on commits and pull requests is stored at /docs/committing.md
  - this is required reading if dealing with any git or Github-based commands like commiting, branches, and creating pull requests.
 
-- TODOs
-  - a list of smaller TODOs are maintained at @docs/TODO.md, with larger tasks broken down into their own specifications in @docs/specs/, with previously completed ones in @docs/specs/completed.
-  -  Large tasks in specs folder may not have their own entries in TODO.md, so part of looking for todos is checking through specs files as well. 
-  - You don't need to open or consider completed specs in context, unless a history lesson would aid you to understand the why and how of a particular feature.
-  - TODO.md is a sliding context window for fresh agents — open tasks only; completed work belongs in commit messages, not here
-  - tasks are grouped by subrepo (`scripts/`, `macos/`, `web/`); cross-repo tasks appear under combined headings (e.g. `scripts/` + `macos/`)
-  - each task is prefixed with its date added in YYYY-MM-DD format
-  - at the start of each session, in the absence of any specific instruction, read TODO.md
+- TASKS
+  - tasks live in bd (beads): `bd ready` lists available work, `bd prime` explains the workflow. Commits for a tracked task carry its bead id, e.g. `[jetlag-xxx]`.
+  - do not add tasks to docs/TODO.md.
+  - larger designs get their own spec doc in /docs/specs/, worked through as a task or a series of PRs. When a spec is fully implemented, move it into /docs/specs/completed/ as part of the final commit or PR.
+  - you don't need to open completed specs, unless a history lesson would help you understand the why and how of a feature.
+  - specs carry no status updates, ticked boxes or "Done" sections. The commit record is the 'Done' record.
+  - when bd is unavailable (e.g. Linux cloud sessions — see /docs/environment.md), work from /docs/specs/ and the user's instruction, and record any newly found tasks in the PR description instead.
   - if not instructed to work on a specific task, determine the single highest-leverage or most badly needed task, and work only on that.
-  - Use dates created to help inform where we are up to in terms of the backlog and broken-down tasks that may only be partially implemented.
-  - if a task is large enough, it can become a spec that requires its own MD. These can be placed in /docs/specs/. These can then similarly be worked through as part of a task or series of PRs, and then the file deleted as part of the final commit or PR in the series.
-  - at the end of a session, remove any completed tasks from TODO.md and add any newly discovered ones.
-  - If a linked spec file is now complete, move that markdown file into /docs/specs/implemented.
-  - Never add a "Done" section or status reports to TODO.md, and never tick off items versus just removing them. The commit record is the 'Done' record. There should be no status updates in any files in the 'spec' folder.

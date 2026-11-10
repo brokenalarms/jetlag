@@ -12,17 +12,17 @@ Two failure modes, both invisible when developing on a newer interpreter:
 """
 
 import ast
-from pathlib import Path
 
 import pytest
 
-SCRIPT_DIR = Path(__file__).parent.parent
+from helpers import SCRIPT_DIR
+
 MIN_VERSION = (3, 9)
 
 SOURCES = sorted(
-    list(SCRIPT_DIR.glob("*.py"))
-    + list((SCRIPT_DIR / "lib").glob("*.py"))
-    + list((SCRIPT_DIR / "tests").glob("*.py"))
+    list((SCRIPT_DIR / "cli").rglob("*.py"))
+    + list((SCRIPT_DIR / "lib").rglob("*.py"))
+    + list((SCRIPT_DIR / "tests").rglob("*.py"))
 )
 
 
@@ -50,7 +50,7 @@ def _union_lineno(annotation) -> int:
     return 0
 
 
-@pytest.mark.parametrize("source", SOURCES, ids=lambda p: p.name)
+@pytest.mark.parametrize("source", SOURCES, ids=lambda p: str(p.relative_to(SCRIPT_DIR)))
 def test_syntax_parses_on_floor_version(source):
     """Module uses no syntax newer than the oldest supported interpreter."""
     try:
@@ -62,7 +62,7 @@ def test_syntax_parses_on_floor_version(source):
         )
 
 
-@pytest.mark.parametrize("source", SOURCES, ids=lambda p: p.name)
+@pytest.mark.parametrize("source", SOURCES, ids=lambda p: str(p.relative_to(SCRIPT_DIR)))
 def test_union_annotations_are_deferred(source):
     """`X | None` annotations require `from __future__ import annotations` below 3.10."""
     tree = ast.parse(source.read_text(), filename=str(source))

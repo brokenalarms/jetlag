@@ -4,86 +4,96 @@ Comprehensive tests for media timestamp fixing, tagging, and organization script
 
 ## Test Structure
 
-### Unit Tests
-Test individual functions in isolation, focusing on data structures and return values rather than output strings.
+The folders mirror `lib/`, so a module's tests sit where its code does:
 
-- `test_fix_media_timestamp_units.py` - Unit tests for timestamp parsing, calculations, and EXIF operations
-- `test_tag_media_units.py` - Unit tests for tag and EXIF read/write operations
+| Folder | Tests for |
+|---|---|
+| `media_pipeline/` | `lib/media_pipeline/` — the whole run, split by area |
+| `fix_media_timestamp/` | `lib/fix_media_timestamp/` — the correction, end to end and by step |
+| `timestamps/` | `lib/timestamps/` — reading and ranking timestamps, file times, provenance |
+| `commands/` | the single-module commands: tag, organize, ingest, archive, gyroflow, probe-camera, scan-source, report-file-dates |
+| `shared/` | the shared `lib/` modules: exiftool client, command-line helpers, filesystem, footage, data portion, profiles |
+| top level | the scripts as a whole: every wrapper runs, dependencies, the Python version macOS ships |
 
-### Scenario Tests
-Test real-world timezone scenarios and workflows.
+`conftest.py` holds the fixtures and the session checks; everything else the tests
+share is the `helpers` package (`helpers.media` makes test videos and photos,
+`helpers.pipeline` runs the pipeline as the app does). `pyproject.toml` puts
+`scripts/` and `scripts/tests/` on the path, so any test folder imports `lib.*`,
+`cli.*` and `helpers.*` the same way. Test file names are unique across folders.
 
-- `test_timezone_scenarios.py` - Comprehensive timezone handling tests covering:
-  - Viewing in different timezones than shooting timezone
-  - Preserve wallclock time vs display time modes
-  - UTC conversions and date boundary crossing
-  - Video editor compatibility behavior
-  - End-to-end workflows
+Each `test_*.py` module opens with a docstring saying what it protects; read that first. The suites fall into four groups:
 
-### Integration Tests
-Test bash scripts and full workflows.
+### Unit tests
+Call functions directly and assert on returned data, not output strings.
 
-- `test_organize_by_date.py` - File organization and template substitution
-- `test_fix_media_timestamp.py` - Full script execution tests
-- `test_tag_media.py` - Full tagging workflow tests
+- `fix_media_timestamp/test_fix_media_timestamp_units.py` — timezone parsing and normalisation, birth-time operations, change detection, the priority order for picking the best timestamp
+- `commands/test_tag_media_units.py` — reading and adding Finder tags and EXIF camera fields, only adding what is missing, dry run vs apply
+- `fix_media_timestamp/test_fix_media_timestamp_plan.py` — `plan_correction` and `apply_correction`: source ranking, declared-zone relabelling, the `--force-timezone` gate, `--time-offset` and the one-write rule
+- `media_pipeline/test_pipeline_stages.py`, `test_pipeline_preflight.py`, `test_pipeline_consent.py` — which stages a run's options route a file through, the stage loop's completion and failure exit, the timezone pre-flight decision, and the consent prompts (each file also holds the end-to-end tests of its area)
+- `shared/test_filesystem.py`, `timestamps/test_sources.py`, `shared/test_footage.py` — `lib/` modules
+
+Unit tests that would otherwise call exiftool take the `fake_metadata` fixture
+(`conftest.py`): reads return the tags a test gives each path and writes are
+recorded, with no exiftool process behind them.
+
+### Scenario tests
+Real timezone combinations users hit.
+
+- `fix_media_timestamp/test_timezone_scenarios.py` — viewing in a different timezone from the one shot in, preserving wall-clock shooting time, UTC conversion and date-boundary crossing, video-editor behaviour (birth time for import, `Keys:CreationDate` for the timeline), and the import → fix → organise workflow
+
+### Integration and regression tests
+Run a script end to end against temporary media and compare file state before and after.
+
+- `media_pipeline/`, split by area: `test_pipeline_cli.py` (arguments, modes, summary, JSONL events), `test_pipeline_discovery.py`, `test_pipeline_timezones.py`, `test_pipeline_organize.py`, `test_pipeline_companions.py`, `test_pipeline_archive.py`, `test_pipeline_working_dir.py`, `test_pipeline_cancel.py`; `helpers/pipeline.py` runs the pipeline as the app does, and the `temp_workspace` / `test_profile` fixtures are in `conftest.py`
+- `fix_media_timestamp/test_timestamp_regression.py`, `fix_media_timestamp/test_fix_media_timestamp.py`, and every module in `commands/`
+
+### Contract tests
+Hold an interface or a cost fixed.
+
+- `media_pipeline/test_pipeline_schema.py` — the pipeline's JSONL output and its parser's tasks and flags match `scripts/lib/media_pipeline/pipeline-schema.yaml`
+- `media_pipeline/test_metadata_call_contract.py` — exact exiftool call counts per file (see `docs/testing.md`)
+- `shared/test_metadata_stderr.py`, `shared/test_process_hygiene.py`, `timestamps/test_xmp_namespace.py` — the long-lived exiftool client and the XMP namespace
+- `test_command_wrappers.py`, `test_requirements.py`, `test_python_compatibility.py` — every command's wrapper, runtime dependencies and the Python version macOS ships
 
 ## Required External Tools
 
-Tests must never be skipped because a tool is missing. `conftest.py` auto-installs missing tools before collection:
+Tests must never be skipped because a tool is missing. `conftest.py` auto-installs missing tools before collection, and refuses to start when a Python package from `scripts/requirements.txt` is missing:
 
-| Tool | All platforms | macOS only | Install (manual fallback) |
-|------|:---:|:---:|---------|
-| ffmpeg | **auto-installed** | | `brew install ffmpeg` / `apt install ffmpeg` |
-| exiftool | **auto-installed** | | `brew install exiftool` / `apt install libimage-exiftool-perl` |
-| humanize (Python) | **auto-installed** | | `pip install humanize` |
-| tag | | **required** | `brew install tag` |
-| SetFile | | **required** | `xcode-select --install` |
+| Tool | Where it comes from |
+|------|---------|
+| ffmpeg (creates test media) | auto-installed by `conftest.py` (`brew install ffmpeg` / `apt-get install ffmpeg`) |
+| exiftool | vendored in `scripts/tools/`. Some tests call `exiftool` directly, so it must also be on `PATH` (see Running Tests) |
+| tag (macOS) | vendored in `scripts/tools/` |
+| SetFile (macOS) | required on macOS: `xcode-select --install` |
 
-On Linux, tests that call macOS-only tools (`tag`, `SetFile`) are skipped automatically by `conftest.py`. All other tests must pass — no skipping.
+On Linux, tests that need macOS-only behaviour (Finder tags, birth time) carry `skipif` markers. All other tests must pass — no skipping.
 
 **Never use `pytest.skip()` for missing tools.** If a test needs a tool, add it to `conftest.py` so it gets installed automatically.
 
 ## Running Tests
 
-### Prerequisites
+Python dependencies: runtime packages are in `scripts/requirements.txt`, test and lint
+tooling in `scripts/requirements-dev.txt`. `make test-scripts` builds `scripts/.venv`
+from both and runs the suite in parallel (stopping at the first failure). The pytest
+settings (`pythonpath`, `testpaths`) live in the root `pyproject.toml`, so run pytest
+from the repository root.
 
 ```bash
-# Install Python dependencies
-pip install -r tests/requirements.txt
+# Whole suite
+make test-scripts
 
-# Tools are auto-installed by conftest.py, but to verify manually:
-ffmpeg -version
-exiftool -ver
+# Linux: exiftool is not on PATH there
+PATH=$PWD/scripts/tools:$PATH make test-scripts
 
-# macOS only
-which tag SetFile
+# Specific file, class or test
+scripts/.venv/bin/pytest scripts/tests/fix_media_timestamp/test_timezone_scenarios.py
+scripts/.venv/bin/pytest scripts/tests/fix_media_timestamp/test_timezone_scenarios.py::TestTimezoneScenarios::test_scenario_viewing_in_japan_shot_in_taiwan
+
+# Lint
+make lint
 ```
 
-### Run All Tests
-
-```bash
-# Using Python runner (recommended)
-python3 run-tests.py
-
-# Or directly with pytest
-cd tests && pytest -v
-```
-
-### Run Specific Tests
-
-```bash
-# Specific test file
-python3 run-tests.py test_timezone_scenarios.py
-
-# Specific test class
-python3 run-tests.py test_timezone_scenarios.py::TestTimezoneScenarios
-
-# Specific test
-python3 run-tests.py test_timezone_scenarios.py::TestTimezoneScenarios::test_scenario_viewing_in_japan_shot_in_taiwan
-
-# With coverage
-python3 run-tests.py --cov=. --cov-report=html
-```
+Per-platform notes, including the tests known to fail when running as root, are in `docs/environment.md`.
 
 ## What We Test (and Don't Test)
 
@@ -125,15 +135,22 @@ Running scripts twice should:
 ```
 
 ### Data/Presentation Separation
-```
-Functions should:
-- Return structured data (tuples, lists, dicts)
-- Not return formatted strings
-- Let presentation layer handle formatting
-- Enable composition and reuse
+```python
+# Good: functions return data
+success, tags_added = apply_finder_tags(file, ["tag1", "tag2"])
+assert isinstance(tags_added, list)
+
+# Bad: asserting on a formatted string is brittle
+assert "Tagged: file.mp4" in result
 ```
 
-## Design Principles from AGENTS.md
+### Birth Time Only
+```
+Only the file's birth time is set. Its modification time changes naturally
+when exiftool writes, and is never set to match the birth time.
+```
+
+## Design Principles
 
 These tests validate adherence to:
 
@@ -157,8 +174,11 @@ Tests create temporary files with controlled metadata to validate:
 ### Tests failing due to timezone
 Some tests depend on system timezone. If running in unexpected timezone, tests may need adjustment.
 
-### pytest refuses to start with "Required tools not installed"
-Install the missing tools listed in the error — see the Required External Tools table above.
+### pytest refuses to start with "Required tool ... not installed"
+Install the missing tool named in the error — see the Required External Tools table above.
+
+### `exiftool: not found` (Linux)
+Put the vendored copy on `PATH`: `PATH=$PWD/scripts/tools:$PATH`.
 
 ## Adding New Tests
 
@@ -170,8 +190,6 @@ When adding features:
 4. **Update this README** with new scenarios
 
 ## Test Philosophy
-
-Following AGENTS.md principles:
 
 - **Test behavior, not implementation** - Validate data structures and file effects
 - **Test real scenarios** - Use actual timezone combinations users face

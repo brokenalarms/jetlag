@@ -18,14 +18,18 @@ import os
 import re
 import subprocess
 import threading
-from pathlib import Path
+from lib import DATA_DIR
 
-EXIFTOOL_CONFIG = str(Path(__file__).parent / "exiftool-jetlag.config")
+EXIFTOOL_CONFIG = str(DATA_DIR / "exiftool-jetlag.config")
 
-# The exiftool to start: the one on PATH (scripts/tools first, via the .sh
-# wrappers) unless JETLAG_EXIFTOOL names another. Tests point it at a stand-in
-# that counts calls before passing them to the real one.
-EXIFTOOL_BINARY = os.environ.get("JETLAG_EXIFTOOL") or "exiftool"
+
+
+def default_binary() -> str:
+    """The exiftool to start: the one on PATH (scripts/tools first, via the .sh
+    wrappers) unless JETLAG_EXIFTOOL names another. Tests point it at a stand-in
+    that counts calls before passing them to the real one."""
+    return os.environ.get("JETLAG_EXIFTOOL") or "exiftool"
+
 
 # pids of every exiftool -stay_open child this process has spawned, so a test
 # session can confirm none of them are still running at session end.
@@ -39,9 +43,19 @@ class MetadataWriteRefused(Exception):
 
 
 class ExifTool:
-    """Manages a persistent ``exiftool -stay_open True`` subprocess."""
+    """Manages a persistent ``exiftool -stay_open True`` subprocess.
 
-    def __init__(self):
+    binary is the exiftool to run; it defaults to default_binary(), read when
+    the client is constructed, so a test can hand a client a stand-in directly.
+
+    cache holds each file's parsed metadata as lib.timestamps.sources's
+    read_exif_data() built it. It lives here so that write_tags() can drop a
+    file's entry whenever it writes that file: no caller has to remember to.
+    """
+
+    def __init__(self, binary: str | None = None):
+        self.binary = binary or default_binary()
+        self.cache: dict[str, dict[str, str]] = {}
         self._process = None
         self._lock = threading.Lock()
         self._exec_id = 0
@@ -60,7 +74,7 @@ class ExifTool:
             return
         try:
             self._process = subprocess.Popen(
-                [EXIFTOOL_BINARY, "-config", EXIFTOOL_CONFIG, "-stay_open", "True", "-@", "-"],
+                [self.binary, "-config", EXIFTOOL_CONFIG, "-stay_open", "True", "-@", "-"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -173,10 +187,14 @@ class ExifTool:
 
         Returns True when exiftool reports files were updated, False when it found
         nothing to change. Raises MetadataWriteRefused when exiftool could not write
-        the file at all, so a refusal can never pass for a write.
+        the file at all, so a refusal can never pass for a write. Either way the
+        file's cached metadata is dropped, since it may no longer describe the file.
         """
         args = ["-P", "-overwrite_original"] + tag_args + [str(file_path)]
-        output, diagnostics = self._run(*args, wait_for_stderr=True)
+        try:
+            output, diagnostics = self._run(*args, wait_for_stderr=True)
+        finally:
+            self.cache.pop(str(file_path), None)
         if re.search(r"\d+ files? weren't updated due to errors", output):
             errors = [
                 line.removeprefix("Error: ").removesuffix(f" - {file_path}")

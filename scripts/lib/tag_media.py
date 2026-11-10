@@ -1,0 +1,200 @@
+"""Finder tags and camera Make/Model for one media file.
+
+The camera fields only fill in what a file lacks: a Make or Model the camera
+wrote is the record of what shot the file, and camera_mismatch reports it.
+"""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+
+from lib.exiftool import exiftool
+from lib.timestamps.sources import read_exif_data
+
+
+@dataclass
+class TagResult:
+    file: str
+    tags_added: list[str]
+    exif_make: str
+    exif_model: str
+    action: str  # "tagged" | "already_correct"
+    # The camera the file says shot it, where that differs from the profile's:
+    # the profile was likely picked for the wrong body. Absent when they agree.
+    file_make: Optional[str] = None
+    file_model: Optional[str] = None
+
+def parse_tag_list(text: Optional[str]) -> List[str]:
+    """Comma-separated Finder tags as a list, each stripped, empty ones dropped.
+
+    The one parser for every place tags arrive as text (--tags on tag-media and
+    on the pipeline), so "a, b" tags a file "b" from either.
+    """
+    return [tag.strip() for tag in (text or "").split(",") if tag.strip()]
+
+
+def get_existing_finder_tags(file_path: str) -> List[str]:
+    """Get existing Finder tags from a file"""
+    try:
+        result = subprocess.run(["tag", '--list', '--no-name', file_path],
+                              capture_output=True, check=True, text=True)
+        output = result.stdout.strip()
+        if not output:
+            return []
+        return [tag.strip() for tag in output.split(',') if tag.strip()]
+    except (subprocess.CalledProcessError, OSError):
+        return []
+
+def apply_finder_tags(file_path: str, tags: List[str], apply: bool = True) -> Tuple[bool, List[str]]:
+    """Apply Finder tags to a file using macOS tag command
+
+    Returns:
+        (success, tags_added): Success status and list of tags that were actually added
+    """
+    if not tags:
+        return True, []
+
+    try:
+        existing_tags = get_existing_finder_tags(file_path)
+        tags_to_add = [tag for tag in tags if tag not in existing_tags]
+
+        if not tags_to_add:
+            return True, []
+
+        if apply:
+            subprocess.run(["tag", '--add', ','.join(tags_to_add), file_path],
+                          capture_output=True, check=True)
+        return True, tags_to_add
+    except OSError:
+        print("Warning: 'tag' command not available — Finder tags require macOS", file=sys.stderr)
+        return False, []
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Failed to apply tags to {file_path}: {e}", file=sys.stderr)
+        return False, []
+
+def get_existing_exif_camera(file_path: str) -> dict:
+    """Get existing Make and Model from EXIF data
+
+    Reads through the shared per-file EXIF cache (lib.timestamps.sources) instead of
+    spawning its own exiftool subprocess, so a file already read by the
+    fix-timestamp step (or vice versa) doesn't pay a second round-trip.
+    """
+    data = read_exif_data(file_path)
+    return {key: data[key] for key in ("Make", "Model") if key in data}
+
+def file_camera(file_path: str) -> Tuple[Optional[str], Optional[str]]:
+    """The Make and Model the file carries, None for either it lacks."""
+    existing = get_existing_exif_camera(file_path)
+    make = str(existing.get('Make') or '').strip() or None
+    model = str(existing.get('Model') or '').strip() or None
+    return make, model
+
+def camera_mismatch(file_path: str, make: Optional[str], model: Optional[str]) -> dict:
+    """The file's own Make/Model wherever it carries one that differs from the
+    profile's. Case is ignored: cameras write SONY where profiles say Sony."""
+    existing = get_existing_exif_camera(file_path)
+    mismatch = {}
+    for field, wanted in (('Make', make), ('Model', model)):
+        present = str(existing.get(field) or '').strip()
+        if wanted and present and present.casefold() != wanted.casefold():
+            mismatch[field] = present
+    return mismatch
+
+def camera_exif_fields(file_path: str, make: Optional[str], model: Optional[str]) -> Dict[str, str]:
+    """The Make/Model fields the profile's camera fills in for this file.
+
+    The profile's camera only fills in what the file lacks. A Make or Model the
+    camera wrote is the record of what shot the file, so a profile picked for the
+    wrong body never relabels it; camera_mismatch reports it.
+    """
+    if not (make or model):
+        return {}
+    existing = get_existing_exif_camera(file_path)
+    return {
+        field: wanted
+        for field, wanted in (('Make', make), ('Model', model))
+        if wanted and not str(existing.get(field) or '').strip()
+    }
+
+def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Optional[str] = None, apply: bool = True) -> List[str]:
+    """Add camera info to EXIF Make and Model fields; return the fields written.
+
+    Raises MetadataWriteRefused, with exiftool's reason, when the file cannot be
+    written.
+    """
+    fields = camera_exif_fields(file_path, make, model)
+    if fields and apply:
+        exiftool.write_tags(file_path, [f'-{field}={value}' for field, value in fields.items()])
+    return list(fields)
+
+def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], model: Optional[str], apply: bool, write_exif: bool = True) -> Optional[TagResult]:
+    """Process a single file: apply tags and EXIF, return structured result.
+
+    write_exif=False leaves the camera fields for the caller to write in its own
+    exiftool call (camera_exif_fields gives them), so the file is rewritten once.
+
+    Returns:
+        TagResult on success, None if the file is not found. Raises
+        MetadataWriteRefused when the camera fields cannot be written.
+    """
+    if not os.path.exists(file_path):
+        print(f"Warning: File not found: {file_path}", file=sys.stderr)
+        return None
+
+    filename = os.path.basename(file_path)
+    actions = []
+    all_tags_added: list[str] = []
+    exif_make = ""
+    exif_model = ""
+
+    mismatch = camera_mismatch(file_path, make, model) if (make or model) else {}
+    if mismatch:
+        shot_on = ' '.join(mismatch.get(f, '') for f in ('Make', 'Model')).strip()
+        print(f"⚠️  {filename} was shot on {shot_on}, not this profile's camera; "
+              "left unchanged — is this the right profile?", file=sys.stderr)
+
+    # Apply camera EXIF (Make and Model)
+    if make or model:
+        fields_updated = add_camera_to_exif(
+            file_path, make=make, model=model, apply=apply and write_exif)
+
+        if fields_updated:
+            exif_parts = []
+            if 'Make' in fields_updated and make:
+                exif_parts.append(make)
+                exif_make = make
+            if 'Model' in fields_updated and model:
+                exif_parts.append(model)
+                exif_model = model
+            actions.append(f"EXIF: {' / '.join(exif_parts)}")
+
+    # Apply Finder tags (macOS only — skipped on other platforms)
+    if finder_tags:
+        success, tags_added = apply_finder_tags(file_path, finder_tags, apply=apply)
+
+        if success and tags_added:
+            all_tags_added = tags_added
+            actions.append(f"Tags: {', '.join(tags_added)}")
+
+    dry_run_suffix = "" if apply else " (DRY RUN)"
+    tag_action = "tagged" if actions else "already_correct"
+
+    if actions:
+        verb = "tagged" if apply else "would tag"
+        print(f"📌 {verb}: {filename} ({'; '.join(actions)}){dry_run_suffix}", file=sys.stderr)
+    else:
+        print(f"✓ already tagged: {filename}{dry_run_suffix}", file=sys.stderr)
+
+    return TagResult(
+        file=filename,
+        tags_added=all_tags_added,
+        exif_make=exif_make,
+        exif_model=exif_model,
+        action=tag_action,
+        file_make=mismatch.get('Make'),
+        file_model=mismatch.get('Model'),
+    )

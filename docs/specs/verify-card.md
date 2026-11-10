@@ -47,7 +47,7 @@ written in the same exiftool call as the correction — no read or write of its 
 | `XMP-jetlag:ContentSHA256`, `XMP-jetlag:ContentBytes` | sha256 and size of the file's content without its metadata (the data portion, see "What is hashed"). Not written at import: added later by the deep check, as a cache (see "Hash cache") |
 
 `jetlag` is a custom XMP namespace (`http://ns.jetlag.app/1.0/`) declared in
-`scripts/lib/exiftool-jetlag.config`. Exiftool only writes tags it has a definition
+`scripts/lib/data/exiftool-jetlag.config`. Exiftool only writes tags it has a definition
 for, so both metadata backends load that config. One property per value, so each is
 readable directly (`exiftool -XMP-jetlag:OriginalCreateDate`) with nothing to parse.
 
@@ -73,11 +73,9 @@ to. That costs an exiftool rewrite of the working copy (same volume) for that fi
 The user adds backup locations on a configuration screen of their own; there can be
 any number. Every location is a mirror of the imported library; none is primary. A
 location is a name and a root, in a top-level `backups:` mapping in
-`media-profiles.yaml`, keyed by name. `verify-card.py` never reads that file: like every
+`media-profiles.yaml`, keyed by name. `verify-card` never reads that file: like every
 base script it takes what it needs as arguments (`--location NAME=ROOT` per enabled
-location), and the app passes them. The app rewrites `media-profiles.yaml` from its own
-model when a profile is saved, so that model must carry `backups:` (and the check's
-lists below), or a save drops them. For example:
+location), and the app passes them. For example:
 
 ```yaml
 backups:
@@ -131,7 +129,7 @@ of its own.
 one card holds files from several cameras and profiles can be deleted.
 
 Under the source, files are sorted by lists the check owns (seeded once from the
-profiles' extensions, then independent of them), passed to `verify-card.py` as
+profiles' extensions, then independent of them), passed to `verify-card` as
 `--media-extensions`, `--companion-extensions` and `--ignore-paths`:
 
 | File | Verdict |
@@ -156,7 +154,7 @@ plus room for added metadata); the range only narrows the reads, never the verdi
 A companion carries no record, and an import renames it with its clip, so it is also
 found beside its media file's matched copy, under that copy's stem.
 
-**Verdict per location** (`verify_result` tokens in `scripts/verify-card-schema.yaml`):
+**Verdict per location** (`verify_result` tokens in `scripts/lib/verify-card-schema.yaml`):
 
 | Verdict | When |
 |---|---|
@@ -280,11 +278,12 @@ its data portion is unchanged by tag + fix-timestamp.
 2. Footage-size reader for QuickTime-family files, with a regression test that footage
    size and hash are unchanged by tag + fix-timestamp on each profile's format.
 3. Provenance on every moved file.
-4. `verify-card.py`: source scan, location listings, matching, JSONL verdicts; data
-   portion readers for QuickTime/HEIF and JPEG.
-5. Verify screen in the app; backup-location configuration screen; the app's profiles
-   model round-trips `backups:` and the check's lists. The per-clip details for
-   unmatched clips (duration, neighbouring clip numbers, `ffprobe`) are gathered here.
+4. `verify-card` (`verify-card.sh`, `cli/verify_card.py`, `lib/verify_card.py`): source
+   scan, location listings, matching, JSONL verdicts; data portion readers for
+   QuickTime/HEIF and JPEG.
+5. Verify screen in the app; backup-location configuration screen. The per-clip
+   details for unmatched clips (duration, neighbouring clip numbers, `ffprobe`) are
+   gathered here.
 6. `archive-source` delete mode accepts only verified or user-accepted files.
 7. Local/network detection and label per location; "Verify hashes" and "Include
    network locations (slow)": reference hash from the hash cache or the card, ssh

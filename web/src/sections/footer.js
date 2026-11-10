@@ -1,3 +1,5 @@
+import { REPO_URL, SUPPORT_URL } from '../content.js'
+
 export function renderFooter() {
   return /* html */`
     <footer class="border-t border-white/8 py-12 px-6">
@@ -11,8 +13,8 @@ export function renderFooter() {
           <div class="flex items-center gap-8 text-sm text-white/35">
             <a href="#features" class="hover:text-white/70 transition-colors">Features</a>
             <a href="#pricing" class="hover:text-white/70 transition-colors">Pricing</a>
-            <a href="https://github.com/brokenalarms/Jetlag" target="_blank" rel="noopener noreferrer" class="hover:text-white/70 transition-colors">GitHub</a>
-            <a href="https://github.com/brokenalarms/Jetlag/issues" target="_blank" rel="noopener noreferrer" class="hover:text-white/70 transition-colors">Support</a>
+            <a href="${REPO_URL}" target="_blank" rel="noopener noreferrer" class="hover:text-white/70 transition-colors">GitHub</a>
+            <a href="${SUPPORT_URL}" target="_blank" rel="noopener noreferrer" class="hover:text-white/70 transition-colors">Support</a>
           </div>
 
           <p class="text-xs text-white/25">

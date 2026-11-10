@@ -1,16 +1,27 @@
 # macOS — Jetlag App
 
+## Layout
+
+Folders group code by feature; Swift ignores them within a target, and XcodeGen picks up `Sources/` and `Tests/` recursively, so a new file needs no project.yml change.
+
+- `Sources/` root: `JetlagApp`, `Strings`, `Theme`, the entitlements, `Assets.xcassets` (written by `design/`) and `Resources/` (written by `BuildScripts/`).
+- `Sources/Models/`: `AppState` and other app-wide state at the root; `Pipeline/` (events, the run transcript, table rows and their outcome, summary, log lines), `Profiles/` (`MediaProfile`, `ProfilesConfig`, matching and camera identity), `Workflow/` (`WorkflowSession`, `TimezoneCatalog`).
+- `Sources/Services/`: `Scripts/` (launching, running and reading scripts, the Python runtime check), `Profiles/` (loading, locating and writing the profiles file); one-off script queries and `LicenseStore` at the root.
+- `Sources/Components/`: form controls that take plain data; `Results/` holds the Files panel, its table, sizing and badges.
+- `Sources/Views/`: screens and their representables; `AppKit/` holds the AppKit helpers they host (sizing, tail following, window growth, the log's scroll view).
+- `Tests/` mirrors `Sources/`, with shared hosting helpers in `Support/`. Tests at the `Tests/` root are the `Strings` tests and those that find repo files by walking up from `#filePath` — moving one deeper changes how many levels it must walk.
+
 ## Architecture choices
 
-- **No view models** — state is lifted to a single `@Observable` AppState; views bind directly. Don't introduce MVVM.
+- **No per-view view models** — state is lifted to a single `@Observable` AppState; views bind directly to it. Don't introduce MVVM. Plain services and reducers that AppState owns (a script launcher, a value type that folds pipeline events into rows, profile CRUD on `ProfilesConfig`) are encouraged: they keep logic out of views and testable without a window.
 - **Profile name is the YAML dict key**, not a field inside the profile model. This is a deliberate constraint shared with the scripts — don't add a `name` property to the model. The name is tracked separately where needed for editing.
 
 ## Cross-component coupling
 
 Where app changes require awareness of the scripts, and vice versa:
 
-- **CLI args**: the app builds command-line arguments for scripts. Changing a script's interface (adding/removing/renaming flags) requires updating how the app wires args.
-- **Profile schema**: the app reads the same `media-profiles.yaml` the scripts use. Schema changes affect both Swift decoding and Python parsing.
+- **CLI args**: the app builds command-line arguments for scripts. Changing a script's interface (adding/removing/renaming flags) requires updating how the app wires args. For media-pipeline, `cli` in `scripts/lib/media_pipeline/pipeline-schema.yaml` declares the steps (`PipelineStep.taskToken`/`stageToken`, in `allCases` order) and every flag the app passes; `PipelineSchemaContractTests` fails when `buildPipelineArgs` or `PipelineStep` drifts from it.
+- **Profile schema**: the app reads the same `media-profiles.yaml` the scripts use. Schema changes affect both Swift decoding and Python parsing. The app writes the file as an edit of the one it read (`ProfilesDocument`), so a key the scripts read that `MediaProfile` doesn't model survives a save; a key the app should show or edit still needs a model field.
 - **Script bundling**: scripts are copied into the app bundle at build time (postBuildScripts in project.yml). The app always runs bundled scripts, not the repo copy.
 - **Color tokens**: shared with the marketing site via `design/tokens.json` → `design/generate-colorsets.py` → Assets.xcassets color sets.
 - **Styles**: every colour role, tint opacity, corner radius, spacing step and font lives in `Sources/Theme.swift`; views reference `Theme.*` and never carry a style literal.
@@ -19,6 +30,5 @@ Where app changes require awareness of the scripts, and vice versa:
 
 - **Running `xcodebuild` outside the main checkout requires `JETLAG_BUNDLE_SUFFIX=.dev JETLAG_PRODUCT_SUFFIX=" Dev"`.** A worktree build otherwise carries the installed app's identity — the same bundle id, product name, UserDefaults suite, Launch Services registration and `~/Library/Application Support/Jetlag/media-profiles.yaml`. `PRODUCT_BUNDLE_IDENTIFIER`, `PRODUCT_NAME` and `INFOPLIST_KEY_CFBundleDisplayName` therefore carry those variables (empty in the main checkout and the Xcode IDE, so those builds are unchanged), and the "Guard Worktree Bundle Identity" pre-build phase fails any build under `.ralph/` that omits them. `make build` and `make test-macos` supply them themselves when run from a worktree.
 
-- **ScriptRunner race condition**: `terminationHandler` fires before `readabilityHandler` drains all buffered output — final lines of script output can be silently lost. Fix: drain both pipes to EOF before finishing the continuation.
 - **Generated project**: the `.xcodeproj` is generated by XcodeGen from `project.yml`, not checked in. Run `make generate` (requires `brew install xcodegen`) before opening in Xcode.
-- **`@@` line filtering**: machine-readable `@@key=value` lines from scripts are filtered out of the UI log display automatically. Adding new `@@` keys in scripts means they'll be hidden from the user without any app changes needed.
+- **Machine-readable lines**: the pipeline and the helper scripts emit JSONL on stdout. `LogLine.isMachineReadable` treats any line starting with `{` as an event: it is decoded, never shown in the log. A new event type needs a decoder case before the app reacts to it, but it is hidden from the log without any app change. `download-gyroflow.sh` is the one script still reporting `@@key=value` lines; only `GyroflowStatus.parse` reads them.

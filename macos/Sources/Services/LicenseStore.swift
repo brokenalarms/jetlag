@@ -7,16 +7,26 @@ final class LicenseStore {
 
     private static let unlockedKey = "jetlag.pro.unlocked"
 
+    /// Where the unlocked choice is kept: the app's own defaults, or a suite of
+    /// its own in a test, so a test never changes the developer's choice.
+    private let defaults: UserDefaults
+
     var isUnlocked: Bool {
-        didSet { UserDefaults.standard.set(isUnlocked, forKey: Self.unlockedKey) }
+        didSet { defaults.set(isUnlocked, forKey: Self.unlockedKey) }
     }
 
-    private init() {
+    init(
+        defaults: UserDefaults = .standard,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        developerBuild: Bool = LicenseStore.isDeveloperBuild
+    ) {
+        self.defaults = defaults
         // Assigning in init skips didSet, so an environment override stays for
         // this run only.
         isUnlocked = Self.initialUnlocked(
-            environment: ProcessInfo.processInfo.environment,
-            defaults: .standard
+            environment: environment,
+            defaults: defaults,
+            developerBuild: developerBuild
         )
     }
 
@@ -44,8 +54,12 @@ final class LicenseStore {
         return defaults.object(forKey: unlockedKey) as? Bool ?? true
     }
 
-    /// Maximum files per run. Free tier: 50. Unlocked: unlimited.
-    var fileLimit: Int { isUnlocked ? Int.max : 50 }
+    /// Files per run on the free tier. design/product.json holds the same number
+    /// for the website; LicenseStoreTests keeps the two equal.
+    static let freeFileLimit = 50
+
+    /// Maximum files per run: the free-tier limit, or unlimited once unlocked.
+    var fileLimit: Int { isUnlocked ? Int.max : Self.freeFileLimit }
 
     func exceedsLimit(fileCount: Int) -> Bool {
         fileCount > fileLimit

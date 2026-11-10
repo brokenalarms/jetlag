@@ -19,9 +19,9 @@ Before any commit or push action, every session:
 - Commit body: concise bullet list covering **why** (the bug or goal), **how** (the approach), and test coverage. Filenames are fine; variable/struct names only when they clarify a concept. Don't narrate the diff — the reader has it open.
 - Related atomic commits may be grouped into a single PR
 - Every commit that changes code for a feature or bug fix must be backed by a test covering that change
-- Never commit without first running tests with `pytest -x` and confirming they pass
+- Never commit without first running the relevant tests and confirming they pass (see `docs/testing.md`; per-platform commands in `docs/environment.md`)
 - One branch per PR — never reuse a branch that has already been merged into main; create a new branch for each new PR. However, multiple commits on the same session branch are fine as long as they belong to the same (open) PR.
-- When a PR completes a step in a multi-step task tracked in `TODO.md` or `todos/`, include updates to those files in the same PR: mark completed sub-steps in the `todos/*.md` spec and strike/update the corresponding entry in `TODO.md`. The tracking files should always reflect reality after each merge, not only at the end of the full task.
+- Specs in `docs/specs/` carry no status: don't tick off steps or add progress notes. When a PR finishes a spec, move the spec into `docs/specs/completed/` in that same PR. Tasks are tracked in bd (`bd ready`), not in `docs/TODO.md`; where bd isn't installed, list newly found tasks in the PR description.
 
 ## Pull requests
 

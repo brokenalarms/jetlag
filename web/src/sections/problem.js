@@ -1,6 +1,9 @@
+import { renderSectionHeader } from '../components/section-header.js'
 import { renderInteractiveTimeline } from '../components/timeline.js'
 
-export function renderProblem() {
+export const id = 'problem'
+
+export function render() {
   // Clip fields: time (HH:MM), day (0-based, 0=same day as first clip),
   // tz (display string), correct (bool), file (label), color (blue|green|purple).
   // Bar positions are derived automatically by the timeline component.
@@ -67,21 +70,15 @@ export function renderProblem() {
   ]
 
   return /* html */`
-    <section class="py-24 px-6">
+    <section id="${id}" class="py-24 px-6">
       <div class="mx-auto max-w-5xl">
 
-        <!-- Section header -->
-        <div class="mb-16 text-center">
-          <span class="section-label">The Problem</span>
-          <h2 class="vhs-scanlines mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
-            Cameras lie about time
-          </h2>
-          <p class="mt-4 mx-auto max-w-2xl text-base leading-relaxed text-white/55">
-            Every camera stores timestamps differently — different fields, different timezone handling,
-            different filesystem quirks. The result is always the same: footage from the same shoot
-            scattered hours apart in your editor's timeline.
-          </p>
-        </div>
+        ${renderSectionHeader({
+          label: 'The Problem',
+          title: 'Cameras lie about time',
+          intro: "Every camera stores timestamps differently — different fields, different timezone handling, different filesystem quirks. The result is always the same: footage from the same shoot scattered hours apart in your editor's timeline.",
+          className: 'mb-16',
+        })}
 
         <!-- Scenarios -->
         <div class="space-y-14 max-w-3xl mx-auto">

@@ -7,7 +7,11 @@
 #   make generate      — generate Xcode project from macos/project.yml
 #   make test-scripts  — run script tests (works on Linux and macOS)
 #   make test-macos    — run Swift unit tests (macOS only, requires Xcode)
+#   make test-web      — run the marketing site's tests and build it
+#   make test-design   — check colour sets match design/tokens.json and test the generator
 #   make test          — run all tests available on this platform
+#   make lint          — ruff and pyrefly over scripts/
+#   make check         — lint, then test
 #   make               — build the Release app for this Mac into dist/Jetlag.app (unlocked)
 #   make build         — build Debug app into build/derived (quick iteration, unlocked)
 #   make archive       — build the shipping Release archive (build/Jetlag.xcarchive)
@@ -59,7 +63,7 @@ endif
 # produces the build that ships.
 LOCAL_UNLOCK := SWIFT_ACTIVE_COMPILATION_CONDITIONS='$$(inherited) JETLAG_LOCAL_BUILD'
 
-.PHONY: all generate test test-scripts test-macos ralph-verify build archive local-archive app release-app dmg clean
+.PHONY: all generate test test-scripts test-macos test-web test-design lint check ralph-verify build archive local-archive app release-app dmg clean
 
 all: app
 
@@ -76,9 +80,9 @@ generate:
 PYTEST := scripts/.venv/bin/pytest
 VENV_STAMP := scripts/.venv/.deps-stamp
 
-$(VENV_STAMP): scripts/requirements.txt scripts/requirements-dev.txt scripts/tests/requirements.txt
+$(VENV_STAMP): scripts/requirements.txt scripts/requirements-dev.txt
 	python3 -m venv --clear scripts/.venv
-	scripts/.venv/bin/pip install --quiet -r scripts/requirements.txt -r scripts/requirements-dev.txt -r scripts/tests/requirements.txt
+	scripts/.venv/bin/pip install --quiet -r scripts/requirements.txt -r scripts/requirements-dev.txt
 	touch $(VENV_STAMP)
 
 ## Run script tests (any platform); tests are profile-isolated so they parallelize
@@ -102,11 +106,30 @@ test-macos: generate
 		$(DEV_IDENTITY) \
 		test < /dev/null
 
+## Lint and type-check the scripts
+lint: $(VENV_STAMP)
+	scripts/.venv/bin/ruff check scripts
+	scripts/.venv/bin/pyrefly check --python-interpreter-path scripts/.venv/bin/python3
+
+## Test and build the marketing site
+test-web:
+	npm ci --prefix web --no-audit --no-fund
+	npm test --prefix web
+	npm run build --prefix web
+
+## Colour sets must match design/tokens.json; generator has its own tests
+test-design:
+	python3 design/generate-colorsets.py --check
+	python3 -m unittest discover -s design/tests
+
 ## Run all tests available on this platform
-test: test-scripts
+test: test-scripts test-web test-design
 ifeq ($(shell uname),Darwin)
 test: test-macos
 endif
+
+## Lint, then run every test available on this platform
+check: lint test
 
 ## Test-based verification for the ralph loop (per-task baseline = the full suite)
 ralph-verify: test

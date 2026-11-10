@@ -1,7 +1,23 @@
 [tool.pytest.ini_options]
 addopts = "-q"
+# The commands import `cli.*` and `lib.*` from scripts/, as lib/launch.sh arranges;
+# tests import them the same way, and their shared `helpers.*` from scripts/tests/.
+pythonpath = ["scripts", "scripts/tests"]
+testpaths = ["scripts/tests"]
 
 [tool.pyrefly]
-project_includes = ["scripts/*.py", "scripts/lib/*.py"]
+project_includes = ["scripts/cli/*.py", "scripts/lib/**/*.py"]
 project_excludes = ["scripts/tests/*"]
 search_path = ["scripts"]
+# The scripts run on macOS; file flags (chflags, st_flags) exist only there.
+python_platform = "darwin"
+
+[tool.ruff]
+# The Python macOS ships, which the scripts must run on (docs/specs/python-runtime.md).
+target-version = "py39"
+extend-exclude = ["scripts/site-packages", "scripts/tools"]
+
+[tool.ruff.lint]
+# Syntax errors, unused or undefined names, imports below code, bare except.
+select = ["E4", "E7", "E9", "F", "E722"]
+
