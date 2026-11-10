@@ -14,7 +14,7 @@ import subprocess
 import pytest
 
 from conftest import create_test_photo, create_test_video
-from lib import fix_timestamp, timestamp_source
+from lib import fix_timestamp
 from lib.countries import get_country_name, get_timezone_for_country
 from lib.exiftool import exiftool
 from lib.provenance import read_provenance_record
@@ -90,7 +90,6 @@ class TestExifDataReading:
         """Clean up temp directory"""
         shutil.rmtree(self.temp_dir)
         # Clear EXIF cache
-        clear_exif_cache()
 
     def test_read_exif_data(self):
         """Test reading EXIF data from file"""
@@ -109,7 +108,7 @@ class TestExifDataReading:
 
         assert data1 == data2
         # Verify cache was used
-        assert self.test_video in timestamp_source._exif_cache
+        assert self.test_video in exiftool.cache
 
 
 class TestChangeDetection:
@@ -122,7 +121,6 @@ class TestChangeDetection:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def _set_tags(self, path, *tag_args):
         subprocess.run(
@@ -338,7 +336,6 @@ class TestBestTimestampPriority:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def test_priority_1_datetimeoriginal_with_tz(self):
         """Test Priority 1: DateTimeOriginal with timezone"""
@@ -370,7 +367,6 @@ class TestGetAllTimestampData:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def _create_video(self, filename, exif_args=None):
         """Create test video with optional EXIF data"""
@@ -584,7 +580,6 @@ class TestTimeOffset:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def _create_video(self, name, exif_args=None):
         path = os.path.join(self.temp_dir, name)
@@ -704,7 +699,6 @@ class TestForceTimezoneGate:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def _run(self, *extra_args):
         return subprocess.run([
@@ -902,7 +896,6 @@ class TestDetermineNeededChanges:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def test_returns_targets_stale_fields_and_file_flag(self):
         """The one comparison reports what each clock field should hold, which of
@@ -946,7 +939,6 @@ class TestTimestampFixResult:
         )
 
     def teardown_method(self):
-        clear_exif_cache()
         shutil.rmtree(self.temp_dir)
 
     def test_returns_timestamp_fix_result(self):
@@ -1009,7 +1001,6 @@ class TestProvenanceRecord:
         )
 
     def teardown_method(self):
-        clear_exif_cache()
         shutil.rmtree(self.temp_dir)
 
     def test_provenance_written_on_first_correction(self):
@@ -1096,7 +1087,6 @@ class TestCorrectionWritesTheWholeClockTable:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def _spy_on_writes(self, monkeypatch):
         """Record the args of every exiftool write without touching the file."""
@@ -1197,7 +1187,6 @@ class TestMachineOriginalTimeCarriesZoneSemantics:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def _video(self, filename, **tags):
         path = os.path.join(self.temp_dir, filename)
@@ -1276,7 +1265,6 @@ class TestStaleFieldsNamesWhatWouldBeWritten:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def test_lists_exactly_the_write_tags_that_differ(self):
         """The correct atoms are not listed; the missing Keys:CreationDate and
@@ -1324,7 +1312,6 @@ class TestAddingMissingFieldsIsNotAFix:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     @pytest.mark.skipif(sys.platform != "darwin", reason="birth time is only corrected on macOS")
     def test_only_empty_fields_to_write_is_would_add(self):
@@ -1407,7 +1394,6 @@ class TestStaleFileTimesNamesFileTimeWrites:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     @pytest.mark.skipif(sys.platform != "darwin", reason="birth time is only corrected on macOS")
     def test_birth_time_only_change_is_named(self):

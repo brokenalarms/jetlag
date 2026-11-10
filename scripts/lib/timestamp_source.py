@@ -22,10 +22,9 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from lib.exiftool import exiftool
 
 # ---------------------------------------------------------------------------
-# EXIF cache — shared across all callers within a process
+# EXIF reads, cached per file on the exiftool client (which drops a file's entry
+# whenever it writes that file)
 # ---------------------------------------------------------------------------
-
-_exif_cache: Dict[str, Dict[str, str]] = {}
 
 PRESERVED_FILENAME_TAG = "XMP-xmpMM:PreservedFileName"
 # The movie header (mvhd) clock, read through the composite in exiftool-jetlag.config
@@ -44,8 +43,8 @@ EMBEDDED_DATA_SUFFIXES = {".insv", ".insp"}
 
 def read_exif_data(file_path: str) -> Dict[str, str]:
     """Read all relevant EXIF timestamp fields with single exiftool call (cached)."""
-    if file_path in _exif_cache:
-        return _exif_cache[file_path]
+    if file_path in exiftool.cache:
+        return exiftool.cache[file_path]
 
     # The provenance tag and camera Make/Model ride along here rather than in reads
     # of their own: an extra exiftool round-trip per file costs more than every
@@ -65,7 +64,7 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
 
         data = dict(raw)
         _complete_datetime_original(data)
-        _exif_cache[file_path] = data
+        exiftool.cache[file_path] = data
         return data
     except FileNotFoundError as e:
         print(f"❌ {e}", file=__import__('sys').stderr)
@@ -96,16 +95,20 @@ def _complete_datetime_original(data: Dict[str, str]) -> None:
 
 def carry_exif_cache(from_path: str, to_path: str) -> None:
     """Let a byte-identical copy of a file use the metadata already read from it."""
-    if from_path in _exif_cache:
-        _exif_cache[to_path] = _exif_cache[from_path]
+    if from_path in exiftool.cache:
+        exiftool.cache[to_path] = exiftool.cache[from_path]
 
 
-def clear_exif_cache(file_path: str = None):
-    """Clear the EXIF cache for a specific file or all files."""
+def clear_exif_cache(file_path: Optional[str] = None) -> None:
+    """Forget cached metadata for one file, or for every file.
+
+    Writes through lib.exiftool already do this; it is for a file changed some
+    other way, such as by a separate exiftool process.
+    """
     if file_path:
-        _exif_cache.pop(file_path, None)
+        exiftool.cache.pop(file_path, None)
     else:
-        _exif_cache.clear()
+        exiftool.cache.clear()
 
 
 # ---------------------------------------------------------------------------

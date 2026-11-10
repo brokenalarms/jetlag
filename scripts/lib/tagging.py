@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 from lib.exiftool import exiftool
-from lib.timestamp_source import clear_exif_cache, read_exif_data
+from lib.timestamp_source import read_exif_data
 
 
 @dataclass
@@ -119,10 +119,7 @@ def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Option
     """
     fields = camera_exif_fields(file_path, make, model)
     if fields and not dry_run:
-        try:
-            exiftool.write_tags(file_path, [f'-{field}={value}' for field, value in fields.items()])
-        finally:
-            clear_exif_cache(file_path)
+        exiftool.write_tags(file_path, [f'-{field}={value}' for field, value in fields.items()])
     return list(fields)
 
 def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], model: Optional[str], dry_run: bool, write_exif: bool = True) -> Optional[TagResult]:

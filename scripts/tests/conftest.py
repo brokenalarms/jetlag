@@ -123,6 +123,15 @@ def _close_exiftool_at_session_end():
     exiftool.close()
 
 
+@pytest.fixture(autouse=True)
+def _fresh_metadata_cache():
+    """Every test starts with no cached metadata, so a file another test wrote
+    (or a path a temp dir reused) is never answered from a stale read."""
+    exiftool.cache.clear()
+    yield
+    exiftool.cache.clear()
+
+
 @pytest.fixture
 def metadata_client():
     """Registers an ExifTool client constructed by a test for guaranteed close()

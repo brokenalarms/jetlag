@@ -21,7 +21,6 @@ from lib.provenance import provenance_field_args
 from lib.timestamp_source import (
     MOVIE_HEADER_CREATE_DATE_TAG,
     TimestampSource,
-    _exif_cache,
     camera_zone_offset_for_file,
     ensure_colon_tz,
     extract_metadata_timezone,
@@ -68,18 +67,6 @@ class TimestampFixResult:
     stale_fields: list = dataclass_field(default_factory=list)
     stale_file_times: list = dataclass_field(default_factory=list)
     error: Optional[str] = None
-
-
-def write_exif_fields(file_path: str, field_args: list) -> bool:
-    """Write multiple EXIF fields in a single exiftool call.
-
-    Raises MetadataWriteRefused, with exiftool's reason, when the file cannot be
-    written.
-    """
-    try:
-        return exiftool.write_tags(file_path, field_args)
-    finally:
-        _exif_cache.pop(file_path, None)
 
 
 @dataclass(frozen=True)
@@ -838,7 +825,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
     write_error = None
     if field_args or file_time_args:
         try:
-            written = write_exif_fields(file_path, field_args + file_time_args)
+            written = exiftool.write_tags(file_path, field_args + file_time_args)
         except MetadataWriteRefused as refusal:
             written, write_error = False, str(refusal)
             print(f"   ❌ exiftool could not write this file: {write_error}", file=sys.stderr)

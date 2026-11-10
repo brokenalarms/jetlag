@@ -202,7 +202,6 @@ class TestExifReadSharedWithTimestampSource:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def test_camera_read_reuses_timestamp_source_cache(self, monkeypatch):
         """A file already read via read_exif_data() (the fix-timestamp step's

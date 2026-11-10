@@ -142,7 +142,6 @@ class TestReadTimestampSources:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def test_dto_with_timezone(self):
         video = os.path.join(self.temp_dir, "test.mp4")
@@ -193,7 +192,6 @@ class TestExtractMetadataTimezone:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def test_from_datetimeoriginal(self):
         video = os.path.join(self.temp_dir, "test.mp4")
@@ -218,7 +216,6 @@ class TestGetBestTimestamp:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def test_dto_with_tz_is_priority_1(self):
         video = os.path.join(self.temp_dir, "test.mp4")
@@ -279,7 +276,6 @@ class TestQuickTimeInstantVersusFilename:
         self.temp_dir = tempfile.mkdtemp()
 
     def teardown_method(self):
-        clear_exif_cache()
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def _video(self, name, media_create_date=None):
@@ -412,7 +408,6 @@ class TestCameraZoneOffsetForFile:
         self.temp_dir = tempfile.mkdtemp()
 
     def teardown_method(self):
-        clear_exif_cache()
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def _video(self, name, media_create_date=None):
@@ -495,7 +490,6 @@ class TestResolveFileTimezoneOffset:
         self.temp_dir = tempfile.mkdtemp()
 
     def teardown_method(self):
-        clear_exif_cache()
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_files_either_side_of_a_changeover_differ(self):
@@ -536,7 +530,6 @@ class TestOffsetTimeOriginalCompletesBareDateTimeOriginal:
 
     def teardown_method(self):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
-        clear_exif_cache()
 
     def test_bare_dto_plus_offset_reads_back_as_a_zoned_value(self):
         """A still whose zone lives in OffsetTimeOriginal presents one zoned
@@ -611,7 +604,6 @@ class TestExiftoolStillWritePathForZonedDateTimeOriginal:
 
     def teardown_method(self):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
-        clear_exif_cache()
 
     def test_writing_a_zoned_dto_to_a_still_drops_the_zone(self):
         photo = os.path.join(self.tmpdir, "IMG_0006.jpg")

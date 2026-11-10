@@ -30,7 +30,6 @@ class TestFilenameSourceOfTruth:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def test_insta360_filename_is_source_of_truth_with_infer(self):
         """
@@ -94,7 +93,6 @@ class TestDateTimeOriginalPreservation:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def test_datetimeoriginal_preserved_by_default(self):
         """Without --infer-from-filename, DateTimeOriginal should never change."""
@@ -124,7 +122,6 @@ class TestInferFromFilenameRequiresTimezone:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def test_infer_without_timezone_fails(self):
         """--infer-from-filename without --timezone should fail."""
@@ -156,7 +153,6 @@ class TestTimezoneMismatchDetection:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def _parse_at_lines(self, stdout: str) -> dict:
         result = {}
@@ -232,7 +228,6 @@ class TestTimezoneConversion:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def test_timezone_conversion_display_mode(self):
         """
@@ -272,7 +267,6 @@ class TestMissingDateTimeOriginalWithTimezoneChange:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def test_missing_datetimeoriginal_updates_all_fields(self):
         """
@@ -326,7 +320,6 @@ class TestExtractMetadataTimezone:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def _create_test_video(self, path: str) -> None:
         create_test_video(path)

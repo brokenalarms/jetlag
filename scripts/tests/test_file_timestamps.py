@@ -17,7 +17,6 @@ import pytest
 
 from conftest import create_test_video
 from lib import fix_timestamp
-from lib.timestamp_source import clear_exif_cache
 
 
 if sys.platform == "darwin":
@@ -42,7 +41,6 @@ class TestFileTimestamps:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def test_get_file_system_timestamps(self):
         """Test reading file system timestamps"""
@@ -190,7 +188,6 @@ class TestBirthTimeCalculation:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def _create_test_video(self, path: str, datetime_with_tz: str) -> None:
         create_test_video(path, DateTimeOriginal=datetime_with_tz)

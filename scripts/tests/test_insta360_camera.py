@@ -50,7 +50,6 @@ def test_other_suffixes_are_read_without_embedded_data(tmp_path, monkeypatch):
         return {}
 
     monkeypatch.setattr(timestamp_source.exiftool, "read_tags", fake_read_tags)
-    timestamp_source._exif_cache.clear()
 
     for name in ("a.insv", "b.INSP", "c.mp4", "d.jpg"):
         timestamp_source.read_exif_data(str(tmp_path / name))

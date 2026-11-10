@@ -33,7 +33,6 @@ class TestTimezoneScenarios:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def create_video_shot_in_timezone(self, filename, shoot_time, shoot_tz_offset):
         video_path = os.path.join(self.temp_dir, filename)
@@ -283,7 +282,6 @@ class TestVideoEditorBehavior:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def test_timeline_uses_keys_creationdate(self):
         """
@@ -325,7 +323,6 @@ class TestRealWorldWorkflow:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        clear_exif_cache()
 
     def test_workflow_import_fix_organize(self):
         """
