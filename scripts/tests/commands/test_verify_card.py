@@ -30,7 +30,7 @@ from pathlib import Path
 import pytest
 
 from helpers import SCRIPT_DIR
-from helpers.media import create_test_photo, create_test_video
+from helpers.media import create_test_photo, create_test_tiff_raw, create_test_video
 from helpers.pipeline_schema import load_schema, validate_event
 from lib.exiftool import exiftool
 from lib.verify_card import SCHEMA_PATH
@@ -173,7 +173,20 @@ class TestJudgingCopies:
 
         assert outcome(report, "DCIM/IMG_0001.jpg", "T9") == ("matched", "data", ["IMG_0001.jpg"])
 
-    def test_format_without_a_reader_is_unverifiable_when_sizes_differ(self, card, tmp_path):
+    def test_written_raw_copy_matches_on_its_image_strips(self, card, tmp_path):
+        raw = create_test_tiff_raw(card / "DCIM" / "DSC0001.arw")
+        library = tmp_path / "T9"
+        copy = copy_to(raw, library / "DSC0001.arw")
+        write_tags(copy, "-XMP-xmpMM:PreservedFileName=DSC0001.arw", "-Make=Sony")
+        assert copy.stat().st_size != raw.stat().st_size
+
+        report = run_verify(card, {"T9": str(library)})
+
+        assert outcome(report, "DCIM/DSC0001.arw", "T9") == ("matched", "data", ["DSC0001.arw"])
+
+    def test_unreadable_card_file_is_unverifiable_when_sizes_differ(self, card, tmp_path):
+        """A card file whose data portion cannot be located (here a raw file with no
+        image directory) can only match on total size."""
         raw = card / "DCIM" / "DSC0001.arw"
         raw.write_bytes(b"II*\x00" + bytes(2000))
         library = tmp_path / "T9"

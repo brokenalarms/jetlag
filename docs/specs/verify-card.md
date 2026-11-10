@@ -260,10 +260,10 @@ it is located from the file's own structure with small header reads, like footag
 | Format | Data portion |
 |---|---|
 | QuickTime family (`.mp4 .mov .insv`, recognised by its first box as `scripts/lib/footage.py` does) | each `mdat` payload plus any trailer after the last box |
-| HEIF (`.hif .heic`) | each `mdat` payload |
+| HEIF and AVIF stills (`.hif .heic .avif`) | the extents (`iloc`) of every item that is not metadata, in item order. Not the `mdat` payload: exiftool stores the Exif and XMP it writes as items inside `mdat` |
 | JPEG (`.jpg .insp`) | from the first start-of-scan marker to the end of the file, so images and camera trailers appended after the main image are included |
-| TIFF-based RAW (`.arw .dng`) | the strips or tiles of the full-size image |
-| Fujifilm `.raf` | the raw data block the RAF header points to |
+| TIFF-based RAW (`.arw .dng`) | the strips or tiles of the full-size image (the largest image not flagged reduced-resolution, found through IFD0's chain and its SubIFDs), in strip order: a write moves them |
+| Fujifilm `.raf` | the raw data block the RAF header points to at `0x64`; a write that grows the embedded JPEG moves it and updates the pointer |
 
 A copy on a `host:/path` location is hashed over the same range, with offsets from a
 matching local copy or read on the host with small `dd` reads. A format not in the
@@ -280,7 +280,7 @@ its data portion is unchanged by tag + fix-timestamp.
 3. Provenance on every moved file.
 4. `verify-card` (`verify-card.sh`, `cli/verify_card.py`, `lib/verify_card.py`): source
    scan, location listings, matching, JSONL verdicts; data portion readers for
-   QuickTime/HEIF and JPEG.
+   QuickTime and JPEG.
 5. Verify screen in the app; backup-location configuration screen. The per-clip
    details for unmatched clips (duration, neighbouring clip numbers, `ffprobe`) are
    gathered here.
@@ -288,6 +288,5 @@ its data portion is unchanged by tag + fix-timestamp.
 7. Local/network detection and label per location; "Verify hashes" and "Include
    network locations (slow)": reference hash from the hash cache or the card, ssh
    copies hashed on their host, hash cache written to matching local copies.
-8. Data portion readers for TIFF-based RAW (`.arw .dng`) and `.raf`, and the phase 2
-   regression test on each, HEIF included. Until then a RAW copy jetlag has written
-   reads as "unverifiable".
+8. Data portion readers for HEIF/AVIF stills, TIFF-based RAW (`.arw .dng`) and `.raf`,
+   and the phase 2 regression test on each.
