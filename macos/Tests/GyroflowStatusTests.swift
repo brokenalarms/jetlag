@@ -104,6 +104,53 @@ final class GyroflowGatingTests: XCTestCase {
         XCTAssertFalse(session.enabledSteps.contains(.gyroflow))
     }
 
+    /// The session outlives a visit to Settings, so installing Gyroflow there has
+    /// to switch the step on for the profile already selected, exactly as a fresh
+    /// session for that profile would have it.
+    func testInstallingGyroflowSwitchesTheStepOnForTheSelectedProfile() {
+        let state = AppState()
+        state.workflowSession = WorkflowSession(
+            profile: gyroflowProfile(), profileName: "test", gyroflowAvailable: false
+        )
+        XCTAssertFalse(state.workflowSession.enabledSteps.contains(.gyroflow))
+
+        state.gyroflowStatus = GyroflowStatus.parse("""
+        @@present=true
+        @@path=/Applications/Gyroflow.app/Contents/MacOS/gyroflow
+        @@source=applications
+        """)
+
+        XCTAssertTrue(state.workflowSession.enabledSteps.contains(.gyroflow))
+        XCTAssertEqual(state.workflowSession.enabledSteps,
+                       WorkflowSession(profile: gyroflowProfile(), profileName: "test",
+                                       gyroflowAvailable: true).enabledSteps)
+    }
+
+    /// A profile that does not use Gyroflow gains no step from the install.
+    func testInstallingGyroflowLeavesAProfileWithoutItAlone() {
+        let session = WorkflowSession(
+            profile: MediaProfile(), profileName: "test", gyroflowAvailable: false
+        )
+
+        session.gyroflowAvailable = true
+
+        XCTAssertFalse(session.enabledSteps.contains(.gyroflow))
+    }
+
+    /// The status is re-checked on launch and after every install; finding the
+    /// same install again must not undo the user switching the step off.
+    func testRecheckingAnInstalledGyroflowKeepsTheStepOff() {
+        let session = WorkflowSession(
+            profile: gyroflowProfile(), profileName: "test", gyroflowAvailable: true
+        )
+        session.toggle(.gyroflow)
+        XCTAssertFalse(session.enabledSteps.contains(.gyroflow))
+
+        session.gyroflowAvailable = true
+
+        XCTAssertFalse(session.enabledSteps.contains(.gyroflow))
+    }
+
     func testAppStatePropagatesInstallStatusToTheActiveSession() {
         let state = AppState()
         state.workflowSession = WorkflowSession(
