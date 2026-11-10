@@ -116,6 +116,20 @@ final class ResultsComponentsTests: XCTestCase {
         XCTAssertEqual(statusBadge(row).label, row.lastCompletedStageLabel)
     }
 
+    /// The label is the last stage finished in pipeline order, whatever order the
+    /// tokens arrived in, and covers every stage the pipeline reports — the
+    /// archive step included.
+    func testLastCompletedStageFollowsPipelineOrder() {
+        var row = DiffTableRow(file: "a.mp4")
+        row.markStageComplete("fix-timestamp")
+        row.markStageComplete("ingest")
+        XCTAssertEqual(row.lastCompletedStageLabel, Strings.Pipeline.fixTimestampsStageLabel)
+
+        row.markStageComplete("archive-source")
+        row.markStageComplete("output")
+        XCTAssertEqual(row.lastCompletedStageLabel, Strings.Pipeline.archiveSourceLabel)
+    }
+
     /// A finished row with nothing to do and a failed row read as their fixed strings,
     /// whatever the action tokens say.
     func testUnchangedAndFailedRowsUseTheirFixedStrings() {

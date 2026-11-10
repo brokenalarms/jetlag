@@ -401,7 +401,7 @@ final class WorkflowSession {
 
     /// What the run carries because of an answer given for one click, rather
     /// than a setting the user chose — the same state `clearRunAssent()` drops.
-    private static let assentFlags = [
+    static let assentFlags = [
         forceTimezoneFlag, allowMixedTimezonesFlag, overwriteFlag, unlockProtectedFlag,
         allowCameraMismatchFlag, applyFlag,
     ]
@@ -427,16 +427,9 @@ final class WorkflowSession {
             args += ["--group", group]
         }
 
-        let optionalSteps = enabledSteps.filter { !$0.isAlwaysOn }
-        let taskNames: [PipelineStep: String] = [
-            .tag: "tag",
-            .fixTimestamps: "fix-timestamp",
-            .gyroflow: "gyroflow",
-            .archiveSource: "archive-source",
-        ]
         let tasks = availableSteps
-            .filter { optionalSteps.contains($0) }
-            .compactMap { taskNames[$0] }
+            .filter { enabledSteps.contains($0) }
+            .compactMap(\.taskToken)
         if !tasks.isEmpty {
             args += ["--tasks"] + tasks
         }

@@ -72,24 +72,8 @@ struct DiffTableRow: Identifiable {
         completedStages.insert(stage)
     }
 
-    /// Stage order matching the pipeline execution sequence
-    private static let stageOrder = ["ingest", "tag", "fix-timestamp", "output", "gyroflow"]
-
-    /// Display label for the most recently completed stage
+    /// Display label for the most recently completed stage, in pipeline order.
     var lastCompletedStageLabel: String? {
-        for stage in Self.stageOrder.reversed() {
-            if completedStages.contains(stage) {
-                return Self.stageLabelMap[stage]
-            }
-        }
-        return nil
+        PipelineStep.allCases.last(where: { completedStages.contains($0.stageToken) })?.stageLabel
     }
-
-    private static let stageLabelMap: [String: String] = [
-        "ingest": "Ingest",
-        "tag": "Tag",
-        "fix-timestamp": "Fix TS",
-        "output": "Organize",
-        "gyroflow": "Gyroflow",
-    ]
 }

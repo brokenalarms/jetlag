@@ -31,6 +31,9 @@ enum Strings {
         static let organizeLabel = String(localized: "pipeline.organize.label", defaultValue: "Organize")
         static let gyroflowLabel = String(localized: "pipeline.gyroflow.label", defaultValue: "Gyroflow")
         static let archiveSourceLabel = String(localized: "pipeline.archiveSource.label", defaultValue: "Archive Source")
+        /// Fix Timestamps' name in a results row's status column, where the full
+        /// label does not fit.
+        static let fixTimestampsStageLabel = String(localized: "pipeline.fixTimestamps.stageLabel", defaultValue: "Fix TS")
 
         static let ingestHelp = String(localized: "pipeline.ingest.help",
             defaultValue: "Copy files from source to working directory for processing")
