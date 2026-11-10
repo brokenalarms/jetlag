@@ -15,9 +15,9 @@ import pytest
 from helpers.media import create_test_photo, create_test_video
 from lib import fix_media_timestamp
 from lib.fix_media_timestamp.describe import format_exif_timestamp_display, format_time_delta, format_timestamp_display
-from lib.fix_media_timestamp.plan import format_offset_display
+from lib.fix_media_timestamp.plan import BIRTH_TIME_IN_FUTURE, format_offset_display
 from lib.fix_media_timestamp.read import determine_needed_changes, get_all_timestamp_data
-from lib.timestamps.file_times import get_expected_file_system_time
+from lib.timestamps.file_times import birth_time_in_future, get_expected_file_system_time
 from lib.countries import get_country_name, get_timezone_for_country
 from lib.exiftool import exiftool
 from lib.timestamps.provenance import read_provenance_record
@@ -1384,6 +1384,90 @@ class TestAddingMissingFieldsIsNotAFix:
                                           time_offset_seconds=3600)
 
         assert result.timestamp_action == "would_fix"
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="birth time is only corrected on macOS")
+class TestBirthTimeIsNeverClampedToModificationTime:
+    """macOS never lets a birth time stand later than the modification time: setting
+    the modification time pulls the birth time back to it. Restoring the old
+    modification time after the write (exiftool's -P) therefore clamped any birth
+    time later than it, so footage shot west of the Mac's zone lost its correction.
+    The modification time is left to be the write's own: a birth time is the
+    shooting instant, which the write always comes after.
+    """
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        clear_exif_cache()
+        self.video = os.path.join(self.temp_dir, "C0001.MP4")
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+
+    def _create_shot_at(self, shot_utc: datetime) -> str:
+        stamp = shot_utc.strftime("%Y:%m:%d %H:%M:%S")
+        create_test_video(self.video, **{"QuickTime:CreateDate": stamp,
+                                         "QuickTime:MediaCreateDate": stamp,
+                                         "QuickTime:TrackCreateDate": stamp})
+        clear_exif_cache()
+        return get_expected_file_system_time(shot_utc)
+
+    def _assert_birth_kept(self, expected_birth: str) -> None:
+        times = get_file_system_timestamps(self.video)
+        assert times["birth"] == expected_birth, \
+            f"Actual: birth {times['birth']}, Expected: {expected_birth}"
+        assert times["modify"] >= times["birth"], \
+            f"Actual: modified {times['modify']} before birth {times['birth']}, Expected: modified no earlier"
+
+    def test_birth_time_later_than_the_modification_time_is_kept(self):
+        shot = datetime(2025, 6, 17, 23, 25, 21, tzinfo=timezone.utc)
+        expected_birth = self._create_shot_at(shot)
+        earlier = (shot - timedelta(hours=1)).timestamp()
+        os.utime(self.video, (earlier, earlier))
+
+        fix_media_timestamp.fix_media_timestamps(self.video, timezone_spec="+08:00")
+
+        self._assert_birth_kept(expected_birth)
+
+
+class TestBirthTimeInFuture:
+    """The write's own modification time is earlier than a birth time in the future,
+    which is an invalid file, and jetlag never sets the modification time. A birth
+    time is the shooting instant, so it is only in the future when --time-offset or
+    --preserve-wallclock moves it there; that correction is refused rather than
+    written.
+    """
+
+    def test_a_birth_time_after_now_is_in_the_future(self):
+        now = datetime(2026, 11, 10, 16, 0, 0)
+        assert birth_time_in_future("2026:11:10 16:00:01", now)
+        assert not birth_time_in_future("2026:11:10 16:00:00", now)
+        assert not birth_time_in_future("2025:06:18 08:25:21", now)
+
+    @pytest.mark.skipif(sys.platform != "darwin", reason="birth time is only corrected on macOS")
+    def test_a_correction_into_the_future_is_refused_and_nothing_written(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            video = os.path.join(temp_dir, "C0001.MP4")
+            stamp = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y:%m:%d %H:%M:%S")
+            create_test_video(video, **{"QuickTime:CreateDate": stamp,
+                                        "QuickTime:MediaCreateDate": stamp,
+                                        "QuickTime:TrackCreateDate": stamp})
+            clear_exif_cache()
+            before = (read_exif_data(video), get_file_system_timestamps(video))
+
+            dry = fix_media_timestamp.fix_media_timestamps(
+                video, apply=False, timezone_spec="+08:00", time_offset_seconds=2 * 24 * 3600)
+            applied = fix_media_timestamp.fix_media_timestamps(
+                video, timezone_spec="+08:00", time_offset_seconds=2 * 24 * 3600)
+            clear_exif_cache()
+            after = (read_exif_data(video), get_file_system_timestamps(video))
+
+            assert (dry.timestamp_action, dry.reason) == ("error", BIRTH_TIME_IN_FUTURE)
+            assert (applied.timestamp_action, applied.reason) == ("error", BIRTH_TIME_IN_FUTURE)
+            assert after == before, "Actual: the file changed, Expected: nothing written"
+        finally:
+            shutil.rmtree(temp_dir)
 
 
 class TestStaleFileTimesNamesFileTimeWrites:

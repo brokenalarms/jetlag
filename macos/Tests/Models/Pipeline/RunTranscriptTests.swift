@@ -25,6 +25,18 @@ final class RunTranscriptTests: XCTestCase {
         XCTAssertEqual(transcript.rows.first?.pipelineResult, "unchanged")
     }
 
+    /// A refused correction reaches the row as its reason token, so the row names
+    /// why instead of a bare "Error".
+    func testARefusedCorrectionCarriesItsReason() throws {
+        var transcript = RunTranscript()
+        _ = transcript.apply(try event(#"{"event": "pipeline_file", "file": "a.mp4"}"#))
+
+        _ = transcript.apply(try event(
+            #"{"event": "timestamp_result", "file": "a.mp4", "action": "error", "reason": "birth_time_in_future"}"#))
+
+        XCTAssertEqual(transcript.liveRow?.refusalReason, .birthTimeInFuture)
+    }
+
     /// A file the pipeline moved past without a verdict is still listed, marked
     /// unfinished, rather than vanishing when the next file starts.
     func testAFileLeftWithoutAVerdictIsKeptAsUnfinished() throws {

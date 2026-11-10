@@ -183,14 +183,20 @@ class ExifTool:
         return data
 
     def write_tags(self, file_path: str, tag_args: list[str]) -> bool:
-        """Write tags with ``-P -overwrite_original``.
+        """Write tags with ``-overwrite_original``, and ``-P`` unless a birth time is written.
+
+        -P restores the old modification time after the write, and macOS pulls a
+        birth time later than the modification time back to it — so a write that
+        sets FileCreateDate lets the modification time become the write's.
 
         Returns True when exiftool reports files were updated, False when it found
         nothing to change. Raises MetadataWriteRefused when exiftool could not write
         the file at all, so a refusal can never pass for a write. Either way the
         file's cached metadata is dropped, since it may no longer describe the file.
         """
-        args = ["-P", "-overwrite_original"] + tag_args + [str(file_path)]
+        sets_birth_time = any(arg.startswith("-FileCreateDate=") for arg in tag_args)
+        preserve = [] if sets_birth_time else ["-P"]
+        args = preserve + ["-overwrite_original"] + tag_args + [str(file_path)]
         try:
             output, diagnostics = self._run(*args, wait_for_stderr=True)
         finally:

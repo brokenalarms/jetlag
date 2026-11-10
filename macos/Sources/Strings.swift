@@ -532,6 +532,9 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let addedChange = String(localized: "diffTable.added.change", defaultValue: "Added metadata")
         static let noChangeChange = String(localized: "diffTable.noChange.change", defaultValue: "No change")
         static let errorChange = String(localized: "diffTable.error.change", defaultValue: "Error")
+        static let birthTimeInFutureChange = String(
+            localized: "diffTable.birthTimeInFuture.change",
+            defaultValue: "Birth time would be in the future")
         static func cameraMismatchHelp(_ camera: String) -> String {
             String(localized: "diffTable.cameraMismatch.help",
                 defaultValue: "Shot on \(camera), not this profile's camera. Its camera fields are left as they are — check this is the right profile.")

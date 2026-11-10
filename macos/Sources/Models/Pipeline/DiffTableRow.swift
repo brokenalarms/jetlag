@@ -21,6 +21,7 @@ struct DiffTableRow: Identifiable {
     var correctionMode: String?
     var timeOffsetDisplay: String?
     var timestampError: String?
+    var refusalReason: RowOutcome.RefusalReason?
     var renamedTo: String?
     var dest: String?
     var organizeAction: String?

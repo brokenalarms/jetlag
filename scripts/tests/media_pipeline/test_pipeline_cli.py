@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 
 from helpers.media import create_test_video as _create_video_raw
-from helpers.pipeline import create_test_video, get_exif_field, run_pipeline
+from helpers.pipeline import create_test_video, get_exif_field, run_in_process, run_pipeline
 from helpers.pipeline_schema import validate_event
 
 
@@ -177,6 +177,77 @@ class TestCLIArguments:
         )
 
         assert str(target) in result.stderr
+
+
+class TestSourceAndTargetMustNotOverlap:
+    """A run whose source and target share files is refused before anything is touched.
+
+    The source is a read-only input, so a file renamed on its way out lands in the
+    target beside its original instead of replacing it; when the two are the same
+    library, every corrected file becomes a duplicate. archive-source would also
+    archive or delete the whole library as if it were a card. Overlap is decided on
+    real paths, so a symlink to the source is the source.
+    """
+
+    @staticmethod
+    def _tree(root: Path) -> set[str]:
+        return {str(p.relative_to(root)) for p in root.rglob("*")}
+
+    def _assert_refused_untouched(self, workspace: dict, source: Path, target: Path,
+                                  test_profile: str) -> None:
+        root = workspace["root"]
+        create_test_video(source / "VID_20250101_000000.mp4")
+        before = self._tree(root)
+
+        result = run_in_process([
+            "--profile", test_profile, "--source", str(source), "--target", str(target),
+            "--timezone", "+0900", "--tasks", "fix-timestamp", "archive-source",
+            "--update-filename-dates", "--apply",
+            "--working-dir", str(target / "working"),
+        ])
+
+        after = self._tree(root)
+        assert result.returncode != 0, "an overlapping source and target should be refused"
+        assert after == before, (
+            f"nothing should be created, moved or removed\n"
+            f"  added:   {sorted(after - before)}\n"
+            f"  removed: {sorted(before - after)}")
+
+    def test_same_directory_is_refused(self, temp_workspace, test_profile):
+        source = temp_workspace["source"]
+        self._assert_refused_untouched(temp_workspace, source, source, test_profile)
+
+    def test_target_inside_source_is_refused(self, temp_workspace, test_profile):
+        source = temp_workspace["source"]
+        self._assert_refused_untouched(temp_workspace, source, source / "Ready", test_profile)
+
+    def test_source_inside_target_is_refused(self, temp_workspace, test_profile):
+        target = temp_workspace["target"]
+        source = target / "2025" / "2025-01-01"
+        source.mkdir(parents=True)
+        self._assert_refused_untouched(temp_workspace, source, target, test_profile)
+
+    def test_symlink_to_source_as_target_is_refused(self, temp_workspace, test_profile):
+        source = temp_workspace["source"]
+        link = temp_workspace["root"] / "library-link"
+        link.symlink_to(source)
+        self._assert_refused_untouched(temp_workspace, source, link, test_profile)
+
+    def test_sibling_sharing_a_name_prefix_is_not_overlap(self, temp_workspace, test_profile):
+        """'source' and 'source-ready' are separate folders; a string-prefix check
+        would wrongly refuse them."""
+        source = temp_workspace["source"]
+        target = temp_workspace["root"] / "source-ready"
+        create_test_video(source / "test.mp4")
+
+        run_in_process([
+            "--profile", test_profile, "--source", str(source), "--target", str(target),
+            "--timezone", "+0900", "--apply",
+        ])
+
+        assert (source / "test.mp4").exists(), "the source file should be kept"
+        assert [p.name for p in target.rglob("*.mp4")] == ["test.mp4"], \
+            "the file should be copied into the target"
 
 
 class TestCLIOverrides:

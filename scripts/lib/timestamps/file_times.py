@@ -91,6 +91,15 @@ def get_expected_file_system_time(datetime_original: datetime, preserve_wallcloc
         return local_dt.strftime('%Y:%m:%d %H:%M:%S')
 
 
+def birth_time_in_future(expected_birth: str, now: datetime) -> bool:
+    """Whether expected_birth ("YYYY:MM:DD HH:MM:SS", local) is later than now.
+
+    A write leaves the modification time at the moment of the write, so a birth time
+    later than that would stand after the modification time: an invalid file.
+    """
+    return datetime.strptime(expected_birth, '%Y:%m:%d %H:%M:%S') > now
+
+
 def check_file_system_timestamps_need_update(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False) -> bool:
     """Check if file system birth time needs updating
 

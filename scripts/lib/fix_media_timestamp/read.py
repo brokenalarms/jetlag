@@ -196,12 +196,14 @@ class CurrentTimestamps:
     """What a file holds now, as far as a correction is concerned.
 
     data is get_all_timestamp_data()'s reading: the fields, the winning source and
-    the time it gives. detected_tz is the zone the file's metadata carries.
+    the time it gives. detected_tz is the zone the file's metadata carries. read_at
+    is when it was read, in local time: the "now" a planned birth time is held to.
     """
     file_path: str
     data: Dict[str, Any]
     detected_tz: Optional[str] = None
     birth_time_tracked: bool = BIRTH_TIME_TRACKED
+    read_at: datetime = dataclass_field(default_factory=datetime.now)
 
 
 def read_current(file_path: str, opts: CorrectionOptions) -> CurrentTimestamps:

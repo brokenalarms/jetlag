@@ -101,6 +101,8 @@ These behaviors are not in our code — they're observed from external tools and
 - There is no such thing as writing to a UTC field as wall-clock time and having video editors recognize it's not UTC anymore. They will take an integer QT UTC field as UTC, or a string field with `Z` as UTC or with timezone.
 - For performance: one read call then one write call per file per script. Cache values from the read, accumulate all writes, send in a single exiftool invocation.
 - ExifTool fails silently if an `exiftool_tmp` directory exists alongside the target file (leftover from a crashed run). media-pipeline checks for these at startup.
+- macOS never lets a birth time stand later than the modification time: setting the modification time pulls the birth time back to it. `-P` puts the card's modification time back after a write, and that can be earlier than the corrected birth time (footage shot west of the Mac's zone), which would clamp it. So a write carrying `FileCreateDate` does not use `-P`: the modification time is left as the time of the write, which is always after the shooting time, and nothing is clamped. Jetlag never sets the modification time itself. `SetFile`, run separately, never hit this. Linux CI tracks no birth time, so only the macOS suite catches it.
+- ExifTool cannot write Insta360 X6 `.insv` files (firmware v1.1.7): it reports `Corrupted Insta360 trailer` for every clip, with or without `-m`. X4 files write normally.
 
 ## Timestamp source of truth hierarchy
 

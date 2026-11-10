@@ -272,9 +272,11 @@ class TestEveryMovedFileRecordsItsCardName:
             "--tasks", "fix-timestamp", "--apply",
         ])
 
+        # The clock fields, not the action: on macOS the staged copy never keeps the
+        # card's birth time, so restoring it makes every apply a fix there.
         timestamp = next(e for e in self._events(result.stdout) if e["event"] == "timestamp_result")
-        assert timestamp["action"] == "no_change", \
-            f"Actual: {timestamp['action']}, Expected: no_change (the file is already correct)"
+        assert timestamp["stale_fields"] == [], \
+            f"Actual: {timestamp['stale_fields']}, Expected: no stale clock fields (the file is already correct)"
         moved = list(target.rglob("*.mp4"))
         assert len(moved) == 1, f"Actual: {moved}, Expected: one file in the library"
         recorded = get_exif_field(moved[0], "XMP-xmpMM:PreservedFileName")
