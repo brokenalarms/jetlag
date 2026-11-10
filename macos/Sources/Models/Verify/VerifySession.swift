@@ -9,6 +9,9 @@ struct VerifySession {
     var verifyHashes = false
     var includeNetwork = false
     var showMatched = false
+    /// The results panel is open once a check has started, so the window widens then.
+    var showsResults = false
+    var showsLog = false
 
     var isRunning = false
     var report = VerifyReport()

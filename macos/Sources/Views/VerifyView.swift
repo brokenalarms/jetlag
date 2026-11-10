@@ -10,13 +10,17 @@ struct VerifyView: View {
     private var session: Binding<VerifySession> { $state.verifySession }
 
     var body: some View {
+        // The same frame as Workflow: the form at its own width, and once a check has
+        // started, the results panel beside it, which widens the window as it opens.
         HStack(alignment: .top, spacing: 0) {
             form
-                .frame(width: Theme.Size.form)
+                .frame(width: WorkflowView.formWidth)
                 .frame(maxHeight: .infinity, alignment: .top)
-            Divider()
-            VerifyResults(state: state)
-                .frame(minWidth: Theme.Size.verifyResultsMin, maxWidth: WorkflowDetail.panelMaxWidth)
+            if state.verifySession.showsResults {
+                Divider()
+                VerifyResultsPanel(state: state)
+                    .frame(maxWidth: WorkflowDetail.panelMaxWidth)
+            }
         }
         .sheet(isPresented: $editingLocations) {
             BackupLocationsEditor(state: state, isPresented: $editingLocations)
@@ -66,6 +70,7 @@ struct VerifyView: View {
                 ToggleRow(title: Strings.Verify.includeNetwork,
                           isOn: session.includeNetwork,
                           isEnabled: state.verifySession.verifyHashes)
+                ToggleRow(title: Strings.Verify.showMatched, isOn: session.showMatched)
             }
 
             Section {
@@ -121,112 +126,6 @@ struct BackupLocationRow: View {
                     .truncationMode(.middle)
             }
         }
-    }
-}
-
-/// The check's outcome: a summary line that is always shown once a check has run, so
-/// an empty list reads as all clear rather than as a check that found nothing, then a
-/// row per file that needs attention, with one status per enabled location.
-struct VerifyResults: View {
-    @Bindable var state: AppState
-
-    private var report: VerifyReport { state.verifySession.report }
-    private var locationNames: [String] { report.locations.map(\.location) }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-            Divider()
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: Theme.Space.sm) {
-                    let rows = report.visibleRows(showMatched: state.verifySession.showMatched)
-                    if rows.isEmpty, report.summary != nil {
-                        Label(Strings.Verify.allClear, systemImage: "checkmark.circle")
-                            .foregroundStyle(Theme.Status.success)
-                    }
-                    ForEach(rows) { row in
-                        VerifyRowView(row: row, locationNames: locationNames)
-                        Divider()
-                    }
-                    ForEach(state.verifySession.log.filter { $0.stream == .stderr }) { line in
-                        Text(line.strippedText)
-                            .font(Theme.Typography.captionMono)
-                            .foregroundStyle(Theme.Text.secondary)
-                    }
-                }
-                .padding(Theme.Space.xl)
-            }
-        }
-    }
-
-    private var header: some View {
-        HStack(spacing: Theme.Space.lg) {
-            if let summary = report.summary {
-                Text(Strings.Verify.summary(
-                    checked: summary.checked, onEvery: summary.onEveryLocation,
-                    attention: summary.needAttention, notChecked: summary.notChecked,
-                    kinds: summary.notCheckedKinds))
-                    .font(Theme.Typography.subheadline)
-            } else if state.verifySession.isRunning {
-                ProgressView().controlSize(.small)
-            }
-            Spacer()
-            Toggle(Strings.Verify.showMatched, isOn: $state.verifySession.showMatched)
-                .toggleStyle(.checkbox)
-        }
-        .padding(Theme.Space.xl)
-    }
-}
-
-/// One card file: its path, then each location's verdict.
-struct VerifyRowView: View {
-    let row: VerifyRow
-    let locationNames: [String]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.xs) {
-            Text(row.file)
-                .font(Theme.Typography.fileMono)
-                .textSelection(.enabled)
-            HStack(spacing: Theme.Space.xxl) {
-                ForEach(locationNames, id: \.self) { name in
-                    if let outcome = row.outcomes[name] {
-                        VerifyOutcomeBadge(location: name, outcome: outcome)
-                    }
-                }
-            }
-            let details = Strings.Verify.clipDetails(row.details)
-            if !details.isEmpty {
-                Text(details)
-                    .font(Theme.Typography.caption)
-                    .foregroundStyle(row.details.opens == false ? Theme.Status.failure : Theme.Text.secondaryColor)
-            }
-            if row.details.recordedHashesDisagree {
-                Text(Strings.Verify.recordedHashesDisagree)
-                    .font(Theme.Typography.caption)
-                    .foregroundStyle(Theme.Status.warning)
-            }
-        }
-    }
-}
-
-struct VerifyOutcomeBadge: View {
-    let location: String
-    let outcome: VerifyOutcome
-
-    var body: some View {
-        HStack(spacing: Theme.Space.sm) {
-            Image(systemName: outcome.verdict.passes ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .foregroundStyle(outcome.verdict.passes ? Theme.Status.success : Theme.Status.warning)
-            Text("\(location): \(outcome.verdict.label)")
-                .font(Theme.Typography.file)
-            if let hash = outcome.hash, hash != "mismatch" {
-                Text(hash == "match" ? Strings.Verify.hashMatch : Strings.Verify.hashNotHashable)
-                    .font(Theme.Typography.detail)
-                    .foregroundStyle(Theme.Text.secondary)
-            }
-        }
-        .help(outcome.copies.joined(separator: "\n"))
     }
 }
 

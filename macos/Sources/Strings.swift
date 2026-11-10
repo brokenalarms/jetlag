@@ -411,6 +411,15 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
             defaultValue: "Every checked file is on every enabled location.")
         static let recordedHashesDisagree = String(localized: "verify.recordedHashesDisagree",
             defaultValue: "Copies recorded different hashes; the card settled it")
+        static let resultsTitle = String(localized: "verify.results.title", defaultValue: "Card check")
+        static let idleLabel = String(localized: "verify.results.idle",
+            defaultValue: "Choose a card and backup locations, then Verify")
+        static let checkingLabel = String(localized: "verify.results.checking",
+            defaultValue: "Checking backup locations…")
+        static let detailsColumn = String(localized: "verify.column.details", defaultValue: "Details")
+        static func copiesFound(_ count: Int) -> String {
+            String(localized: "verify.copiesFound", defaultValue: "\(count) copies")
+        }
         static let hashMatch = String(localized: "verify.hash.match", defaultValue: "hash ✓")
         static let hashNotHashable = String(localized: "verify.hash.notHashable", defaultValue: "no hash")
 

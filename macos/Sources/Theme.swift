@@ -87,7 +87,6 @@ enum Theme {
         static let typePicker = 160.0
         static let zoomMethodPicker = 200.0
         static let settingsWidth = 500.0
-        static let verifyResultsMin: CGFloat = 420
         static let upgradeWidth = 420.0
         static let timezoneListMin = 180.0
         static let timezonePopoverWidth = 250.0

@@ -37,7 +37,9 @@ struct ContentView: View {
                 VerifyView(state: state)
             }
         }
-        .background(WindowEdgeGrowthController(panelOpen: state.showInspector, isRunning: state.isRunning))
+        .background(WindowEdgeGrowthController(
+            panelOpen: state.selectedTab == .verify ? state.verifySession.showsResults : state.showInspector,
+            isRunning: state.selectedTab == .verify ? state.verifySession.isRunning : state.isRunning))
     }
 }
 
