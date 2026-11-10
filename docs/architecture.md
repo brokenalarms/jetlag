@@ -93,6 +93,7 @@ All user-facing text in the macOS app is centralized in `macos/Sources/Strings.s
 | `Strings.Pipeline` | Pipeline step labels and help text |
 | `Strings.Workflow` | Workflow view: labels, placeholders, toggles, warnings, help text |
 | `Strings.Profiles` | Profile editor: labels, placeholders, dialog text, help text |
+| `Strings.Verify` | Verify view: card, backup locations, options, verdict labels, summary |
 | `Strings.Settings` | Settings view: sections, status, buttons |
 | `Strings.Upgrade` | Upgrade dialog: titles, messages |
 | `Strings.DiffTable` | Table column headers and status badges |

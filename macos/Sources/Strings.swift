@@ -19,6 +19,7 @@ enum Strings {
     enum Nav {
         static let workflow = String(localized: "nav.workflow", defaultValue: "Workflow")
         static let profiles = String(localized: "nav.profiles", defaultValue: "Profiles")
+        static let verify = String(localized: "nav.verify", defaultValue: "Verify")
         static let mediaProfiles = String(localized: "nav.mediaProfiles", defaultValue: "Media Profiles")
     }
 
@@ -373,6 +374,87 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
     }
 
     // MARK: - Settings
+
+    enum Verify {
+        static let sourceSection = String(localized: "verify.source.section", defaultValue: "Card")
+        static let sourcePlaceholder = String(localized: "verify.source.placeholder",
+            defaultValue: "Folder to check, usually the card")
+        static let sourceHelp = String(localized: "verify.source.help",
+            defaultValue: "Every file under this folder must be on each backup location ticked below before the card is wiped.")
+        static let locationsSection = String(localized: "verify.locations.section", defaultValue: "Backup locations")
+        static let noLocations = String(localized: "verify.locations.none",
+            defaultValue: "No backup locations yet. Add the drives and NAS folders your library is mirrored to.")
+        static let local = String(localized: "verify.location.local", defaultValue: "Local")
+        static let network = String(localized: "verify.location.network", defaultValue: "Network")
+        static let addLocation = String(localized: "verify.location.add", defaultValue: "Add Location")
+        static let removeLocation = String(localized: "verify.location.remove", defaultValue: "Remove")
+        static let locationNamePlaceholder = String(localized: "verify.location.name", defaultValue: "Name")
+        static let locationPathPlaceholder = String(localized: "verify.location.path",
+            defaultValue: "/Volumes/Drive/Videos or host:/path")
+        static let editLocations = String(localized: "verify.locations.edit", defaultValue: "Edit Locations…")
+        static let saveLocations = String(localized: "verify.locations.save", defaultValue: "Save")
+        static let duplicateLocationName = String(localized: "verify.location.duplicate",
+            defaultValue: "Each location needs its own name")
+        static let optionsSection = String(localized: "verify.options.section", defaultValue: "Options")
+        static let includeCompanions = String(localized: "verify.includeCompanions", defaultValue: "Include companion files")
+        static let includeCompanionsCaption = String(localized: "verify.includeCompanions.caption",
+            defaultValue: "Also require .lrv, .thm and similar files on every location")
+        static let verifyHashes = String(localized: "verify.verifyHashes", defaultValue: "Verify hashes")
+        static let verifyHashesCaption = String(localized: "verify.verifyHashes.caption",
+            defaultValue: "Hash every copy on a Local location and compare it with the card")
+        static let includeNetwork = String(localized: "verify.includeNetwork", defaultValue: "Include network locations (slow)")
+        static let runButton = String(localized: "verify.run", defaultValue: "Verify")
+        static let stopButton = String(localized: "verify.stop", defaultValue: "Stop")
+        static let showMatched = String(localized: "verify.showMatched", defaultValue: "Show matched")
+        static let fileColumn = String(localized: "verify.column.file", defaultValue: "File")
+        static let allClear = String(localized: "verify.allClear",
+            defaultValue: "Every checked file is on every enabled location.")
+        static let recordedHashesDisagree = String(localized: "verify.recordedHashesDisagree",
+            defaultValue: "Copies recorded different hashes; the card settled it")
+        static let hashMatch = String(localized: "verify.hash.match", defaultValue: "hash ✓")
+        static let hashNotHashable = String(localized: "verify.hash.notHashable", defaultValue: "no hash")
+
+        static let verdictMatched = String(localized: "verify.verdict.matched", defaultValue: "On location")
+        static let verdictMissing = String(localized: "verify.verdict.missing", defaultValue: "Missing")
+        static let verdictDuplicate = String(localized: "verify.verdict.duplicate", defaultValue: "Duplicates")
+        static let verdictDataDiffers = String(localized: "verify.verdict.dataDiffers", defaultValue: "Footage differs")
+        static let verdictSizeDiffers = String(localized: "verify.verdict.sizeDiffers", defaultValue: "Size differs")
+        static let verdictUnverifiable = String(localized: "verify.verdict.unverifiable", defaultValue: "Can't verify")
+        static let verdictUnreachable = String(localized: "verify.verdict.unreachable", defaultValue: "Not reachable")
+        static let verdictHashMismatch = String(localized: "verify.verdict.hashMismatch", defaultValue: "Hash mismatch")
+
+        static let doesNotOpen = String(localized: "verify.clip.doesNotOpen",
+            defaultValue: "Does not open: no duration, likely a broken recording")
+        static let neighboursBackedUp = String(localized: "verify.clip.neighboursBackedUp",
+            defaultValue: "the clip numbered next to it is backed up")
+        static let neighboursNotBackedUp = String(localized: "verify.clip.neighboursNotBackedUp",
+            defaultValue: "the clip numbered next to it is not backed up either")
+
+        /// The size, length and neighbour note for a clip not on every location.
+        static func clipDetails(_ file: VerifyFileDetails) -> String {
+            var parts = [ByteCountFormatter.string(fromByteCount: Int64(file.size), countStyle: .file)]
+            if file.opens == false {
+                parts.append(doesNotOpen)
+            } else if let seconds = file.durationSeconds {
+                let formatter = DateComponentsFormatter()
+                formatter.allowedUnits = seconds >= 3600 ? [.hour, .minute, .second] : [.minute, .second]
+                formatter.zeroFormattingBehavior = .pad
+                parts.append(formatter.string(from: seconds) ?? "")
+            }
+            if let backedUp = file.neighboursBackedUp {
+                parts.append(backedUp ? neighboursBackedUp : neighboursNotBackedUp)
+            }
+            return file.opens == nil && file.durationSeconds == nil && file.neighboursBackedUp == nil
+                ? "" : parts.joined(separator: " · ")
+        }
+
+        static func summary(checked: Int, onEvery: Int, attention: Int, notChecked: Int, kinds: [String]) -> String {
+            let skipped = notChecked > 0
+                ? " · \(notChecked) not checked (\(kinds.joined(separator: ", ")))" : ""
+            return String(localized: "verify.summary",
+                defaultValue: "\(checked) files on card · \(onEvery) on every enabled location · \(attention) need attention\(skipped)")
+        }
+    }
 
     enum Settings {
         static let licenseSection = String(localized: "settings.license.section", defaultValue: "License")

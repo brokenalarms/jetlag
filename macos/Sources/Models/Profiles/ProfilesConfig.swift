@@ -14,9 +14,24 @@ struct ProfilesConfig: Codable {
     /// The whole file as it was read. A write is laid over it, so top-level and
     /// gyroflow keys the app does not model survive, as does the file's order.
     var fileNode: Node? = nil
+    /// Backup locations verify-card checks a card against, keyed by name.
+    var backups: [String: BackupLocationConfig]? = nil
+    /// The check's file lists; seeded from the profiles until first saved.
+    var verify: VerifyListsConfig? = nil
 
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case gyroflow, profiles
+        case gyroflow, profiles, backups, verify
+    }
+
+    /// The lists verify-card sorts a card by: the saved ones, or seeded from the
+    /// profiles when none have been saved.
+    var verifyLists: VerifyListsConfig {
+        verify ?? VerifyListsConfig.seeded(from: profiles)
+    }
+
+    /// Backup locations by name, in name order.
+    var sortedBackups: [NamedBackupLocation] {
+        (backups ?? [:]).sorted { $0.key < $1.key }.map { NamedBackupLocation(name: $0.key, config: $0.value) }
     }
 
     var globalStabilization: StabilizationSettings? {

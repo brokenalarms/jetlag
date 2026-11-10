@@ -298,9 +298,11 @@ its data portion is unchanged by tag + fix-timestamp.
 4. `verify-card` (`verify-card.sh`, `cli/verify_card.py`, `lib/verify_card.py`): source
    scan, location listings, matching, JSONL verdicts; data portion readers for
    QuickTime and JPEG.
-5. Verify screen in the app; backup-location configuration screen. The per-clip
-   details for unmatched clips (duration, neighbouring clip numbers, `ffprobe`) are
-   gathered here.
+5. Verify screen in the app (a Verify sidebar tab); backup-location configuration
+   (an editor sheet on that screen); `backups:` and `verify:` modelled by the app's
+   `ProfilesConfig`, the lists seeded from the profiles until first saved. The
+   per-clip details for unmatched clips (duration, neighbouring clip numbers,
+   `ffprobe`) are gathered here.
 6. `archive-source` delete mode accepts only verified or user-accepted files.
 7. Local/network detection and label per location; "Verify hashes" and "Include
    network locations (slow)": reference hash from the hash cache or the card, ssh
