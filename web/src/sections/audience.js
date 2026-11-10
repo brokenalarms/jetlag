@@ -66,7 +66,7 @@ export function render() {
 
         <div class="text-center mb-14">
           <span class="section-label">Who it's for</span>
-          <h2 class="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 class="vhs-scanlines mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
             Made for people who don't stop moving
           </h2>
           <p class="mt-4 mx-auto max-w-2xl text-base leading-relaxed text-white/55">
