@@ -197,7 +197,7 @@ def pytest_configure(config):
     if sys.platform == "darwin":
         # tag is vendored at scripts/tools/tag; SetFile is from Xcode
         missing_mac = [t for t in MACOS_TOOLS if not shutil.which(t)]
-        # Don't fail for 'tag' — it's resolved via lib/tools.py from scripts/tools/
+        # Don't fail for 'tag' — it is vendored in scripts/tools/
         missing_mac = [t for t in missing_mac if t != "tag"]
         if missing_mac:
             raise pytest.UsageError(

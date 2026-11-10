@@ -33,7 +33,7 @@ At build time, the `Bundle scripts` build phase copies `scripts/` into `Contents
 
 Three components that share config:
 
-1. **Python scripts** (`scripts/`) — CLI tools for timestamp fixing, tagging, organizing, gyroflow generation. Run standalone or via shell wrappers. Each hyphenated script (`fix-media-timestamp.py`, `media-pipeline.py`, …) is a thin command line over a module in `scripts/lib/` (`fix_timestamp`, `pipeline`, …); the pipeline and the tests import those modules directly. The pipeline itself is a package (`lib/pipeline/`): pre-flight checks over the whole batch, then each file through a list of stages run by one loop. See "Code layout" in `scripts/AGENTS.md`.
+1. **Python scripts** (`scripts/`) — CLI tools for timestamp fixing, tagging, organizing, gyroflow generation, run standalone or by the app; `scripts/README.md` is the user's guide. Each command is a `<command>.sh` at the top of `scripts/`, which `lib/launch.sh` runs as `cli/<command>.py`, a thin command line over the module named after it in `scripts/lib/` (`fix_media_timestamp`, `media_pipeline`, …); the pipeline and the tests import those modules directly. The pipeline itself is a package (`lib/media_pipeline/`): pre-flight checks over the whole batch, then each file through a list of stages run by one loop. See "Code layout" in `scripts/AGENTS.md`.
 2. **Jetlag macOS app** (`macos/`) — SwiftUI wrapper that reads the same `media-profiles.yaml`, edits profiles, and launches the scripts.
 3. **Marketing site** (`web/`) — static site sharing the design token palette with the macOS app.
 
@@ -112,7 +112,7 @@ All user-facing text in the macOS app is centralized in `macos/Sources/Strings.s
 
 Every metadata read and write goes through `scripts/lib/exiftool.py`, the single exiftool client. It keeps one `exiftool -stay_open` process per script run and talks to it over stdin/stdout; scripts import its `exiftool` instance and never start exiftool themselves. It runs the exiftool on PATH — the vendored `scripts/tools/exiftool`, which the `.sh` wrappers put first — unless `JETLAG_EXIFTOOL` names another (tests use that to count calls).
 
-It starts exiftool with `scripts/lib/exiftool-jetlag.config`, which declares jetlag's own XMP namespace (`XMP-jetlag`, `http://ns.jetlag.app/1.0/`). Exiftool refuses to write a tag it has no definition for, so a client started without the config silently drops every provenance write.
+It starts exiftool with `scripts/lib/data/exiftool-jetlag.config`, which declares jetlag's own XMP namespace (`XMP-jetlag`, `http://ns.jetlag.app/1.0/`). Exiftool refuses to write a tag it has no definition for, so a client started without the config silently drops every provenance write.
 
 An exiftool write rebuilds a QuickTime file (`moov` moves ahead of `mdat`), so a copy jetlag has written never matches its card file byte for byte. `scripts/lib/footage.py` reads only the top-level box headers to find the footage — each `mdat` payload plus any trailer after the last box — which those writes leave unchanged; verify-card compares copies by its size and hash.
 
