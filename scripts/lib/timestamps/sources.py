@@ -740,7 +740,7 @@ class FileReading:
                              parse_datetime_original(raw_value) if raw_value else None, raw_value)
 
         local_tz = tzinfo_from_offset(offset)
-        if local_tz is None:
+        if offset is None or local_tz is None:
             return LocalTime(timestamp, source, offset)
         if source.is_utc:
             # UTC digits are expressed in the declared zone: same instant, new label.

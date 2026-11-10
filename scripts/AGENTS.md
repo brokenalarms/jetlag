@@ -54,7 +54,10 @@ one-line `<command>.sh` like the others, and its logic in `lib/<command>`;
 | `verify-card` | `verify_card.py`; its JSONL events are declared in `verify-card-schema.yaml` |
 | `probe-camera`, `scan-source`, `report-file-dates` | small enough to stay in the `cli/` module |
 
-Shared modules: `timestamps/` (`sources.py` reads and ranks a file's timestamps,
+Shared modules: `timestamps/` (`sources.py` reads and ranks a file's timestamps:
+`read_file()` returns the one `FileReading` every consumer takes a file's winning
+time, zone, camera zone, filename time and date folder from —
+`tests/timestamps/test_one_derivation.py` fails on a copy anywhere else,
 `file_times.py` the file system's birth and modification times, `provenance.py` the
 recovery record written with a correction), `exiftool.py` (the one metadata
 client), `countries.py` (country → timezone), `command_line.py` (timezone flags and
