@@ -14,8 +14,9 @@ import os
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
+from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from lib.exiftool import exiftool
@@ -171,20 +172,50 @@ def normalize_timezone_format(value: str) -> str:
     return re.sub(r'([+-]\d{2}):(\d{2})$', r'\1\2', value)
 
 
-# Source labels for the QuickTime clock. The digits are UTC by specification either
-# way; the label records whether the file itself corroborated that (see
-# docs/timestamp-fields.md, "A UTC-specified field is corroborated UTC only when the file shows it").
-SOURCE_UTC_CORROBORATED = "QuickTime CreateDate (corroborated UTC)"
-SOURCE_UTC_BY_SPEC = "QuickTime CreateDate (UTC by spec)"
+# ---------------------------------------------------------------------------
+# Timestamp sources
+# ---------------------------------------------------------------------------
 
-_UTC_TIMESTAMP_SOURCES = {
-    "CreationDate with Z (UTC)", SOURCE_UTC_CORROBORATED, SOURCE_UTC_BY_SPEC,
-}
+class TimestampSource(Enum):
+    """Where a file's best timestamp came from.
 
+    display is the label shown to people, token the machine value emitted as
+    timestamp_result.source (enumerated in pipeline-schema.yaml), is_utc whether
+    the source's digits are UTC rather than local wall-clock time, and field the
+    read_exif_data() key the value was read from (None for the filename and the
+    file system). zoned sources carry their own zone.
 
-def is_utc_timestamp_source(source: str) -> bool:
-    """True when a source's digits are UTC rather than local wall-clock time."""
-    return source in _UTC_TIMESTAMP_SOURCES
+    The QuickTime clock has two members because its digits are UTC by
+    specification either way; the member records whether the file itself
+    corroborated that (see docs/timestamp-fields.md, "A UTC-specified field is
+    corroborated UTC only when the file shows it").
+    """
+
+    DATETIME_ORIGINAL_ZONED = ("DateTimeOriginal with timezone", "datetimeoriginal", False, "DateTimeOriginal", True)
+    CREATION_DATE_ZONED = ("CreationDate with timezone", "creationdate", False, "CreationDate", True)
+    CREATION_DATE_UTC = ("CreationDate with Z (UTC)", "creationdate", True, "CreationDate", False)
+    MOVIE_HEADER_CORROBORATED = ("QuickTime CreateDate (corroborated UTC)", "moviecreatedate", True,
+                                 MOVIE_HEADER_CREATE_DATE_TAG, False)
+    FILENAME = ("filename", "filename", False, None, False)
+    FILENAME_INFERRED = ("filename (infer mode)", "filename", False, None, False)
+    MOVIE_HEADER_BY_SPEC = ("QuickTime CreateDate (UTC by spec)", "moviecreatedate", True,
+                            MOVIE_HEADER_CREATE_DATE_TAG, False)
+    DATETIME_ORIGINAL = ("DateTimeOriginal", "datetimeoriginal", False, "DateTimeOriginal", False)
+    CREATION_DATE = ("CreationDate", "creationdate", False, "CreationDate", False)
+    FILE_BIRTH = ("file birthtime", "file_birth", False, None, False)
+    FILE_MTIME = ("file mtime", "file_mtime", False, None, False)
+    NONE = ("no timestamps found", "no timestamps found", False, None, False)
+
+    def __init__(self, display: str, token: str, is_utc: bool,
+                 field: Optional[str], zoned: bool):
+        self.display = display
+        self.token = token
+        self.is_utc = is_utc
+        self.field = field
+        self.zoned = zoned
+
+    def __str__(self) -> str:
+        return self.display
 
 
 def is_zone_name(timezone_spec: str) -> bool:
@@ -233,9 +264,7 @@ def resolve_file_timezone_offset(file_path: str, timezone_spec: Optional[str]) -
     if not timezone_spec:
         return None
     best_timestamp, source = get_best_timestamp(file_path, timezone_spec)
-    return resolve_timezone_offset(
-        timezone_spec, best_timestamp, is_utc_timestamp_source(source)
-    )
+    return resolve_timezone_offset(timezone_spec, best_timestamp, source.is_utc)
 
 
 def normalize_exif_value(value: str) -> str:
@@ -357,7 +386,7 @@ def extract_metadata_timezone(file_path: str) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# Best timestamp (6-tier priority)
+# Best timestamp
 # ---------------------------------------------------------------------------
 
 _MIN_ZONE_OFFSET = timedelta(hours=-12)
@@ -443,91 +472,150 @@ def camera_zone_offset_for_file(file_path: str) -> Optional[str]:
     return camera_zone_offset(movie_timestamp, filename_timestamp)
 
 
+_TIMESTAMP_DIGITS = re.compile(r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*')
+_TRAILING_ZONE = re.compile(r'[+-]\d{2}:?\d{2}$')
+
+Candidate = Tuple[str, TimestampSource]
+
+
+@dataclass(frozen=True)
+class _RankingInputs:
+    """Everything a ranking rule may look at, read once per file."""
+    file_path: str
+    exif: Dict[str, str]
+    filename_timestamp: Optional[str]
+    movie_timestamp: str
+    timezone_offset: Optional[str]
+
+    @property
+    def basename(self) -> str:
+        return os.path.basename(self.file_path)
+
+
+def _digits(value: str) -> str:
+    """The YYYY:MM:DD HH:MM:SS part of a tag value, dropping any zone suffix."""
+    return _TIMESTAMP_DIGITS.sub(r'\1', value)
+
+
+def _datetime_original_zoned(inputs: _RankingInputs) -> Optional[Candidate]:
+    value = inputs.exif.get("DateTimeOriginal", "")
+    if value and _TRAILING_ZONE.search(value):
+        return _digits(value), TimestampSource.DATETIME_ORIGINAL_ZONED
+    return None
+
+
+def _creation_date_zoned(inputs: _RankingInputs) -> Optional[Candidate]:
+    value = inputs.exif.get("CreationDate", "")
+    if value and _TRAILING_ZONE.search(value):
+        return _digits(value), TimestampSource.CREATION_DATE_ZONED
+    return None
+
+
+def _creation_date_utc(inputs: _RankingInputs) -> Optional[Candidate]:
+    """Keys:CreationDate with a Z marker — UTC, so it needs a declared zone."""
+    value = inputs.exif.get("CreationDate", "")
+    if value and value.endswith('Z') and inputs.timezone_offset:
+        timestamp = value[:-1].strip()
+        if re.match(r'[0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}', timestamp):
+            return timestamp, TimestampSource.CREATION_DATE_UTC
+    return None
+
+
+def _movie_header_corroborated(inputs: _RankingInputs) -> Optional[Candidate]:
+    """A UTC clock value the filename corroborates.
+
+    A camera left on the previous country's time writes a filename that is wrong
+    for where it was shot; the UTC value survives that, so it wins where the two
+    contradict each other. Without a declared timezone there is nothing to
+    convert UTC into.
+    """
+    if inputs.timezone_offset and _is_corroborated_utc(inputs.movie_timestamp, inputs.filename_timestamp):
+        return inputs.movie_timestamp, TimestampSource.MOVIE_HEADER_CORROBORATED
+    return None
+
+
+def _camera_filename(inputs: _RankingInputs) -> Optional[Candidate]:
+    """The filename digits, for the camera patterns VID/IMG/LRV/DJI."""
+    if inputs.filename_timestamp and (
+            re.match(r'^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6}', inputs.basename)
+            or re.match(r'^DJI_[0-9]{14}_', inputs.basename)):
+        return inputs.filename_timestamp, TimestampSource.FILENAME
+    return None
+
+
+def _movie_header_by_spec(inputs: _RankingInputs) -> Optional[Candidate]:
+    """A UTC-specified clock value with nothing to corroborate it.
+
+    Still ranks above the bare tags below: those are naive by definition, whereas
+    this field at least has a specification saying what its digits mean.
+    """
+    if inputs.movie_timestamp:
+        return inputs.movie_timestamp, TimestampSource.MOVIE_HEADER_BY_SPEC
+    return None
+
+
+def _datetime_original_bare(inputs: _RankingInputs) -> Optional[Candidate]:
+    value = inputs.exif.get("DateTimeOriginal", "")
+    if value and re.search(r'[0-9]', value):
+        return _digits(value), TimestampSource.DATETIME_ORIGINAL
+    return None
+
+
+def _creation_date_bare(inputs: _RankingInputs) -> Optional[Candidate]:
+    """CreationDate without a zone and without a Z marker — naive, the same tier
+    as a bare DateTimeOriginal. No device is known to write this shape bare (see
+    docs/timestamp-fields.md ranking row 7)."""
+    value = inputs.exif.get("CreationDate", "")
+    if value and not value.endswith('Z') and re.search(r'[0-9]', value):
+        return _digits(value), TimestampSource.CREATION_DATE
+    return None
+
+
+def _file_times(inputs: _RankingInputs) -> Optional[Candidate]:
+    """File birth time where the platform has one, else modification time."""
+    try:
+        st = os.stat(inputs.file_path)
+    except OSError:
+        return None
+    birthtime = getattr(st, "st_birthtime", None)
+    if birthtime is not None:
+        return datetime.fromtimestamp(birthtime).strftime('%Y:%m:%d %H:%M:%S'), TimestampSource.FILE_BIRTH
+    return datetime.fromtimestamp(st.st_mtime).strftime('%Y:%m:%d %H:%M:%S'), TimestampSource.FILE_MTIME
+
+
+# The ranking in docs/timestamp-fields.md, first match wins. Adding a source means
+# one rule here and one TimestampSource member.
+RANKING: List[Callable[[_RankingInputs], Optional[Candidate]]] = [
+    _datetime_original_zoned,
+    _creation_date_zoned,
+    _creation_date_utc,
+    _movie_header_corroborated,
+    _camera_filename,
+    _movie_header_by_spec,
+    _datetime_original_bare,
+    _creation_date_bare,
+    _file_times,
+]
+
+
 def get_best_timestamp(
     file_path: str,
     timezone_offset: Optional[str] = None,
-) -> tuple[Optional[str], str]:
-    """Get the best timestamp using 6-tier priority system.
-
-    Returns: (timestamp_string, source_description)
-    """
-    exif_data = read_exif_data(file_path)
-    base = os.path.basename(file_path)
-
-    # Priority 1: DateTimeOriginal with timezone
-    datetime_original = exif_data.get("DateTimeOriginal", "")
-    if datetime_original and re.search(r'[+-]\d{2}:?\d{2}$', datetime_original):
-        timestamp = re.sub(
-            r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1',
-            datetime_original)
-        return timestamp, "DateTimeOriginal with timezone"
-
-    # Priority 2: CreationDate with timezone
-    creation_date = exif_data.get("CreationDate", "")
-    if creation_date and re.search(r'[+-]\d{2}:?\d{2}$', creation_date):
-        timestamp = re.sub(
-            r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1',
-            creation_date)
-        return timestamp, "CreationDate with timezone"
-
-    # Priority 2.5: Keys:CreationDate with Z marker
-    if creation_date and creation_date.endswith('Z') and timezone_offset:
-        timestamp = creation_date[:-1].strip()
-        if re.match(r'[0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}', timestamp):
-            return timestamp, "CreationDate with Z (UTC)"
-
-    movie_timestamp = _movie_header_timestamp(exif_data)
-
-    ts, _ = parse_filename_timestamp(file_path)
-
-    # Priority 3: a UTC clock value the filename corroborates. A camera left on the
-    # previous country's time writes a filename that is wrong for where it was shot;
-    # the UTC value survives that, so it wins where the two contradict each other.
-    # Without a declared timezone there is nothing to convert UTC into.
-    if timezone_offset and _is_corroborated_utc(movie_timestamp, ts):
-        return movie_timestamp, SOURCE_UTC_CORROBORATED
-
-    # Priority 4: Filename for VID/IMG/LRV/DJI
-    if ts and (re.match(r'^(VID|LRV|IMG)_[0-9]{8}_[0-9]{6}', base) or
-               re.match(r'^DJI_[0-9]{14}_', base)):
-        return ts, "filename"
-
-    # Priority 5: a UTC-specified clock value with nothing to corroborate it. Still
-    # ranks above the bare tags below: those are naive by definition, whereas this
-    # field at least has a specification saying what its digits mean.
-    if movie_timestamp:
-        return movie_timestamp, SOURCE_UTC_BY_SPEC
-
-    # Priority 6: DateTimeOriginal without timezone
-    if datetime_original and re.search(r'[0-9]', datetime_original):
-        timestamp = re.sub(
-            r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1',
-            datetime_original)
-        return timestamp, "DateTimeOriginal"
-
-    # Priority 6.5: CreationDate without timezone and without a Z marker — a naive
-    # source, same tier as bare DateTimeOriginal. No device is known to write this
-    # shape bare (see docs/timestamp-fields.md ranking row 7).
-    if creation_date and not creation_date.endswith('Z') and re.search(r'[0-9]', creation_date):
-        timestamp = re.sub(
-            r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1',
-            creation_date)
-        return timestamp, "CreationDate"
-
-    # Priority 7: File timestamps
-    try:
-        st = os.stat(file_path)
-        try:
-            birth = datetime.fromtimestamp(st.st_birthtime).strftime('%Y:%m:%d %H:%M:%S')
-            return birth, "file birthtime"
-        except AttributeError:
-            pass
-        mtime = datetime.fromtimestamp(st.st_mtime).strftime('%Y:%m:%d %H:%M:%S')
-        return mtime, "file mtime"
-    except OSError:
-        pass
-
-    return None, "no timestamps found"
+) -> Tuple[Optional[str], TimestampSource]:
+    """The file's best timestamp and the source it came from, per RANKING."""
+    exif = read_exif_data(file_path)
+    inputs = _RankingInputs(
+        file_path=file_path,
+        exif=exif,
+        filename_timestamp=parse_filename_timestamp(file_path)[0],
+        movie_timestamp=_movie_header_timestamp(exif),
+        timezone_offset=timezone_offset,
+    )
+    for rule in RANKING:
+        candidate = rule(inputs)
+        if candidate is not None:
+            return candidate
+    return None, TimestampSource.NONE
 
 
 # ---------------------------------------------------------------------------
@@ -538,7 +626,7 @@ def get_best_timestamp(
 class TimestampReport:
     """Everything known about a file's available timestamps."""
     metadata_date: Optional[datetime]
-    metadata_source: str
+    metadata_source: TimestampSource
     metadata_tz: Optional[str]
 
     filename_parseable: bool

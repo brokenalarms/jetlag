@@ -20,8 +20,7 @@ from lib.timestamp_source import (
     read_timestamp_sources,
     extract_metadata_timezone,
     get_best_timestamp,
-    SOURCE_UTC_BY_SPEC,
-    SOURCE_UTC_CORROBORATED,
+    TimestampSource,
     read_exif_data,
     clear_exif_cache,
     is_zone_name,
@@ -154,7 +153,7 @@ class TestReadTimestampSources:
         assert report.metadata_date.hour == 7
         assert report.metadata_date.minute == 25
         assert report.metadata_tz == "+08:00"
-        assert "DateTimeOriginal" in report.metadata_source
+        assert report.metadata_source is TimestampSource.DATETIME_ORIGINAL_ZONED
 
     def test_filename_only(self):
         video = os.path.join(self.temp_dir, "VID_20250618_072521.mp4")
@@ -227,7 +226,7 @@ class TestGetBestTimestamp:
 
         ts, source = get_best_timestamp(video)
         assert ts == "2025:06:18 07:25:21"
-        assert "DateTimeOriginal" in source
+        assert source is TimestampSource.DATETIME_ORIGINAL_ZONED
 
     def test_filename_for_vid_prefix(self):
         video = os.path.join(self.temp_dir, "VID_20250618_072521.mp4")
@@ -235,7 +234,7 @@ class TestGetBestTimestamp:
 
         ts, source = get_best_timestamp(video, timezone_offset="+08:00")
         assert ts == "2025:06:18 07:25:21"
-        assert "filename" in source
+        assert source is TimestampSource.FILENAME
 
     def test_bare_creationdate_ranks_with_bare_datetimeoriginal(self):
         """A Keys:CreationDate with no zone suffix and no Z is a naive source, ranked
@@ -250,7 +249,7 @@ class TestGetBestTimestamp:
 
         ts, source = get_best_timestamp(video, timezone_offset="+08:00")
         assert ts == "2025:06:18 07:25:21"
-        assert source == "CreationDate"
+        assert source is TimestampSource.CREATION_DATE
 
     def test_bare_creationdate_loses_to_zoned_datetimeoriginal(self):
         """A higher-ranked source (zoned DateTimeOriginal, priority 1) still wins over
@@ -266,7 +265,7 @@ class TestGetBestTimestamp:
 
         ts, source = get_best_timestamp(video, timezone_offset="+08:00")
         assert ts == "2025:06:18 09:25:21"
-        assert source == "DateTimeOriginal with timezone"
+        assert source is TimestampSource.DATETIME_ORIGINAL_ZONED
 
 
 class TestQuickTimeInstantVersusFilename:
@@ -298,7 +297,7 @@ class TestQuickTimeInstantVersusFilename:
         ts, source = get_best_timestamp(video, timezone_offset="+13:00")
 
         assert ts == "2026:01:03 18:35:32"
-        assert source == SOURCE_UTC_CORROBORATED
+        assert source is TimestampSource.MOVIE_HEADER_CORROBORATED
 
     def test_filename_wins_without_a_declared_timezone(self):
         """An instant cannot be labelled without a zone to label it in."""
@@ -307,7 +306,7 @@ class TestQuickTimeInstantVersusFilename:
         ts, source = get_best_timestamp(video)
 
         assert ts == "2026:01:04 03:35:32"
-        assert source == "filename"
+        assert source is TimestampSource.FILENAME
 
     def test_filename_wins_when_the_clock_is_broken(self):
         """A battery-reset camera: years from any legal offset, so not an instant."""
@@ -316,7 +315,7 @@ class TestQuickTimeInstantVersusFilename:
         ts, source = get_best_timestamp(video, timezone_offset="+01:00")
 
         assert ts == "2025:05:05 12:03:34"
-        assert source == "filename"
+        assert source is TimestampSource.FILENAME
 
     def test_filename_wins_when_the_quicktime_date_matches_it(self):
         """Zero delta cannot separate a UTC+0 camera from one writing local time."""
@@ -324,14 +323,14 @@ class TestQuickTimeInstantVersusFilename:
 
         _, source = get_best_timestamp(video, timezone_offset="+08:00")
 
-        assert source == "filename"
+        assert source is TimestampSource.FILENAME
 
     def test_filename_wins_when_the_quicktime_date_is_zeroed(self):
         video = self._video("VID_20250618_072521_00_001.mp4")
 
         _, source = get_best_timestamp(video, timezone_offset="+08:00")
 
-        assert source == "filename"
+        assert source is TimestampSource.FILENAME
 
     def test_offset_at_the_legal_maximum_is_an_instant(self):
         """+14:00, the largest offset any zone uses."""
@@ -339,14 +338,14 @@ class TestQuickTimeInstantVersusFilename:
 
         _, source = get_best_timestamp(video, timezone_offset="+14:00")
 
-        assert source == SOURCE_UTC_CORROBORATED
+        assert source is TimestampSource.MOVIE_HEADER_CORROBORATED
 
     def test_offset_beyond_the_legal_maximum_is_not(self):
         video = self._video("VID_20250618_150000_00_001.mp4", "2025:06:18 00:00:00")
 
         _, source = get_best_timestamp(video, timezone_offset="+14:00")
 
-        assert source == "filename"
+        assert source is TimestampSource.FILENAME
 
     def test_offset_at_the_legal_minimum_is_an_instant(self):
         """-12:00, the filename twelve hours behind the instant."""
@@ -354,14 +353,14 @@ class TestQuickTimeInstantVersusFilename:
 
         _, source = get_best_timestamp(video, timezone_offset="-12:00")
 
-        assert source == SOURCE_UTC_CORROBORATED
+        assert source is TimestampSource.MOVIE_HEADER_CORROBORATED
 
     def test_offset_beyond_the_legal_minimum_is_not(self):
         video = self._video("VID_20250617_110000_00_001.mp4", "2025:06:18 00:00:00")
 
         _, source = get_best_timestamp(video, timezone_offset="-12:00")
 
-        assert source == "filename"
+        assert source is TimestampSource.FILENAME
 
     def test_quarter_hour_offset_is_an_instant(self):
         """Nepal is +05:45."""
@@ -369,7 +368,7 @@ class TestQuickTimeInstantVersusFilename:
 
         _, source = get_best_timestamp(video, timezone_offset="+05:45")
 
-        assert source == SOURCE_UTC_CORROBORATED
+        assert source is TimestampSource.MOVIE_HEADER_CORROBORATED
 
     def test_offset_off_the_quarter_hour_is_not(self):
         """9h07m is not an offset any zone uses."""
@@ -377,7 +376,7 @@ class TestQuickTimeInstantVersusFilename:
 
         _, source = get_best_timestamp(video, timezone_offset="+13:00")
 
-        assert source == "filename"
+        assert source is TimestampSource.FILENAME
 
     def test_a_file_with_no_filename_date_still_uses_the_quicktime_date(self):
         """Nothing to corroborate against, and nothing else to fall back to."""
@@ -386,7 +385,7 @@ class TestQuickTimeInstantVersusFilename:
         ts, source = get_best_timestamp(video, timezone_offset="+13:00")
 
         assert ts == "2026:01:03 18:35:32"
-        assert source == SOURCE_UTC_BY_SPEC
+        assert source is TimestampSource.MOVIE_HEADER_BY_SPEC
 
     def test_uncorroborated_utc_outranks_bare_datetimeoriginal(self):
         """A field specified as UTC says what its digits mean; a bare tag says nothing."""
@@ -399,7 +398,7 @@ class TestQuickTimeInstantVersusFilename:
         ts, source = get_best_timestamp(video, timezone_offset="+13:00")
 
         assert ts == "2026:01:03 18:35:32"
-        assert source == SOURCE_UTC_BY_SPEC
+        assert source is TimestampSource.MOVIE_HEADER_BY_SPEC
 
 
 class TestCameraZoneOffsetForFile:
@@ -558,7 +557,7 @@ class TestOffsetTimeOriginalCompletesBareDateTimeOriginal:
                           OffsetTimeOriginal="+08:00")
 
         timestamp, source = get_best_timestamp(photo)
-        assert source == "DateTimeOriginal with timezone"
+        assert source is TimestampSource.DATETIME_ORIGINAL_ZONED
         assert timestamp == "2025:06:18 07:25:21"
 
     def test_offset_time_original_supplies_the_metadata_timezone(self):
@@ -578,7 +577,7 @@ class TestOffsetTimeOriginalCompletesBareDateTimeOriginal:
 
         assert read_exif_data(photo)["DateTimeOriginal"] == "2025:06:18 07:25:21"
         timestamp, source = get_best_timestamp(photo)
-        assert source == "DateTimeOriginal"
+        assert source is TimestampSource.DATETIME_ORIGINAL
         assert timestamp == "2025:06:18 07:25:21"
         assert extract_metadata_timezone(photo) is None
 
@@ -591,7 +590,7 @@ class TestOffsetTimeOriginalCompletesBareDateTimeOriginal:
         clear_exif_cache()
 
         assert read_exif_data(photo)["DateTimeOriginal"] == "2025:06:18 07:25:21"
-        assert get_best_timestamp(photo)[1] == "DateTimeOriginal"
+        assert get_best_timestamp(photo)[1] is TimestampSource.DATETIME_ORIGINAL
 
     def test_already_zoned_dto_is_left_untouched(self):
         """A value that already carries its own zone is never rewritten."""
@@ -640,7 +639,7 @@ class TestMovieHeaderIsTheQuickTimeClock:
         timestamp, source = get_best_timestamp(path, "+08:00")
 
         assert timestamp == "2025:06:17 23:25:21"
-        assert source == SOURCE_UTC_BY_SPEC
+        assert source is TimestampSource.MOVIE_HEADER_BY_SPEC
 
     def test_the_track_header_is_not_the_clock(self, tmp_path):
         path = str(tmp_path / "clip.mp4")
@@ -651,3 +650,35 @@ class TestMovieHeaderIsTheQuickTimeClock:
         timestamp, _ = get_best_timestamp(path, "+08:00")
 
         assert timestamp == "2025:06:17 23:25:21"
+
+
+class TestTimestampSourceTokens:
+    """The token is what timestamp_result.source carries to the app, and the label
+    is what people read; each member names both, so rewording a label can never
+    change the machine value. These pins protect the JSONL contract: changing a
+    token here means changing the app's handling of it in the same commit."""
+
+    def test_tokens_are_pinned_per_source(self):
+        tokens = {source.name: source.token for source in TimestampSource}
+        assert tokens == {
+            "DATETIME_ORIGINAL_ZONED": "datetimeoriginal",
+            "CREATION_DATE_ZONED": "creationdate",
+            "CREATION_DATE_UTC": "creationdate",
+            "MOVIE_HEADER_CORROBORATED": "moviecreatedate",
+            "FILENAME": "filename",
+            "FILENAME_INFERRED": "filename",
+            "MOVIE_HEADER_BY_SPEC": "moviecreatedate",
+            "DATETIME_ORIGINAL": "datetimeoriginal",
+            "CREATION_DATE": "creationdate",
+            "FILE_BIRTH": "file_birth",
+            "FILE_MTIME": "file_mtime",
+            "NONE": "no timestamps found",
+        }
+
+    def test_only_the_utc_specified_sources_are_utc(self):
+        utc = {source for source in TimestampSource if source.is_utc}
+        assert utc == {
+            TimestampSource.CREATION_DATE_UTC,
+            TimestampSource.MOVIE_HEADER_CORROBORATED,
+            TimestampSource.MOVIE_HEADER_BY_SPEC,
+        }

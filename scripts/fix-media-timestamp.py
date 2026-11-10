@@ -34,8 +34,8 @@ from lib.timestamp_source import (
     extract_metadata_timezone,
     read_timestamp_sources,
     is_zone_name,
-    is_utc_timestamp_source,
     resolve_timezone_offset,
+    TimestampSource,
     camera_zone_offset_for_file,
 )
 
@@ -370,6 +370,14 @@ def missing_clock_fields(exif: Dict[str, str], stale: list) -> list:
     return [tag for tag in stale if not stored.get(tag)]
 
 
+# How each source field is named to people: CreationDate is read from the Keys
+# atom, which is the name a user sees in other tools.
+_FIELD_LABELS = {
+    "DateTimeOriginal": "DateTimeOriginal",
+    "CreationDate": "Keys:CreationDate",
+}
+
+
 def _timezone_from_offset(offset_str: str) -> Optional[timezone]:
     """Build a tzinfo from a +HH:MM / +HHMM offset string."""
     match = re.match(r'([+-])(\d{2}):?(\d{2})$', offset_str)
@@ -400,7 +408,7 @@ def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, 
         "file_system": get_file_system_timestamps(file_path) if sys.platform == "darwin" else {"birth": "", "modify": ""},
         "datetime_original_str": "",
         "datetime_original": None,
-        "timestamp_source": "",
+        "timestamp_source": TimestampSource.NONE,
         "timezone_source": "",
         "timezone_offset": None,
         "camera_zone_offset": camera_zone_offset_for_file(file_path),
@@ -418,28 +426,22 @@ def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, 
         datetime_with_tz = f"{fn_ts}{timezone_offset}"
         data["datetime_original_str"] = datetime_with_tz
         data["datetime_original"] = parse_datetime_original(datetime_with_tz)
-        data["timestamp_source"] = "filename (infer mode)"
+        data["timestamp_source"] = TimestampSource.FILENAME_INFERRED
         data["timezone_source"] = f"--timezone flag ({timezone_offset})"
         return data
 
-    # Use 6-tier priority system to find best timestamp
     best_timestamp, source = get_best_timestamp(file_path, timezone_spec)
     data["timestamp_source"] = source
 
     timezone_offset = resolve_timezone_offset(
-        timezone_spec, best_timestamp,
-        timestamp_is_utc=is_utc_timestamp_source(source),
+        timezone_spec, best_timestamp, timestamp_is_utc=source.is_utc,
     )
     data["timezone_offset"] = timezone_offset
 
     if best_timestamp:
-        if source in ("CreationDate with timezone", "DateTimeOriginal with timezone"):
-            if source == "CreationDate with timezone":
-                raw_value = data["exif"].get("CreationDate", "")
-                data["timezone_source"] = "Keys:CreationDate metadata"
-            else:
-                raw_value = data["exif"].get("DateTimeOriginal", "")
-                data["timezone_source"] = "DateTimeOriginal metadata"
+        if source.zoned:
+            raw_value = data["exif"].get(source.field, "")
+            data["timezone_source"] = f"{_FIELD_LABELS[source.field]} metadata"
             data["datetime_original_str"] = raw_value
             embedded = parse_datetime_original(raw_value) if raw_value else None
             if embedded:
@@ -458,39 +460,16 @@ def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, 
                         data["datetime_original"] = converted
                         data["datetime_original_str"] = converted.strftime("%Y:%m:%d %H:%M:%S") + declared_offset
                         data["timezone_source"] = f"--timezone flag ({declared_offset})"
-        elif source == "DateTimeOriginal" and timezone_offset:
-            datetime_with_tz = f"{best_timestamp}{timezone_offset}"
-            data["datetime_original_str"] = datetime_with_tz
-            data["datetime_original"] = parse_datetime_original(datetime_with_tz)
-            data["timezone_source"] = f"--timezone flag ({timezone_offset})"
-        elif source == "DateTimeOriginal":
+        elif source is TimestampSource.DATETIME_ORIGINAL and not timezone_offset:
             data["datetime_original_str"] = data["exif"].get("DateTimeOriginal", "")
             data["timezone_source"] = "DateTimeOriginal metadata"
             if data["datetime_original_str"]:
                 data["datetime_original"] = parse_datetime_original(data["datetime_original_str"])
-        elif source == "CreationDate with Z (UTC)" and timezone_offset:
-            utc_dt = datetime.strptime(best_timestamp, "%Y:%m:%d %H:%M:%S").replace(tzinfo=timezone.utc)
-            tz_match = re.match(r'([+-])(\d{2}):?(\d{2})', timezone_offset)
-            if tz_match:
-                sign, hours, minutes = tz_match.groups()
-                offset_seconds = int(hours) * 3600 + int(minutes) * 60
-                if sign == '-':
-                    offset_seconds = -offset_seconds
-                local_tz = timezone(timedelta(seconds=offset_seconds))
-                local_dt = utc_dt.astimezone(local_tz)
-                datetime_with_tz = local_dt.strftime("%Y:%m:%d %H:%M:%S") + timezone_offset
-                data["datetime_original_str"] = datetime_with_tz
-                data["datetime_original"] = parse_datetime_original(datetime_with_tz)
-                data["timezone_source"] = f"--timezone flag ({timezone_offset})"
-        elif source.startswith("QuickTime CreateDate") and timezone_offset:
-            utc_dt = datetime.strptime(best_timestamp, "%Y:%m:%d %H:%M:%S").replace(tzinfo=timezone.utc)
-            tz_match = re.match(r'([+-])(\d{2}):?(\d{2})', timezone_offset)
-            if tz_match:
-                sign, hours, minutes = tz_match.groups()
-                offset_seconds = int(hours) * 3600 + int(minutes) * 60
-                if sign == '-':
-                    offset_seconds = -offset_seconds
-                local_tz = timezone(timedelta(seconds=offset_seconds))
+        elif source.is_utc:
+            # UTC digits are expressed in the declared zone: same instant, new label.
+            local_tz = _timezone_from_offset(timezone_offset) if timezone_offset else None
+            if local_tz is not None:
+                utc_dt = datetime.strptime(best_timestamp, "%Y:%m:%d %H:%M:%S").replace(tzinfo=timezone.utc)
                 local_dt = utc_dt.astimezone(local_tz)
                 datetime_with_tz = local_dt.strftime("%Y:%m:%d %H:%M:%S") + timezone_offset
                 data["datetime_original_str"] = datetime_with_tz
@@ -547,12 +526,12 @@ def _machine_original_time(current_data: dict) -> str:
     tag - have no zone, and stay bare rather than claiming one.
     """
     return _apply_source_zone(_stored_original_time(current_data),
-                              current_data.get("timestamp_source", ""))
+                              current_data.get("timestamp_source", TimestampSource.NONE))
 
 
-def _apply_source_zone(value: str, source: str) -> str:
+def _apply_source_zone(value: str, source: TimestampSource) -> str:
     """Mark a UTC source's stored value as UTC; leave any other source alone."""
-    if not value or not is_utc_timestamp_source(source):
+    if not value or not source.is_utc:
         return value
     if value.endswith("Z") or re.search(r'[+-]\d{2}:?\d{2}$', value):
         return value
@@ -565,20 +544,10 @@ def _stored_original_time(current_data: dict) -> str:
     Falls back through the common fields when the source-specific one is empty.
     """
     exif = current_data.get("exif", {})
-    source = current_data.get("timestamp_source", "")
+    source = current_data.get("timestamp_source", TimestampSource.NONE)
 
-    if "DateTimeOriginal" in source:
-        val = exif.get("DateTimeOriginal", "")
-        if val:
-            return val
-    if "CreationDate" in source:
-        val = exif.get("CreationDate", "")
-        if val:
-            return val
-    if source.startswith("QuickTime CreateDate"):
-        val = exif.get(MOVIE_HEADER_CREATE_DATE_TAG, "")
-        if val:
-            return val
+    if source.field and exif.get(source.field):
+        return exif[source.field]
 
     # Fallback: first non-empty common timestamp field
     for field in ["DateTimeOriginal", "CreationDate", MOVIE_HEADER_CREATE_DATE_TAG, "CreateDate"]:
@@ -598,47 +567,32 @@ def format_original_timestamps(current_data: dict) -> str:
     parts = []
 
     # Show the timestamp source that was actually used
-    source = current_data.get("timestamp_source", "")
+    source = current_data.get("timestamp_source", TimestampSource.NONE)
 
-    if source == "DateTimeOriginal with timezone":
-        datetime_original = current_data["exif"].get("DateTimeOriginal", "")
-        if datetime_original:
-            parts.append(f"{format_exif_timestamp_display(datetime_original)} (DateTimeOriginal)")
-    elif source == "CreationDate with timezone":
-        creation_date = current_data["exif"].get("CreationDate", "")
-        if creation_date:
-            parts.append(f"{format_exif_timestamp_display(creation_date)} (Keys:CreationDate)")
-    elif source == "CreationDate with Z (UTC)":
-        creation_date = current_data["exif"].get("CreationDate", "")
-        if creation_date:
-            parts.append(f"{format_exif_timestamp_display(creation_date)} (Keys:CreationDate UTC)")
-    elif source == "DateTimeOriginal":
-        datetime_original = current_data["exif"].get("DateTimeOriginal", "")
-        if datetime_original:
-            parts.append(f"{format_exif_timestamp_display(datetime_original)} (DateTimeOriginal)")
-    elif source == "CreationDate":
-        creation_date = current_data["exif"].get("CreationDate", "")
-        if creation_date:
-            parts.append(f"{format_exif_timestamp_display(creation_date)} (Keys:CreationDate)")
-    elif source.startswith("QuickTime CreateDate"):
+    if source.field in _FIELD_LABELS:
+        value = current_data["exif"].get(source.field, "")
+        if value:
+            utc_suffix = " UTC" if source.is_utc else ""
+            parts.append(f"{format_exif_timestamp_display(value)} ({_FIELD_LABELS[source.field]}{utc_suffix})")
+    elif source.field == MOVIE_HEADER_CREATE_DATE_TAG:
         media_create = current_data["exif"].get(MOVIE_HEADER_CREATE_DATE_TAG, "")
         birth_ts = current_data["file_system"].get("birth", "")
         if media_create:
             parts.append(f"{format_exif_timestamp_display(media_create)} UTC (QuickTime:CreateDate)")
         if birth_ts:
             parts.append(f"{format_exif_timestamp_display(birth_ts)} local (file)")
-    elif "filename" in source:
+    elif source in (TimestampSource.FILENAME, TimestampSource.FILENAME_INFERRED):
         # Show the parsed filename timestamp
         filename_ts, _ = parse_filename_timestamp(current_data.get("file_path", ""))
         if filename_ts:
             parts.append(f"{format_exif_timestamp_display(filename_ts)} (from filename)")
         else:
             parts.append("(from filename)")
-    elif source == "file birthtime":
+    elif source is TimestampSource.FILE_BIRTH:
         birth_ts = current_data["file_system"].get("birth", "")
         if birth_ts:
             parts.append(f"{format_exif_timestamp_display(birth_ts)} (file birth)")
-    elif source == "file mtime":
+    elif source is TimestampSource.FILE_MTIME:
         mod_ts = current_data["file_system"].get("modify", "")
         if mod_ts:
             parts.append(f"{format_exif_timestamp_display(mod_ts)} (file modified)")
@@ -649,20 +603,14 @@ def format_timestamp_display(dt: datetime) -> str:
     """Format timestamp with dashes for date, colons for time"""
     return dt.strftime('%Y-%m-%d %H:%M:%S%z')
 
-def format_corrected_timestamp(datetime_original: datetime, timestamp_source: str, timezone_source: str) -> str:
+def format_corrected_timestamp(datetime_original: datetime, timestamp_source: TimestampSource, timezone_source: str) -> str:
     """Format corrected timestamp display"""
     corrected_str = format_timestamp_display(datetime_original)
     tz_value = datetime_original.strftime('%z')
     # Format timezone with colon
     tz_formatted = f"{tz_value[:3]}:{tz_value[3:]}" if len(tz_value) == 5 else tz_value
 
-    # Determine source display based on actual timestamp source
-    if "CreationDate" in timestamp_source:
-        source_display = "Keys:CreationDate"
-    elif "DateTimeOriginal" in timestamp_source:
-        source_display = "DateTimeOriginal"
-    else:
-        source_display = timestamp_source
+    source_display = _FIELD_LABELS.get(timestamp_source.field or "", timestamp_source.display)
 
     # Use the actual timezone source
     tz_source_display = timezone_source if timezone_source else f"{source_display} metadata ({tz_formatted})"
@@ -808,24 +756,6 @@ def format_offset_display(seconds: int) -> str:
     return f"{sign}{days}d {hours}h {minutes}m {secs}s"
 
 
-def _source_to_machine_token(source: str) -> str:
-    """Map human-readable timestamp source description to machine token."""
-    source_lower = source.lower()
-    if "filename" in source_lower:
-        return "filename"
-    if "datetimeoriginal" in source_lower:
-        return "datetimeoriginal"
-    if "creationdate" in source_lower:
-        return "creationdate"
-    if "quicktime createdate" in source_lower:
-        return "moviecreatedate"
-    if "birthtime" in source_lower or "birth" in source_lower:
-        return "file_birth"
-    if "mtime" in source_lower:
-        return "file_mtime"
-    return source_lower
-
-
 def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None, force_timezone: bool = False, extra_write_fields: Optional[Dict[str, str]] = None) -> TimestampFixResult:
     """Fix media (photo/video) timestamps.
 
@@ -855,9 +785,9 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
     # the flag confirms.
     requires_force_timezone = False
     if timezone_spec and not infer_from_filename:
-        source = current_data.get("timestamp_source", "")
+        source = current_data["timestamp_source"]
         declared_offset = current_data.get("timezone_offset")
-        if ("with timezone" in source and detected_tz and declared_offset
+        if (source.zoned and detected_tz and declared_offset
                 and normalize_timezone_format(detected_tz) != normalize_timezone_format(declared_offset)):
             requires_force_timezone = not force_timezone
             if requires_force_timezone:
@@ -937,7 +867,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
     original_display = format_original_timestamps(current_data)
     print(f"📅 Original : {original_display}", file=sys.stderr)
 
-    timestamp_source = current_data.get("timestamp_source", "")
+    timestamp_source = current_data["timestamp_source"]
     timezone_source = current_data.get("timezone_source", "")
     corrected_display = format_corrected_timestamp(datetime_original, timestamp_source, timezone_source)
     print(f"⏱️ Corrected: {corrected_display}", file=sys.stderr)
@@ -987,7 +917,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
         corrected_time=datetime_original_str,
         stale_fields=changes["stale_clock_fields"],
         stale_file_times=["FileCreateDate"] if changes["file_timestamps"] else [],
-        timestamp_source=_source_to_machine_token(timestamp_source),
+        timestamp_source=timestamp_source.token,
         correction_mode=correction_mode,
         timezone=detected_tz,
         time_offset_seconds=time_offset_seconds if (time_offset_seconds is not None and time_offset_seconds != 0) else None,

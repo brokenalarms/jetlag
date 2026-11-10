@@ -24,7 +24,7 @@ spec = importlib.util.spec_from_file_location(
 )
 fmt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fmt)
-from lib.timestamp_source import SOURCE_UTC_BY_SPEC, SOURCE_UTC_CORROBORATED, clear_exif_cache
+from lib.timestamp_source import TimestampSource, clear_exif_cache
 if sys.platform == "darwin":
     from lib.file_timestamps import get_file_system_timestamps, set_file_system_timestamps
 
@@ -351,8 +351,8 @@ class TestBestTimestampPriority:
         timestamp, source = fmt.get_best_timestamp(video_path)
 
         assert timestamp == "2025:06:18 07:25:21"
-        assert "DateTimeOriginal" in source
-        assert "timezone" in source
+        assert source is TimestampSource.DATETIME_ORIGINAL_ZONED
+        assert source.zoned
 
     def test_priority_3_filename(self):
         """Test Priority 3: Filename pattern"""
@@ -362,7 +362,7 @@ class TestBestTimestampPriority:
         timestamp, source = fmt.get_best_timestamp(video_path)
 
         assert timestamp == "2025:06:18 07:25:21"
-        assert "filename" in source
+        assert source is TimestampSource.FILENAME
 
 
 class TestGetAllTimestampData:
@@ -395,7 +395,7 @@ class TestGetAllTimestampData:
 
         data = fmt.get_all_timestamp_data(video)
 
-        assert data["timestamp_source"] == "DateTimeOriginal with timezone"
+        assert data["timestamp_source"] is TimestampSource.DATETIME_ORIGINAL_ZONED
         assert data["datetime_original"] is not None
         assert data["datetime_original"].hour == 7
         assert data["datetime_original"].minute == 25
@@ -412,7 +412,7 @@ class TestGetAllTimestampData:
 
         data = fmt.get_all_timestamp_data(photo)
 
-        assert data["timestamp_source"] == "DateTimeOriginal with timezone"
+        assert data["timestamp_source"] is TimestampSource.DATETIME_ORIGINAL_ZONED
         assert data["timezone_source"] == "DateTimeOriginal metadata"
         assert data["datetime_original"] is not None
         assert data["datetime_original"].hour == 7
@@ -425,7 +425,7 @@ class TestGetAllTimestampData:
 
         data = fmt.get_all_timestamp_data(video)
 
-        assert data["timestamp_source"] == "CreationDate with timezone"
+        assert data["timestamp_source"] is TimestampSource.CREATION_DATE_ZONED
         assert data["datetime_original"] is not None
         assert data["datetime_original"].hour == 9
         assert data["datetime_original"].minute == 30
@@ -438,7 +438,7 @@ class TestGetAllTimestampData:
 
         data = fmt.get_all_timestamp_data(video, timezone_spec="+08:00")
 
-        assert data["timestamp_source"] == "CreationDate"
+        assert data["timestamp_source"] is TimestampSource.CREATION_DATE
         assert data["datetime_original"] is not None
         assert data["datetime_original"].hour == 7
         assert data["datetime_original"].minute == 25
@@ -451,7 +451,7 @@ class TestGetAllTimestampData:
 
         data = fmt.get_all_timestamp_data(video, timezone_spec="+08:00")
 
-        assert data["timestamp_source"] == "CreationDate with Z (UTC)"
+        assert data["timestamp_source"] is TimestampSource.CREATION_DATE_UTC
         assert data["datetime_original"] is not None
         # UTC 23:25:21 + 8 hours = 07:25:21 next day
         assert data["datetime_original"].hour == 7
@@ -464,7 +464,7 @@ class TestGetAllTimestampData:
 
         data = fmt.get_all_timestamp_data(video, timezone_spec="+08:00")
 
-        assert data["timestamp_source"] == SOURCE_UTC_BY_SPEC
+        assert data["timestamp_source"] is TimestampSource.MOVIE_HEADER_BY_SPEC
         assert data["datetime_original"] is not None
         # UTC 23:25:21 + 8 hours = 07:25:21 next day
         assert data["datetime_original"].hour == 7
@@ -480,7 +480,7 @@ class TestGetAllTimestampData:
 
         data = fmt.get_all_timestamp_data(video, timezone_spec="+13:00")
 
-        assert data["timestamp_source"] == SOURCE_UTC_CORROBORATED
+        assert data["timestamp_source"] is TimestampSource.MOVIE_HEADER_CORROBORATED
         assert data["datetime_original"] is not None
         assert data["datetime_original"].day == 4
         assert data["datetime_original"].hour == 7
@@ -493,7 +493,7 @@ class TestGetAllTimestampData:
 
         data = fmt.get_all_timestamp_data(video, timezone_spec="+08:00")
 
-        assert "filename" in data["timestamp_source"]
+        assert data["timestamp_source"].token == "filename"
         assert data["datetime_original"] is not None
         assert data["datetime_original"].hour == 7
         assert data["datetime_original"].minute == 25
@@ -513,7 +513,7 @@ class TestGetAllTimestampData:
             infer_from_filename=True
         )
 
-        assert data["timestamp_source"] == "filename (infer mode)"
+        assert data["timestamp_source"] is TimestampSource.FILENAME_INFERRED
         assert data["datetime_original"].hour == 6  # From filename, not 9 from EXIF
         assert data["datetime_original"].minute == 38
         assert data["datetime_original"].second == 9
@@ -542,7 +542,7 @@ class TestGetAllTimestampData:
 
         data = fmt.get_all_timestamp_data(video, timezone_spec="+08:00")
 
-        assert data["timestamp_source"] == "DateTimeOriginal"
+        assert data["timestamp_source"] is TimestampSource.DATETIME_ORIGINAL
         assert data["datetime_original"] is not None
         assert data["datetime_original"].utcoffset() == timedelta(hours=8)
         assert "--timezone flag" in data["timezone_source"]
@@ -555,7 +555,7 @@ class TestGetAllTimestampData:
 
         data = fmt.get_all_timestamp_data(video, timezone_spec="+02:00")
 
-        assert data["timestamp_source"] == "DateTimeOriginal with timezone"
+        assert data["timestamp_source"] is TimestampSource.DATETIME_ORIGINAL_ZONED
         converted = data["datetime_original"]
         assert converted is not None
         assert converted.utcoffset() == timedelta(hours=2)
