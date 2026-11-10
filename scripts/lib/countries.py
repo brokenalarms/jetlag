@@ -1,15 +1,17 @@
-"""Country → timezone lookup, from the CSV tables in lib/timezones/."""
+"""Country → timezone lookup, from the CSV tables in lib/data/timezones/."""
 
 from __future__ import annotations
 
 import os
 from typing import Optional
 
-TIMEZONE_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "timezones")
+from lib import DATA_DIR
+
+TIMEZONE_DATA_DIR = str(DATA_DIR / "timezones")
 
 
 def get_timezone_for_country(input_country: str) -> Optional[str]:
-    """The +HH:MM offset for a country code or name, from lib/timezones/*.csv.
+    """The +HH:MM offset for a country code or name, from lib/data/timezones/*.csv.
 
     Returns None when the country or its zone cannot be found.
     """

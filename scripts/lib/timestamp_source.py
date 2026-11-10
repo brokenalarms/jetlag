@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from lib import DATA_DIR
 from lib.exiftool import exiftool
 
 # ---------------------------------------------------------------------------
@@ -281,7 +282,7 @@ def normalize_exif_value(value: str) -> str:
 # Filename timestamp parsing — generic date patterns
 # ---------------------------------------------------------------------------
 
-_PATTERNS_FILE = Path(__file__).parent / "filename-patterns.json"
+_PATTERNS_FILE = DATA_DIR / "filename-patterns.json"
 _FILENAME_PATTERNS = [
     (re.compile(p["regex"]), p["name"])
     for p in json.loads(_PATTERNS_FILE.read_text())

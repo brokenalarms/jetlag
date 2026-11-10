@@ -18,9 +18,9 @@ import os
 import re
 import subprocess
 import threading
-from pathlib import Path
+from lib import DATA_DIR
 
-EXIFTOOL_CONFIG = str(Path(__file__).parent / "exiftool-jetlag.config")
+EXIFTOOL_CONFIG = str(DATA_DIR / "exiftool-jetlag.config")
 
 
 
