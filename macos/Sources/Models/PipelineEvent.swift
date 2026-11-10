@@ -20,8 +20,9 @@ enum PipelineEvent: Decodable {
                          staleFileTimes: [String])
     case renameResult(file: String, renamedTo: String)
     case organizeResult(file: String, action: String, dest: String, reason: String?)
-    case gyroflowResult(file: String, action: String, gyroflowPath: String,
-                        error: String?)
+    /// The table has no gyroflow column, so nothing of the event is read; its
+    /// stage shows through `stage_complete`.
+    case gyroflowResult
     case pipelineResult(file: String, result: String)
     case pipelineSummary(PipelineSummary)
     case timezoneConflict(conflictType: String, providedTz: String?,
@@ -53,7 +54,6 @@ enum PipelineEvent: Decodable {
         case staleFileTimes = "stale_file_times"
         case renamedTo = "renamed_to"
         case dest, reason
-        case gyroflowPath = "gyroflow_path"
         case error, result, message
         case conflictType = "conflict_type"
         case providedTz = "provided_tz"
@@ -117,11 +117,7 @@ enum PipelineEvent: Decodable {
                 dest: try container.decode(String.self, forKey: .dest),
                 reason: try container.decodeIfPresent(String.self, forKey: .reason))
         case "gyroflow_result":
-            self = .gyroflowResult(
-                file: try container.decode(String.self, forKey: .file),
-                action: try container.decode(String.self, forKey: .action),
-                gyroflowPath: try container.decode(String.self, forKey: .gyroflowPath),
-                error: try container.decodeIfPresent(String.self, forKey: .error))
+            self = .gyroflowResult
         case "pipeline_result":
             self = .pipelineResult(
                 file: try container.decode(String.self, forKey: .file),

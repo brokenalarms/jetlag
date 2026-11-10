@@ -110,7 +110,6 @@ enum Theme {
         static let subheadline = Font.subheadline
         static let subheadlineMedium = Font.subheadline.weight(.medium)
         static let title = Font.title2.bold()
-        static let largeTitle = Font.largeTitle
         static let caption = Font.caption
         static let captionMono = Font.system(.caption, design: .monospaced)
         static let hero = Font.system(size: 28)
