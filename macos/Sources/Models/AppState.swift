@@ -392,13 +392,21 @@ final class AppState {
         let (process, stream) = launcher.run(script: script, args: args)
         currentProcess = process
 
+        // The drain runs off the main actor, so a line can be on its way to it when
+        // Cancel is pressed there: cancellation is checked again once on the main
+        // actor, or that line would land after the cancelled line.
         currentRunTask = Task {
             for await line in stream {
                 if Task.isCancelled { break }
-                await MainActor.run { appendLog(line) }
+                await MainActor.run {
+                    guard !Task.isCancelled else { return }
+                    appendLog(line)
+                }
             }
-            guard !Task.isCancelled else { return }
-            await MainActor.run { finishRun() }
+            await MainActor.run {
+                guard !Task.isCancelled else { return }
+                finishRun()
+            }
         }
     }
 
