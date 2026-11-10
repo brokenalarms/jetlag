@@ -22,6 +22,6 @@ Mandatory for every change to files under `web/`:
 
 1. Run screenshots before committing: `npm run screenshot --prefix web`
 2. Read and share each saved screenshot image with the user using the Read tool before committing, so they can review the rendered output
-3. Screenshots overwrite PNGs in `design/screenshots/` with fixed names so each commit shows a visual diff
+3. Screenshots overwrite PNGs in `design/screenshots/` with fixed names (`<section id>.png` for each entry in `SECTIONS`, plus `full.png`) so each commit shows a visual diff. A full run deletes any other PNG there.
 
 If the Playwright browser is missing: `npx playwright install chromium` inside `web/`.
