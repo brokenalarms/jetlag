@@ -561,6 +561,46 @@ final class ProfileTests: XCTestCase {
         XCTAssertNotNil(state.activeProfile)
     }
 
+    /// Every visit to the Workflow tab used to rebuild its session from the
+    /// profile, dropping the timezone the user had chosen. Only picking another
+    /// profile starts afresh now; picking the one already selected keeps it.
+    func testReselectingTheSameProfileKeepsTheChosenTimezone() throws {
+        let state = try stateLoaded(from: fixtureYAML)
+        state.selectProfile("gopro")
+        state.workflowSession.timezone.value = "Asia/Seoul"
+
+        state.selectProfile("gopro")
+
+        XCTAssertEqual(state.workflowSession.timezone.current, "Asia/Seoul")
+    }
+
+    /// Another profile is another camera and card: its own folders, and no zone
+    /// carried over from the last one.
+    func testSelectingAnotherProfileStartsAFreshSession() throws {
+        let state = try stateLoaded(from: fixtureYAML)
+        state.selectProfile("gopro")
+        state.workflowSession.timezone.value = "Asia/Seoul"
+
+        state.selectProfile("sony")
+
+        XCTAssertEqual(state.workflowSession.profileName, "sony")
+        XCTAssertEqual(state.workflowSession.sourceDir.current, "/Volumes/SonyCard/DCIM")
+        XCTAssertEqual(state.workflowSession.timezone.current, "")
+    }
+
+    /// The workflow runs the profile as saved: editing the selected profile
+    /// rebuilds its session from the saved values.
+    func testSavingTheSelectedProfileRebuildsTheWorkflow() throws {
+        let state = try stateLoaded(from: fixtureYAML)
+        state.selectProfile("gopro")
+        var edited = try XCTUnwrap(state.profile(named: "gopro"))
+        edited.readyDir = "/tmp/new-ready"
+
+        try state.saveProfile(edited, as: "gopro", replacing: "gopro")
+
+        XCTAssertEqual(state.workflowSession.readyDir.current, "/tmp/new-ready")
+    }
+
     // MARK: - Save and Cancel visibility
 
     /// Save and Cancel used to show on every profile, edited or not, so clicking Save

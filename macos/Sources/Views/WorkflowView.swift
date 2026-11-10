@@ -49,16 +49,6 @@ struct WorkflowView: View {
                 executionBar
             }
         }
-        .onAppear {
-            let name = state.workflowSession.profileName
-            if !name.isEmpty {
-                state.workflowSession = WorkflowSession(
-                    profile: state.profile(named: name),
-                    profileName: name,
-                    gyroflowAvailable: state.gyroflowStatus.isInstalled
-                )
-            }
-        }
         .frame(width: Self.formWidth)
         .navigationTitle(Strings.Nav.workflow)
         .toolbar {
@@ -240,8 +230,7 @@ struct WorkflowView: View {
     // MARK: - Profile selection
 
     private var profileSelector: some View {
-        @Bindable var session = state.workflowSession
-        return VStack(alignment: .leading, spacing: Theme.Space.xl) {
+        VStack(alignment: .leading, spacing: Theme.Space.xl) {
             if let error = state.profileLoadError {
                 VStack(alignment: .leading, spacing: Theme.Space.md) {
                     Label(error.message, systemImage: "exclamationmark.triangle.fill")
@@ -267,15 +256,11 @@ struct WorkflowView: View {
 
             HStack(spacing: Theme.Space.lg) {
                 Text(Strings.Workflow.profileLabel)
-                ProfilePicker(selection: $session.profileName, state: state)
-                    .onChange(of: session.profileName) { _, newValue in
-                        state.clearLog()
-                        state.workflowSession = WorkflowSession(
-                            profile: state.profile(named: newValue),
-                            profileName: newValue,
-                            gyroflowAvailable: state.gyroflowStatus.isInstalled
-                        )
-                    }
+                ProfilePicker(
+                    selection: Binding(
+                        get: { state.workflowSession.profileName },
+                        set: { state.selectProfile($0) }),
+                    state: state)
             }
         }
     }

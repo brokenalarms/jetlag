@@ -121,8 +121,15 @@ final class AppState {
             return
         }
         do {
+            let selected = workflowSession.profileName
+            let previous = profile(named: selected)
             profilesConfig = try ProfileService.load(from: profilesLocation.path)
             profileLoadError = nil
+            // A workflow whose profile was changed or removed in the file follows
+            // it; one whose profile is as it was keeps every choice made for it.
+            if !selected.isEmpty, profile(named: selected) != previous {
+                startSession(with: profile(named: selected) == nil ? "" : selected)
+            }
         } catch {
             profilesConfig = nil
             profileLoadError = error
@@ -168,18 +175,39 @@ final class AppState {
         guard var config = profilesConfig else { return }
         try config.save(profile, as: name, replacing: storedName)
         profilesConfig = config
-        if let storedName, storedName != name, workflowSession.profileName == storedName {
-            workflowSession.profileName = name
-        }
         writeProfiles()
+        // The workflow runs the profile as it is now saved, under its new name.
+        if let storedName, workflowSession.profileName == storedName {
+            startSession(with: name)
+        }
     }
 
     func deleteProfile(named name: String) {
         profilesConfig?.remove(named: name)
         writeProfiles()
         if workflowSession.profileName == name {
-            workflowSession = WorkflowSession(gyroflowAvailable: gyroflowStatus.isInstalled)
+            startSession(with: "")
         }
+    }
+
+    /// Make `name` the workflow's profile. A different profile starts a fresh
+    /// session from it — its folders, tags and steps — and clears the last run's
+    /// log and table. Choosing the profile already selected changes nothing, so
+    /// returning to the workflow keeps every choice made for it, the timezone
+    /// included.
+    func selectProfile(_ name: String) {
+        guard name != workflowSession.profileName else { return }
+        startSession(with: name)
+    }
+
+    /// A fresh session for `name` as it is stored now; an empty name is none.
+    private func startSession(with name: String) {
+        clearLog()
+        workflowSession = WorkflowSession(
+            profile: profile(named: name),
+            profileName: name,
+            gyroflowAvailable: gyroflowStatus.isInstalled
+        )
     }
 
     func writeProfiles() {
