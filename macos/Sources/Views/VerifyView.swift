@@ -64,12 +64,17 @@ struct VerifyView: View {
                 ToggleRow(title: Strings.Verify.includeCompanions,
                           caption: Strings.Verify.includeCompanionsCaption,
                           isOn: session.includeCompanions)
-                ToggleRow(title: Strings.Verify.verifyHashes,
-                          caption: Strings.Verify.verifyHashesCaption,
-                          isOn: session.verifyHashes)
-                ToggleRow(title: Strings.Verify.includeNetwork,
-                          isOn: session.includeNetwork,
-                          isEnabled: state.verifySession.verifyHashes)
+                // Network locations are only ever hashed as part of a hash check, so
+                // their toggle sits indented inside that row, dimmed until it is on.
+                VStack(alignment: .leading, spacing: Theme.Space.xl) {
+                    ToggleRow(title: Strings.Verify.verifyHashes,
+                              caption: Strings.Verify.verifyHashesCaption,
+                              isOn: session.verifyHashes)
+                    ToggleRow(title: Strings.Verify.includeNetwork,
+                              isOn: session.includeNetwork,
+                              isEnabled: state.verifySession.verifyHashes)
+                        .padding(.leading, Theme.Space.section)
+                }
                 ToggleRow(title: Strings.Verify.showMatched, isOn: session.showMatched)
             }
 
