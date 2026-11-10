@@ -70,24 +70,16 @@ final class AppState {
     /// cancel this too: the pipeline can be far ahead of the UI, and terminating the
     /// process alone leaves every buffered line still to be appended.
     var currentRunTask: Task<Void, Never>?
-    var diffTableRows: [DiffTableRow] = []
-    /// What the last run reported when it reached the end of the batch. A
-    /// cancelled run never produces one: the pipeline is killed before it reports.
-    private(set) var runSummary: PipelineSummary?
-    /// Set when the last run found nothing to process, so the inspector can say
-    /// where it looked instead of showing the never-run placeholder.
-    private(set) var emptySource: EmptySource?
+    /// The last run's events, folded into the table's rows and its summary.
+    var transcript = RunTranscript()
     var showRunSummary: Bool = false
-    private(set) var currentDiffRow: DiffTableRow?
-    private(set) var liveRow: DiffTableRow?
 
+    var diffTableRows: [DiffTableRow] { transcript.rows }
+    var liveRow: DiffTableRow? { transcript.liveRow }
+    var runSummary: PipelineSummary? { transcript.summary }
+    var emptySource: EmptySource? { transcript.emptySource }
     /// All completed rows plus the in-progress file for live table display
-    var visibleRows: [DiffTableRow] {
-        if let live = liveRow {
-            return diffTableRows + [live]
-        }
-        return diffTableRows
-    }
+    var visibleRows: [DiffTableRow] { transcript.visibleRows }
 
     /// The most recent line of pipeline progress, for the stretch between starting
     /// a run and the first file appearing in the table.
@@ -205,93 +197,30 @@ final class AppState {
 
     func clearLog() {
         logOutput = []
-        diffTableRows = []
-        currentDiffRow = nil
-        liveRow = nil
-        runSummary = nil
-        emptySource = nil
+        transcript = RunTranscript()
         showRunSummary = false
         workflowSession.clearConflictReport()
     }
 
     func appendLog(_ line: LogLine) {
-        if line.isMachineReadable {
-            parseMachineReadableLine(line.text)
+        guard line.isMachineReadable else {
+            logOutput.append(line)
             return
         }
-        logOutput.append(line)
-    }
-
-    private func parseMachineReadableLine(_ text: String) {
-        guard let data = text.data(using: .utf8),
+        guard let data = line.text.data(using: .utf8),
               let event = try? JSONDecoder().decode(PipelineEvent.self, from: data)
         else { return }
+        if let notice = transcript.apply(event) {
+            handle(notice)
+        }
+    }
 
-        switch event {
-        case .pipelineFile(let file, let sourcePath):
-            if var row = currentDiffRow {
-                row.pipelineResult = row.pipelineResult ?? "in_progress"
-                diffTableRows.append(row)
-            }
-            var started = DiffTableRow(file: file)
-            started.sourcePath = sourcePath
-            currentDiffRow = started
-            liveRow = currentDiffRow
-
-        case .pipelineResult(_, let result):
-            if var row = currentDiffRow {
-                row.pipelineResult = result
-                diffTableRows.append(row)
-                currentDiffRow = nil
-                liveRow = nil
-            }
-
-        case .tagResult(_, let action, let tagsAdded, _, _, let fileCamera):
-            currentDiffRow?.fileCamera = fileCamera
-            currentDiffRow?.tagAction = action
-            currentDiffRow?.tagsAdded = tagsAdded.joined(separator: ", ")
-            liveRow = currentDiffRow
-
-        case .timestampResult(_, let action, let originalTime, let correctedTime,
-                              let source, let timezone, let correctionMode,
-                              _, let timeOffsetDisplay, let error,
-                              let originalEpoch, let correctedEpoch,
-                              let requiresForceTimezone, let staleFields, let staleFileTimes):
-            currentDiffRow?.timestampAction = action
-            currentDiffRow?.originalTime = originalTime
-            currentDiffRow?.correctedTime = correctedTime
-            currentDiffRow?.timestampSource = TimestampSource(token: source)
-            currentDiffRow?.timezone = timezone
-            currentDiffRow?.correctionMode = correctionMode
-            currentDiffRow?.timeOffsetDisplay = timeOffsetDisplay
-            currentDiffRow?.timestampError = error
-            currentDiffRow?.originalEpoch = originalEpoch
-            currentDiffRow?.correctedEpoch = correctedEpoch
-            currentDiffRow?.requiresForceTimezone = requiresForceTimezone
-            currentDiffRow?.staleFields = staleFields
-            currentDiffRow?.staleFileTimes = staleFileTimes
-            liveRow = currentDiffRow
-
-        case .renameResult(_, let renamedTo):
-            currentDiffRow?.renamedTo = renamedTo
-            liveRow = currentDiffRow
-
-        case .organizeResult(_, let action, let dest, let reason):
-            currentDiffRow?.organizeAction = action
-            currentDiffRow?.dest = dest
-            currentDiffRow?.organizeReason = reason
-            liveRow = currentDiffRow
-
-        case .gyroflowResult:
-            liveRow = currentDiffRow
-
-        case .stageComplete(let stage):
-            currentDiffRow?.markStageComplete(stage)
-            liveRow = currentDiffRow
-
-        case .timezoneConflict(let conflictType, let providedTz, let fileTimezones):
+    /// Act on what an event asked of the app beyond the table.
+    private func handle(_ notice: RunTranscript.Notice) {
+        switch notice {
+        case .timezoneConflict(let kind, let providedTz, let fileTimezones):
             workflowSession.noteConflict()
-            workflowSession.timezoneConflictType = conflictType
+            workflowSession.timezoneConflictType = kind
             workflowSession.timezoneConflictProvidedTz = providedTz
             workflowSession.timezoneConflictFileTimezones = fileTimezones
             // A dry run previews a provided-vs-embedded mismatch instead of
@@ -300,7 +229,7 @@ final class AppState {
             // refuses — an apply, or a mixed-zone batch in either mode — asks
             // the user to confirm.
             workflowSession.showTimezoneConflict =
-                conflictType == "mixed_timezones" || workflowSession.applyMode
+                kind == .mixedTimezones || workflowSession.applyMode
 
         case .organizeConflict(let count, let files):
             workflowSession.organizeConflictCount = count
@@ -320,13 +249,7 @@ final class AppState {
             // apply is refused, so only an apply asks.
             workflowSession.showCameraMismatch = workflowSession.applyMode
 
-        case .pipelineSummary(let summary):
-            runSummary = summary
-
-        case .noMediaFiles(let empty):
-            emptySource = empty
-
-        case .pipelineError(let message):
+        case .error(let message):
             logOutput.append(LogLine(text: "ERROR: \(message)", stream: .stderr))
         }
     }
@@ -484,7 +407,6 @@ final class AppState {
         // user" line can arrive, so that line never reaches the log. This is the app's
         // own line, not parsed from the pipeline's output.
         logOutput.append(LogLine(text: Strings.LogOutput.cancelled, stream: .stderr))
-        liveRow = nil
-        currentDiffRow = nil
+        transcript.dropLiveRow()
     }
 }

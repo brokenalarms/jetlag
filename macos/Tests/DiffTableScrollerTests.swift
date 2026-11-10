@@ -50,7 +50,7 @@ final class DiffTableScrollerTests: XCTestCase {
         let state = AppState()
         state.selectedTab = .workflow
         state.showInspector = true
-        state.diffTableRows = rows
+        state.transcript.rows = rows
         let host = NSHostingView(rootView: WorkflowDetail(state: state))
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: width, height: 800),
@@ -65,7 +65,7 @@ final class DiffTableScrollerTests: XCTestCase {
         // Each appended row must be new content: SwiftUI re-runs the auto-sizer only
         // when the computed column widths change, exactly as a live run's rows do.
         for batch in 1...2 {
-            state.diffTableRows.append(contentsOf: rows.map { row in
+            state.transcript.rows.append(contentsOf: rows.map { row in
                 var longer = DiffTableRow(file: String(repeating: "x", count: batch * 4) + row.file)
                 longer.timestampAction = row.timestampAction
                 longer.pipelineResult = row.pipelineResult
@@ -114,7 +114,7 @@ final class DiffTableScrollerTests: XCTestCase {
         let state = AppState()
         state.selectedTab = .workflow
         state.showInspector = true
-        state.diffTableRows = narrowRows(rowCount)
+        state.transcript.rows = narrowRows(rowCount)
         let host = NSHostingView(rootView: WorkflowDetail(state: state))
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
@@ -139,7 +139,7 @@ final class DiffTableScrollerTests: XCTestCase {
     }
 
     private func append(_ count: Int, to state: AppState, host: NSHostingView<WorkflowDetail>) {
-        state.diffTableRows.append(contentsOf: narrowRows(count, from: state.diffTableRows.count))
+        state.transcript.rows.append(contentsOf: narrowRows(count, from: state.diffTableRows.count))
         settle(host)
     }
 

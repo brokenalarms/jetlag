@@ -25,7 +25,7 @@ enum PipelineEvent: Decodable {
     case gyroflowResult
     case pipelineResult(file: String, result: String)
     case pipelineSummary(PipelineSummary)
-    case timezoneConflict(conflictType: String, providedTz: String?,
+    case timezoneConflict(conflictType: TimezoneConflictKind, providedTz: String?,
                           fileTimezones: [String: [String]])
     case organizeConflict(count: Int, files: [String])
     case protectedSources(files: [String])
@@ -137,8 +137,14 @@ enum PipelineEvent: Decodable {
                 failedFiles: try container.decode([String].self, forKey: .failedFiles),
                 mode: mode))
         case "timezone_conflict":
+            let kindToken = try container.decode(String.self, forKey: .conflictType)
+            guard let kind = TimezoneConflictKind(rawValue: kindToken) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .conflictType, in: container,
+                    debugDescription: "Unknown timezone_conflict conflict_type: \(kindToken)")
+            }
             self = .timezoneConflict(
-                conflictType: try container.decode(String.self, forKey: .conflictType),
+                conflictType: kind,
                 providedTz: try container.decodeIfPresent(String.self, forKey: .providedTz),
                 fileTimezones: try container.decode([String: [String]].self, forKey: .fileTimezones))
         case "organize_conflict":
@@ -169,4 +175,14 @@ enum PipelineEvent: Decodable {
                 debugDescription: "Unknown event type: \(event)")
         }
     }
+}
+
+/// The `timezone_conflict.conflict_type` tokens: what the pipeline refused on.
+enum TimezoneConflictKind: String, CaseIterable {
+    /// The batch spans several zones; refused in both modes until
+    /// `--allow-mixed-timezones`.
+    case mixedTimezones = "mixed_timezones"
+    /// The declared zone differs from the one files carry; an apply refuses
+    /// until `--force-timezone`.
+    case providedMismatch = "provided_mismatch"
 }

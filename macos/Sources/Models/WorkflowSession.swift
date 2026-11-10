@@ -35,7 +35,7 @@ final class WorkflowSession {
     var forceTimezone: Bool = false
     var allowMixedTimezones: Bool = false
 
-    var timezoneConflictType: String?
+    var timezoneConflictType: TimezoneConflictKind?
     var timezoneConflictProvidedTz: String?
     var timezoneConflictFileTimezones: [String: [String]]?
     var showTimezoneConflict: Bool = false
@@ -140,7 +140,7 @@ final class WorkflowSession {
     /// Record the user's answer to the conflict the pipeline just refused on,
     /// so the next run carries the override flag that unblocks it.
     func grantTimezoneAssent() {
-        if timezoneConflictType == "mixed_timezones" {
+        if timezoneConflictType == .mixedTimezones {
             allowMixedTimezones = true
         } else {
             forceTimezone = true

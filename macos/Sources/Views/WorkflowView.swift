@@ -225,7 +225,7 @@ struct WorkflowView: View {
         guard let fileTimezones = session.timezoneConflictFileTimezones else {
             return ""
         }
-        if session.timezoneConflictType == "mixed_timezones" {
+        if session.timezoneConflictType == .mixedTimezones {
             let groups = fileTimezones.map { tz, files in
                 "\(tz): \(files.count) file\(files.count == 1 ? "" : "s")"
             }.sorted().joined(separator: "\n")
