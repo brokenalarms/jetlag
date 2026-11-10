@@ -1386,6 +1386,50 @@ class TestAddingMissingFieldsIsNotAFix:
         assert result.timestamp_action == "would_fix"
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="birth time is only corrected on macOS")
+class TestBirthTimeIsNeverClampedToModificationTime:
+    """macOS never lets a birth time stand later than the modification time: setting
+    the modification time pulls the birth time back to it. Restoring the old
+    modification time after the write (exiftool's -P) therefore clamped any birth
+    time later than it, so footage shot west of the Mac's zone lost its correction.
+    The modification time is left to be the write's own: a birth time is the
+    shooting instant, which the write always comes after.
+    """
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        clear_exif_cache()
+        self.video = os.path.join(self.temp_dir, "C0001.MP4")
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+
+    def _create_shot_at(self, shot_utc: datetime) -> str:
+        stamp = shot_utc.strftime("%Y:%m:%d %H:%M:%S")
+        create_test_video(self.video, **{"QuickTime:CreateDate": stamp,
+                                         "QuickTime:MediaCreateDate": stamp,
+                                         "QuickTime:TrackCreateDate": stamp})
+        clear_exif_cache()
+        return get_expected_file_system_time(shot_utc)
+
+    def _assert_birth_kept(self, expected_birth: str) -> None:
+        times = get_file_system_timestamps(self.video)
+        assert times["birth"] == expected_birth, \
+            f"Actual: birth {times['birth']}, Expected: {expected_birth}"
+        assert times["modify"] >= times["birth"], \
+            f"Actual: modified {times['modify']} before birth {times['birth']}, Expected: modified no earlier"
+
+    def test_birth_time_later_than_the_modification_time_is_kept(self):
+        shot = datetime(2025, 6, 17, 23, 25, 21, tzinfo=timezone.utc)
+        expected_birth = self._create_shot_at(shot)
+        earlier = (shot - timedelta(hours=1)).timestamp()
+        os.utime(self.video, (earlier, earlier))
+
+        fix_media_timestamp.fix_media_timestamps(self.video, timezone_spec="+08:00")
+
+        self._assert_birth_kept(expected_birth)
+
+
 class TestStaleFileTimesNamesFileTimeWrites:
     """A sidecar whose metadata needs nothing but whose birth time is wrong is a
     "would fix" with an empty stale_fields. stale_file_times names the file system
