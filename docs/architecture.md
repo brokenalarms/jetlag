@@ -121,11 +121,5 @@ Direct distribution only via notarized DMG. No App Store version — the depende
 
 ## Testing
 
-Tests live in `scripts/tests/`.
-
-- **Regression tests** — assert actual file state before and after, not just exit codes or stdout. Structured as "record before → run script → compare after" with human-readable expected vs actual diffs.
-- **Performance tests** — see `docs/testing.md`'s "Performance tests" entry.
-
-Testing rules:
-- Testing `returncode == 0` is not testing behavior — it only confirms the script didn't crash.
-- Tests should not be updated without explicit confirmation unless following TDD (break test first, confirm expected failure, then update).
+Tests live in a `tests/` folder in each project (`scripts/tests/`, `macos/Tests/`).
+Testing rules and the cost contracts are in `docs/testing.md`; per-platform commands are in `docs/environment.md`.
