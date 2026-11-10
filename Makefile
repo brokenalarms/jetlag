@@ -109,7 +109,7 @@ test-macos: generate
 ## Lint and type-check the scripts
 lint: $(VENV_STAMP)
 	scripts/.venv/bin/ruff check scripts
-	scripts/.venv/bin/pyrefly check
+	scripts/.venv/bin/pyrefly check --python-interpreter-path scripts/.venv/bin/python3
 
 ## Test and build the marketing site
 test-web:
