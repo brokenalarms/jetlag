@@ -45,6 +45,11 @@ struct RowOutcome {
         case userChoice = "user_choice"
     }
 
+    /// The `timestamp_result.reason` tokens: why a correction was refused.
+    enum RefusalReason: String, CaseIterable {
+        case birthTimeInFuture = "birth_time_in_future"
+    }
+
     /// The `pipeline_result.result` tokens: the pipeline's verdict on the file.
     enum FileResult: String, CaseIterable {
         case changed
@@ -137,6 +142,15 @@ extension RowOutcome.Movement {
             if dryRun, reason == .existsDiffers { return Strings.DiffTable.wouldReplaceStatusAfterFix }
             return Strings.DiffTable.moveSkippedStatusAfterFix
         case .error: return Strings.DiffTable.moveFailedStatusAfterFix
+        }
+    }
+}
+
+extension RowOutcome.RefusalReason {
+    /// What the row's change cell says in place of a bare "Error".
+    var label: String {
+        switch self {
+        case .birthTimeInFuture: return Strings.DiffTable.birthTimeInFutureChange
         }
     }
 }

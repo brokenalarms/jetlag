@@ -270,7 +270,7 @@ struct DiffTableView: View {
         case .wouldAdd: return Strings.DiffTable.wouldAddChange
         case .added: return Strings.DiffTable.addedChange
         case .noChange: return Strings.DiffTable.noChangeChange
-        case .error: return row.timestampError ?? Strings.DiffTable.errorChange
+        case .error: return row.refusalReason?.label ?? row.timestampError ?? Strings.DiffTable.errorChange
         case nil: return "—"
         }
     }

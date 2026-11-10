@@ -12,7 +12,7 @@ from typing import Any, Dict, Optional
 
 from lib.fix_media_timestamp.clock_fields import is_quicktime_container, needed_changes, stored_zone
 from lib.fix_media_timestamp.read import CorrectionOptions, CurrentTimestamps
-from lib.timestamps.file_times import birth_time_needs_update, get_expected_file_system_time
+from lib.timestamps.file_times import birth_time_in_future, birth_time_needs_update, get_expected_file_system_time
 from lib.timestamps.provenance import provenance_field_args
 from lib.timestamps.sources import MOVIE_HEADER_CREATE_DATE_TAG, TimestampSource, normalize_timezone_format
 
@@ -35,6 +35,7 @@ class TimestampFixResult:
     stale_fields: list = dataclass_field(default_factory=list)
     stale_file_times: list = dataclass_field(default_factory=list)
     error: Optional[str] = None
+    reason: Optional[str] = None
 
 
 def machine_original_time(current_data: dict) -> str:
@@ -97,6 +98,7 @@ def format_offset_display(seconds: int) -> str:
 REFUSED_WITHOUT_FORCE = "refused_without_force"  # applying would relabel a zoned file unconfirmed
 ZONE_NEEDED = "zone_needed"                      # a CreateDate, no DateTimeOriginal, no --timezone
 NO_TIMESTAMP = "no_timestamp"                    # nothing to correct from
+BIRTH_TIME_IN_FUTURE = "birth_time_in_future"    # the corrected birth time is later than now
 
 
 @dataclass(frozen=True)
@@ -150,7 +152,8 @@ class CorrectionPlan:
                 and (self.has_changes or bool(self.opts.extra_write_fields)
                      or (self.opts.record_provenance and bool(self.provenance_args))))
 
-    def result(self, action: str, error: Optional[str] = None) -> TimestampFixResult:
+    def result(self, action: str, error: Optional[str] = None,
+               reason: Optional[str] = None) -> TimestampFixResult:
         """The machine-readable result of this plan ending in action."""
         data = self.current.data
         offset = self.opts.time_offset_seconds if self.opts.moves_time else None
@@ -159,8 +162,8 @@ class CorrectionPlan:
             timestamp_action=action,
             original_time=machine_original_time(data),
             corrected_time=self.corrected_str,
-            stale_fields=self.changes["stale_clock_fields"],
-            stale_file_times=["FileCreateDate"] if self.changes["file_timestamps"] else [],
+            stale_fields=self.changes.get("stale_clock_fields", []),
+            stale_file_times=["FileCreateDate"] if self.changes.get("file_timestamps") else [],
             timestamp_source=data["timestamp_source"].token,
             correction_mode=self.correction_mode,
             timezone=self.current.detected_tz,
@@ -171,6 +174,7 @@ class CorrectionPlan:
             requires_force_timezone=self.requires_force_timezone or None,
             camera_zone_offset=data.get("camera_zone_offset"),
             error=error,
+            reason=reason,
         )
 
 
@@ -231,6 +235,11 @@ def plan_correction(current: CurrentTimestamps, opts: CorrectionOptions) -> Corr
     changes = needed_changes(exif, corrected, birth_time_stale, write_datetime_original, write_zone)
 
     expected_birth = get_expected_file_system_time(corrected, preserve_wallclock=opts.preserve_wallclock)
+    if current.birth_time_tracked and birth_time_in_future(expected_birth, current.read_at):
+        return CorrectionPlan(current, opts, requires_force_timezone=requires_force_timezone,
+                              problem=BIRTH_TIME_IN_FUTURE, original=original, corrected=corrected,
+                              corrected_str=corrected_str,
+                              birth_time={"expected_time": expected_birth})
     birth_time: Optional[Dict[str, Any]] = None
     if changes["file_timestamps"]:
         birth_time = {"expected_time": expected_birth, "current_birth": current_birth,

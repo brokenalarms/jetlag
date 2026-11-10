@@ -227,6 +227,7 @@ class FixTimestampStage(Stage):
             stale_fields=ts_result.stale_fields,
             stale_file_times=ts_result.stale_file_times,
             error=ts_result.error,
+            reason=ts_result.reason,
         )
 
         if ts_result.timestamp_action == "error":

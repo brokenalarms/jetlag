@@ -6,7 +6,7 @@ import sys
 
 from lib.exiftool import MetadataWriteRefused, exiftool
 from lib.fix_media_timestamp.plan import (
-    NO_TIMESTAMP, REFUSED_WITHOUT_FORCE, ZONE_NEEDED, CorrectionPlan, TimestampFixResult,
+    BIRTH_TIME_IN_FUTURE, NO_TIMESTAMP, REFUSED_WITHOUT_FORCE, ZONE_NEEDED, CorrectionPlan, TimestampFixResult,
     machine_original_time,
 )
 
@@ -32,6 +32,8 @@ def apply_correction(plan: CorrectionPlan) -> TimestampFixResult:
     if plan.problem == NO_TIMESTAMP:
         return TimestampFixResult(file=plan.filename, timestamp_action="error",
                                   timezone=plan.current.detected_tz)
+    if plan.problem == BIRTH_TIME_IN_FUTURE:
+        return plan.result("error", reason=BIRTH_TIME_IN_FUTURE)
 
     if not plan.opts.apply:
         if plan.has_changes:

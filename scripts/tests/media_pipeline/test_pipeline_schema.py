@@ -18,6 +18,7 @@ import pytest
 
 from helpers.media import create_test_video
 from helpers.pipeline_schema import enum_tokens, load_cli, load_schema, validate_event, validate_events
+from lib.fix_media_timestamp import BIRTH_TIME_IN_FUTURE
 from helpers.pipeline import pipeline_parser, run_pipeline
 
 
@@ -43,6 +44,11 @@ class TestSchemaIsSelfConsistent:
         """The skip reason is data with a closed token set, not free-form prose."""
         assert set(enum_tokens("organize_result", "reason")) == \
             {"identical", "exists_differs", "user_choice"}
+
+    def test_timestamp_refusal_reasons_are_the_plan_problems_it_reports(self):
+        """A refused correction names its reason from a closed token set the app maps
+        to text; the free-form error field stays for exiftool's own messages."""
+        assert enum_tokens("timestamp_result", "reason") == [BIRTH_TIME_IN_FUTURE]
 
 
 class TestCommandLineMatchesSchema:

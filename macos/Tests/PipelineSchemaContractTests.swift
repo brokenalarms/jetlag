@@ -156,6 +156,22 @@ final class PipelineSchemaContractTests: XCTestCase {
                        "RowOutcome.SkipReason and organize_result.reason have drifted apart")
     }
 
+    /// A refused correction's row shows why in place of a bare "Error", so every
+    /// reason the schema declares needs a label here.
+    func testEveryTimestampReasonTokenHasALabel() throws {
+        let declared = try tokens(schema(), event: "timestamp_result", field: "reason")
+
+        for token in declared {
+            let reason = RowOutcome.RefusalReason(rawValue: token)
+            XCTAssertNotNil(reason, "timestamp_result.reason '\(token)' has no case in RowOutcome.RefusalReason")
+            XCTAssertFalse(reason?.label.isEmpty ?? true,
+                           "timestamp_result.reason '\(token)' has no label")
+        }
+
+        XCTAssertEqual(Set(RowOutcome.RefusalReason.allCases.map(\.rawValue)), declared,
+                       "RowOutcome.RefusalReason and timestamp_result.reason have drifted apart")
+    }
+
     func testEveryTimestampActionTokenIsAKnownCorrection() throws {
         let declared = try tokens(schema(), event: "timestamp_result", field: "action")
 

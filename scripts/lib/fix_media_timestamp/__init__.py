@@ -20,13 +20,14 @@ from typing import Dict, Optional
 from lib.fix_media_timestamp.apply import apply_correction
 from lib.fix_media_timestamp.describe import describe_correction
 from lib.fix_media_timestamp.plan import (
-    NO_TIMESTAMP, REFUSED_WITHOUT_FORCE, ZONE_NEEDED, CorrectionPlan, TimestampFixResult,
-    plan_correction,
+    BIRTH_TIME_IN_FUTURE, NO_TIMESTAMP, REFUSED_WITHOUT_FORCE, ZONE_NEEDED, CorrectionPlan,
+    TimestampFixResult, plan_correction,
 )
 from lib.fix_media_timestamp.read import CorrectionOptions, CurrentTimestamps, read_current
 
 __all__ = [
-    "NO_TIMESTAMP", "REFUSED_WITHOUT_FORCE", "ZONE_NEEDED", "CorrectionOptions", "CorrectionPlan",
+    "BIRTH_TIME_IN_FUTURE", "NO_TIMESTAMP", "REFUSED_WITHOUT_FORCE", "ZONE_NEEDED",
+    "CorrectionOptions", "CorrectionPlan",
     "CurrentTimestamps", "TimestampFixResult", "apply_correction", "describe_correction",
     "fix_media_timestamps", "plan_correction", "read_current",
 ]

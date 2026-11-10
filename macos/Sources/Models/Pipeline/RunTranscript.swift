@@ -64,7 +64,7 @@ struct RunTranscript {
 
         case .timestampResult(_, let action, let originalTime, let correctedTime,
                               let source, let timezone, let correctionMode,
-                              _, let timeOffsetDisplay, let error,
+                              _, let timeOffsetDisplay, let error, let reason,
                               let originalEpoch, let correctedEpoch,
                               let requiresForceTimezone, let staleFields, let staleFileTimes):
             liveRow?.timestampAction = action
@@ -75,6 +75,7 @@ struct RunTranscript {
             liveRow?.correctionMode = correctionMode
             liveRow?.timeOffsetDisplay = timeOffsetDisplay
             liveRow?.timestampError = error
+            liveRow?.refusalReason = reason.flatMap(RowOutcome.RefusalReason.init(rawValue:))
             liveRow?.originalEpoch = originalEpoch
             liveRow?.correctedEpoch = correctedEpoch
             liveRow?.requiresForceTimezone = requiresForceTimezone

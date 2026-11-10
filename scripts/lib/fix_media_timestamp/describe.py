@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from lib.fix_media_timestamp.clock_fields import CLOCK_FIELDS
-from lib.fix_media_timestamp.plan import NO_TIMESTAMP, REFUSED_WITHOUT_FORCE, ZONE_NEEDED, CorrectionPlan
+from lib.fix_media_timestamp.plan import BIRTH_TIME_IN_FUTURE, NO_TIMESTAMP, REFUSED_WITHOUT_FORCE, ZONE_NEEDED, CorrectionPlan
 from lib.fix_media_timestamp.read import FIELD_LABELS
 from lib.timestamps.sources import MOVIE_HEADER_CREATE_DATE_TAG, TimestampSource, parse_filename_timestamp
 
@@ -228,6 +228,12 @@ def describe_correction(plan: CorrectionPlan) -> str:
     lines.append(f"📅 Original : {format_original_timestamps(data)}")
     lines.append(f"⏱️ Corrected: {format_corrected_timestamp(corrected, data['timestamp_source'], data.get('timezone_source', ''))}")
     lines.append(f"🌐 UTC      : {corrected.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    if plan.problem == BIRTH_TIME_IN_FUTURE:
+        assert plan.birth_time is not None
+        expected = format_exif_timestamp_display(plan.birth_time["expected_time"])
+        lines.append(f"❌ Birth time would be {expected}, later than now: refusing to write it.")
+        lines.append("   Check --time-offset or --preserve-wallclock.")
+        return "\n".join(lines)
 
     change_desc = format_change_description(plan.changes, plan.birth_time, data,
                                             plan.opts.preserve_wallclock, corrected)

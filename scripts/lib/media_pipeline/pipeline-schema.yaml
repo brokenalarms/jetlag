@@ -97,6 +97,15 @@ events:
       stale_fields: { type: "list[string]", optional: true }
       stale_file_times: { type: "list[string]", optional: true }
       error: { type: string, optional: true }
+      reason:
+        type: string
+        optional: true
+        enum: [birth_time_in_future]
+        description: >-
+          Why an error result refused the correction. birth_time_in_future: the
+          corrected birth time is later than now (only --time-offset or
+          --preserve-wallclock move it there), and the write's own modification time
+          would stand before it, so nothing is written.
     example:
       event: timestamp_result
       file: DJI_20250815_101112_0001.MP4
