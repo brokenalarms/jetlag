@@ -6,7 +6,7 @@ Work happens in one of two places. Check which one you are in (`uname`) before r
 
 The full toolchain: Xcode, Homebrew, `bd`.
 
-- `make test` runs the script tests and then the Swift tests (`test-macos` is added only when `uname` is `Darwin`).
+- `make test` runs the script, web and design tests, then the Swift tests (`test-macos` is added only when `uname` is `Darwin`). The web tests need Node and npm. `make lint` runs ruff and pyrefly; `make check` runs lint and then test.
 - `make test-macos`, `make build`, `make` and `make dmg` all run `xcodegen generate` first, so they need `brew install xcodegen`.
 - `make test-scripts` bootstraps `scripts/.venv` on first run and re-installs whenever a requirements file changes.
 - `tag` and `exiftool` are vendored in `scripts/tools/`; `SetFile` comes from the Xcode command-line tools (`xcode-select --install`).
@@ -39,4 +39,4 @@ Scripts and the web site only. Sessions usually run as root.
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pull requests on Ubuntu, not as root: it installs `ffmpeg` and `exiftool` with apt and runs `pytest scripts/tests/ -x`. It does not run the Swift tests.
+`.github/workflows/ci.yml` runs on pull requests on Ubuntu, not as root: the `test` job installs `ffmpeg` and `exiftool` with apt, then runs `make test-scripts` and `make lint`; the `web-design` job runs `make test-web` and `make test-design`. It does not build or test the macOS app.
