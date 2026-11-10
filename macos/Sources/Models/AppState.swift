@@ -911,13 +911,7 @@ final class AppState {
     /// Create the profile for a camera found in the source chosen for it. Its
     /// camera, kind of media and file types come from that source's files.
     func createProfile(for found: SourceContents.NewCamera) -> String {
-        let base = found.kind.defaultProfileName
-        var name = base
-        var counter = 2
-        while profilesConfig?.profiles[name] != nil {
-            name = "\(base) \(counter)"
-            counter += 1
-        }
+        let name = uniqueProfileName(found.kind.defaultProfileName)
         var profile = MediaProfile(type: found.kind.type)
         profile.exif = ExifConfig(make: found.kind.camera.make, model: found.kind.camera.model)
         profile.fileExtensions = found.extensions
@@ -928,6 +922,33 @@ final class AppState {
         profilesConfig?.profiles[name] = profile
         writeProfiles()
         return name
+    }
+
+    /// A name no profile has yet, for a profile about to be created or copied.
+    func uniqueProfileName(_ base: String) -> String {
+        profilesConfig?.uniqueName(base) ?? base
+    }
+
+    /// Save an edited profile under `name` and write the file. `storedName` is
+    /// the name it is stored under now, nil for a new one; a workflow that has
+    /// the profile selected follows a rename. Throws `ProfileNameError` when
+    /// another profile already has `name`, and nothing is written.
+    func saveProfile(_ profile: MediaProfile, as name: String, replacing storedName: String?) throws {
+        guard var config = profilesConfig else { return }
+        try config.save(profile, as: name, replacing: storedName)
+        profilesConfig = config
+        if let storedName, storedName != name, workflowSession.profileName == storedName {
+            workflowSession.profileName = name
+        }
+        writeProfiles()
+    }
+
+    func deleteProfile(named name: String) {
+        profilesConfig?.remove(named: name)
+        writeProfiles()
+        if workflowSession.profileName == name {
+            workflowSession = WorkflowSession(gyroflowAvailable: gyroflowStatus.isInstalled)
+        }
     }
 
     func writeProfiles() {

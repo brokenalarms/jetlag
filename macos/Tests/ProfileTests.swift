@@ -210,7 +210,7 @@ final class ProfileTests: XCTestCase {
         XCTAssertEqual(edited.gyroflowSettings?.maxZoom, 105.0)
         edited.readyDir = "/tmp/new-ready"
         var saved = config
-        saved.profiles["gopro"] = config.storable(edited, replacing: config.profiles["gopro"])
+        try saved.save(edited, as: "gopro", replacing: "gopro")
         try ProfileService.write(saved, to: path)
 
         let written = try XCTUnwrap(try Yams.compose(yaml: String(contentsOfFile: path, encoding: .utf8)))
@@ -229,8 +229,8 @@ final class ProfileTests: XCTestCase {
 
     /// A stabilization value the user changed is the profile's own and is stored;
     /// the ones left at the preset's still follow the preset.
-    func testStorableKeepsOnlyTheStabilizationValuesTheUserChanged() throws {
-        let config = ProfilesConfig(
+    func testSaveKeepsOnlyTheStabilizationValuesTheUserChanged() throws {
+        var config = ProfilesConfig(
             gyroflow: GyroflowConfig(
                 binary: nil,
                 preset: GyroflowPreset(stabilization: StabilizationSettings(
@@ -240,9 +240,9 @@ final class ProfileTests: XCTestCase {
         var edited = try XCTUnwrap(config.profile(named: "gopro"))
         edited.gyroflowSettings?.maxZoom = 120.0
 
-        let stored = config.storable(edited, replacing: config.profiles["gopro"])
+        try config.save(edited, as: "gopro", replacing: "gopro")
 
-        XCTAssertEqual(stored.gyroflowSettings, StabilizationSettings(maxZoom: 120.0))
+        XCTAssertEqual(config.profiles["gopro"]?.gyroflowSettings, StabilizationSettings(maxZoom: 120.0))
     }
 
     // MARK: - CRUD operations
@@ -300,23 +300,65 @@ final class ProfileTests: XCTestCase {
         XCTAssertNotNil(reloaded.profiles["sony"])
     }
 
+    /// An app state reading `yaml` as its profiles file, in a temporary directory.
+    private func stateLoaded(from yaml: String) throws -> AppState {
+        let dir = NSTemporaryDirectory() + UUID().uuidString
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        tempFiles.append(dir)
+        let location = ProfilesLocation(directory: dir, seedPath: "")
+        try yaml.write(toFile: location.path, atomically: true, encoding: .utf8)
+        let state = AppState(profilesLocation: location)
+        state.loadProfiles()
+        return state
+    }
+
+    /// Renaming goes through the same save the editor uses: the profile moves
+    /// to its new name in the file, and a workflow that had it selected follows.
     func testRenameProfile() throws {
-        let path = writeTempYAML(fixtureYAML)
-        var config = try ProfileService.load(from: path)
+        let state = try stateLoaded(from: fixtureYAML)
+        let gopro = try XCTUnwrap(state.profile(named: "gopro"))
+        state.workflowSession = WorkflowSession(profile: gopro, profileName: "gopro")
 
-        let originalProfile = try XCTUnwrap(config.profiles["gopro"])
-        config.profiles.removeValue(forKey: "gopro")
-        config.profiles["gopro-hero-13"] = originalProfile
+        try state.saveProfile(gopro, as: "gopro-hero-13", replacing: "gopro")
 
-        try ProfileService.write(config, to: path)
-        let reloaded = try ProfileService.load(from: path)
-
+        let reloaded = try ProfileService.load(from: state.profilesLocation.path)
         XCTAssertEqual(reloaded.profiles.count, 2)
         XCTAssertNil(reloaded.profiles["gopro"])
         let renamed = try XCTUnwrap(reloaded.profiles["gopro-hero-13"])
         XCTAssertEqual(renamed.exif?.make, "GoPro")
         XCTAssertEqual(renamed.exif?.model, "HERO12 Black")
         XCTAssertEqual(renamed.type, .video)
+        XCTAssertEqual(state.workflowSession.profileName, "gopro-hero-13")
+    }
+
+    /// Saving under a name another profile already had used to replace that
+    /// profile without a word. The save is refused with the reason, and the file
+    /// keeps both profiles as they were.
+    func testSavingOntoAnotherProfilesNameIsRefused() throws {
+        let state = try stateLoaded(from: fixtureYAML)
+        let gopro = try XCTUnwrap(state.profile(named: "gopro"))
+
+        XCTAssertThrowsError(try state.saveProfile(gopro, as: "sony", replacing: "gopro")) { error in
+            XCTAssertEqual(error as? ProfileNameError, .taken("sony"))
+        }
+        XCTAssertThrowsError(try state.saveProfile(MediaProfile(type: .video), as: "gopro", replacing: nil)) { error in
+            XCTAssertEqual(error as? ProfileNameError, .taken("gopro"))
+        }
+
+        let reloaded = try ProfileService.load(from: state.profilesLocation.path)
+        XCTAssertEqual(reloaded.profiles["sony"]?.exif?.make, "Sony")
+        XCTAssertEqual(reloaded.profiles["gopro"]?.exif?.make, "GoPro")
+        XCTAssertEqual(state.profile(named: "sony")?.exif?.make, "Sony")
+    }
+
+    /// New and copied profiles get the first free name, so starting one never
+    /// lands on a profile that already exists.
+    func testUniqueNameCountsUpFromTwo() {
+        let config = ProfilesConfig(gyroflow: nil, profiles: [
+            "cam": MediaProfile(type: .video), "cam 2": MediaProfile(type: .video),
+        ])
+        XCTAssertEqual(config.uniqueName("cam"), "cam 3")
+        XCTAssertEqual(config.uniqueName("other"), "other")
     }
 
     func testPerProfileGyroflowSettingsRoundTrip() throws {

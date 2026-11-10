@@ -341,6 +341,14 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
                    defaultValue: "Delete profile \"\(name)\"?")
         }
 
+        static let nameTakenTitle = String(localized: "profiles.nameTaken.title",
+            defaultValue: "Profile not saved")
+
+        static func nameTakenMessage(_ name: String) -> String {
+            String(localized: "profiles.nameTaken.message",
+                   defaultValue: "Another profile is already called \"\(name)\". Choose a different name.")
+        }
+
         // Help text
         static let typeHelp = String(localized: "profiles.type.help",
             defaultValue: "Whether this profile handles photo or video files from the camera")

@@ -4,6 +4,9 @@ struct ProfileEditingSession: Equatable {
     var name: String
     var profile: MediaProfile
     var globalStabilization: StabilizationSettings?
+    /// The name the profile is stored under, or nil for a new or copied profile
+    /// not saved yet. Saving under a different name renames it.
+    var storedName: String?
 
     var canSave: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
@@ -31,6 +34,8 @@ struct ProfilesView: View {
     @State private var pendingAction: PendingAction?
     @State private var newCameraChoices: [SourceContents.NewCamera] = []
     @State private var noMediaSource: URL?
+    /// Why the last save was refused, shown until dismissed.
+    @State private var saveError: String?
 
     private enum PendingAction {
         case loadProfile(ProfileEditingSession)
@@ -48,7 +53,7 @@ struct ProfilesView: View {
         return ProfileEditingSession.hasUnsavedChanges(
             editor: editor,
             snapshot: snapshot,
-            isSaved: snapshot.flatMap { state.profile(named: $0.name) } != nil)
+            isSaved: snapshot?.storedName != nil)
     }
 
     private var sessionBinding: Binding<ProfileEditingSession> {
@@ -102,8 +107,11 @@ struct ProfilesView: View {
             isPresented: $showDiscardConfirmation
         ) {
             Button(Strings.Profiles.saveAndContinue) {
-                saveCurrentProfile()
-                resolvePendingAction()
+                if saveCurrentProfile() {
+                    resolvePendingAction()
+                } else {
+                    pendingAction = nil
+                }
             }
             Button(Strings.Profiles.discardChanges, role: .destructive) {
                 editor = snapshot
@@ -136,6 +144,13 @@ struct ProfilesView: View {
             Button(Strings.Common.cancel, role: .cancel) {}
         } message: {
             Text(Strings.Profiles.noMediaFoundMessage)
+        }
+        .alert(Strings.Profiles.nameTakenTitle,
+               isPresented: Binding(get: { saveError != nil },
+                                    set: { if !$0 { saveError = nil } })) {
+            Button(Strings.Common.done) { saveError = nil }
+        } message: {
+            Text(saveError ?? "")
         }
     }
 
@@ -175,7 +190,7 @@ struct ProfilesView: View {
                 newCameraChoices = contents.newCameras
             } else if let existing = contents.existingProfiles.first,
                       let profile = state.profile(named: existing) {
-                requestProfileLoad(ProfileEditingSession(name: existing, profile: profile))
+                requestProfileLoad(ProfileEditingSession(name: existing, profile: profile, storedName: existing))
             } else if contents.hasCameralessMedia {
                 let type = probes.first { $0.camera == nil }?.type
                 startHandNamedProfile(MediaProfile(type: type, sourceDir: url.path))
@@ -186,14 +201,14 @@ struct ProfilesView: View {
     }
 
     private func startHandNamedProfile(_ profile: MediaProfile) {
-        requestProfileLoad(ProfileEditingSession(name: "new-profile", profile: profile))
+        requestProfileLoad(ProfileEditingSession(name: state.uniqueProfileName("new-profile"), profile: profile))
     }
 
     private func createProfile(for found: SourceContents.NewCamera) {
         newCameraChoices = []
         let name = state.createProfile(for: found)
         guard let profile = state.profile(named: name) else { return }
-        requestProfileLoad(ProfileEditingSession(name: name, profile: profile))
+        requestProfileLoad(ProfileEditingSession(name: name, profile: profile, storedName: name))
     }
 
     private var profileList: some View {
@@ -241,7 +256,7 @@ struct ProfilesView: View {
                 guard let name = newValue, name != snapshot?.name else { return }
                 guard let profile = state.profile(named: name) else { return }
                 requestProfileLoad(
-                    ProfileEditingSession(name: name, profile: profile)
+                    ProfileEditingSession(name: name, profile: profile, storedName: name)
                 )
             }
 
@@ -335,31 +350,26 @@ struct ProfilesView: View {
 
     // MARK: - CRUD
 
-    private func saveCurrentProfile() {
-        guard let editor, let config = state.profilesConfig else { return }
-
-        let original = snapshot.flatMap { config.profiles[$0.name] }
-        if let snapshot, snapshot.name != editor.name {
-            state.profilesConfig?.profiles.removeValue(forKey: snapshot.name)
-            if state.workflowSession.profileName == snapshot.name {
-                state.workflowSession.profileName = editor.name
-            }
+    /// Returns whether the profile was saved. A save onto another profile's
+    /// name is refused and says why, leaving the edit open to change the name.
+    @discardableResult
+    private func saveCurrentProfile() -> Bool {
+        guard var saved = editor else { return false }
+        do {
+            try state.saveProfile(saved.profile, as: saved.name, replacing: saved.storedName)
+        } catch {
+            saveError = error.localizedDescription
+            return false
         }
-        state.profilesConfig?.profiles[editor.name] = config.storable(editor.profile, replacing: original)
-
-        state.writeProfiles()
-        snapshot = editor
-        selectedProfile = editor.name
+        saved.storedName = saved.name
+        editor = saved
+        snapshot = saved
+        selectedProfile = saved.name
+        return true
     }
 
     private func deleteProfile(_ name: String) {
-        state.profilesConfig?.profiles.removeValue(forKey: name)
-        state.writeProfiles()
-        if state.workflowSession.profileName == name {
-            state.workflowSession = WorkflowSession(
-                gyroflowAvailable: state.gyroflowStatus.isInstalled
-            )
-        }
+        state.deleteProfile(named: name)
         selectedProfile = nil
         editor = nil
         snapshot = nil
@@ -370,15 +380,8 @@ struct ProfilesView: View {
             let profile = state.profile(named: name)
         else { return }
 
-        let baseName = name.replacing(/\ copy \d+$/, with: "")
-        var counter = 1
-        var duplicateName = "\(baseName) copy \(counter)"
-        while state.profile(named: duplicateName) != nil {
-            counter += 1
-            duplicateName = "\(baseName) copy \(counter)"
-        }
         requestProfileLoad(
-            ProfileEditingSession(name: duplicateName, profile: profile)
+            ProfileEditingSession(name: state.uniqueProfileName(name), profile: profile)
         )
     }
 }
