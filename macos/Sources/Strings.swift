@@ -265,6 +265,14 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let applyAnywayButton = String(localized: "workflow.applyAnyway.button",
             defaultValue: "Apply Anyway")
 
+        static func mixedTimezoneGroup(zone: String, count: Int) -> String {
+            count == 1
+                ? String(localized: "workflow.mixedTimezones.group.one",
+                         defaultValue: "\(zone): \(count) file")
+                : String(localized: "workflow.mixedTimezones.group.many",
+                         defaultValue: "\(zone): \(count) files")
+        }
+
         static func mixedTimezonesMessage(groups: String) -> String {
             String(localized: "workflow.mixedTimezones.message",
                    defaultValue: "Files have different embedded timezones. Consider processing each group separately.\n\n\(groups)")

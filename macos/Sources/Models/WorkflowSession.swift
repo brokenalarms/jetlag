@@ -503,4 +503,78 @@ final class WorkflowSession {
 
         return (script: "media-pipeline.sh", args: args)
     }
+
+    // MARK: - What the form previews
+
+    /// What the timezone question says about the conflict the pipeline refused on.
+    var timezoneConflictMessage: String {
+        guard let fileTimezones = timezoneConflictFileTimezones else { return "" }
+        switch timezoneConflictType {
+        case .mixedTimezones:
+            let groups = fileTimezones
+                .map { zone, files in Strings.Workflow.mixedTimezoneGroup(zone: zone, count: files.count) }
+                .sorted()
+                .joined(separator: "\n")
+            return Strings.Workflow.mixedTimezonesMessage(groups: groups)
+        case .providedMismatch, nil:
+            let existing = fileTimezones.keys.sorted().joined(separator: ", ")
+            return Strings.Workflow.providedMismatchMessage(
+                provided: timezoneConflictProvidedTz ?? "", existing: existing)
+        }
+    }
+
+    /// One line under the Fix Timestamps step saying what the run will do to
+    /// each file's time, or nil when the step is off or changes nothing yet.
+    var fixTimestampPreview: String? {
+        guard enabledSteps.contains(.fixTimestamps) else { return nil }
+
+        var parts: [String] = []
+        if inferFromFilenames {
+            if let option = timezoneOption {
+                parts.append(option.offsets.count > 1
+                    ? Strings.Workflow.fixTimestampSourceFilenamesZoneMultiHint(city: option.city)
+                    : Strings.Workflow.fixTimestampSourceFilenamesZoneHint(city: option.city, offsetLabel: option.offsetLabel))
+            } else {
+                parts.append(Strings.Workflow.fixTimestampSourceFilenamesHint)
+            }
+        }
+        if let offset = timeOffsetSeconds, offset != 0 {
+            let sign = offset > 0 ? "+" : ""
+            parts.append(Strings.Workflow.fixTimestampShiftHint(sign: sign, offset: offset))
+        }
+        if let option = timezoneOption, !inferFromFilenames {
+            parts.append(option.offsets.count > 1
+                ? Strings.Workflow.fixTimestampZoneMultiHint(city: option.city)
+                : Strings.Workflow.fixTimestampZoneHint(city: option.city, offsetLabel: option.offsetLabel))
+        }
+        if updateFilenameDates {
+            parts.append(Strings.Workflow.fixTimestampRenameHint)
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Where organized files land, laid out as the pipeline lays them out: the
+    /// profile's `folder_template` when it has one, otherwise year / [group /]
+    /// date. Date parts show as their placeholders (YYYY, MM, …).
+    var destinationPreview: String {
+        let template: String
+        if let folderTemplate = workingProfile.folderTemplate, !folderTemplate.isEmpty {
+            template = group.isEmpty
+                ? folderTemplate
+                : folderTemplate.replacingOccurrences(of: "{{GROUP}}", with: group)
+        } else if !group.isEmpty {
+            template = "{{YYYY}}/\(group)/{{YYYY}}-{{MM}}-{{DD}}"
+        } else {
+            template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
+        }
+        var relative = template
+        for token in ["YYYY-MM-DD", "YYYY", "MMM", "MM", "DD"] {
+            relative = relative.replacingOccurrences(of: "{{\(token)}}", with: token)
+        }
+        relative = relative.replacingOccurrences(of: "//", with: "/")
+        while relative.hasSuffix("/") {
+            relative.removeLast()
+        }
+        return readyDir.current + "/" + relative
+    }
 }

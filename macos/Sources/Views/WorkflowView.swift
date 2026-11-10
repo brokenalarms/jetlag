@@ -84,7 +84,7 @@ struct WorkflowView: View {
                 state.workflowSession.showTimezoneConflict = false
             }
         } message: {
-            Text(timezoneConflictMessage)
+            Text(state.workflowSession.timezoneConflictMessage)
         }
         .alert(
             Strings.Workflow.overwriteConflictTitle,
@@ -172,7 +172,7 @@ struct WorkflowView: View {
                 }
             }
         } message: {
-            Text(runSummaryMessage)
+            Text(state.runSummary?.message(cameraMismatch: state.workflowSession.cameraMismatch) ?? "")
         }
         .alert(
             Strings.Errors.commandLineToolsTitle,
@@ -184,46 +184,6 @@ struct WorkflowView: View {
             Button(Strings.Common.done) { state.pythonRuntimeAlert = nil }
         } message: {
             Text(state.pythonRuntimeAlert ?? "")
-        }
-    }
-
-    private var runSummaryMessage: String {
-        guard let summary = state.runSummary else { return "" }
-        var lines = [Strings.Workflow.runSummaryCounts(
-            processed: summary.processed,
-            changed: summary.changed,
-            mode: summary.mode)]
-        lines.append(summary.mode == .applied
-                     ? Strings.Workflow.runSummaryApplied
-                     : Strings.Workflow.runSummaryDryRun)
-        if summary.failed > 0 {
-            lines.append(Strings.Workflow.runSummaryFailed(
-                count: summary.failed,
-                files: summary.failedFiles))
-        }
-        if summary.mode == .dryRun, let mismatch = state.workflowSession.cameraMismatch {
-            lines.append(Strings.Workflow.runSummaryCameraMismatch(
-                count: mismatch.files.count,
-                found: mismatch.foundName,
-                expected: mismatch.expected?.name ?? ""))
-        }
-        return lines.joined(separator: "\n\n")
-    }
-
-    private var timezoneConflictMessage: String {
-        let session = state.workflowSession
-        guard let fileTimezones = session.timezoneConflictFileTimezones else {
-            return ""
-        }
-        if session.timezoneConflictType == .mixedTimezones {
-            let groups = fileTimezones.map { tz, files in
-                "\(tz): \(files.count) file\(files.count == 1 ? "" : "s")"
-            }.sorted().joined(separator: "\n")
-            return Strings.Workflow.mixedTimezonesMessage(groups: groups)
-        } else {
-            let provided = session.timezoneConflictProvidedTz ?? ""
-            let existing = fileTimezones.keys.sorted().joined(separator: ", ")
-            return Strings.Workflow.providedMismatchMessage(provided: provided, existing: existing)
         }
     }
 
@@ -344,7 +304,7 @@ struct WorkflowView: View {
                 placeholder: Strings.Workflow.readyDirPlaceholder,
                 path: $session.readyDir.value,
                 error: validateDirectory(session.readyDir.current))
-            Text(session.readyDir.current.isEmpty ? Strings.Workflow.readyDirRequired : destinationPreview(readyDir: session.readyDir.current))
+            Text(session.readyDir.current.isEmpty ? Strings.Workflow.readyDirRequired : session.destinationPreview)
                 .font(Theme.Typography.caption)
                 .foregroundStyle(Theme.Text.secondary)
             OptionGroup {
@@ -391,7 +351,7 @@ struct WorkflowView: View {
                 isEnabled: parseable,
                 help: Strings.Workflow.updateFilenameDatesHelp)
 
-            if let preview = fixTimestampPreview {
+            if let preview = session.fixTimestampPreview {
                 Text(preview)
                     .font(Theme.Typography.caption)
                     .foregroundStyle(Theme.Text.tertiary)
@@ -412,35 +372,6 @@ struct WorkflowView: View {
     private struct SourceRead: Hashable {
         let session: ObjectIdentifier
         let source: String
-    }
-
-    var fixTimestampPreview: String? {
-        let session = state.workflowSession
-        guard session.enabledSteps.contains(.fixTimestamps) else { return nil }
-
-        var parts: [String] = []
-        if session.inferFromFilenames {
-            if let option = session.timezoneOption {
-                parts.append(option.offsets.count > 1
-                    ? Strings.Workflow.fixTimestampSourceFilenamesZoneMultiHint(city: option.city)
-                    : Strings.Workflow.fixTimestampSourceFilenamesZoneHint(city: option.city, offsetLabel: option.offsetLabel))
-            } else {
-                parts.append(Strings.Workflow.fixTimestampSourceFilenamesHint)
-            }
-        }
-        if let offset = session.timeOffsetSeconds, offset != 0 {
-            let sign = offset > 0 ? "+" : ""
-            parts.append(Strings.Workflow.fixTimestampShiftHint(sign: sign, offset: offset))
-        }
-        if let option = session.timezoneOption, !session.inferFromFilenames {
-            parts.append(option.offsets.count > 1
-                ? Strings.Workflow.fixTimestampZoneMultiHint(city: option.city)
-                : Strings.Workflow.fixTimestampZoneHint(city: option.city, offsetLabel: option.offsetLabel))
-        }
-        if session.updateFilenameDates {
-            parts.append(Strings.Workflow.fixTimestampRenameHint)
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     private var archiveSourceOptions: some View {
@@ -487,17 +418,5 @@ struct WorkflowView: View {
                 state.runWorkflow()
             },
             onCancel: { state.cancelRunning() })
-    }
-
-    // MARK: - Helpers
-
-    private func destinationPreview(readyDir: String) -> String {
-        let session = state.workflowSession
-        var path = readyDir + "/YYYY"
-        if !session.group.isEmpty {
-            path += "/\(session.group)"
-        }
-        path += "/YYYY-MM-DD"
-        return path
     }
 }

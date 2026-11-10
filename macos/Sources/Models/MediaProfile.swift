@@ -77,6 +77,10 @@ struct MediaProfile: Codable, Equatable {
     var exif: ExifConfig?
     var fileExtensions: [String]?
     var companionExtensions: [String]?
+    /// Where organize puts files under the ready folder, e.g.
+    /// `{{YYYY}}/{{GROUP}}/{{YYYY-MM-DD}}`. Set by hand in the file; absent means
+    /// the pipeline's default of year / [group /] date.
+    var folderTemplate: String?
     /// The profile's block as it was read from the profiles file. A save is
     /// written over it, so keys the app does not model — or anything a newer
     /// script reads — survive a save, a rename and a copy.
@@ -91,6 +95,7 @@ struct MediaProfile: Codable, Equatable {
         case tags, exif
         case fileExtensions = "file_extensions"
         case companionExtensions = "companion_extensions"
+        case folderTemplate = "folder_template"
     }
 }
 
