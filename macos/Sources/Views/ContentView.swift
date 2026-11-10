@@ -33,6 +33,8 @@ struct ContentView: View {
                 WorkflowDetail(state: state)
             case .profiles:
                 ProfilesView(state: state)
+            case .verify:
+                VerifyView(state: state)
             }
         }
         .background(WindowEdgeGrowthController(panelOpen: state.showInspector, isRunning: state.isRunning))

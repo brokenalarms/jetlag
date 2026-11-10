@@ -42,6 +42,11 @@ final class AppState {
 
     var workflowSession = WorkflowSession()
 
+    /// The Verify screen's choices and its last check.
+    var verifySession = VerifySession()
+    private var verifyProcess: ScriptProcess?
+    private var verifyTask: Task<Void, Never>?
+
     /// Presence of the optional Gyroflow install, refreshed on launch and after
     /// an install. Every gyroflow feature in the app is gated on this.
     var gyroflowStatus: GyroflowStatus = .notInstalled {
@@ -453,5 +458,81 @@ final class AppState {
         // own line, not parsed from the pipeline's output.
         logOutput.append(LogLine(text: Strings.LogOutput.cancelled, stream: .stderr))
         transcript.dropLiveRow()
+    }
+
+    // MARK: - Verify
+
+    /// Store the backup locations and write the file. A location renamed or removed
+    /// leaves the check; a new one joins it.
+    func saveBackups(_ backups: [String: BackupLocationConfig]) {
+        if profilesConfig == nil {
+            profilesConfig = ProfilesConfig(gyroflow: nil, profiles: [:])
+        }
+        let existing = Set(profilesConfig?.backups.map { Array($0.keys) } ?? [])
+        let added = Set(backups.keys).subtracting(existing)
+        profilesConfig?.backups = backups.isEmpty ? nil : backups
+        verifySession.enabledLocations = verifySession.enabledLocations
+            .intersection(backups.keys).union(added)
+        writeProfiles()
+    }
+
+    /// Store the check's file lists, which from then on no longer follow the profiles.
+    func saveVerifyLists(_ lists: VerifyListsConfig) {
+        guard profilesConfig != nil else { return }
+        profilesConfig?.verify = lists
+        writeProfiles()
+    }
+
+    /// The locations the next check covers, in name order.
+    var enabledBackups: [NamedBackupLocation] {
+        (profilesConfig?.sortedBackups ?? []).filter { verifySession.enabledLocations.contains($0.name) }
+    }
+
+    var canRunVerify: Bool {
+        !verifySession.isRunning && !verifySession.source.isEmpty && !enabledBackups.isEmpty
+    }
+
+    /// Run verify-card for the screen's choices and fold its events into the report.
+    /// The check is read-only, so there is no dry run to preview first.
+    func runVerify() {
+        guard canRunVerify, let config = profilesConfig else { return }
+        let args = VerifySession.arguments(
+            source: verifySession.source, locations: enabledBackups, lists: config.verifyLists,
+            includeCompanions: verifySession.includeCompanions,
+            verifyHashes: verifySession.verifyHashes,
+            includeNetwork: verifySession.includeNetwork)
+        verifySession.report = VerifyReport()
+        verifySession.log = []
+        verifySession.isRunning = true
+
+        let (process, stream) = launcher.run(script: "verify-card.sh", args: args)
+        verifyProcess = process
+        verifyTask = Task {
+            for await line in stream {
+                if Task.isCancelled { break }
+                await MainActor.run {
+                    guard !Task.isCancelled else { return }
+                    if line.stream == .stdout, line.isMachineReadable, let event = VerifyEvent.decode(line.text) {
+                        verifySession.report.apply(event)
+                    } else {
+                        verifySession.log.append(line)
+                    }
+                }
+            }
+            await MainActor.run {
+                guard !Task.isCancelled else { return }
+                verifySession.isRunning = false
+                verifyProcess = nil
+                verifyTask = nil
+            }
+        }
+    }
+
+    func cancelVerify() {
+        verifyTask?.cancel()
+        verifyTask = nil
+        verifyProcess?.terminateGroup()
+        verifyProcess = nil
+        verifySession.isRunning = false
     }
 }

@@ -54,6 +54,23 @@ events:
         description: >-
           With --verify-hashes: two of its copies recorded different hashes, so the card
           was hashed to settle which is right and no hash was recorded for it this run
+      duration_seconds:
+        type: number
+        optional: true
+        description: "For a media file not on every location: its length from ffprobe, when it has one"
+      opens:
+        type: boolean
+        optional: true
+        description: >-
+          For a media file not on every location: whether ffprobe finds a duration. false
+          means a broken recording. Absent when ffprobe is not installed
+      neighbours_backed_up:
+        type: boolean
+        optional: true
+        description: >-
+          For a media file not on every location: whether a card file numbered one
+          either side of it (same folder and prefix) is on every location. Absent when
+          its name carries no clip number or no neighbour is on the card
     example:
       event: verify_file
       file: DCIM/Camera01/VID_20250619_042028_00_004.insv

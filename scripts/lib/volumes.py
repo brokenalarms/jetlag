@@ -1,7 +1,7 @@
 """Whether a folder is on a local disk or across a network.
 
 Decided on every run, never stored: the same root can be a USB drive one day and an
-SMB mount the next. See docs/specs/verify-card.md, "Local or network".
+SMB mount the next. See docs/specs/completed/verify-card.md, "Local or network".
 
 - A host:/path root is remote by its syntax.
 - Any other root is local only if its volume's filesystem type is on an allowlist, the

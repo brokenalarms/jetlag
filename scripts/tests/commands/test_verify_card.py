@@ -458,3 +458,34 @@ class TestRecordedHashesDisagree:
         assert hashes == {"T9": "match", "SSD": "match"}
         assert (recorded_hash(good), recorded_hash(stale)) == ("a" * 64, "b" * 64)
         assert report["summary"]["hash_cache_written"] == 0
+
+
+class TestUnmatchedClipDetails:
+    """For a clip not on every location, the details that help the user judge it:
+    its length, whether it opens at all (a broken recording has no duration), and
+    whether the clip numbered next to it was backed up."""
+
+    def test_missing_clip_beside_a_backed_up_one(self, card, tmp_path):
+        missing = card / "DCIM" / "VID_20250619_042028_00_005.mp4"
+        create_test_video(missing)
+        library = tmp_path / "T9"
+        copy_to(card / "DCIM" / CLIP, library / CLIP)
+
+        report = run_verify(card, {"T9": str(library)})
+
+        details = report["files"]["DCIM/VID_20250619_042028_00_005.mp4"]
+        assert details["opens"] is True and details["duration_seconds"] > 0
+        assert details["neighbours_backed_up"] is True
+        assert "opens" not in report["files"][f"DCIM/{CLIP}"], "a matched clip needs no details"
+
+    def test_broken_recording_does_not_open(self, card, tmp_path):
+        broken = card / "DCIM" / "VID_20250619_042028_00_006.mp4"
+        broken.write_bytes(b"\x00\x00\x00\x20ftypisom" + bytes(500))
+        library = tmp_path / "T9"
+        library.mkdir()
+
+        report = run_verify(card, {"T9": str(library)})
+
+        details = report["files"]["DCIM/VID_20250619_042028_00_006.mp4"]
+        assert details["opens"] is False and "duration_seconds" not in details
+        assert "neighbours_backed_up" not in details, "the clip numbered beside it is missing too"

@@ -5,7 +5,7 @@
 Folders group code by feature; Swift ignores them within a target, and XcodeGen picks up `Sources/` and `Tests/` recursively, so a new file needs no project.yml change.
 
 - `Sources/` root: `JetlagApp`, `Strings`, `Theme`, the entitlements, `Assets.xcassets` (written by `design/`) and `Resources/` (written by `BuildScripts/`).
-- `Sources/Models/`: `AppState` and other app-wide state at the root; `Pipeline/` (events, the run transcript, table rows and their outcome, summary, log lines), `Profiles/` (`MediaProfile`, `ProfilesConfig`, matching and camera identity), `Workflow/` (`WorkflowSession`, `TimezoneCatalog`).
+- `Sources/Models/`: `AppState` and other app-wide state at the root; `Pipeline/` (events, the run transcript, table rows and their outcome, summary, log lines), `Profiles/` (`MediaProfile`, `ProfilesConfig`, matching and camera identity), `Workflow/` (`WorkflowSession`, `TimezoneCatalog`), `Verify/` (backup locations and the check's lists as the profiles file stores them, verify-card's events, the report they fold into, the Verify screen's session).
 - `Sources/Services/`: `Scripts/` (launching, running and reading scripts, the Python runtime check), `Profiles/` (loading, locating and writing the profiles file); one-off script queries and `LicenseStore` at the root.
 - `Sources/Components/`: form controls that take plain data; `Results/` holds the Files panel, its table, sizing and badges.
 - `Sources/Views/`: screens and their representables; `AppKit/` holds the AppKit helpers they host (sizing, tail following, window growth, the log's scroll view).
@@ -20,6 +20,7 @@ Folders group code by feature; Swift ignores them within a target, and XcodeGen 
 
 Where app changes require awareness of the scripts, and vice versa:
 
+- **verify-card**: the Verify tab runs `verify-card.sh` with `VerifySession.arguments` and decodes `VerifyEvent` from the events in `scripts/lib/verify-card-schema.yaml`; `VerifyModelTests` decodes every example there and requires a `VerifyVerdict` case per verdict token. Backup locations and the check's lists live in the profiles file's top-level `backups:` and `verify:` mappings, which `ProfilesConfig` models.
 - **CLI args**: the app builds command-line arguments for scripts. Changing a script's interface (adding/removing/renaming flags) requires updating how the app wires args. For media-pipeline, `cli` in `scripts/lib/media_pipeline/pipeline-schema.yaml` declares the steps (`PipelineStep.taskToken`/`stageToken`, in `allCases` order) and every flag the app passes; `PipelineSchemaContractTests` fails when `buildPipelineArgs` or `PipelineStep` drifts from it.
 - **Profile schema**: the app reads the same `media-profiles.yaml` the scripts use. Schema changes affect both Swift decoding and Python parsing. The app writes the file as an edit of the one it read (`ProfilesDocument`), so a key the scripts read that `MediaProfile` doesn't model survives a save; a key the app should show or edit still needs a model field.
 - **Script bundling**: scripts are copied into the app bundle at build time (postBuildScripts in project.yml). The app always runs bundled scripts, not the repo copy.

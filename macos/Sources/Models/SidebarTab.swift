@@ -3,6 +3,7 @@ import Foundation
 enum SidebarTab: String, CaseIterable, Identifiable {
     case workflow = "Workflow"
     case profiles = "Profiles"
+    case verify = "Verify"
 
     var id: String { rawValue }
 
@@ -10,6 +11,7 @@ enum SidebarTab: String, CaseIterable, Identifiable {
         switch self {
         case .workflow: Strings.Nav.workflow
         case .profiles: Strings.Nav.profiles
+        case .verify: Strings.Nav.verify
         }
     }
 
@@ -17,6 +19,7 @@ enum SidebarTab: String, CaseIterable, Identifiable {
         switch self {
         case .workflow: "play.rectangle"
         case .profiles: "camera.on.rectangle"
+        case .verify: "checkmark.shield"
         }
     }
 }

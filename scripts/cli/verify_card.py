@@ -77,7 +77,9 @@ def main() -> int:
     for card_file in report.scan.checked:
         emit("verify_file", file=card_file.rel, kind=card_file.kind, size=card_file.size,
              data_bytes=card_file.data_bytes,
-             recorded_hashes_disagree=card_file.recorded_hashes_disagree or None)
+             recorded_hashes_disagree=card_file.recorded_hashes_disagree or None,
+             duration_seconds=card_file.duration_seconds, opens=card_file.opens,
+             neighbours_backed_up=card_file.neighbours_backed_up)
         for location_name, result in report.verdicts[card_file.rel].items():
             emit("verify_result", file=card_file.rel, location=location_name,
                  verdict=result.verdict, basis=result.basis, copies=result.copies,

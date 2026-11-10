@@ -6,7 +6,7 @@ reached over ssh. A card file's copy is looked for anywhere under the root, by i
 name or by the card name recorded in the copy's provenance
 (XMP-xmpMM:PreservedFileName), since an import can rename a file. A copy passes when
 its total size equals the card file's (an untouched copy) or its data portion does (a
-copy jetlag has written); nothing is passed on a guess. See docs/specs/verify-card.md.
+copy jetlag has written); nothing is passed on a guess. See docs/specs/completed/verify-card.md.
 
 The check is read-only. A local location is walked; a remote one is listed by its host
 with `rsync --list-only --recursive` and never read over the network: a remote copy is
@@ -67,6 +67,12 @@ class CardFile:
     data_bytes: Optional[int]
     # With --verify-hashes: two copies recorded different hashes for this file.
     recorded_hashes_disagree: bool = False
+    # For a media file not on every location, what helps the user judge it: its
+    # length and whether it opens (no duration means a broken recording), and
+    # whether a clip numbered next to it was backed up.
+    duration_seconds: Optional[float] = None
+    opens: Optional[bool] = None
+    neighbours_backed_up: Optional[bool] = None
 
     @property
     def name(self) -> str:
@@ -414,7 +420,69 @@ def verify_card(source: Path, locations: list[tuple[str, str]], media_extensions
     report = Report(opened, scan, verdicts)
     if verify_hashes:
         check_hashes(report, matchers, include_network)
+    describe_unmatched(report)
     return report
+
+
+_CLIP_NUMBER = re.compile(r"^(?P<prefix>.*?)(?P<number>\d+)$")
+
+
+def _clip_number(path: Path) -> Optional[tuple[str, str, int, int]]:
+    """(folder, prefix, number, digits) of a clip name ending in a number:
+    GX010123 → GX01 / 0123, VID_20250619_042028_00_004 → …_00_ / 004."""
+    match = _CLIP_NUMBER.match(path.stem)
+    if not match:
+        return None
+    return str(path.parent), match["prefix"], int(match["number"]), len(match["number"])
+
+
+def probe_duration(path: Path) -> Optional[float]:
+    """The clip's length from ffprobe; None when ffprobe finds none or is missing."""
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+            capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    try:
+        return float(result.stdout.strip())
+    except ValueError:
+        return None
+
+
+def _have_ffprobe() -> bool:
+    try:
+        subprocess.run(["ffprobe", "-version"], capture_output=True, timeout=10)
+        return True
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def describe_unmatched(report: Report) -> None:
+    """Gather, for each media file not on every location, its length, whether it
+    opens, and whether a clip numbered next to it is on every location."""
+    unmatched = [c for c in report.scan.checked if c.kind == "media" and not all(
+        v.verdict == "matched" for v in report.verdicts[c.rel].values())]
+    if not unmatched:
+        return
+    by_number: dict[tuple[str, str, int, int], CardFile] = {}
+    for card_file in report.scan.checked:
+        key = _clip_number(Path(card_file.rel))
+        if card_file.kind == "media" and key:
+            by_number[key] = card_file
+    can_probe = _have_ffprobe()
+    for card_file in unmatched:
+        if can_probe:
+            card_file.duration_seconds = probe_duration(card_file.path)
+            card_file.opens = card_file.duration_seconds is not None
+        key = _clip_number(Path(card_file.rel))
+        if key:
+            folder, prefix, number, digits = key
+            neighbours = [by_number.get((folder, prefix, n, digits)) for n in (number - 1, number + 1)]
+            present = [n for n in neighbours if n is not None]
+            if present:
+                card_file.neighbours_backed_up = any(
+                    all(v.verdict == "matched" for v in report.verdicts[n.rel].values()) for n in present)
 
 
 def cleared_files(report: Report, source: Path) -> set[Path]:
