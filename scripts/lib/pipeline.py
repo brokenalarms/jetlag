@@ -128,6 +128,35 @@ def cancel_handler(working_dir: WorkingDir):
     return interrupt_handler(working_dir.clean_on_cancel)
 
 
+def require_consent(granted: bool, prompt: str, refusal_lines: list[str],
+                    declined_line: str = "Cancelled.", stdin=None, stderr=None) -> None:
+    """Go on only with the user's consent; otherwise exit 1.
+
+    granted is consent already given by a flag. Without it, a real terminal is
+    asked the y/n prompt (declined_line answers anything but y), and anything
+    else is refused with refusal_lines, which say how to give consent.
+
+    The prompt only ever runs on a real terminal. Reading stdin otherwise must
+    never happen: under Xcode's Python input() opens /dev/tty regardless of where
+    stdin points, and a non-interactive runner (tests, the app, a supervisor)
+    reading the terminal from a background process group is stopped by SIGTTIN —
+    the whole run freezes instead of failing.
+    """
+    if granted:
+        return
+    stdin = stdin or sys.stdin
+    stderr = stderr or sys.stderr
+    if stdin.isatty() and stderr.isatty():
+        print(f"{prompt} (y/n) ", end="", file=stderr, flush=True)
+        if stdin.readline().strip().lower() == "y":
+            return
+        print(declined_line, file=stderr)
+        sys.exit(1)
+    for line in refusal_lines:
+        print(line, file=stderr)
+    sys.exit(1)
+
+
 def load_config(profile_name: str) -> tuple[dict, dict]:
     """The named profile and the whole profiles file, or exit naming what is wrong."""
     try:
@@ -184,19 +213,12 @@ def check_source_camera(files: list[Path], profile: Optional[dict], apply: bool,
         found_makes=found_makes,
         found_models=found_models,
     )
-    if apply and not allow_mismatch:
-        # Prompt only on a real terminal, for the reason given at the
-        # exiftool_tmp prompt.
-        if sys.stdin.isatty() and sys.stderr.isatty():
-            print("Import them anyway? (y/n) ", end="", file=sys.stderr, flush=True)
-            if sys.stdin.readline().strip().lower() != "y":
-                print("Cancelled.", file=sys.stderr)
-                sys.exit(1)
-        else:
-            print("ERROR: Cannot proceed without consent to import files from another camera.", file=sys.stderr)
-            print("Re-run with --allow-camera-mismatch, or pick the profile for this camera.", file=sys.stderr)
-            sys.exit(1)
-    elif not apply:
+    if apply:
+        require_consent(allow_mismatch, "Import them anyway?", [
+            "ERROR: Cannot proceed without consent to import files from another camera.",
+            "Re-run with --allow-camera-mismatch, or pick the profile for this camera.",
+        ])
+    else:
         print("Previewing anyway; applying asks first (or pass --allow-camera-mismatch).", file=sys.stderr)
         print(file=sys.stderr)
 
@@ -645,25 +667,15 @@ def run(args, working: WorkingDir) -> None:
             print(f"   {d}", file=sys.stderr)
         print(file=sys.stderr)
 
-        # Prompt only on a real terminal. input() must never run otherwise: under
-        # Xcode's Python it opens /dev/tty regardless of where stdin points, and a
-        # non-interactive runner (tests, the app, a supervisor) reading the terminal
-        # from a background process group is stopped by SIGTTIN — the whole run
-        # freezes instead of failing.
-        if sys.stdin.isatty() and sys.stderr.isatty():
-            print("Delete them? This will allow exiftool to run. (y/n) ", end="", file=sys.stderr, flush=True)
-            response = sys.stdin.readline().strip()
-            if response.lower() == "y":
-                for d in tmp_dirs:
-                    shutil.rmtree(d)
-                print("✅ Deleted exiftool_tmp directories", file=sys.stderr)
-            else:
-                print("ERROR: Cannot proceed - exiftool will fail with these directories present", file=sys.stderr)
-                sys.exit(1)
-        else:
-            print("ERROR: Cannot proceed - exiftool will fail with these directories present.", file=sys.stderr)
-            print("Delete the directories listed above, or re-run from a terminal to be prompted.", file=sys.stderr)
-            sys.exit(1)
+        require_consent(
+            False, "Delete them? This will allow exiftool to run.",
+            ["ERROR: Cannot proceed - exiftool will fail with these directories present.",
+             "Delete the directories listed above, or re-run from a terminal to be prompted."],
+            declined_line="ERROR: Cannot proceed - exiftool will fail with these directories present",
+        )
+        for d in tmp_dirs:
+            shutil.rmtree(d)
+        print("✅ Deleted exiftool_tmp directories", file=sys.stderr)
 
     # Set up working directory
     working_dir = args.working_dir or os.path.join(target_dir, WORKING_DIR_NAME)
@@ -703,19 +715,12 @@ def run(args, working: WorkingDir) -> None:
         print("Their imported copies will be unlocked; the source files stay locked.", file=sys.stderr)
         print(file=sys.stderr)
         emit_event("protected_sources", files=protected)
-        if args.apply and not args.unlock_protected:
-            # Prompt only on a real terminal, for the reason given at the
-            # exiftool_tmp prompt above.
-            if sys.stdin.isatty() and sys.stderr.isatty():
-                print("Import them unlocked? (y/n) ", end="", file=sys.stderr, flush=True)
-                if sys.stdin.readline().strip().lower() != "y":
-                    print("Cancelled.", file=sys.stderr)
-                    sys.exit(1)
-            else:
-                print("ERROR: Cannot proceed without consent to import protected files unlocked.", file=sys.stderr)
-                print("Re-run with --unlock-protected, or from a terminal to be prompted.", file=sys.stderr)
-                sys.exit(1)
-        elif not args.apply:
+        if args.apply:
+            require_consent(args.unlock_protected, "Import them unlocked?", [
+                "ERROR: Cannot proceed without consent to import protected files unlocked.",
+                "Re-run with --unlock-protected, or from a terminal to be prompted.",
+            ])
+        else:
             print("Previewing anyway; applying asks first (or pass --unlock-protected).", file=sys.stderr)
             print(file=sys.stderr)
 
