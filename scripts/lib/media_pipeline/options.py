@@ -8,9 +8,9 @@ import sys
 from dataclasses import dataclass, replace
 from typing import NoReturn, Optional
 
-from lib import profiles, tagging
-from lib.cli import UnknownLocation, UnknownTimezone, resolve_timezone
-from lib.pipeline.working_dir import WORKING_DIR_NAME
+from lib import profiles, tag_media
+from lib.command_line import UnknownLocation, UnknownTimezone, resolve_timezone
+from lib.media_pipeline.working_dir import WORKING_DIR_NAME
 
 # The optional steps --tasks names. Ingest and output always run.
 TAG = "tag"
@@ -127,7 +127,7 @@ def load_config(profile_name: str) -> tuple[dict, dict]:
 def apply_profile_overrides(profile: dict, args) -> None:
     """The workflow tab's ad-hoc edits: --tags, --make and --model over the profile."""
     if args.tags is not None:
-        profile["tags"] = tagging.parse_tag_list(args.tags)
+        profile["tags"] = tag_media.parse_tag_list(args.tags)
     if args.make is not None:
         profile.setdefault("exif", {})["make"] = args.make
     if args.model is not None:

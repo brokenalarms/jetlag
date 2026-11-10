@@ -5,7 +5,7 @@ Copies a single source file into a flat working directory.
 
 Usage: ingest-media.sh <source_file> --target <working_dir> [--apply]
 
-Command line for lib/ingest.py. Source files are treated as read-only inputs —
+Command line for lib/ingest_media.py. Source files are treated as read-only inputs —
 this script copies, never moves.
 """
 
@@ -15,8 +15,8 @@ import argparse
 import os
 import sys
 
-from lib.cli import install_interrupt_handlers
-from lib.ingest import ingest_file
+from lib.command_line import install_interrupt_handlers
+from lib.ingest_media import ingest_file
 
 
 def main():

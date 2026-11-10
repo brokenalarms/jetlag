@@ -3,7 +3,7 @@
 archive-source.sh
 Acts on the source directory after all pipeline files have been processed.
 
-Command line for lib/archive.py; prints the result as @@key=value lines.
+Command line for lib/archive_source.py; prints the result as @@key=value lines.
 
 Modes:
   archive — move the source folder to <destination>/<archived-name>, defaulting
@@ -15,8 +15,8 @@ import argparse
 import os
 import sys
 
-from lib.archive import archive_source, delete_files
-from lib.cli import install_interrupt_handlers
+from lib.archive_source import archive_source, delete_files
+from lib.command_line import install_interrupt_handlers
 from cli.results import emit_result
 
 

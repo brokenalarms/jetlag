@@ -26,7 +26,7 @@ from pathlib import Path
 import pytest
 
 from conftest import create_test_video
-from lib import pipeline
+from lib import media_pipeline
 from lib.exiftool import exiftool
 
 SCRIPT_DIR = Path(__file__).parent.parent
@@ -241,9 +241,9 @@ class TestCancelClearsTheWorkingDir:
         (working_dir / "VID_20251005_100000_00_001.mp4_exiftool_tmp").write_bytes(b"scratch")
 
         monkeypatch.setattr(exiftool, "close", lambda: None)
-        working = pipeline.WorkingDir(str(working_dir), created=True)
+        working = media_pipeline.WorkingDir(str(working_dir), created=True)
         working.stage([staged, companion])
-        yield working_dir, pipeline.cancel_handler(working)
+        yield working_dir, media_pipeline.cancel_handler(working)
 
     @pytest.mark.parametrize("sig", [signal.SIGINT, signal.SIGTERM],
                              ids=["sigint", "sigterm"])

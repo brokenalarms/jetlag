@@ -13,7 +13,7 @@ import io
 
 import pytest
 
-from lib.pipeline import require_consent
+from lib.media_pipeline import require_consent
 
 
 class _Stream(io.StringIO):

@@ -43,7 +43,7 @@ Shared modules: `timestamp_source.py` (reading and ranking a file's timestamps),
 A script holds argument parsing, validation messages and output; anything another
 script or the pipeline could call belongs in its `lib/` module.
 
-`lib/pipeline/` is split by what each part decides:
+`lib/media_pipeline/` is split by what each part decides:
 
 | Module | Holds |
 |---|---|

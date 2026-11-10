@@ -13,7 +13,7 @@ import json
 import sys
 from pathlib import Path
 
-from lib.cli import install_interrupt_handlers
+from lib.command_line import install_interrupt_handlers
 from lib.filesystem import find_media_files, iter_media_files
 from lib.timestamp_source import parse_filename_timestamp
 

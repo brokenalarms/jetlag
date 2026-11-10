@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from conftest import create_test_video
-from lib import organize
+from lib import organize_by_date
 
 
 SCRIPT_DIR = Path(__file__).parent.parent
@@ -669,10 +669,10 @@ class TestSkipReasonIsData:
         with open(dest, "ab") as f:
             f.write(b"x" * 100)
 
-        monkeypatch.setattr(organize.sys.stderr, "isatty", lambda: True, raising=False)
-        monkeypatch.setattr(organize, "open", lambda *a, **k: io.StringIO("s\n"), raising=False)
+        monkeypatch.setattr(organize_by_date.sys.stderr, "isatty", lambda: True, raising=False)
+        monkeypatch.setattr(organize_by_date, "open", lambda *a, **k: io.StringIO("s\n"), raising=False)
 
-        result = organize.process_file(
+        result = organize_by_date.process_file(
             source, os.path.join(temp_dir, "target"), "{{YYYY}}-{{MM}}-{{DD}}",
             copy_mode=True, overwrite=False, apply=True, verbose=False,
         )
@@ -704,7 +704,7 @@ class TestLogNamesTheFileItWasGiven:
         create_test_video(staged, DateTimeOriginal="2025:06:18 07:25:21+08:00")
         target_dir = os.path.join(temp_dir, "target")
 
-        result = organize.process_file(
+        result = organize_by_date.process_file(
             staged, target_dir, "{{YYYY}}-{{MM}}-{{DD}}",
             copy_mode=False, overwrite=False, apply=True, verbose=False,
         )
@@ -774,18 +774,18 @@ class TestFolderTemplateDefault:
     pipeline and organize-by-date; these pin how it and a group combine."""
 
     def test_default_without_group(self):
-        assert organize.expand_path_template(None, "2025-08-15") == "2025/2025-08-15"
+        assert organize_by_date.expand_path_template(None, "2025-08-15") == "2025/2025-08-15"
 
     def test_default_with_group_puts_it_after_the_year(self):
-        assert organize.expand_path_template(None, "2025-08-15", "Japan") == "2025/Japan/2025-08-15"
+        assert organize_by_date.expand_path_template(None, "2025-08-15", "Japan") == "2025/Japan/2025-08-15"
 
     def test_own_template_takes_the_group(self):
         template = "{{YYYY}}/{{GROUP}}/{{MMM}}-{{DD}}"
-        assert organize.expand_path_template(template, "2025-08-15", "Japan") == "2025/Japan/Aug-15"
+        assert organize_by_date.expand_path_template(template, "2025-08-15", "Japan") == "2025/Japan/Aug-15"
 
     def test_own_template_drops_the_group_folder_without_a_group(self):
         """The group is an optional grouping folder: with no group there is no
         such folder, never one literally named {{GROUP}}."""
         template = "{{YYYY}}/{{GROUP}}/{{DD}}"
-        assert organize.expand_path_template(template, "2025-08-15") == "2025/15"
+        assert organize_by_date.expand_path_template(template, "2025-08-15") == "2025/15"
 

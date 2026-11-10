@@ -19,9 +19,9 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from lib.cli import install_interrupt_handlers
+from lib.command_line import install_interrupt_handlers
 from lib.filesystem import _is_walked
-from lib.tagging import file_camera
+from lib.tag_media import file_camera
 
 VIDEO_EXTENSIONS = [".insv", ".mp4", ".mov"]
 PHOTO_EXTENSIONS = [".arw", ".cr2", ".cr3", ".dng", ".heic", ".heif", ".hif", ".insp", ".jpeg", ".jpg",

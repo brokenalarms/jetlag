@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from lib import organize, pipeline
+from lib import media_pipeline, organize_by_date
 from pipeline_helpers import SCRIPT_DIR, PipelineResult, create_test_video, run_pipeline
 
 
@@ -26,8 +26,8 @@ import json
 import os
 import sys
 
-from cli import media_pipeline as pipeline
-from lib import ingest, organize
+import cli.media_pipeline
+from lib import ingest_media, organize_by_date
 
 record_path = sys.argv[1]
 
@@ -37,8 +37,8 @@ def record(**entry):
         handle.write(json.dumps(entry) + "\\n")
 
 
-real_ingest = ingest.ingest_file
-real_organize = organize.process_file
+real_ingest = ingest_media.ingest_file
+real_organize = organize_by_date.process_file
 
 
 def ingest_spy(source, working_dir, apply, **kwargs):
@@ -55,10 +55,10 @@ def organize_spy(file_path, *args, **kwargs):
     return result
 
 
-ingest.ingest_file = ingest_spy
-organize.process_file = organize_spy
+ingest_media.ingest_file = ingest_spy
+organize_by_date.process_file = organize_spy
 sys.argv = [sys.argv[0]] + sys.argv[2:]
-pipeline.main()
+cli.media_pipeline.main()
 '''
 
 
@@ -370,18 +370,18 @@ class TestWorkingDirIsTransient:
         name = "VID_20251005_100000_00_001.mp4"
         create_test_video(temp_workspace["source"] / name)
 
-        errored = organize.OrganizeResult(dest="", action="error")
-        original = organize.process_file
-        organize.process_file = lambda *a, **k: errored
-        working = pipeline.WorkingDir(str(working_dir), created=True)
+        errored = organize_by_date.OrganizeResult(dest="", action="error")
+        original = organize_by_date.process_file
+        organize_by_date.process_file = lambda *a, **k: errored
+        working = media_pipeline.WorkingDir(str(working_dir), created=True)
         try:
-            opts = pipeline.RunOptions(
+            opts = media_pipeline.RunOptions(
                 source_dir=str(temp_workspace["source"]), target_dir=str(temp_workspace["target"]),
                 working_dir=str(working_dir), extensions=[".mp4"], apply=True,
             )
-            result = pipeline.process_file(temp_workspace["source"] / name, opts, working)
+            result = media_pipeline.process_file(temp_workspace["source"] / name, opts, working)
         finally:
-            organize.process_file = original
+            organize_by_date.process_file = original
 
         assert result.failed, "Actual: the run succeeded, Expected: organize's error to fail it"
         assert self._leftovers(working_dir) == [name], \

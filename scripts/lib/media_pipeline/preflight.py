@@ -12,10 +12,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from lib import ingest, tagging
-from lib.pipeline.consent import require_consent
-from lib.pipeline.events import emit_event
-from lib.pipeline.options import FIX_TIMESTAMP, RunOptions
+from lib import ingest_media, tag_media
+from lib.media_pipeline.consent import require_consent
+from lib.media_pipeline.events import emit_event
+from lib.media_pipeline.options import FIX_TIMESTAMP, RunOptions
 from lib.timestamp_source import (
     extract_metadata_timezone, normalize_timezone_input, parse_filename_timestamp,
     resolve_file_timezone_offset,
@@ -47,7 +47,7 @@ def check_stale_exiftool_tmp(source_dir: str) -> None:
 def check_protected_sources(files: list[Path], opts: RunOptions) -> None:
     """Report protected (locked) source files; an apply needs consent to import
     them unlocked."""
-    protected = [fp.name for fp in files if ingest.is_protected(str(fp))]
+    protected = [fp.name for fp in files if ingest_media.is_protected(str(fp))]
     if not protected:
         return
     print(f"🔒 {len(protected)} source file(s) are protected (locked):", file=sys.stderr)
@@ -80,7 +80,7 @@ def check_source_camera(files: list[Path], opts: RunOptions) -> None:
     if not make and not model:
         return
 
-    mismatched = {fp.name: tagging.camera_mismatch(str(fp), make, model) for fp in files}
+    mismatched = {fp.name: tag_media.camera_mismatch(str(fp), make, model) for fp in files}
     mismatched = {name: found for name, found in mismatched.items() if found}
     if not mismatched:
         return

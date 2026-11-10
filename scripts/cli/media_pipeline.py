@@ -6,7 +6,7 @@ Orchestrates media processing: ingest from source, process, output to target.
 Usage: media-pipeline.sh --profile PROFILE [--group GROUP] [OPTIONS]
        media-pipeline.sh --source DIR --target DIR [--group GROUP] [OPTIONS]
 
-Command line for lib/pipeline.py, which runs
+Command line for lib/media_pipeline/, which runs
 INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow] → [archive-source].
 """
 
@@ -15,8 +15,8 @@ from __future__ import annotations
 import argparse
 import sys
 
-from lib.cli import add_timezone_args, attach_negative_option_values, install_interrupt_handlers
-from lib.pipeline import WORKING_DIR_NAME, WorkingDir, cancel_handler, emit_event, run
+from lib.command_line import add_timezone_args, attach_negative_option_values, install_interrupt_handlers
+from lib.media_pipeline import WORKING_DIR_NAME, WorkingDir, cancel_handler, emit_event, run
 
 
 def build_parser():

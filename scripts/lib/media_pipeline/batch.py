@@ -8,13 +8,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import NoReturn
 
-from lib import archive
+from lib import archive_source
 from lib.filesystem import find_media_files
-from lib.pipeline.events import emit_event
-from lib.pipeline.options import ARCHIVE_SOURCE, RunOptions, resolve_options, with_gyroflow_preset
-from lib.pipeline.preflight import check_stale_exiftool_tmp, run_preflight
-from lib.pipeline.stages import process_file
-from lib.pipeline.working_dir import WorkingDir
+from lib.media_pipeline.events import emit_event
+from lib.media_pipeline.options import ARCHIVE_SOURCE, RunOptions, resolve_options, with_gyroflow_preset
+from lib.media_pipeline.preflight import check_stale_exiftool_tmp, run_preflight
+from lib.media_pipeline.stages import process_file
+from lib.media_pipeline.working_dir import WorkingDir
 
 
 @dataclass
@@ -94,7 +94,7 @@ def report_organize_conflicts(stats: BatchStats) -> None:
     )
 
 
-def archive_source(opts: RunOptions, stats: BatchStats) -> None:
+def act_on_source(opts: RunOptions, stats: BatchStats) -> None:
     """Archive or delete the source once every file is through.
 
     A failed file's only copy may still be in the source directory, so archiving
@@ -107,9 +107,9 @@ def archive_source(opts: RunOptions, stats: BatchStats) -> None:
         return
     print("📦 Archive source...", file=sys.stderr)
     if opts.source_action == "delete":
-        arc_result = archive.delete_files(opts.source_dir, stats.source_files, opts.apply)
+        arc_result = archive_source.delete_files(opts.source_dir, stats.source_files, opts.apply)
     else:
-        arc_result = archive.archive_source(
+        arc_result = archive_source.archive_source(
             opts.source_dir, opts.apply,
             destination=opts.archive_destination,
             archived_name=opts.archived_name,
@@ -194,7 +194,7 @@ def run(args, working_dir: WorkingDir) -> NoReturn:
 
     stats = process_files(files, with_gyroflow_preset(opts), working_dir)
     report_organize_conflicts(stats)
-    archive_source(opts, stats)
+    act_on_source(opts, stats)
     finish_working_dir(opts, stats)
     report_summary(stats, opts.apply)
     sys.exit(1 if stats.failed > 0 else 0)

@@ -2,7 +2,7 @@
 """
 Fix one photo or video file's timestamps.
 
-Command line for lib/fix_timestamp.py: parses arguments, resolves the timezone,
+Command line for lib/fix_media_timestamp.py: parses arguments, resolves the timezone,
 runs the correction and prints its result as @@key=value lines.
 """
 
@@ -10,7 +10,7 @@ import argparse
 import os
 import sys
 
-from lib.cli import (
+from lib.command_line import (
     UnknownLocation,
     UnknownTimezone,
     add_timezone_args,
@@ -19,7 +19,7 @@ from lib.cli import (
     resolve_timezone,
 )
 from lib.countries import get_country_name
-from lib.fix_timestamp import fix_media_timestamps
+from lib.fix_media_timestamp import fix_media_timestamps
 from cli.results import emit_result
 
 

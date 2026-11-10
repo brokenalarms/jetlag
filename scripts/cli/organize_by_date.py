@@ -3,15 +3,15 @@
 organize-by-date.sh
 Organizes a single file into date-based directory structure.
 
-Command line for lib/organize.py; prints the result as @@key=value lines.
+Command line for lib/organize_by_date.py; prints the result as @@key=value lines.
 """
 
 import argparse
 import os
 import sys
 
-from lib.cli import install_interrupt_handlers
-from lib.organize import DEFAULT_FOLDER_TEMPLATE, process_file
+from lib.command_line import install_interrupt_handlers
+from lib.organize_by_date import DEFAULT_FOLDER_TEMPLATE, process_file
 from cli.results import emit_result
 
 

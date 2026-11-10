@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 from conftest import create_insta360_file
-from lib import tagging, timestamp_source
+from lib import tag_media, timestamp_source
 
 SCRIPT_DIR = Path(__file__).parent.parent
 
@@ -24,7 +24,7 @@ def test_insv_reports_the_model_its_trailer_records(tmp_path):
     """The camera check sees an .insv's Model, which only the trailer carries."""
     insv = create_insta360_file(tmp_path / "VID_0001.insv", "Insta360 X4")
 
-    make, model = tagging.file_camera(str(insv))
+    make, model = tag_media.file_camera(str(insv))
 
     assert model == "Insta360 X4", f"Actual: {model!r}, Expected: the trailer's Model"
 
@@ -34,8 +34,8 @@ def test_insv_with_another_profiles_camera_is_flagged(tmp_path):
     profile's camera is not written over the Model the file records."""
     insv = create_insta360_file(tmp_path / "VID_0002.insv", "Insta360 X4")
 
-    mismatch = tagging.camera_mismatch(str(insv), None, "ILCE-7M5")
-    fields = tagging.camera_exif_fields(str(insv), None, "ILCE-7M5")
+    mismatch = tag_media.camera_mismatch(str(insv), None, "ILCE-7M5")
+    fields = tag_media.camera_exif_fields(str(insv), None, "ILCE-7M5")
 
     assert mismatch == {"Model": "Insta360 X4"}, f"Actual: {mismatch}"
     assert "Model" not in fields, f"Actual: {fields}, Expected no Model to write"

@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-from lib.cli import interrupt_handler
+from lib.command_line import interrupt_handler
 
 EXIFTOOL_TMP_GLOB = "*_exiftool_tmp"
 

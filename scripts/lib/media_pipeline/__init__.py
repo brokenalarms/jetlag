@@ -16,12 +16,12 @@ is a call into its lib module; media-pipeline is the command line.
 - events:      the JSONL events on stdout
 """
 
-from lib.pipeline.batch import run
-from lib.pipeline.consent import require_consent
-from lib.pipeline.events import emit_event
-from lib.pipeline.options import RunOptions
-from lib.pipeline.stages import process_file
-from lib.pipeline.working_dir import WORKING_DIR_NAME, WorkingDir, cancel_handler
+from lib.media_pipeline.batch import run
+from lib.media_pipeline.consent import require_consent
+from lib.media_pipeline.events import emit_event
+from lib.media_pipeline.options import RunOptions
+from lib.media_pipeline.stages import process_file
+from lib.media_pipeline.working_dir import WORKING_DIR_NAME, WorkingDir, cancel_handler
 
 __all__ = [
     "WORKING_DIR_NAME", "RunOptions", "WorkingDir", "cancel_handler", "emit_event",

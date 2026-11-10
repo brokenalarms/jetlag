@@ -5,7 +5,7 @@ Generates a .gyroflow project file for a video with gyroscope data.
 
 Usage: generate-gyroflow.sh FILE --preset '{"stabilization": {...}}' [--apply]
 
-Command line for lib/gyroflow.py; prints the result as @@key=value lines.
+Command line for lib/generate_gyroflow.py; prints the result as @@key=value lines.
 """
 
 import argparse
@@ -13,8 +13,8 @@ import json
 import sys
 from pathlib import Path
 
-from lib.cli import install_interrupt_handlers
-from lib.gyroflow import generate_gyroflow_project
+from lib.command_line import install_interrupt_handlers
+from lib.generate_gyroflow import generate_gyroflow_project
 from lib.profiles import ProfilesFileMissing, load_config
 from cli.results import emit_result
 

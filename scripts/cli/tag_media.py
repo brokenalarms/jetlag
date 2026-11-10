@@ -2,17 +2,17 @@
 """
 Tag media files with Finder tags and camera EXIF metadata.
 
-Command line for lib/tagging.py; prints each file's result as @@key=value lines.
+Command line for lib/tag_media.py; prints each file's result as @@key=value lines.
 """
 
 import argparse
 import os
 import sys
 
-from lib.cli import install_interrupt_handlers
+from lib.command_line import install_interrupt_handlers
 from lib.exiftool import MetadataWriteRefused
 from cli.results import emit_result
-from lib.tagging import parse_tag_list, tag_media_file
+from lib.tag_media import parse_tag_list, tag_media_file
 
 
 def main():

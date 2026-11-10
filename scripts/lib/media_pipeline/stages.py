@@ -18,11 +18,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from lib import fix_timestamp, gyroflow, ingest, organize, tagging
+from lib import fix_media_timestamp, generate_gyroflow, ingest_media, organize_by_date, tag_media
 from lib.exiftool import MetadataWriteRefused
-from lib.pipeline.events import emit_event
-from lib.pipeline.options import FIX_TIMESTAMP, GYROFLOW, TAG, RunOptions
-from lib.pipeline.working_dir import WorkingDir
+from lib.media_pipeline.events import emit_event
+from lib.media_pipeline.options import FIX_TIMESTAMP, GYROFLOW, TAG, RunOptions
+from lib.media_pipeline.working_dir import WorkingDir
 from lib.timestamp_source import build_filename, carry_exif_cache, parse_datetime_original, read_exif_data
 
 
@@ -98,7 +98,7 @@ class IngestStage(Stage):
         # which partial copy to take with it.
         ctx.working_dir.stage([Path(ctx.working_dir.path) / source.name] if opts.apply else [])
         try:
-            dest, action, companion_dests = ingest.ingest_file(
+            dest, action, companion_dests = ingest_media.ingest_file(
                 str(source), ctx.working_dir.path, opts.apply, companion_extensions=ingest_companions,
             )
         except Exception as e:
@@ -140,7 +140,7 @@ class TagStage(Stage):
 
     @staticmethod
     def _finder_tags(opts: RunOptions) -> list:
-        return tagging.parse_tag_list(",".join((opts.profile or {}).get("tags", [])))
+        return tag_media.parse_tag_list(",".join((opts.profile or {}).get("tags", [])))
 
     @staticmethod
     def _camera(opts: RunOptions) -> tuple:
@@ -153,14 +153,14 @@ class TagStage(Stage):
         fields_ride_along = fix_writes_fields(opts)
         print("🏷️  Tagging...", file=sys.stderr)
         try:
-            tag_result = tagging.tag_media_file(
+            tag_result = tag_media.tag_media_file(
                 str(active), self._finder_tags(opts), make or None, model or None,
                 apply=opts.apply, write_exif=not fields_ride_along)
         except MetadataWriteRefused as refusal:
             print(f"   ❌ exiftool could not write {active.name}: {refusal}", file=sys.stderr)
             return StageOutcome(error=str(refusal))
         if fields_ride_along:
-            ctx.camera_fields = tagging.camera_exif_fields(str(active), make or None, model or None)
+            ctx.camera_fields = tag_media.camera_exif_fields(str(active), make or None, model or None)
         if tag_result is None:
             return StageOutcome()
         emit_event("tag_result",
@@ -186,7 +186,7 @@ class FixTimestampStage(Stage):
         opts, active = ctx.opts, ctx.active
         print("🔧 Fixing timestamp...", file=sys.stderr)
         try:
-            ts_result = fix_timestamp.fix_media_timestamps(
+            ts_result = fix_media_timestamp.fix_media_timestamps(
                 str(active),
                 apply=opts.apply,
                 timezone_spec=opts.timezone_spec,
@@ -324,7 +324,7 @@ class OutputStage(Stage):
         print("📁 Organizing by date...", file=sys.stderr)
 
         folder_template = opts.profile.get("folder_template") if opts.profile else None
-        org_result = organize.process_file(
+        org_result = organize_by_date.process_file(
             str(active), opts.target_dir, folder_template or None, group=opts.group,
             copy_mode=False, overwrite=opts.overwrite, apply=opts.apply, verbose=opts.verbose,
             dest_name=ctx.pending_rename, datetime_original=ctx.organize_datetime,
@@ -344,7 +344,7 @@ class OutputStage(Stage):
         # A file the destination already holds a different copy of is the one skip
         # --overwrite can resolve, so it is the only one the batch reports back.
         if (org_result.action == "skipped"
-                and org_result.reason == organize.SKIP_EXISTS_DIFFERS):
+                and org_result.reason == organize_by_date.SKIP_EXISTS_DIFFERS):
             ctx.organize_conflict = active.name
 
         if org_result.action == "error":
@@ -391,7 +391,7 @@ class GyroflowStage(Stage):
         config = opts.gyroflow_config or {}
         print("🎥 Generating gyroflow project...", file=sys.stderr)
         gyroflow_file = Path(ctx.dest) if ctx.dest and opts.apply else ctx.active
-        gf_result = gyroflow.generate_gyroflow_project(
+        gf_result = generate_gyroflow.generate_gyroflow_project(
             gyroflow_file, opts.apply, binary=config.get("binary"),
             preset_json=json.dumps(config.get("preset", {})))
         emit_event("gyroflow_result",

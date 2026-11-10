@@ -21,7 +21,7 @@ import pytest
 import yaml
 
 from conftest import create_test_video as _create_video_raw
-from lib.pipeline.preflight import (
+from lib.media_pipeline.preflight import (
     MIXED_TIMEZONES, PROVIDED_MISMATCH, FileZone, TimezoneConflict, preflight_timezones,
     read_file_zones,
 )

@@ -1,5 +1,5 @@
 """
-lib/cli.py holds what every script's command line shares: the timezone flags and
+lib/command_line.py holds what every script's command line shares: the timezone flags and
 how they resolve, and the SIGINT/SIGTERM handling. One implementation is what keeps
 media-pipeline and fix-media-timestamp accepting the same --timezone values, and
 every script shutting exiftool down on Cancel.
@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from conftest import create_test_video
-from lib.cli import (
+from lib.command_line import (
     UnknownLocation,
     UnknownTimezone,
     attach_negative_option_values,

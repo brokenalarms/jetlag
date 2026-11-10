@@ -4,7 +4,7 @@ Running media-pipeline for the pipeline tests, in a process of its own or in thi
 run_pipeline starts media-pipeline.sh in a fresh process with stdout piped, so
 the run emits its JSONL events exactly as the app receives them: the tests of the
 command line and the JSONL contract use it. run_in_process parses the same
-arguments with media-pipeline's own parser and calls lib.pipeline.run() here,
+arguments with media-pipeline's own parser and calls lib.media_pipeline.run() here,
 with the same stdout, stderr and exit code, but without a new interpreter and
 exiftool per run; tests of what a run does to files and which way it routes
 them use it. The temp_workspace and test_profile fixtures that go with both live
@@ -24,11 +24,11 @@ from pathlib import Path
 from typing import Optional
 
 from conftest import create_test_video as _create_video_raw
-from cli import media_pipeline
-from lib import pipeline
-from lib.cli import attach_negative_option_values
+import cli.media_pipeline
+from lib import media_pipeline
+from lib.command_line import attach_negative_option_values
 from lib.exiftool import exiftool
-from lib.pipeline import events
+from lib.media_pipeline import events
 
 SCRIPT_DIR = Path(__file__).parent.parent
 MEDIA_PIPELINE = SCRIPT_DIR / "media-pipeline.sh"
@@ -85,13 +85,13 @@ def run_pipeline(args: list[str], cwd: Optional[Path] = None) -> PipelineResult:
 
 def pipeline_parser():
     """media-pipeline's own argument parser."""
-    return media_pipeline.build_parser()
+    return cli.media_pipeline.build_parser()
 
 
 def run_in_process(args: list[str]) -> PipelineResult:
     """run_pipeline's run, made in this process.
 
-    The arguments go through media-pipeline's parser and lib.pipeline.run()
+    The arguments go through media-pipeline's parser and lib.media_pipeline.run()
     with a WorkingDir of its own, as main() does; stdout is a pipe, as the app
     sees it, so the JSONL events are emitted. Each run starts with no cached
     metadata, as a new process would.
@@ -107,7 +107,7 @@ def run_in_process(args: list[str]) -> PipelineResult:
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             parsed = pipeline_parser().parse_args(
                 attach_negative_option_values(args))
-            pipeline.run(parsed, pipeline.WorkingDir())
+            media_pipeline.run(parsed, media_pipeline.WorkingDir())
     except SystemExit as exit_info:
         code = exit_info.code
         returncode = code if isinstance(code, int) else (0 if code is None else 1)
