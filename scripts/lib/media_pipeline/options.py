@@ -141,6 +141,15 @@ def _profile_dir(profile: Optional[dict], key: str) -> Optional[str]:
     return value if value and value != "None" else None
 
 
+def directories_overlap(a: str, b: str) -> bool:
+    """Whether a and b are the same directory, or one lies inside the other.
+
+    Compared on real paths, so a symlink to a directory is that directory.
+    """
+    real_a, real_b = os.path.realpath(a), os.path.realpath(b)
+    return os.path.commonpath([real_a, real_b]) in (real_a, real_b)
+
+
 def resolve_options(args) -> RunOptions:
     """The run's options for parsed command-line arguments, or exit naming the problem."""
     profile = None
@@ -162,6 +171,13 @@ def resolve_options(args) -> RunOptions:
         _fail("ERROR: --target is required (or use --profile with ready_dir)")
     if not os.path.isdir(source_dir):
         _fail(f"ERROR: Source directory not found: {source_dir}")
+    # The source is never modified, so a file renamed on its way out would land
+    # beside its original, and archive-source would take the library for a card.
+    if directories_overlap(source_dir, target_dir):
+        _fail(f"ERROR: Source and target overlap: {source_dir} and {target_dir}",
+              "The source is copied from, never changed, so processing a folder into "
+              "itself leaves every renamed file beside its original. "
+              "Choose a target outside the source.")
 
     try:
         timezone_spec = resolve_timezone(args.timezone, args.location)
