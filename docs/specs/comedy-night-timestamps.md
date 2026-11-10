@@ -39,7 +39,58 @@ comes from `exiftool` and `stat`, never from jetlag.
   XMP). Their birth times are the filename digits read as `+08:00`: the 10 Oct code's
   separate `SetFile` call landed while its metadata write was refused.
 
-## 1. Ranking: a camera filename against a UTC clock that contradicts it
+## 1. One source of truth for everything read from a file
+
+This has been a core rule of the app from the start: every fact about a file comes from
+its one exiftool read, which is cached (`exiftool.cache`), and every value derived from it
+(the winning timestamp and its source, the file's zone, the camera's zone setting, the
+filename's time, the date folder) is worked out once, by the hierarchy in
+`lib/timestamps/sources.py`, and taken from there by every consumer.
+
+The shape is declarative, and the correction already follows it: read the file once into
+a list of current values (`read.py`, `CurrentTimestamps`); generate the list of expected
+values (`plan.py`, `clock_targets` from the one clock-field table); compare the two, and the
+difference is what will change (`needed_changes`, reported as `stale_fields` and
+`stale_file_times`); apply writes exactly that difference. Everything else is a reading of
+those two lists: a guard is a predicate over them (mixed zones compares current zones across
+files; a future birth time checks one expected value against the read time), and the date
+folder is one more expected value.
+
+The read has held: `test_metadata_call_contract.py` counts it. The derivations have not,
+because nothing enforces them, and the same decisions are made in parallel again, outside
+the two lists:
+
+| Decision | The hierarchy | Parallel copy |
+|---|---|---|
+| A file's zone | the winning source's zone | `extract_metadata_timezone`: the mixed-zone guard (`media_pipeline/preflight.py`), `read_current`'s `detected_tz`, `sources.py` |
+| The camera's zone setting | `_RankingInputs` holds the UTC clock and the filename | `camera_zone_offset_for_file` gathers both again |
+| A camera filename | `_camera_filename`'s `^(VID\|LRV\|IMG)_` pattern | the same pattern in `organize_by_date.py` |
+| The date folder | the corrected time | `get_file_date_for_organization`: its own `DateTimeOriginal`, filename, modification time chain |
+| The filename's time | parsed inside `get_best_timestamp` | parsed again in `fix_media_timestamp/read.py`, `describe.py`, `preflight.py` |
+
+These are how the Comedy night went wrong in three places at once:
+
+- **The mixed-zone guard** sees only zoned tags, so it never saw the X6 batch's two zones.
+  Compared on the hierarchy's per-file zone, the UTC clock against each filename gives
+  −07:00 for clips 001–004 and 007 and +08:00 for 005 and 006, and the import would have
+  stopped as mixed. A file with no zone evidence adds nothing to the comparison; the
+  guard says so rather than guessing.
+- **The date folder** fell back to the file's modification time read in the Mac's zone:
+  C0199's card modification time, NZ clock digits read in India (+05:30) where the import
+  ran, filed it under 2026-10-07. It must come from the per-file result with the run's
+  declared timezone, never from where the Mac is.
+- **The correction and the guard** can disagree about a file, since each decides its zone
+  separately.
+
+Do this first, as a behaviour-preserving refactor held by the existing tests, deleting
+each parallel copy. Then hold the derivations the way the call-count contract holds the
+read: a test that fails when anything outside the hierarchy derives a file's time, zone,
+filename time or date for itself, so the next refactor cannot reintroduce a copy. Then the ranking change below lands in one place and reaches the
+correction, the guard and the date folder together. The standalone scripts
+(`organize-by-date.sh` and the rest) keep working on their own: they build the same
+per-file result from the same cached read.
+
+## 2. Ranking: a camera filename against a UTC clock that contradicts it
 
 The 10 Oct code (`def9e4a`), run dry on 001 with `--timezone +08:00`, took the filename
 over the UTC `CreateDate` and planned to overwrite the correct UTC fields with a time
@@ -58,7 +109,7 @@ writing it. Pin it with a test built on an X6-shaped file: UTC clock fields, a f
 another zone, `--timezone +08:00`. It must correct to the UTC instant in `+08:00`, rename
 to the Perth time under `--update-filename-dates`, and never rewrite the UTC fields.
 
-## 2. `.insv` from the X6 cannot be written
+## 3. `.insv` from the X6 cannot be written
 
 ExifTool 13.50 and 13.55 refuse every X6 clip: `Corrupted Insta360 trailer`, with or
 without `-m`. The trailer's size and signature are valid, but the record table before them
@@ -70,14 +121,6 @@ Since #256 a refused write fails the file, so an X6 import fails outright. Decid
 user whether X6 `.insv` skips the metadata write (the birth time, filename and date folder
 are still corrected; `.insv` reaches Final Cut only through an Insta360 Studio export),
 and how that shows in the app.
-
-## 3. The organize step dates a file by the Mac's zone
-
-When the run carries no corrected time, `get_file_date_for_organization()` falls back to
-the file's modification time read in the Mac's current zone. C0199 was filed under
-2026-10-07 this way: its card modification time, NZ clock digits read in India (+05:30),
-where the import ran. The date folder must come from the same ranking the timestamp step
-uses, with the run's declared timezone, never from where the Mac is.
 
 ## 4. Fix Timestamps can be turned off in the app
 
@@ -95,18 +138,9 @@ resets its birth time to its modification time. `ProvenanceStage` does not eithe
 only runs when the timestamp step is off (item 4). Pin it with a macOS test: tag a file
 whose birth time is correct, and its birth time is unchanged.
 
-## 6. A birth time in the future
+## 6. Re-run the Insta360 clips
 
-`--preserve-wallclock` (shooting clock digits in the Mac's zone) and `--time-offset` can
-make the corrected birth time a later instant than the shot. Applied soon enough after
-shooting, from a Mac west of the shooting zone, the birth time lands in the future and the
-write's modification time is earlier than it: an invalid file. Jetlag never sets the
-modification time, so the birth time must not be written in that case; report the file
-instead. Confirm the reporting with the user.
-
-## 7. Re-run the Insta360 clips
-
-Once 1 and 2 have landed, run `fix-media-timestamp --timezone +08:00
+Once 1 to 3 have landed, run `fix-media-timestamp --timezone +08:00
 --update-filename-dates --apply` on the seven clips where they sit, then `organize-by-date`
 if a date changes. `media-pipeline` refuses a source inside its target, by design. This
 needs the T9, so it runs on the user's Mac.
