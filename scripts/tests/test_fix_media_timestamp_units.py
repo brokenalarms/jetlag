@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit tests for lib/fix_media_timestamp.py, the logic behind fix-media-timestamp
+Unit tests for lib/fix_media_timestamp/, the logic behind fix-media-timestamp
 Tests individual functions without relying on output strings
 """
 
@@ -15,6 +15,10 @@ import pytest
 
 from conftest import create_test_photo, create_test_video
 from lib import fix_media_timestamp
+from lib.fix_media_timestamp.describe import format_exif_timestamp_display, format_time_delta, format_timestamp_display
+from lib.fix_media_timestamp.plan import format_offset_display
+from lib.fix_media_timestamp.read import determine_needed_changes, get_all_timestamp_data
+from lib.timestamps.file_times import get_expected_file_system_time
 from lib.countries import get_country_name, get_timezone_for_country
 from lib.exiftool import exiftool
 from lib.timestamps.provenance import read_provenance_record
@@ -134,7 +138,7 @@ class TestChangeDetection:
         written, so FCP reads the corrected time rather than nothing."""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
 
-        changes = fix_media_timestamp.determine_needed_changes(self.test_video, dt)
+        changes = determine_needed_changes(self.test_video, dt)
 
         assert "Keys:CreationDate" in changes["stale_clock_fields"]
 
@@ -144,7 +148,7 @@ class TestChangeDetection:
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
         self._set_tags(self.test_video, "-Keys:CreationDate=2025:06:18 07:25:21+08:00")
 
-        changes = fix_media_timestamp.determine_needed_changes(self.test_video, dt)
+        changes = determine_needed_changes(self.test_video, dt)
 
         assert "Keys:CreationDate" not in changes["stale_clock_fields"]
 
@@ -160,7 +164,7 @@ class TestChangeDetection:
             "-QuickTime:TrackCreateDate=2025:06:17 23:25:21",
         )
 
-        changes = fix_media_timestamp.determine_needed_changes(self.test_video, dt)
+        changes = determine_needed_changes(self.test_video, dt)
 
         assert "QuickTime:CreateDate" in changes["stale_clock_fields"]
 
@@ -176,7 +180,7 @@ class TestChangeDetection:
             "-QuickTime:TrackCreateDate=2020:01:01 00:00:00",
         )
 
-        changes = fix_media_timestamp.determine_needed_changes(self.test_video, dt)
+        changes = determine_needed_changes(self.test_video, dt)
 
         assert "QuickTime:TrackCreateDate" in changes["stale_clock_fields"]
 
@@ -192,7 +196,7 @@ class TestChangeDetection:
             "-QuickTime:TrackCreateDate=2025:06:17 23:25:21",
         )
 
-        changes = fix_media_timestamp.determine_needed_changes(self.test_video, dt)
+        changes = determine_needed_changes(self.test_video, dt)
 
         assert changes["stale_clock_fields"] == []
 
@@ -204,7 +208,7 @@ class TestChangeDetection:
                           CreateDate="2025:06:18 07:25:21")
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
 
-        changes = fix_media_timestamp.determine_needed_changes(photo, dt)
+        changes = determine_needed_changes(photo, dt)
 
         assert not [tag for tag in changes["clock_targets"] if tag.startswith("QuickTime:")]
         assert not [tag for tag in changes["stale_clock_fields"] if tag.startswith("QuickTime:")]
@@ -217,7 +221,7 @@ class TestChangeDetection:
         create_test_photo(photo, DateTimeOriginal="2025:06:18 07:25:21")
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
 
-        targets = fix_media_timestamp.determine_needed_changes(
+        targets = determine_needed_changes(
             photo, dt, write_datetime_original=True)["clock_targets"]
 
         assert targets["DateTimeOriginal"] == "2025:06:18 07:25:21+08:00"
@@ -231,7 +235,7 @@ class TestChangeDetection:
         create_test_photo(photo, DateTimeOriginal="2025:06:18 07:25:21")
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
 
-        changes = fix_media_timestamp.determine_needed_changes(photo, dt, write_datetime_original=True)
+        changes = determine_needed_changes(photo, dt, write_datetime_original=True)
 
         assert "OffsetTimeOriginal" in changes["stale_clock_fields"]
 
@@ -244,7 +248,7 @@ class TestChangeDetection:
         clear_exif_cache()
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
 
-        changes = fix_media_timestamp.determine_needed_changes(photo, dt, write_datetime_original=True)
+        changes = determine_needed_changes(photo, dt, write_datetime_original=True)
 
         assert "OffsetTimeOriginal" in changes["stale_clock_fields"]
 
@@ -257,7 +261,7 @@ class TestChangeDetection:
         clear_exif_cache()
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
 
-        changes = fix_media_timestamp.determine_needed_changes(photo, dt, write_datetime_original=True)
+        changes = determine_needed_changes(photo, dt, write_datetime_original=True)
 
         assert "OffsetTimeOriginal" not in changes["stale_clock_fields"]
         assert "DateTimeOriginal" not in changes["stale_clock_fields"]
@@ -267,7 +271,7 @@ class TestChangeDetection:
         OffsetTimeOriginal too, and exiftool drops it where it cannot be stored."""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
 
-        targets = fix_media_timestamp.determine_needed_changes(
+        targets = determine_needed_changes(
             self.test_video, dt, write_datetime_original=True)["clock_targets"]
 
         assert targets["OffsetTimeOriginal"] == "+08:00"
@@ -285,7 +289,7 @@ class TestChangeDetection:
             "-QuickTime:TrackCreateDate=2025:06:17 23:25:21",
         )
 
-        changes = fix_media_timestamp.determine_needed_changes(
+        changes = determine_needed_changes(
             self.test_video, dt, write_datetime_original=True)
 
         assert changes["stale_clock_fields"] == []
@@ -295,7 +299,7 @@ class TestChangeDetection:
         zoned local time, so no atom disagrees with another after a correction."""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
 
-        changes = fix_media_timestamp.determine_needed_changes(self.test_video, dt)
+        changes = determine_needed_changes(self.test_video, dt)
         targets = changes["clock_targets"]
 
         assert targets["QuickTime:CreateDate"] == "2025:06:17 23:25:21"
@@ -386,7 +390,7 @@ class TestGetAllTimestampData:
         """Priority 1: DateTimeOriginal with timezone is source of truth"""
         video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
 
-        data = fix_media_timestamp.get_all_timestamp_data(video)
+        data = get_all_timestamp_data(video)
 
         assert data["timestamp_source"] is TimestampSource.DATETIME_ORIGINAL_ZONED
         assert data["datetime_original"] is not None
@@ -403,7 +407,7 @@ class TestGetAllTimestampData:
                           OffsetTimeOriginal="+08:00")
         clear_exif_cache()
 
-        data = fix_media_timestamp.get_all_timestamp_data(photo)
+        data = get_all_timestamp_data(photo)
 
         assert data["timestamp_source"] is TimestampSource.DATETIME_ORIGINAL_ZONED
         assert data["timezone_source"] == "DateTimeOriginal metadata"
@@ -416,7 +420,7 @@ class TestGetAllTimestampData:
         """Priority 2: Keys:CreationDate with timezone when no DateTimeOriginal"""
         video = self._create_video("test.mp4", ["-Keys:CreationDate=2025:06:18 09:30:00+09:00"])
 
-        data = fix_media_timestamp.get_all_timestamp_data(video)
+        data = get_all_timestamp_data(video)
 
         assert data["timestamp_source"] is TimestampSource.CREATION_DATE_ZONED
         assert data["datetime_original"] is not None
@@ -429,7 +433,7 @@ class TestGetAllTimestampData:
         the same tier as bare DateTimeOriginal, and uses --timezone like it does."""
         video = self._create_video("test.mp4", ["-Keys:CreationDate#=2025:06:18 07:25:21"])
 
-        data = fix_media_timestamp.get_all_timestamp_data(video, timezone_spec="+08:00")
+        data = get_all_timestamp_data(video, timezone_spec="+08:00")
 
         assert data["timestamp_source"] is TimestampSource.CREATION_DATE
         assert data["datetime_original"] is not None
@@ -442,7 +446,7 @@ class TestGetAllTimestampData:
         """CreationDate with Z (UTC) needs --timezone to convert to local time"""
         video = self._create_video("test.mp4", ["-Keys:CreationDate=2025:06:17 23:25:21Z"])
 
-        data = fix_media_timestamp.get_all_timestamp_data(video, timezone_spec="+08:00")
+        data = get_all_timestamp_data(video, timezone_spec="+08:00")
 
         assert data["timestamp_source"] is TimestampSource.CREATION_DATE_UTC
         assert data["datetime_original"] is not None
@@ -455,7 +459,7 @@ class TestGetAllTimestampData:
         """The movie header (UTC) needs --timezone to convert to local time"""
         video = self._create_video("test.mp4", ["-QuickTime:CreateDate=2025:06:17 23:25:21"])
 
-        data = fix_media_timestamp.get_all_timestamp_data(video, timezone_spec="+08:00")
+        data = get_all_timestamp_data(video, timezone_spec="+08:00")
 
         assert data["timestamp_source"] is TimestampSource.MOVIE_HEADER_BY_SPEC
         assert data["datetime_original"] is not None
@@ -471,7 +475,7 @@ class TestGetAllTimestampData:
             ["-QuickTime:CreateDate=2026:01:03 18:35:32"],
         )
 
-        data = fix_media_timestamp.get_all_timestamp_data(video, timezone_spec="+13:00")
+        data = get_all_timestamp_data(video, timezone_spec="+13:00")
 
         assert data["timestamp_source"] is TimestampSource.MOVIE_HEADER_CORROBORATED
         assert data["datetime_original"] is not None
@@ -484,7 +488,7 @@ class TestGetAllTimestampData:
         """Filename pattern VID_YYYYMMDD_HHMMSS needs --timezone"""
         video = self._create_video("VID_20250618_072521.mp4")
 
-        data = fix_media_timestamp.get_all_timestamp_data(video, timezone_spec="+08:00")
+        data = get_all_timestamp_data(video, timezone_spec="+08:00")
 
         assert data["timestamp_source"].token == "filename"
         assert data["datetime_original"] is not None
@@ -500,7 +504,7 @@ class TestGetAllTimestampData:
             ["-DateTimeOriginal=2025:06:19 09:38:09+08:00"]
         )
 
-        data = fix_media_timestamp.get_all_timestamp_data(
+        data = get_all_timestamp_data(
             video,
             timezone_spec="+08:00",
             infer_from_filename=True
@@ -516,7 +520,7 @@ class TestGetAllTimestampData:
         video = self._create_video("VID_20250618_072521.mp4")
 
         with pytest.raises(ValueError) as exc_info:
-            fix_media_timestamp.get_all_timestamp_data(video, infer_from_filename=True)
+            get_all_timestamp_data(video, infer_from_filename=True)
 
         assert "requires --timezone" in str(exc_info.value)
 
@@ -525,7 +529,7 @@ class TestGetAllTimestampData:
         video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
 
         with pytest.raises(ValueError) as exc_info:
-            fix_media_timestamp.get_all_timestamp_data(video, timezone_spec="+08:00", infer_from_filename=True)
+            get_all_timestamp_data(video, timezone_spec="+08:00", infer_from_filename=True)
 
         assert "no parseable date" in str(exc_info.value)
 
@@ -533,7 +537,7 @@ class TestGetAllTimestampData:
         """DateTimeOriginal without timezone uses --timezone flag"""
         video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21"])
 
-        data = fix_media_timestamp.get_all_timestamp_data(video, timezone_spec="+08:00")
+        data = get_all_timestamp_data(video, timezone_spec="+08:00")
 
         assert data["timestamp_source"] is TimestampSource.DATETIME_ORIGINAL
         assert data["datetime_original"] is not None
@@ -546,7 +550,7 @@ class TestGetAllTimestampData:
         The UTC value must not move — only the wall clock and its zone label do."""
         video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:10:05 01:00:00+09:00"])
 
-        data = fix_media_timestamp.get_all_timestamp_data(video, timezone_spec="+02:00")
+        data = get_all_timestamp_data(video, timezone_spec="+02:00")
 
         assert data["timestamp_source"] is TimestampSource.DATETIME_ORIGINAL_ZONED
         converted = data["datetime_original"]
@@ -565,7 +569,7 @@ class TestGetAllTimestampData:
         used verbatim, which is what keeps reprocessing corrected files a no-op."""
         video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:10:05 01:00:00+09:00"])
 
-        data = fix_media_timestamp.get_all_timestamp_data(video)
+        data = get_all_timestamp_data(video)
 
         assert data["datetime_original"].utcoffset() == timedelta(hours=9)
         assert data["datetime_original"].hour == 1
@@ -791,16 +795,16 @@ class TestFormatOffsetDisplay:
     """Test format_offset_display helper"""
 
     def test_positive_offset(self):
-        assert fix_media_timestamp.format_offset_display(93784) == "+1d 2h 3m 4s"
+        assert format_offset_display(93784) == "+1d 2h 3m 4s"
 
     def test_negative_offset(self):
-        assert fix_media_timestamp.format_offset_display(-5400) == "-0d 1h 30m 0s"
+        assert format_offset_display(-5400) == "-0d 1h 30m 0s"
 
     def test_zero(self):
-        assert fix_media_timestamp.format_offset_display(0) == "+0d 0h 0m 0s"
+        assert format_offset_display(0) == "+0d 0h 0m 0s"
 
     def test_small_offset(self):
-        assert fix_media_timestamp.format_offset_display(300) == "+0d 0h 5m 0s"
+        assert format_offset_display(300) == "+0d 0h 5m 0s"
 
 
 class TestFormattingFunctions:
@@ -808,48 +812,48 @@ class TestFormattingFunctions:
 
     def test_format_exif_timestamp_display(self):
         """Test EXIF timestamp formatting (colons to dashes for date)"""
-        result = fix_media_timestamp.format_exif_timestamp_display("2025:06:18 07:25:21")
+        result = format_exif_timestamp_display("2025:06:18 07:25:21")
         assert result == "2025-06-18 07:25:21"
 
     def test_format_exif_timestamp_display_empty(self):
         """Test formatting handles empty string"""
-        result = fix_media_timestamp.format_exif_timestamp_display("")
+        result = format_exif_timestamp_display("")
         assert result == ""
 
     def test_format_timestamp_display(self):
         """Test datetime formatting"""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
-        result = fix_media_timestamp.format_timestamp_display(dt)
+        result = format_timestamp_display(dt)
         assert result == "2025-06-18 07:25:21+0800"
 
     def test_format_time_delta_exact_hour(self):
         """Test formatting exact hour delta"""
-        result = fix_media_timestamp.format_time_delta(3600)  # 1 hour
+        result = format_time_delta(3600)  # 1 hour
         assert result == "+1 hour"
 
     def test_format_time_delta_multiple_hours(self):
         """Test formatting multiple hours delta"""
-        result = fix_media_timestamp.format_time_delta(7200)  # 2 hours
+        result = format_time_delta(7200)  # 2 hours
         assert result == "+2 hours"
 
     def test_format_time_delta_negative(self):
         """Test formatting negative delta"""
-        result = fix_media_timestamp.format_time_delta(-3600)  # -1 hour
+        result = format_time_delta(-3600)  # -1 hour
         assert result == "-1 hour"
 
     def test_format_time_delta_minutes_only(self):
         """Test formatting minutes only"""
-        result = fix_media_timestamp.format_time_delta(1800)  # 30 minutes
+        result = format_time_delta(1800)  # 30 minutes
         assert result == "+30 minutes"
 
     def test_format_time_delta_hours_and_minutes(self):
         """Test formatting hours and minutes"""
-        result = fix_media_timestamp.format_time_delta(5400)  # 1h 30m
+        result = format_time_delta(5400)  # 1h 30m
         assert result == "+1h 30m"
 
     def test_format_time_delta_rounds_to_hour(self):
         """Test that times within 2 minutes of hour round to hour"""
-        result = fix_media_timestamp.format_time_delta(3660)  # 1 hour + 1 minute
+        result = format_time_delta(3660)  # 1 hour + 1 minute
         assert result == "+1 hour"
 
 
@@ -901,7 +905,7 @@ class TestDetermineNeededChanges:
         """The one comparison reports what each clock field should hold, which of
         those are not already correct, and whether the file system needs touching."""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
-        changes = fix_media_timestamp.determine_needed_changes(self.test_video, dt)
+        changes = determine_needed_changes(self.test_video, dt)
 
         assert "clock_targets" in changes
         assert "stale_clock_fields" in changes
@@ -911,7 +915,7 @@ class TestDetermineNeededChanges:
     def test_fresh_file_needs_keys_creationdate(self):
         """Test that a fresh file needs Keys:CreationDate"""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
-        changes = fix_media_timestamp.determine_needed_changes(self.test_video, dt)
+        changes = determine_needed_changes(self.test_video, dt)
 
         assert "Keys:CreationDate" in changes["stale_clock_fields"]
 
@@ -921,9 +925,9 @@ class TestDetermineNeededChanges:
         (missing tag, --infer-from-filename or a confirmed --force-timezone)."""
         dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
 
-        assert "DateTimeOriginal" not in fix_media_timestamp.determine_needed_changes(
+        assert "DateTimeOriginal" not in determine_needed_changes(
             self.test_video, dt)["clock_targets"]
-        assert "DateTimeOriginal" in fix_media_timestamp.determine_needed_changes(
+        assert "DateTimeOriginal" in determine_needed_changes(
             self.test_video, dt, write_datetime_original=True)["clock_targets"]
 
 
@@ -1304,7 +1308,7 @@ class TestAddingMissingFieldsIsNotAFix:
                "QuickTime:MediaCreateDate": "2026:10:28 06:08:08",
                "QuickTime:TrackCreateDate": "2026:10:28 06:08:08"},
         )
-        self.expected_birth = fix_media_timestamp.get_expected_file_system_time(
+        self.expected_birth = get_expected_file_system_time(
             datetime(2026, 10, 28, 6, 8, 8, tzinfo=timezone.utc))
         if sys.platform == "darwin":
             set_file_system_timestamps(self.video, self.expected_birth)

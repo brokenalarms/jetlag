@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from conftest import create_test_video
-from lib import fix_media_timestamp
+from lib.fix_media_timestamp.read import determine_needed_changes
 
 
 if sys.platform == "darwin":
@@ -112,7 +112,7 @@ class TestFileTimestamps:
             "SetFile", "-d", "06/18/2025 07:25:21", self.test_video
         ], capture_output=True, check=True)
 
-        changes = fix_media_timestamp.determine_needed_changes(self.test_video, dt, preserve_wallclock=True)
+        changes = determine_needed_changes(self.test_video, dt, preserve_wallclock=True)
         assert changes["file_timestamps"] is False
 
     def test_get_expected_file_system_time_display_mode(self):

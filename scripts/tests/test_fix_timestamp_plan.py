@@ -16,7 +16,6 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from lib import fix_media_timestamp
 from lib.fix_media_timestamp import (
     NO_TIMESTAMP, REFUSED_WITHOUT_FORCE, ZONE_NEEDED, CorrectionOptions, apply_correction,
     plan_correction, read_current,
@@ -158,7 +157,7 @@ class TestNothingToCorrect:
         assert (result.timestamp_action, result.original_time) == ("error", "2025:10:05 10:00:00")
 
     def test_a_file_with_no_time_at_all_is_an_error(self, fake_metadata, monkeypatch):
-        monkeypatch.setattr(fix_media_timestamp, "get_best_timestamp",
+        monkeypatch.setattr("lib.fix_media_timestamp.read.get_best_timestamp",
                             lambda *_: (None, TimestampSource.NONE))
         plan = _plan(fake_metadata, CLIP, {}, timezone_spec="+09:00")
 
