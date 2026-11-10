@@ -1,9 +1,11 @@
+import { BUY_URL, FREE_FILE_LIMIT, MIN_MACOS, PRICE } from '../content.js'
+
 const freeFeatures = [
   'Full pipeline: import, tag, fix timestamps, organize',
   'All camera profiles (GoPro, iPhone, DJI, Insta360…)',
   'Dry-run preview mode',
   'Date-based folder organization',
-  'Up to 50 files per run',
+  `Up to ${FREE_FILE_LIMIT} files per run`,
 ]
 
 const proFeatures = [
@@ -63,7 +65,7 @@ export function render() {
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" class="text-white/25 flex-shrink-0 mt-0.5" aria-hidden="true">
                   <path d="M4 8h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
-                <span>50-file limit per run</span>
+                <span>${FREE_FILE_LIMIT}-file limit per run</span>
               </li>
             </ul>
 
@@ -81,7 +83,7 @@ export function render() {
             <div class="mb-6 mt-2">
               <h3 class="text-lg font-bold text-white">Jetlag Pro</h3>
               <div class="mt-3 flex items-baseline gap-1">
-                <span class="text-4xl font-bold text-white">$29</span>
+                <span class="text-4xl font-bold text-white">${PRICE}</span>
                 <span class="text-sm text-white/40">one time</span>
               </div>
               <p class="mt-2 text-sm text-white/45">Unlock unlimited processing, forever.</p>
@@ -96,8 +98,8 @@ export function render() {
               `).join('')}
             </ul>
 
-            <a href="https://jetlag.app/buy" class="btn-primary w-full justify-center">
-              Buy Jetlag Pro — $29
+            <a href="${BUY_URL}" class="btn-primary w-full justify-center">
+              Buy Jetlag Pro — ${PRICE}
             </a>
             <p class="mt-3 text-center text-xs text-white/30">Secure checkout via Paddle. Instant license delivery.</p>
           </div>
@@ -111,10 +113,10 @@ export function render() {
         <!-- FAQ -->
         <div class="mt-16 grid gap-4 sm:grid-cols-2 max-w-3xl mx-auto">
           ${[
-            ['What is the 50-file limit?', 'The free version processes up to 50 files per pipeline run. For most day trips with one or two cameras, that\'s plenty. Pro removes the limit entirely.'],
+            [`What is the ${FREE_FILE_LIMIT}-file limit?`, `The free version processes up to ${FREE_FILE_LIMIT} files per pipeline run. For most day trips with one or two cameras, that's plenty. Pro removes the limit entirely.`],
             ['Is it really a one-time purchase?', 'Yes. Pay once, use Jetlag Pro forever. No monthly fee, no annual renewal.'],
-            ['What macOS version do I need?', 'macOS 13 Ventura or later. Jetlag is a native SwiftUI app — no Electron, no web runtime.'],
-            ['Can I try it before buying?', 'Yes. Download the free version and run it on your footage. The full pipeline works — you\'re only limited to 50 files per run.'],
+            ['What macOS version do I need?', `${MIN_MACOS} or later. Jetlag is a native SwiftUI app — no Electron, no web runtime.`],
+            ['Can I try it before buying?', `Yes. Download the free version and run it on your footage. The full pipeline works — you're only limited to ${FREE_FILE_LIMIT} files per run.`],
           ].map(([q, a]) => /* html */`
             <div class="card">
               <h4 class="text-sm font-semibold text-white mb-2">${q}</h4>

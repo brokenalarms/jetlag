@@ -1,3 +1,5 @@
+import { MIN_MACOS, PRICE } from '../content.js'
+
 export const id = 'hero'
 
 export function render() {
@@ -39,13 +41,13 @@ export function render() {
           Download free for macOS
         </a>
         <a href="#pricing" class="btn-secondary text-base px-8 py-3.5">
-          Unlock Pro — one-time $29
+          Unlock Pro — one-time ${PRICE}
         </a>
       </div>
 
       <!-- Trust line -->
       <p class="animate-fade-up opacity-0 mt-6 text-sm text-white/30" style="animation-delay: 0.6s">
-        macOS 13 Ventura or later &nbsp;·&nbsp; No subscription &nbsp;·&nbsp; Free tier included
+        ${MIN_MACOS} or later &nbsp;·&nbsp; No subscription &nbsp;·&nbsp; Free tier included
       </p>
 
       <!-- App preview / diagram -->

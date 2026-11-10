@@ -9,6 +9,7 @@
  * a dead nav link without any error.
  */
 import { beforeAll, describe, expect, test } from 'vitest'
+import { BUY_URL, FREE_FILE_LIMIT, PRICE } from '../src/content.js'
 import { SECTIONS, renderPage } from '../src/page.js'
 
 describe('rendered page', () => {
@@ -37,5 +38,18 @@ describe('rendered page', () => {
     expect(targets.length).toBeGreaterThan(0)
     const missing = targets.filter(id => !document.getElementById(id))
     expect(missing).toEqual([])
+  })
+
+  // Price, buy link and free limit come from content.js; a hardcoded copy left in a
+  // section would show a stale value after the constant changes.
+  test('every price, buy link and file limit matches content.js', () => {
+    const text = document.body.textContent
+    expect(new Set(text.match(/\$\d+/g))).toEqual(new Set([PRICE]))
+    const limits = [...text.matchAll(/(\d+)(?:-file limit| files per)/g)].map(m => Number(m[1]))
+    expect(limits.length).toBeGreaterThan(0)
+    expect(new Set(limits)).toEqual(new Set([FREE_FILE_LIMIT]))
+    const buyLinks = [...document.querySelectorAll('a')].filter(a => /buy/i.test(a.textContent))
+    expect(buyLinks.length).toBeGreaterThan(0)
+    for (const a of buyLinks) expect(['#pricing', BUY_URL]).toContain(a.getAttribute('href'))
   })
 })

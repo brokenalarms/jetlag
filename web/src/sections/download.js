@@ -1,3 +1,5 @@
+import { BUY_URL, DOWNLOAD_URL, MIN_MACOS, PRICE } from '../content.js'
+
 export const id = 'download'
 
 export function render() {
@@ -19,7 +21,7 @@ export function render() {
 
         <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
-            href="https://github.com/brokenalarms/Jetlag/releases/latest"
+            href="${DOWNLOAD_URL}"
             class="btn-primary text-base px-8 py-4 w-full sm:w-auto justify-center"
             target="_blank"
             rel="noopener noreferrer"
@@ -30,15 +32,15 @@ export function render() {
             Download for macOS
           </a>
           <a
-            href="https://jetlag.app/buy"
+            href="${BUY_URL}"
             class="btn-secondary text-base px-8 py-4 w-full sm:w-auto justify-center"
           >
-            Buy Jetlag Pro — $29
+            Buy Jetlag Pro — ${PRICE}
           </a>
         </div>
 
         <p class="mt-6 text-xs text-white/25">
-          macOS 13 Ventura or later &nbsp;·&nbsp; Apple Silicon & Intel &nbsp;·&nbsp; ~8 MB download
+          ${MIN_MACOS} or later &nbsp;·&nbsp; Apple Silicon & Intel &nbsp;·&nbsp; ~8 MB download
         </p>
       </div>
     </section>
