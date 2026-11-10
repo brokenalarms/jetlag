@@ -890,7 +890,7 @@ final class AppState {
             return
         }
         do {
-            profilesConfig = try ProfileService.load(from: profilesLocation.path).normalized()
+            profilesConfig = try ProfileService.load(from: profilesLocation.path)
             profileLoadError = nil
         } catch {
             profilesConfig = nil
@@ -902,8 +902,10 @@ final class AppState {
         workflowSession.profileName.isEmpty ? nil : workflowSession.workingProfile
     }
 
+    /// The profile as the app shows and runs it, gyroflow settings it leaves to
+    /// the global preset filled in.
     func profile(named name: String) -> MediaProfile? {
-        profilesConfig?.profiles[name]
+        profilesConfig?.profile(named: name)
     }
 
     /// Create the profile for a camera found in the source chosen for it. Its

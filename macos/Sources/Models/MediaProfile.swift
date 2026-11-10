@@ -1,41 +1,21 @@
 import Foundation
-
-struct ProfilesConfig: Codable {
-    var gyroflow: GyroflowConfig?
-    var profiles: [String: MediaProfile]
-
-    enum CodingKeys: String, CodingKey {
-        case gyroflow, profiles
-    }
-
-    func normalized() -> ProfilesConfig {
-        let globalStab = gyroflow?.preset?.stabilization
-        var result = self
-        for (name, profile) in profiles {
-            guard profile.gyroflowEnabled == true else { continue }
-            var p = profile
-            if p.gyroflowSettings == nil {
-                p.gyroflowSettings = globalStab ?? StabilizationSettings()
-            } else if let globalStab {
-                var settings = p.gyroflowSettings!
-                settings.maxZoom = settings.maxZoom ?? globalStab.maxZoom
-                settings.adaptiveZoomWindow = settings.adaptiveZoomWindow ?? globalStab.adaptiveZoomWindow
-                settings.adaptiveZoomMethod = settings.adaptiveZoomMethod ?? globalStab.adaptiveZoomMethod
-                p.gyroflowSettings = settings
-            }
-            result.profiles[name] = p
-        }
-        return result
-    }
-}
+import Yams
 
 struct GyroflowConfig: Codable {
     var binary: String?
     var preset: GyroflowPreset?
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case binary, preset
+    }
 }
 
 struct GyroflowPreset: Codable {
     var stabilization: StabilizationSettings?
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case stabilization
+    }
 }
 
 struct StabilizationSettings: Codable, Equatable {
@@ -43,7 +23,7 @@ struct StabilizationSettings: Codable, Equatable {
     var adaptiveZoomWindow: Double?
     var adaptiveZoomMethod: Int?
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case maxZoom = "max_zoom"
         case adaptiveZoomWindow = "adaptive_zoom_window"
         case adaptiveZoomMethod = "adaptive_zoom_method"
@@ -97,8 +77,12 @@ struct MediaProfile: Codable, Equatable {
     var exif: ExifConfig?
     var fileExtensions: [String]?
     var companionExtensions: [String]?
+    /// The profile's block as it was read from the profiles file. A save is
+    /// written over it, so keys the app does not model — or anything a newer
+    /// script reads — survive a save, a rename and a copy.
+    var fileNode: Node? = nil
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case type
         case sourceDir = "source_dir"
         case readyDir = "ready_dir"
@@ -113,4 +97,8 @@ struct MediaProfile: Codable, Equatable {
 struct ExifConfig: Codable, Equatable {
     var make: String?
     var model: String?
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case make, model
+    }
 }

@@ -60,7 +60,7 @@ struct WorkflowView: View {
             let name = state.workflowSession.profileName
             if !name.isEmpty {
                 state.workflowSession = WorkflowSession(
-                    profile: state.profilesConfig?.profiles[name],
+                    profile: state.profile(named: name),
                     profileName: name,
                     gyroflowAvailable: state.gyroflowStatus.isInstalled
                 )
@@ -278,7 +278,7 @@ struct WorkflowView: View {
                     .onChange(of: session.profileName) { _, newValue in
                         state.clearLog()
                         state.workflowSession = WorkflowSession(
-                            profile: state.profilesConfig?.profiles[newValue],
+                            profile: state.profile(named: newValue),
                             profileName: newValue,
                             gyroflowAvailable: state.gyroflowStatus.isInstalled
                         )

@@ -336,15 +336,16 @@ struct ProfilesView: View {
     // MARK: - CRUD
 
     private func saveCurrentProfile() {
-        guard let editor, state.profilesConfig != nil else { return }
+        guard let editor, let config = state.profilesConfig else { return }
 
+        let original = snapshot.flatMap { config.profiles[$0.name] }
         if let snapshot, snapshot.name != editor.name {
             state.profilesConfig?.profiles.removeValue(forKey: snapshot.name)
             if state.workflowSession.profileName == snapshot.name {
                 state.workflowSession.profileName = editor.name
             }
         }
-        state.profilesConfig?.profiles[editor.name] = editor.profile
+        state.profilesConfig?.profiles[editor.name] = config.storable(editor.profile, replacing: original)
 
         state.writeProfiles()
         snapshot = editor
