@@ -54,8 +54,12 @@ final class LicenseStore {
         return defaults.object(forKey: unlockedKey) as? Bool ?? true
     }
 
-    /// Maximum files per run. Free tier: 50. Unlocked: unlimited.
-    var fileLimit: Int { isUnlocked ? Int.max : 50 }
+    /// Files per run on the free tier. design/product.json holds the same number
+    /// for the website; LicenseStoreTests keeps the two equal.
+    static let freeFileLimit = 50
+
+    /// Maximum files per run: the free-tier limit, or unlimited once unlocked.
+    var fileLimit: Int { isUnlocked ? Int.max : Self.freeFileLimit }
 
     func exceedsLimit(fileCount: Int) -> Bool {
         fileCount > fileLimit

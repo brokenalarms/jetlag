@@ -61,4 +61,18 @@ final class LicenseStoreTests: XCTestCase {
             developerBuild: false
         ))
     }
+
+    /// The website states the free-tier limit from design/product.json; the app
+    /// must enforce the same number.
+    func testFreeFileLimitMatchesTheProductFacts() throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // Services
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // macos
+            .deletingLastPathComponent()   // repo root
+            .appendingPathComponent("design/product.json")
+        let product = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        let limit = try XCTUnwrap(product?["freeFileLimit"] as? Int, "design/product.json has no freeFileLimit")
+        XCTAssertEqual(LicenseStore.freeFileLimit, limit)
+    }
 }

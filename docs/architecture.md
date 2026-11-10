@@ -24,11 +24,11 @@
 │   ├── src/components/   ← shared pieces (section header, nav, timeline)
 │   ├── tokens.js         ← Tailwind plugin: design/tokens.json → CSS variables
 │   └── tests/            ← Vitest suite (`npm test`)
-├── design/               ← shared design tokens, app icon generation, screenshots
+├── design/               ← shared design tokens, product facts (product.json), app icon generation, screenshots
 └── docs/                 ← documentation
 ```
 
-`scripts/`, `macos/`, and `web/` are independent components. `scripts/` and `macos/` share `media-profiles.yaml`. `web/` and `macos/` share color tokens via `design/tokens.json`. The scripts have no knowledge of the app or website.
+`scripts/`, `macos/`, and `web/` are independent components. `scripts/` and `macos/` share `media-profiles.yaml`. `web/` and `macos/` share color tokens via `design/tokens.json`, and product facts (free-file limit, minimum macOS) via `design/product.json`, which tests on both sides hold the app to. The scripts have no knowledge of the app or website.
 
 At build time, the `Bundle scripts` build phase copies `scripts/` into `Contents/Resources/scripts/` inside the app bundle.
 
