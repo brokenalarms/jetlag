@@ -890,12 +890,16 @@ def _source_to_machine_token(source: str) -> str:
     return source_lower
 
 
-def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None, force_timezone: bool = False, extra_write_fields: Optional[Dict[str, str]] = None) -> TimestampFixResult:
+def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None, force_timezone: bool = False, extra_write_fields: Optional[Dict[str, str]] = None, record_provenance: bool = False) -> TimestampFixResult:
     """Fix media (photo/video) timestamps.
 
     extra_write_fields are other steps' field writes, sent in this step's exiftool
     call so the file is rewritten once. They are written even when the timestamps
     need no change.
+
+    record_provenance makes a missing provenance record a reason to write on its own,
+    for a caller that records provenance on every file it moves. Without it the record
+    rides only on a write the file needed anyway.
 
     Returns:
         TimestampFixResult with all machine-readable fields populated.
@@ -1070,15 +1074,14 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
         print(f"📊 Change   : {change_desc}", file=sys.stderr)
 
     extra_write_fields = extra_write_fields or {}
-    if dry_run or not (has_changes or extra_write_fields):
+    # Capture what the file held before jetlag touches it, in the same write as the
+    # correction below.
+    provenance_args = [] if dry_run else provenance_field_args(file_path, current_data["exif"])
+    if dry_run or not (has_changes or extra_write_fields or (record_provenance and provenance_args)):
         return TimestampFixResult(**result_base, timestamp_action="no_change")
 
     # Apply changes
     success = True
-
-    # Capture what the file held before jetlag touches it, in the same write as the
-    # correction below.
-    provenance_args = provenance_field_args(file_path, current_data["exif"])
 
     if should_write_datetime_original and infer_from_filename and current_data["exif"].get("DateTimeOriginal"):
         print("   ⚠️  Overwriting existing DateTimeOriginal (--infer-from-filename flag)", file=sys.stderr)

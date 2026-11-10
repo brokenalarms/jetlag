@@ -111,6 +111,8 @@ It starts exiftool with `scripts/lib/exiftool-jetlag.config`, which declares jet
 
 An exiftool write rebuilds a QuickTime file (`moov` moves ahead of `mdat`), so a copy jetlag has written never matches its card file byte for byte. `scripts/lib/footage.py` reads only the top-level box headers to find the footage — each `mdat` payload plus any trailer after the last box — which those writes leave unchanged; verify-card compares copies by its size and hash.
 
+Every file the pipeline moves carries a provenance record — its card name in `XMP-xmpMM:PreservedFileName` and its clock fields as they were before jetlag's first write, in `XMP-jetlag` — written once and never overwritten. It rides in the file's single metadata write: fix-timestamp's when that step runs (a missing record is reason enough for it to write), the pipeline's own otherwise, together with the tag step's camera fields. verify-card finds a renamed copy by that card name.
+
 ---
 
 ## Distribution

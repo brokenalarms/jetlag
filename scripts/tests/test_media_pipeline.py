@@ -751,6 +751,88 @@ class TestTagging:
         assert model == "Camera"
 
 
+class TestEveryMovedFileRecordsItsCardName:
+    """verify-card finds a file's backup copies by the name it had on the card, and a
+    timezone correction can rename it. So every file the pipeline moves carries its
+    card name in XMP-xmpMM:PreservedFileName, even when no step changes its metadata:
+    without it, a renamed copy could never be matched to its card file.
+    """
+
+    @staticmethod
+    def _events(stdout: str) -> list[dict]:
+        return [json.loads(line) for line in stdout.splitlines() if line.startswith("{")]
+
+    def test_file_needing_no_timestamp_change_still_records_its_card_name(self, temp_workspace, test_profile):
+        source, target = temp_workspace["source"], temp_workspace["target"]
+        video = source / "VID_20251005_100000.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+        # A file whose clock fields are already right: corrected once, then stripped of
+        # the record that correction wrote, as a file from another tool would be.
+        subprocess.run(
+            [sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), str(video),
+             "--timezone", "+09:00", "--apply"],
+            capture_output=True, check=True,
+        )
+        subprocess.run(
+            ["exiftool", "-overwrite_original", "-XMP-xmpMM:PreservedFileName=", "-XMP-jetlag:all=", str(video)],
+            capture_output=True, check=True,
+        )
+        assert get_exif_field(video, "XMP-xmpMM:PreservedFileName") == ""
+
+        result = run_pipeline([
+            "--profile", test_profile, "--source", str(source), "--timezone", "+0900",
+            "--tasks", "fix-timestamp", "--apply",
+        ])
+
+        timestamp = next(e for e in self._events(result.stdout) if e["event"] == "timestamp_result")
+        assert timestamp["action"] == "no_change", \
+            f"Actual: {timestamp['action']}, Expected: no_change (the file is already correct)"
+        moved = list(target.rglob("*.mp4"))
+        assert len(moved) == 1, f"Actual: {moved}, Expected: one file in the library"
+        recorded = get_exif_field(moved[0], "XMP-xmpMM:PreservedFileName")
+        assert recorded == video.name, \
+            f"Actual: PreservedFileName={recorded!r}, Expected: {video.name!r}"
+
+    def test_file_no_metadata_step_touches_records_its_card_name_and_clock(self, temp_workspace, test_profile):
+        source, target = temp_workspace["source"], temp_workspace["target"]
+        video = source / "VID_20251005_100000.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        run_pipeline([
+            "--profile", test_profile, "--source", str(source), "--timezone", "+0900",
+            "--tasks", "gyroflow", "--apply",
+        ])
+
+        moved = list(target.rglob("*.mp4"))
+        assert len(moved) == 1, f"Actual: {moved}, Expected: one file in the library"
+        recorded = {
+            "PreservedFileName": get_exif_field(moved[0], "XMP-xmpMM:PreservedFileName"),
+            "OriginalCreateDate": get_exif_field(moved[0], "XMP-jetlag:OriginalCreateDate"),
+        }
+        expected = {"PreservedFileName": video.name, "OriginalCreateDate": "2025:10:05 01:00:00"}
+        assert recorded == expected, f"Actual: {recorded}, Expected: {expected}"
+
+    def test_existing_record_is_never_overwritten(self, temp_workspace, test_profile):
+        """A re-imported file keeps the record of its first import, not this run's name."""
+        source, target = temp_workspace["source"], temp_workspace["target"]
+        video = source / "VID_20251005_100000.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+        subprocess.run(
+            ["exiftool", "-overwrite_original", "-XMP-xmpMM:PreservedFileName=VID_20251005_090000.mp4", str(video)],
+            capture_output=True, check=True,
+        )
+
+        run_pipeline([
+            "--profile", test_profile, "--source", str(source), "--timezone", "+0900",
+            "--tasks", "gyroflow", "--apply",
+        ])
+
+        moved = list(target.rglob("*.mp4"))
+        recorded = get_exif_field(moved[0], "XMP-xmpMM:PreservedFileName")
+        assert recorded == "VID_20251005_090000.mp4", \
+            f"Actual: PreservedFileName={recorded!r}, Expected: the first import's name"
+
+
 class TestAlreadyProcessedFiles:
     """Tests for handling files that are already correctly processed."""
 
