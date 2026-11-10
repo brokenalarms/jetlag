@@ -21,7 +21,7 @@ import pytest
 from lib.pipeline import RunOptions, WorkingDir, process_file
 from lib.pipeline import stages
 from lib.pipeline.stages import Stage, StageOutcome, enabled_stages, fix_writes_fields
-from pipeline_helpers import create_test_video, get_exif_field, has_tag_cmd, run_pipeline
+from pipeline_helpers import create_test_video, get_exif_field, has_tag_cmd, run_in_process, run_pipeline
 
 DEFAULT_TASKS = frozenset({"tag", "fix-timestamp", "gyroflow"})
 CAMERA_PROFILE = {"tags": ["test-camera"], "exif": {"make": "Test", "model": "Camera"}}
@@ -246,7 +246,7 @@ class TestFileExiftoolCannotWrite:
         source, target = temp_workspace["source"], temp_workspace["target"]
         self._create_unwritable_video(source / "VID_20251005_100000.mp4")
 
-        result = run_pipeline([
+        result = run_in_process([
             "--profile", test_profile, "--source", str(source),
             "--timezone", "+0900", "--infer-from-filename", "--apply",
         ])
@@ -267,7 +267,7 @@ class TestFileExiftoolCannotWrite:
         source, target = temp_workspace["source"], temp_workspace["target"]
         self._create_unwritable_video(source / "VID_20251005_100000.mp4")
 
-        result = run_pipeline([
+        result = run_in_process([
             "--profile", test_profile, "--source", str(source),
             "--timezone", "+0900", "--tasks", "tag", "--apply",
         ])

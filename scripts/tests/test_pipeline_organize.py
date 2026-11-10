@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 
-from pipeline_helpers import create_test_video, run_pipeline
+from pipeline_helpers import create_test_video, run_in_process, run_pipeline
 from pipeline_schema import validate_event
 
 
@@ -146,7 +146,7 @@ class TestGroupTemplate:
         video = source / "test.mp4"
         create_test_video(video, media_create_date="2025:08:15 03:00:00")
 
-        result = run_pipeline(
+        result = run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "South Korea Trip", "--apply"],
         )
 
@@ -161,7 +161,7 @@ class TestGroupTemplate:
         video = source / "test.mp4"
         create_test_video(video, media_create_date="2025:08:15 03:00:00")
 
-        run_pipeline(
+        run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "08-09 - South Korea", "--apply"],
         )
 
@@ -175,7 +175,7 @@ class TestGroupTemplate:
         video = source / "test.mp4"
         create_test_video(video, media_create_date="2025:08:15 03:00:00")
 
-        result = run_pipeline(
+        result = run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--apply"],
         )
 
@@ -197,7 +197,7 @@ class TestGroupTemplate:
         video = source / "test.mp4"
         create_test_video(video, media_create_date="2025:08:15 03:00:00")
 
-        result = run_pipeline(
+        result = run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Japan", "--apply"],
         )
 
@@ -219,7 +219,7 @@ class TestGroupTemplate:
         video = source / "test.mp4"
         create_test_video(video, media_create_date="2025:08:15 03:00:00")
 
-        result = run_pipeline(
+        result = run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--apply"],
         )
 
@@ -238,7 +238,7 @@ class TestGroupFolder:
         video = source / "test.mp4"
         create_test_video(video, media_create_date="2025:08:15 03:00:00")
 
-        run_pipeline([
+        run_in_process([
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
@@ -265,7 +265,7 @@ class TestAlreadyProcessedFiles:
         )
         original_size = correct_path.stat().st_size
 
-        run_pipeline(
+        run_in_process(
             ["--profile", test_profile, "--source", str(correct_path.parent), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
@@ -285,7 +285,7 @@ class TestOutputAlwaysOn:
         video = source / "test.mp4"
         create_test_video(video, media_create_date="2025:10:05 01:00:00")
 
-        run_pipeline(
+        run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900",
              "--group", "Test", "--tasks", "fix-timestamp", "--apply"],
         )
@@ -300,7 +300,7 @@ class TestOutputAlwaysOn:
         video = source / "test.mp4"
         create_test_video(video, media_create_date="2025:10:05 01:00:00")
 
-        run_pipeline(
+        run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900",
              "--group", "Test", "--tasks", "tag", "--apply"],
         )
@@ -320,7 +320,7 @@ class TestOverwriteDestination:
     """
 
     def _run(self, workspace, profile, *extra):
-        return run_pipeline([
+        return run_in_process([
             "--profile", profile,
             "--source", str(workspace["source"]),
             "--target", str(workspace["target"]),
@@ -505,7 +505,7 @@ class TestOrganizeReportsTheUserFacingOutcome:
     """
 
     def _run(self, workspace, profile, *extra):
-        return run_pipeline([
+        return run_in_process([
             "--profile", profile,
             "--source", str(workspace["source"]),
             "--target", str(workspace["target"]),

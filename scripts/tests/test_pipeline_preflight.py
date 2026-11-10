@@ -25,7 +25,7 @@ from lib.pipeline.preflight import (
     MIXED_TIMEZONES, PROVIDED_MISMATCH, FileZone, TimezoneConflict, preflight_timezones,
     read_file_zones,
 )
-from pipeline_helpers import create_test_video, run_pipeline
+from pipeline_helpers import create_test_video, run_in_process, run_pipeline
 from pipeline_schema import validate_event
 
 
@@ -235,7 +235,7 @@ class TestSourceCameraIsCheckedAgainstTheProfile:
     VIDEO = "VID_20251005_100000_00_001.mp4"
 
     def _run(self, workspace, profile, *extra):
-        return run_pipeline([
+        return run_in_process([
             "--profile", profile,
             "--source", str(workspace["source"]),
             "--target", str(workspace["target"]),

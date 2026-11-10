@@ -7,7 +7,7 @@ test_pipeline_preflight.py; these hold the whole run's effect on the files.
 
 
 from conftest import create_test_video as _create_video_raw
-from pipeline_helpers import create_test_video, get_exif_field, run_pipeline
+from pipeline_helpers import create_test_video, get_exif_field, run_in_process
 
 
 class TestTimezoneHandling:
@@ -24,7 +24,7 @@ class TestTimezoneHandling:
         video = source / "test.mp4"
         create_test_video(video, media_create_date="2025:10:05 01:00:00")
 
-        run_pipeline(
+        run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
@@ -38,7 +38,7 @@ class TestTimezoneHandling:
         video = source / "test.mp4"
         create_test_video(video)
 
-        result = run_pipeline(
+        result = run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "JST", "--group", "Test"],
         )
 
@@ -50,7 +50,7 @@ class TestTimezoneHandling:
         source = temp_workspace["source"]
         create_test_video(source / "test.mp4")
 
-        result = run_pipeline(
+        result = run_in_process(
             ["--profile", test_profile, "--source", str(source),
              "--timezone", "Pacific/Atlantis", "--group", "Test"],
         )
@@ -69,7 +69,7 @@ class TestTimezoneHandling:
         create_test_video(source / "summer.mp4", media_create_date="2025:03:15 01:00:00")
         create_test_video(source / "winter.mp4", media_create_date="2025:07:15 01:00:00")
 
-        run_pipeline(
+        run_in_process(
             ["--profile", test_profile, "--source", str(source),
              "--timezone", "Pacific/Auckland", "--group", "Test", "--apply"],
         )
@@ -103,7 +103,7 @@ class TestInferFromFilename:
             DateTimeOriginal="2025:06:19 09:38:09+08:00",
         )
 
-        run_pipeline([
+        run_in_process([
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0800",
@@ -123,7 +123,7 @@ class TestInferFromFilename:
         video = source / "VID_20250619_063809.mp4"
         create_test_video(video)
 
-        result = run_pipeline([
+        result = run_in_process([
             "--profile", test_profile,
             "--source", str(source),
             "--group", "Test",
@@ -147,7 +147,7 @@ class TestTimeOffset:
         video = source / "test.mp4"
         create_test_video(video, media_create_date="2025:10:05 01:00:00")
 
-        run_pipeline([
+        run_in_process([
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
@@ -167,7 +167,7 @@ class TestTimeOffset:
         video = source / "test.mp4"
         create_test_video(video)
 
-        result = run_pipeline([
+        result = run_in_process([
             "--profile", test_profile,
             "--source", str(source),
             "--group", "Test",

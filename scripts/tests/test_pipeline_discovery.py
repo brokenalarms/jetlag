@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from pipeline_helpers import create_test_video, get_exif_field, run_pipeline
+from pipeline_helpers import create_test_video, get_exif_field, run_in_process, run_pipeline
 
 
 class TestFileTypesMustBeDeclared:
@@ -32,7 +32,7 @@ class TestFileTypesMustBeDeclared:
         create_test_video(source / "clip.mp4")
         target = temp_workspace["root"] / "fresh-target"
 
-        result = run_pipeline(["--profile", test_profile, "--source", str(source),
+        result = run_in_process(["--profile", test_profile, "--source", str(source),
                                "--target", str(target), "--apply"])
 
         assert result.returncode == 1, f"Actual: {result.returncode}, Expected: 1"
@@ -45,7 +45,7 @@ class TestFileTypesMustBeDeclared:
         create_test_video(source / "clip.mp4")
         target = temp_workspace["root"] / "fresh-target"
 
-        result = run_pipeline(["--source", str(source), "--target", str(target), "--apply"])
+        result = run_in_process(["--source", str(source), "--target", str(target), "--apply"])
 
         assert result.returncode == 1, f"Actual: {result.returncode}, Expected: 1"
         assert self.NO_TYPES_ERROR in result.stderr, f"Actual: {result.stderr}, Expected: it names file_extensions"
@@ -57,7 +57,7 @@ class TestFileTypesMustBeDeclared:
         create_test_video(source / "clip.mp4")
         (source / "other.mov").write_bytes(b"fake")
 
-        result = run_pipeline(["--source", str(source), "--target", str(temp_workspace["target"]),
+        result = run_in_process(["--source", str(source), "--target", str(temp_workspace["target"]),
                                "--extensions", ".mp4", "--timezone", "+0900", "--group", "Test"])
 
         assert "Found 1 .mp4 file(s)" in result.stderr, f"Actual: {result.stderr}, Expected: one .mp4 found"
@@ -72,7 +72,7 @@ class TestFileDiscovery:
         create_test_video(source / "2025-10-05" / "test1.mp4")
         create_test_video(source / "2025-10-05" / "test2.mp4")
 
-        result = run_pipeline(
+        result = run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
@@ -85,7 +85,7 @@ class TestFileDiscovery:
         (source / "2025-10-05" / "test.mov").write_bytes(b"fake")
         (source / "2025-10-05" / "test.txt").write_bytes(b"fake")
 
-        result = run_pipeline(
+        result = run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
@@ -97,7 +97,7 @@ class TestFileDiscovery:
         create_test_video(source / "2025-10-05" / "test1.mp4")
         create_test_video(source / "2025-10-06" / "subdir" / "test2.mp4")
 
-        result = run_pipeline(
+        result = run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
@@ -110,7 +110,7 @@ class TestFileDiscovery:
         create_test_video(source / "apple.mp4")
         create_test_video(source / "mango.mp4")
 
-        result = run_pipeline(
+        result = run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
@@ -130,7 +130,7 @@ class TestExiftoolTmpDetection:
         (source / "exiftool_tmp").mkdir()
         create_test_video(source / "test.mp4")
 
-        result = run_pipeline(
+        result = run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test"],
         )
 
@@ -176,7 +176,7 @@ class TestIngestIntegration:
         create_test_video(video, media_create_date="2025:10:05 01:00:00")
         original_bytes = video.read_bytes()
 
-        run_pipeline(
+        run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
@@ -191,7 +191,7 @@ class TestIngestIntegration:
 
         original_dto = get_exif_field(video, "DateTimeOriginal")
 
-        run_pipeline(
+        run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 

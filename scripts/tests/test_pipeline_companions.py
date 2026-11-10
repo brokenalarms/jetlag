@@ -8,7 +8,7 @@ import shutil
 
 
 from conftest import create_test_video as _create_video_raw
-from pipeline_helpers import create_test_video, run_pipeline
+from pipeline_helpers import create_test_video, run_in_process
 
 
 class TestCompanionFiles:
@@ -24,7 +24,7 @@ class TestCompanionFiles:
         (source / "test.thm").write_bytes(b"thumbnail-data")
         (source / "test.lrv").write_bytes(b"lowres-video-data")
 
-        run_pipeline([
+        run_in_process([
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
@@ -48,7 +48,7 @@ class TestCompanionFiles:
         (source / "test.thm").write_bytes(b"thumbnail-data")
         (source / "test.lrv").write_bytes(b"lowres-video-data")
 
-        run_pipeline([
+        run_in_process([
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
@@ -73,7 +73,7 @@ class TestCompanionFiles:
         thm.write_bytes(b"thumbnail-data")
         lrv.write_bytes(b"lowres-video-data")
 
-        run_pipeline([
+        run_in_process([
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
@@ -106,7 +106,7 @@ class TestUpdateFilenameDates:
             CreateDate="2025:05:05 04:03:34",
         )
 
-        run_pipeline([
+        run_in_process([
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
@@ -135,7 +135,7 @@ class TestUpdateFilenameDates:
             CreateDate="2025:05:05 04:03:34",
         )
 
-        result = run_pipeline([
+        result = run_in_process([
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
@@ -179,7 +179,7 @@ class TestUpdateFilenameDates:
         organized.parent.mkdir(parents=True)
         shutil.copy2(video, organized)
 
-        result = run_pipeline([
+        result = run_in_process([
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
@@ -214,7 +214,7 @@ class TestUpdateFilenameDates:
         video = source / "test.mp4"
         create_test_video(video, media_create_date="2025:10:05 01:00:00")
 
-        result = run_pipeline([
+        result = run_in_process([
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
@@ -242,7 +242,7 @@ class TestUpdateFilenameDates:
             CreateDate="2025:05:05 04:03:34",
         )
 
-        result = run_pipeline([
+        result = run_in_process([
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
@@ -271,7 +271,7 @@ class TestUpdateFilenameDates:
         )
         (source / "VID_20250505_130334_00_001.thm").write_bytes(b"thumbnail")
 
-        run_pipeline([
+        run_in_process([
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0900",
