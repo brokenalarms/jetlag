@@ -4,7 +4,16 @@ Shared timestamp source analysis.
 Reads a file and reports what timestamps are available from which sources.
 Used by lib/fix_media_timestamp/, lib/media_pipeline/, lib/tag_media.py and report-file-dates.
 
+Every fact jetlag uses about a file's time comes from here, worked out once from
+the file's one cached exiftool read: read_file() returns a FileReading, and every
+consumer (the correction, the pipeline's pre-flight guards, the date folder) takes
+the winning timestamp, the file's zone, the camera's zone setting, the filename's
+time and the wall-clock time from it rather than deriving any of them itself.
+tests/timestamps/test_one_derivation.py fails when anything outside lib/timestamps/
+does.
+
 Public API:
+    read_file(file_path) -> FileReading
     read_timestamp_sources(file_path, ...) -> TimestampReport
     build_filename(original_name, corrected_date) -> Optional[str]
 """
@@ -176,6 +185,31 @@ def normalize_timezone_format(value: str) -> str:
     return re.sub(r'([+-]\d{2}):(\d{2})$', r'\1\2', value)
 
 
+_TRAILING_ZONE_OR_UTC = re.compile(r'([+-]\d{2}:?\d{2}|Z)$')
+
+
+def trailing_zone(value: Optional[str]) -> Optional[str]:
+    """The zone a tag value carries at its end: '+HH:MM', 'Z', or None for a
+    naive value."""
+    match = _TRAILING_ZONE_OR_UTC.search(value or "")
+    if not match:
+        return None
+    zone = match.group(1)
+    return zone if zone == "Z" else ensure_colon_tz(zone)
+
+
+def tzinfo_from_offset(offset_str: Optional[str]) -> Optional[timezone]:
+    """A tzinfo for a '+HH:MM' / '+HHMM' offset string, or None if it is not one."""
+    match = re.match(r'([+-])(\d{2}):?(\d{2})$', offset_str or "")
+    if not match:
+        return None
+    sign, hours, minutes = match.groups()
+    offset_seconds = int(hours) * 3600 + int(minutes) * 60
+    if sign == '-':
+        offset_seconds = -offset_seconds
+    return timezone(timedelta(seconds=offset_seconds))
+
+
 # ---------------------------------------------------------------------------
 # Timestamp sources
 # ---------------------------------------------------------------------------
@@ -261,14 +295,6 @@ def resolve_timezone_offset(
         local = naive.replace(tzinfo=zone)
 
     return ensure_colon_tz(local.strftime("%z"))
-
-
-def resolve_file_timezone_offset(file_path: str, timezone_spec: Optional[str]) -> Optional[str]:
-    """Resolve a timezone spec to the offset that applies to one file's own timestamp."""
-    if not timezone_spec:
-        return None
-    best_timestamp, source = get_best_timestamp(file_path, timezone_spec)
-    return resolve_timezone_offset(timezone_spec, best_timestamp, source.is_utc)
 
 
 def normalize_exif_value(value: str) -> str:
@@ -374,22 +400,6 @@ def build_filename(original_name: str, corrected_date: datetime) -> Optional[str
 
 
 # ---------------------------------------------------------------------------
-# Metadata timezone extraction
-# ---------------------------------------------------------------------------
-
-def extract_metadata_timezone(file_path: str) -> Optional[str]:
-    """Extract timezone offset from DateTimeOriginal or CreationDate if present."""
-    exif_data = read_exif_data(file_path)
-    for field in ["DateTimeOriginal", "CreationDate"]:
-        value = exif_data.get(field, "")
-        if value:
-            tz_match = re.search(r'([+-]\d{2}):?(\d{2})$', value)
-            if tz_match:
-                return f"{tz_match.group(1)}:{tz_match.group(2)}"
-    return None
-
-
-# ---------------------------------------------------------------------------
 # Best timestamp
 # ---------------------------------------------------------------------------
 
@@ -461,19 +471,6 @@ def _movie_header_timestamp(exif_data: Dict[str, str]) -> str:
         r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*', r'\1',
         movie_header_date)
     return candidate if is_valid_timestamp(candidate) else ""
-
-
-def camera_zone_offset_for_file(file_path: str) -> Optional[str]:
-    """The camera's own zone offset for a file, independent of --timezone or priority.
-
-    Reads the raw QuickTime movie header and filename timestamp directly, so it is
-    available whenever both sources coexist and their delta is a legal zone offset —
-    regardless of whether the QuickTime date wins get_best_timestamp()'s priority race.
-    """
-    exif_data = read_exif_data(file_path)
-    movie_timestamp = _movie_header_timestamp(exif_data)
-    filename_timestamp, _ = parse_filename_timestamp(file_path)
-    return camera_zone_offset(movie_timestamp, filename_timestamp)
 
 
 _TIMESTAMP_DIGITS = re.compile(r'([0-9]{4}:[0-9]{2}:[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}).*')
@@ -602,24 +599,170 @@ RANKING: List[Callable[[_RankingInputs], Optional[Candidate]]] = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# FileReading — the one per-file result every consumer takes its facts from
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class LocalTime:
+    """A file's time on the wall clock where it was shot, as the hierarchy gives it.
+
+    timestamp and source are the ranking's winner. time is that winner as an aware
+    datetime in offset's zone, or None where nothing gives the digits a zone (a
+    naive or UTC source with no declared timezone). text is how the time is
+    stored: the tag's own value for a zoned tag left as it is, else time with its
+    offset. declared says whether offset came from --timezone rather than from the
+    file's own tag.
+    """
+    timestamp: Optional[str]
+    source: TimestampSource
+    offset: Optional[str] = None
+    time: Optional[datetime] = None
+    text: str = ""
+    declared: bool = False
+
+
+def _zoned_text(dt: datetime) -> str:
+    return ensure_colon_tz(dt.strftime("%Y:%m:%d %H:%M:%S%z"))
+
+
+@dataclass(frozen=True)
+class FileReading:
+    """Everything the hierarchy derives from one file's cached exiftool read.
+
+    exif is the read itself (read_exif_data()). filename_timestamp is the
+    filename's digits, movie_timestamp the movie header clock, both as
+    'YYYY:MM:DD HH:MM:SS' or empty. The rest is derived here and nowhere else.
+    """
+    file_path: str
+    exif: Dict[str, str]
+    filename_timestamp: Optional[str]
+    filename_pattern: Optional[str]
+    movie_timestamp: str
+
+    @property
+    def basename(self) -> str:
+        return os.path.basename(self.file_path)
+
+    @property
+    def camera_zone(self) -> Optional[str]:
+        """The camera's zone setting, where the UTC clock and the filename show it
+        (camera_zone_offset()), whatever source wins the ranking."""
+        return camera_zone_offset(self.movie_timestamp, self.filename_timestamp)
+
+    @property
+    def tagged_zone(self) -> Optional[str]:
+        """The zone a zoned tag gives the file ('+HH:MM'), or None: the winning
+        source's zone where that source is a zoned tag, which rank first whatever
+        timezone is declared."""
+        timestamp, source = self.best()
+        if not (timestamp and source.zoned and source.field):
+            return None
+        return trailing_zone(self.exif.get(source.field, ""))
+
+    def best(self, timezone_offset: Optional[str] = None) -> Tuple[Optional[str], TimestampSource]:
+        """The file's best timestamp and the source it came from, per RANKING."""
+        inputs = _RankingInputs(
+            file_path=self.file_path,
+            exif=self.exif,
+            filename_timestamp=self.filename_timestamp,
+            movie_timestamp=self.movie_timestamp,
+            timezone_offset=timezone_offset,
+        )
+        for rule in RANKING:
+            candidate = rule(inputs)
+            if candidate is not None:
+                return candidate
+        return None, TimestampSource.NONE
+
+    def declared_offset(self, timezone_spec: Optional[str]) -> Optional[str]:
+        """The offset timezone_spec gives this file: a zone name resolves against
+        the file's own timestamp, so each file gets the offset in effect when it
+        was shot."""
+        if not timezone_spec:
+            return None
+        timestamp, source = self.best(timezone_spec)
+        return resolve_timezone_offset(timezone_spec, timestamp, source.is_utc)
+
+    def local_time(self, timezone_spec: Optional[str] = None,
+                   infer_from_filename: bool = False) -> LocalTime:
+        """The file's wall-clock time where it was shot.
+
+        A zoned tag keeps its instant, re-expressed in the declared zone when one
+        is given; a UTC source is expressed in the declared zone; a naive source's
+        digits are taken as local time in it. infer_from_filename takes the
+        filename's digits in the declared zone whatever else the file holds.
+        """
+        if infer_from_filename:
+            if not timezone_spec:
+                raise ValueError("--infer-from-filename requires --timezone to be specified")
+            if not self.filename_timestamp:
+                raise ValueError("--infer-from-filename specified but filename has no parseable date")
+            offset = resolve_timezone_offset(timezone_spec, self.filename_timestamp)
+            text = f"{self.filename_timestamp}{offset}"
+            return LocalTime(self.filename_timestamp, TimestampSource.FILENAME_INFERRED,
+                             offset, parse_datetime_original(text), text, declared=True)
+
+        timestamp, source = self.best(timezone_spec)
+        offset = resolve_timezone_offset(timezone_spec, timestamp, timestamp_is_utc=source.is_utc)
+        if not timestamp:
+            return LocalTime(timestamp, source, offset)
+
+        if source.zoned and source.field:
+            raw_value = self.exif.get(source.field, "")
+            embedded = parse_datetime_original(raw_value) if raw_value else None
+            if not embedded:
+                return LocalTime(timestamp, source, offset, None, raw_value)
+            if timezone_spec:
+                # The zoned tag defines an instant; the embedded offset is a label
+                # from the camera's zone setting, which goes stale across a flight.
+                # --timezone declares where the footage was shot, so the instant is
+                # expressed in that zone rather than passed through unchanged.
+                utc_str = embedded.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
+                declared = resolve_timezone_offset(timezone_spec, utc_str, timestamp_is_utc=True)
+                declared_tz = tzinfo_from_offset(declared)
+                if declared and declared_tz is not None:
+                    converted = embedded.astimezone(declared_tz)
+                    return LocalTime(timestamp, source, declared, converted,
+                                     converted.strftime("%Y:%m:%d %H:%M:%S") + declared, declared=True)
+            return LocalTime(timestamp, source, offset, embedded, raw_value)
+
+        if source is TimestampSource.DATETIME_ORIGINAL and not offset:
+            raw_value = self.exif.get("DateTimeOriginal", "")
+            return LocalTime(timestamp, source, offset,
+                             parse_datetime_original(raw_value) if raw_value else None, raw_value)
+
+        local_tz = tzinfo_from_offset(offset)
+        if local_tz is None:
+            return LocalTime(timestamp, source, offset)
+        if source.is_utc:
+            # UTC digits are expressed in the declared zone: same instant, new label.
+            utc_dt = datetime.strptime(timestamp, "%Y:%m:%d %H:%M:%S").replace(tzinfo=timezone.utc)
+            text = utc_dt.astimezone(local_tz).strftime("%Y:%m:%d %H:%M:%S") + offset
+        else:
+            text = f"{timestamp}{offset}"
+        return LocalTime(timestamp, source, offset, parse_datetime_original(text), text, declared=True)
+
+
+def read_file(file_path: str) -> FileReading:
+    """The file's FileReading, from its one cached exiftool read."""
+    exif = read_exif_data(file_path)
+    filename_timestamp, filename_pattern = parse_filename_timestamp(file_path)
+    return FileReading(
+        file_path=file_path,
+        exif=exif,
+        filename_timestamp=filename_timestamp,
+        filename_pattern=filename_pattern,
+        movie_timestamp=_movie_header_timestamp(exif),
+    )
+
+
 def get_best_timestamp(
     file_path: str,
     timezone_offset: Optional[str] = None,
 ) -> Tuple[Optional[str], TimestampSource]:
     """The file's best timestamp and the source it came from, per RANKING."""
-    exif = read_exif_data(file_path)
-    inputs = _RankingInputs(
-        file_path=file_path,
-        exif=exif,
-        filename_timestamp=parse_filename_timestamp(file_path)[0],
-        movie_timestamp=_movie_header_timestamp(exif),
-        timezone_offset=timezone_offset,
-    )
-    for rule in RANKING:
-        candidate = rule(inputs)
-        if candidate is not None:
-            return candidate
-    return None, TimestampSource.NONE
+    return read_file(file_path).best(timezone_offset)
 
 
 # ---------------------------------------------------------------------------
@@ -643,11 +786,11 @@ def read_timestamp_sources(
     timezone_offset: Optional[str] = None,
 ) -> TimestampReport:
     """Analyse a file and report all available timestamp sources."""
-    # Metadata side — use the existing priority system
-    best_ts, source = get_best_timestamp(file_path, timezone_offset)
+    reading = read_file(file_path)
+    best_ts, source = reading.best(timezone_offset)
 
     metadata_date = None
-    metadata_tz = extract_metadata_timezone(file_path)
+    metadata_tz = reading.tagged_zone
 
     if best_ts:
         try:
@@ -656,7 +799,7 @@ def read_timestamp_sources(
             pass
 
     # Filename side
-    fn_ts, fn_pattern = parse_filename_timestamp(file_path)
+    fn_ts, fn_pattern = reading.filename_timestamp, reading.filename_pattern
     fn_parseable = fn_ts is not None
     fn_date = None
     if fn_ts:

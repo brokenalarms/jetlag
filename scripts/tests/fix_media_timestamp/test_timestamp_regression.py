@@ -13,7 +13,7 @@ import pytest
 
 from helpers.media import create_test_video
 from helpers import SCRIPT_DIR
-from lib.timestamps.sources import clear_exif_cache, extract_metadata_timezone, read_exif_data
+from lib.timestamps.sources import clear_exif_cache, read_exif_data, read_file
 
 
 
@@ -310,7 +310,7 @@ class TestMissingDateTimeOriginalWithTimezoneChange:
 
 class TestExtractMetadataTimezone:
     """
-    extract_metadata_timezone should output @@timezone= to stdout when
+    FileReading.tagged_zone should output @@timezone= to stdout when
     DateTimeOriginal or CreationDate contains a timezone offset.
     """
 
@@ -324,7 +324,7 @@ class TestExtractMetadataTimezone:
         create_test_video(path)
 
     def test_extracts_timezone_from_datetimeoriginal(self):
-        """When DateTimeOriginal has +08:00, extract_metadata_timezone returns it"""
+        """When DateTimeOriginal has +08:00, FileReading.tagged_zone returns it"""
         video_path = os.path.join(self.temp_dir, "test_tz.mp4")
         self._create_test_video(video_path)
 
@@ -335,7 +335,7 @@ class TestExtractMetadataTimezone:
         ], capture_output=True, check=True)
 
         clear_exif_cache()
-        result = extract_metadata_timezone(video_path)
+        result = read_file(video_path).tagged_zone
         assert result == "+08:00"
 
     def test_extracts_timezone_from_creationdate(self):
@@ -350,7 +350,7 @@ class TestExtractMetadataTimezone:
         ], capture_output=True, check=True)
 
         clear_exif_cache()
-        result = extract_metadata_timezone(video_path)
+        result = read_file(video_path).tagged_zone
         assert result == "+13:00"
 
     def test_returns_none_when_no_timezone(self):
@@ -359,7 +359,7 @@ class TestExtractMetadataTimezone:
         self._create_test_video(video_path)
 
         clear_exif_cache()
-        result = extract_metadata_timezone(video_path)
+        result = read_file(video_path).tagged_zone
         assert result is None
 
     def test_stdout_contains_timezone_marker(self):

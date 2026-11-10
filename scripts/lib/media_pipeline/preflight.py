@@ -16,10 +16,7 @@ from lib import ingest_media, tag_media
 from lib.media_pipeline.consent import require_consent
 from lib.media_pipeline.events import emit_event
 from lib.media_pipeline.options import FIX_TIMESTAMP, RunOptions
-from lib.timestamps.sources import (
-    extract_metadata_timezone, normalize_timezone_input, parse_filename_timestamp,
-    resolve_file_timezone_offset,
-)
+from lib.timestamps.sources import normalize_timezone_input, read_file
 
 
 def check_stale_exiftool_tmp(source_dir: str) -> None:
@@ -147,10 +144,11 @@ def read_file_zones(files: list[Path], timezone_spec: Optional[str]) -> list[Fil
     """The embedded and expected zone of every file that carries one."""
     zones = []
     for fp in files:
-        tz = extract_metadata_timezone(str(fp))
+        reading = read_file(str(fp))
+        tz = reading.tagged_zone
         if not tz:
             continue
-        expected = resolve_file_timezone_offset(str(fp), timezone_spec)
+        expected = reading.declared_offset(timezone_spec)
         zones.append(FileZone(
             name=fp.name,
             embedded=normalize_timezone_input(tz).replace(":", ""),
@@ -236,7 +234,7 @@ def check_filename_timestamps(files: list[Path], opts: RunOptions) -> None:
     """With --infer-from-filename, stop if any filename has no parseable timestamp."""
     if not opts.infer_from_filename:
         return
-    unparseable = [fp.name for fp in files if parse_filename_timestamp(str(fp))[0] is None]
+    unparseable = [fp.name for fp in files if read_file(str(fp)).filename_timestamp is None]
     if unparseable:
         print("⚠️  --infer-from-filename specified but these files have no parseable timestamp in their filename:", file=sys.stderr)
         for name in unparseable:
