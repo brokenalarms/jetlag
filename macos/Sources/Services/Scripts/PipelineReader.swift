@@ -5,7 +5,7 @@ import Foundation
 /// Reading is driven by a read source on a serial queue, so the ordinary
 /// EOF-driven finish and the finish forced once the script has exited cannot
 /// interleave — both run on that queue, and whichever gets there first wins.
-final class PipeLineReader: @unchecked Sendable {
+final class PipelineReader: @unchecked Sendable {
     private let handle: FileHandle
     private let stream: LogLine.Stream
     private let emit: (LogLine) -> Void
