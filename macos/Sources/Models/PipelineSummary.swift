@@ -21,4 +21,24 @@ struct PipelineSummary: Equatable {
     let mode: Mode
 
     var unchanged: Int { succeeded - changed }
+
+    /// The completion popup's text. A dry run that found files from another
+    /// camera says so, since an apply of the same batch will stop to ask.
+    func message(cameraMismatch: CameraMismatch?) -> String {
+        var lines = [Strings.Workflow.runSummaryCounts(
+            processed: processed, changed: changed, mode: mode)]
+        lines.append(mode == .applied
+                     ? Strings.Workflow.runSummaryApplied
+                     : Strings.Workflow.runSummaryDryRun)
+        if failed > 0 {
+            lines.append(Strings.Workflow.runSummaryFailed(count: failed, files: failedFiles))
+        }
+        if mode == .dryRun, let mismatch = cameraMismatch {
+            lines.append(Strings.Workflow.runSummaryCameraMismatch(
+                count: mismatch.files.count,
+                found: mismatch.foundName,
+                expected: mismatch.expected?.name ?? ""))
+        }
+        return lines.joined(separator: "\n\n")
+    }
 }

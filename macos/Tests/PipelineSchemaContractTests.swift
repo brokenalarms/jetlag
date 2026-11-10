@@ -146,6 +146,24 @@ final class PipelineSchemaContractTests: XCTestCase {
                        "RowOutcome.Correction and timestamp_result.action have drifted apart")
     }
 
+    /// The table's status badge switches over these with no default, so a verdict
+    /// the schema adds has to be given a status here.
+    func testEveryPipelineResultTokenIsAKnownFileResult() throws {
+        let declared = try tokens(schema(), event: "pipeline_result", field: "result")
+
+        XCTAssertEqual(Set(RowOutcome.FileResult.allCases.map(\.rawValue)), declared,
+                       "RowOutcome.FileResult and pipeline_result.result have drifted apart")
+    }
+
+    /// Which flag answers a refused run depends on the conflict, so every kind the
+    /// pipeline can report has to decode into one the app knows.
+    func testEveryTimezoneConflictTypeIsAKnownKind() throws {
+        let declared = try tokens(schema(), event: "timezone_conflict", field: "conflict_type")
+
+        XCTAssertEqual(Set(TimezoneConflictKind.allCases.map(\.rawValue)), declared,
+                       "TimezoneConflictKind and timezone_conflict.conflict_type have drifted apart")
+    }
+
     /// The mapping is 1:1: two tokens sharing a label would mean the app decides an
     /// outcome the script already named. Lumping copied, moved and overwrote into
     /// "Moved" is exactly what told the user a pipelined file had left its folder.

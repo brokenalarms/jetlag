@@ -51,7 +51,6 @@ enum Strings {
     enum Workflow {
         static let profileLabel = String(localized: "workflow.profile.label", defaultValue: "Profile")
         static let requiredLabel = String(localized: "workflow.required.label", defaultValue: "Required")
-        static let modeLabel = String(localized: "workflow.mode.label", defaultValue: "Mode")
         static let tagsLabel = String(localized: "workflow.tags.label", defaultValue: "Tags")
         static let cameraLabel = String(localized: "workflow.camera.label", defaultValue: "Camera")
         static let groupLabel = String(localized: "workflow.group.label", defaultValue: "Group")
@@ -60,10 +59,7 @@ enum Strings {
         static let readyDirPlaceholder = String(localized: "workflow.readyDir.placeholder", defaultValue: "Ready directory path")
         static let archiveDestinationPlaceholder = String(localized: "workflow.archiveDestination.placeholder", defaultValue: "Archive destination path")
         static let tagPlaceholder = String(localized: "workflow.tag.placeholder", defaultValue: "tag1, tag2")
-        static let makePlaceholder = String(localized: "workflow.make.placeholder", defaultValue: "Make")
-        static let modelPlaceholder = String(localized: "workflow.model.placeholder", defaultValue: "Model")
         static let groupPlaceholder = String(localized: "workflow.group.placeholder", defaultValue: "Optional")
-        static let timezonePlaceholder = String(localized: "workflow.timezone.placeholder", defaultValue: "+HHMM")
         static let selectProfile = String(localized: "workflow.selectProfile", defaultValue: "Select...")
         static let selectTimezone = String(localized: "workflow.selectTimezone", defaultValue: "Select timezone...")
         static let searchTimezones = String(localized: "workflow.searchTimezones", defaultValue: "Search timezones...")
@@ -86,8 +82,6 @@ enum Strings {
         static let runButton = String(localized: "workflow.run.button", defaultValue: "Run")
         static let runningButton = String(localized: "workflow.running.button", defaultValue: "Running...")
 
-        static let typeManuallyHelp = String(localized: "workflow.typeManually.help", defaultValue: "Type manually")
-        static let pickFromListHelp = String(localized: "workflow.pickFromList.help", defaultValue: "Pick from list")
         static let hideInspectorHelp = String(localized: "workflow.hideInspector.help", defaultValue: "Hide inspector")
         static let showInspectorHelp = String(localized: "workflow.showInspector.help", defaultValue: "Show inspector")
         static let hideLogOutputHelp = String(localized: "workflow.hideLogOutput.help", defaultValue: "Hide output log")
@@ -108,8 +102,6 @@ enum Strings {
         // Help text
         static let groupHelp = String(localized: "workflow.group.help",
             defaultValue: "Optional group folder for organizing files (e.g. trip name like 'Japan'). Creates YYYY/Group/YYYY-MM-DD structure.")
-        static let sourceDirHelp = String(localized: "workflow.sourceDir.help",
-            defaultValue: "Directory to import from, usually an SD card mount point. Pre-filled from profile, editable.")
         static let copyCompanionHelp = String(localized: "workflow.copyCompanionFiles.help",
             defaultValue: "Companion files are sidecar files generated alongside the main media — e.g. .thm (thumbnail), .lrv (low-res proxy), .srt (subtitles/telemetry). When enabled, companions are copied alongside the main file to the ready directory.")
         static let archiveSourceHelp = String(localized: "workflow.archiveSource.help",
@@ -120,8 +112,6 @@ What happens to the source folder after processing:
 
 Runs once, after the whole batch: if the run is cancelled or a file fails, the source is left exactly as it was — re-run the folder to finish and archive it.
 """)
-        static let timezoneHelp = String(localized: "workflow.timezone.help",
-            defaultValue: "Timezone the footage was shot in, used to fix timestamps for your video editor")
         static let timestampSourceLabel = String(localized: "workflow.timestampSource.label", defaultValue: "Source")
         static let timestampSourceMetadata = String(localized: "workflow.timestampSource.metadata", defaultValue: "Metadata")
         static let timestampSourceFilenames = String(localized: "workflow.timestampSource.filenames", defaultValue: "From filenames")
@@ -132,10 +122,6 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let updateFilenameDatesToggle = String(localized: "workflow.updateFilenameDates.toggle", defaultValue: "Update filename dates")
         static let updateFilenameDatesHelp = String(localized: "workflow.updateFilenameDates.help",
             defaultValue: "Rename files to reflect corrected timestamps after fixing. Only affects files with parseable date patterns in their names.")
-        static let timezoneManualHelp = String(localized: "workflow.timezoneManual.help",
-            defaultValue: "Enter timezone manually in +HHMM or -HHMM format (e.g. +0900 for Japan)")
-        static let dryRunHelp = String(localized: "workflow.dryRun.help",
-            defaultValue: "Dry Run previews changes without modifying files. Apply performs the actual processing.")
 
         // Fix Timestamps preview
         static let fixTimestampSourceFilenamesHint = String(localized: "workflow.fixTimestampPreview.sourceFilenames",
@@ -279,6 +265,14 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let applyAnywayButton = String(localized: "workflow.applyAnyway.button",
             defaultValue: "Apply Anyway")
 
+        static func mixedTimezoneGroup(zone: String, count: Int) -> String {
+            count == 1
+                ? String(localized: "workflow.mixedTimezones.group.one",
+                         defaultValue: "\(zone): \(count) file")
+                : String(localized: "workflow.mixedTimezones.group.many",
+                         defaultValue: "\(zone): \(count) files")
+        }
+
         static func mixedTimezonesMessage(groups: String) -> String {
             String(localized: "workflow.mixedTimezones.message",
                    defaultValue: "Files have different embedded timezones. Consider processing each group separately.\n\n\(groups)")
@@ -341,6 +335,14 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
                    defaultValue: "Delete profile \"\(name)\"?")
         }
 
+        static let nameTakenTitle = String(localized: "profiles.nameTaken.title",
+            defaultValue: "Profile not saved")
+
+        static func nameTakenMessage(_ name: String) -> String {
+            String(localized: "profiles.nameTaken.message",
+                   defaultValue: "Another profile is already called \"\(name)\". Choose a different name.")
+        }
+
         // Help text
         static let typeHelp = String(localized: "profiles.type.help",
             defaultValue: "Whether this profile handles photo or video files from the camera")
@@ -348,8 +350,6 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
             defaultValue: "Sidecar files generated alongside the main video — e.g. .thm (thumbnail), .lrv (low-res proxy), .srt (subtitle/telemetry). Imported together with the main file unless skipped.")
         static let gyroflowHelp = String(localized: "profiles.gyroflow.help",
             defaultValue: "Generate Gyroflow stabilization project files during pipeline processing. Requires the camera to record gyroscope data (e.g. GoPro, Insta360).")
-        static let gyroflowUnavailable = String(localized: "profiles.gyroflow.unavailable",
-            defaultValue: "Install Gyroflow in Settings to enable stabilization.")
         static let fileExtensionsHelp = String(localized: "profiles.fileExtensions.help",
             defaultValue: "File types this profile processes (e.g. .mp4, .mov, .insv)")
         static let tagsHelp = String(localized: "profiles.tags.help",
@@ -579,6 +579,26 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
 
             xcode-select --install
             """)
+
+        static func yamlTypeMismatch(path: String, expected: String) -> String {
+            String(localized: "error.yaml.typeMismatch",
+                   defaultValue: "Type mismatch at \(path): expected \(expected)")
+        }
+
+        static func yamlKeyMissing(key: String, path: String) -> String {
+            String(localized: "error.yaml.keyMissing",
+                   defaultValue: "Missing key '\(key)' at \(path)")
+        }
+
+        static func yamlValueMissing(type: String, path: String) -> String {
+            String(localized: "error.yaml.valueMissing",
+                   defaultValue: "Missing value of type \(type) at \(path)")
+        }
+
+        static func yamlInvalidAt(path: String, description: String) -> String {
+            String(localized: "error.yaml.invalidAt",
+                   defaultValue: "At \(path): \(description)")
+        }
 
         static func scriptStartFailed(_ description: String) -> String {
             String(localized: "error.scriptStartFailed",

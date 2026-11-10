@@ -1,4 +1,5 @@
 import XCTest
+import Yams
 @testable import Jetlag
 
 final class ProfileTests: XCTestCase {
@@ -168,6 +169,82 @@ final class ProfileTests: XCTestCase {
         XCTAssertEqual(reloaded.profiles.count, 1)
     }
 
+    /// The app models only the keys it edits. A save used to re-encode the model,
+    /// which deleted every other key the scripts read (a profile's
+    /// `folder_template`) and copied the global stabilization preset into each
+    /// gyroflow profile, so a later change to the preset no longer reached it.
+    /// Saving one edited field now leaves everything else in the file as it was.
+    func testSavingAnEditKeepsWhatTheAppDoesNotModel() throws {
+        let yaml = """
+        gyroflow:
+          binary: /usr/local/bin/gyroflow
+          preset:
+            stabilization:
+              max_zoom: 105.0
+              adaptive_zoom_window: 15.0
+              adaptive_zoom_method: 1
+            smoothing: 0.5
+        archive_root: /Volumes/Archive
+        profiles:
+          gopro:
+            type: video
+            source_dir: /Volumes/Card/DCIM
+            ready_dir: /tmp/ready
+            gyroflow_enabled: true
+            folder_template: '{{YYYY}}/{{GROUP}}/{{YYYY-MM-DD}}'
+            file_extensions:
+            - .mp4
+          sony:
+            type: photo
+            source_dir: /Volumes/SonyCard/DCIM
+            ready_dir: /tmp/photos
+            notes: kept as written
+            file_extensions:
+            - .arw
+        """
+        let path = writeTempYAML(yaml)
+        let config = try ProfileService.load(from: path)
+
+        // The editor shows the preset filled in; only the ready folder is changed.
+        var edited = try XCTUnwrap(config.profile(named: "gopro"))
+        XCTAssertEqual(edited.gyroflowSettings?.maxZoom, 105.0)
+        edited.readyDir = "/tmp/new-ready"
+        var saved = config
+        try saved.save(edited, as: "gopro", replacing: "gopro")
+        try ProfileService.write(saved, to: path)
+
+        let written = try XCTUnwrap(try Yams.compose(yaml: String(contentsOfFile: path, encoding: .utf8)))
+        let expected = try XCTUnwrap(try Yams.compose(yaml: yaml.replacingOccurrences(
+            of: "ready_dir: /tmp/ready", with: "ready_dir: /tmp/new-ready")))
+        XCTAssertNil(written["profiles"]?["gopro"]?["gyroflow_settings"],
+                     "the global preset must not be copied into the profile")
+        XCTAssertEqual(written["profiles"]?["gopro"]?["folder_template"]?.string,
+                       "{{YYYY}}/{{GROUP}}/{{YYYY-MM-DD}}")
+        XCTAssertEqual(written["profiles"]?["sony"]?["notes"]?.string, "kept as written")
+        XCTAssertEqual(written["archive_root"]?.string, "/Volumes/Archive")
+        XCTAssertEqual(written["gyroflow"]?["preset"]?["smoothing"]?.float, 0.5)
+        // Everything else — every key, value and the file's order — is unchanged.
+        XCTAssertEqual(written, expected)
+    }
+
+    /// A stabilization value the user changed is the profile's own and is stored;
+    /// the ones left at the preset's still follow the preset.
+    func testSaveKeepsOnlyTheStabilizationValuesTheUserChanged() throws {
+        var config = ProfilesConfig(
+            gyroflow: GyroflowConfig(
+                binary: nil,
+                preset: GyroflowPreset(stabilization: StabilizationSettings(
+                    maxZoom: 105.0, adaptiveZoomWindow: 15.0, adaptiveZoomMethod: 1))),
+            profiles: ["gopro": MediaProfile(type: .video, gyroflowEnabled: true, fileExtensions: [".mp4"])]
+        )
+        var edited = try XCTUnwrap(config.profile(named: "gopro"))
+        edited.gyroflowSettings?.maxZoom = 120.0
+
+        try config.save(edited, as: "gopro", replacing: "gopro")
+
+        XCTAssertEqual(config.profiles["gopro"]?.gyroflowSettings, StabilizationSettings(maxZoom: 120.0))
+    }
+
     // MARK: - CRUD operations
 
     func testAddProfile() throws {
@@ -223,23 +300,65 @@ final class ProfileTests: XCTestCase {
         XCTAssertNotNil(reloaded.profiles["sony"])
     }
 
+    /// An app state reading `yaml` as its profiles file, in a temporary directory.
+    private func stateLoaded(from yaml: String) throws -> AppState {
+        let dir = NSTemporaryDirectory() + UUID().uuidString
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        tempFiles.append(dir)
+        let location = ProfilesLocation(directory: dir, seedPath: "")
+        try yaml.write(toFile: location.path, atomically: true, encoding: .utf8)
+        let state = AppState(profilesLocation: location)
+        state.loadProfiles()
+        return state
+    }
+
+    /// Renaming goes through the same save the editor uses: the profile moves
+    /// to its new name in the file, and a workflow that had it selected follows.
     func testRenameProfile() throws {
-        let path = writeTempYAML(fixtureYAML)
-        var config = try ProfileService.load(from: path)
+        let state = try stateLoaded(from: fixtureYAML)
+        let gopro = try XCTUnwrap(state.profile(named: "gopro"))
+        state.workflowSession = WorkflowSession(profile: gopro, profileName: "gopro")
 
-        let originalProfile = try XCTUnwrap(config.profiles["gopro"])
-        config.profiles.removeValue(forKey: "gopro")
-        config.profiles["gopro-hero-13"] = originalProfile
+        try state.saveProfile(gopro, as: "gopro-hero-13", replacing: "gopro")
 
-        try ProfileService.write(config, to: path)
-        let reloaded = try ProfileService.load(from: path)
-
+        let reloaded = try ProfileService.load(from: state.profilesLocation.path)
         XCTAssertEqual(reloaded.profiles.count, 2)
         XCTAssertNil(reloaded.profiles["gopro"])
         let renamed = try XCTUnwrap(reloaded.profiles["gopro-hero-13"])
         XCTAssertEqual(renamed.exif?.make, "GoPro")
         XCTAssertEqual(renamed.exif?.model, "HERO12 Black")
         XCTAssertEqual(renamed.type, .video)
+        XCTAssertEqual(state.workflowSession.profileName, "gopro-hero-13")
+    }
+
+    /// Saving under a name another profile already had used to replace that
+    /// profile without a word. The save is refused with the reason, and the file
+    /// keeps both profiles as they were.
+    func testSavingOntoAnotherProfilesNameIsRefused() throws {
+        let state = try stateLoaded(from: fixtureYAML)
+        let gopro = try XCTUnwrap(state.profile(named: "gopro"))
+
+        XCTAssertThrowsError(try state.saveProfile(gopro, as: "sony", replacing: "gopro")) { error in
+            XCTAssertEqual(error as? ProfileNameError, .taken("sony"))
+        }
+        XCTAssertThrowsError(try state.saveProfile(MediaProfile(type: .video), as: "gopro", replacing: nil)) { error in
+            XCTAssertEqual(error as? ProfileNameError, .taken("gopro"))
+        }
+
+        let reloaded = try ProfileService.load(from: state.profilesLocation.path)
+        XCTAssertEqual(reloaded.profiles["sony"]?.exif?.make, "Sony")
+        XCTAssertEqual(reloaded.profiles["gopro"]?.exif?.make, "GoPro")
+        XCTAssertEqual(state.profile(named: "sony")?.exif?.make, "Sony")
+    }
+
+    /// New and copied profiles get the first free name, so starting one never
+    /// lands on a profile that already exists.
+    func testUniqueNameCountsUpFromTwo() {
+        let config = ProfilesConfig(gyroflow: nil, profiles: [
+            "cam": MediaProfile(type: .video), "cam 2": MediaProfile(type: .video),
+        ])
+        XCTAssertEqual(config.uniqueName("cam"), "cam 3")
+        XCTAssertEqual(config.uniqueName("other"), "other")
     }
 
     func testPerProfileGyroflowSettingsRoundTrip() throws {
@@ -440,6 +559,46 @@ final class ProfileTests: XCTestCase {
         state.profilesConfig?.profiles["dji"] = MediaProfile(type: .video)
         XCTAssertEqual(state.workflowSession.profileName, "gopro")
         XCTAssertNotNil(state.activeProfile)
+    }
+
+    /// Every visit to the Workflow tab used to rebuild its session from the
+    /// profile, dropping the timezone the user had chosen. Only picking another
+    /// profile starts afresh now; picking the one already selected keeps it.
+    func testReselectingTheSameProfileKeepsTheChosenTimezone() throws {
+        let state = try stateLoaded(from: fixtureYAML)
+        state.selectProfile("gopro")
+        state.workflowSession.timezone.value = "Asia/Seoul"
+
+        state.selectProfile("gopro")
+
+        XCTAssertEqual(state.workflowSession.timezone.current, "Asia/Seoul")
+    }
+
+    /// Another profile is another camera and card: its own folders, and no zone
+    /// carried over from the last one.
+    func testSelectingAnotherProfileStartsAFreshSession() throws {
+        let state = try stateLoaded(from: fixtureYAML)
+        state.selectProfile("gopro")
+        state.workflowSession.timezone.value = "Asia/Seoul"
+
+        state.selectProfile("sony")
+
+        XCTAssertEqual(state.workflowSession.profileName, "sony")
+        XCTAssertEqual(state.workflowSession.sourceDir.current, "/Volumes/SonyCard/DCIM")
+        XCTAssertEqual(state.workflowSession.timezone.current, "")
+    }
+
+    /// The workflow runs the profile as saved: editing the selected profile
+    /// rebuilds its session from the saved values.
+    func testSavingTheSelectedProfileRebuildsTheWorkflow() throws {
+        let state = try stateLoaded(from: fixtureYAML)
+        state.selectProfile("gopro")
+        var edited = try XCTUnwrap(state.profile(named: "gopro"))
+        edited.readyDir = "/tmp/new-ready"
+
+        try state.saveProfile(edited, as: "gopro", replacing: "gopro")
+
+        XCTAssertEqual(state.workflowSession.readyDir.current, "/tmp/new-ready")
     }
 
     // MARK: - Save and Cancel visibility

@@ -49,27 +49,27 @@ struct DiffTableView: View {
     /// The row's status: what the pipeline said it did, composed from the emitted
     /// action tokens. `dest` never contributes — a skipped file carries one too.
     func statusText(_ row: DiffTableRow) -> String {
-        switch row.pipelineResult {
-        case "changed":
+        guard let token = row.pipelineResult else { return row.lastCompletedStageLabel ?? "" }
+        switch RowOutcome.FileResult(rawValue: token) {
+        case .changed:
             return row.outcome.statusLabel ?? Strings.DiffTable.changedStatus
-        case "would_change":
+        case .wouldChange:
             return row.outcome.statusLabel ?? Strings.DiffTable.wouldChangeStatus
-        case "unchanged": return Strings.DiffTable.noChangeStatus
-        case "failed":
+        case .unchanged: return Strings.DiffTable.noChangeStatus
+        case .failed:
             return Strings.DiffTable.failedStatus
-        case nil: return row.lastCompletedStageLabel ?? ""
-        default: return row.pipelineResult ?? ""
+        case nil: return token
         }
     }
 
     func statusState(_ row: DiffTableRow) -> StatusBadgeState {
-        switch row.pipelineResult {
-        case "changed": .done
-        case "unchanged": .unchanged
-        case "failed": .failed
-        case "would_change": .wouldDo
-        case nil: .pending
-        default: .plain
+        guard let token = row.pipelineResult else { return .pending }
+        switch RowOutcome.FileResult(rawValue: token) {
+        case .changed: return .done
+        case .unchanged: return .unchanged
+        case .failed: return .failed
+        case .wouldChange: return .wouldDo
+        case nil: return .plain
         }
     }
 

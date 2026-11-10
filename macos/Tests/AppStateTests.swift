@@ -186,7 +186,7 @@ final class TimezoneConflictTests: XCTestCase {
         feedConflict(state, type: "provided_mismatch")
 
         XCTAssertFalse(state.workflowSession.showTimezoneConflict)
-        XCTAssertEqual(state.workflowSession.timezoneConflictType, "provided_mismatch")
+        XCTAssertEqual(state.workflowSession.timezoneConflictType, .providedMismatch)
         XCTAssertEqual(state.workflowSession.timezoneConflictProvidedTz, "+0200")
         XCTAssertEqual(state.workflowSession.timezoneConflictFileTimezones?["+0900"], ["test.mp4"])
     }

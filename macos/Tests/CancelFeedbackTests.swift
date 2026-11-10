@@ -29,7 +29,7 @@ final class CancelFeedbackTests: XCTestCase {
 
         XCTAssertEqual(state.logOutput.last?.text, Strings.LogOutput.cancelled)
         XCTAssertNil(state.liveRow)
-        XCTAssertNil(state.currentDiffRow)
+        XCTAssertNil(state.transcript.liveRow)
         XCTAssertEqual(state.visibleRows.count, 1)
         XCTAssertEqual(state.visibleRows.first?.file, "completed.mp4")
         XCTAssertFalse(state.isRunning)

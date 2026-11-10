@@ -71,7 +71,7 @@ final class StreamingPerformanceTests: XCTestCase {
             let wallStart = Date()
             let cpuStart = mainThreadCPUTime()
             for i in range {
-                state.diffTableRows.append(row(i))
+                state.transcript.rows.append(row(i))
                 for k in 0..<8 {
                     state.logOutput.append(LogLine(
                         text: "\u{1B}[36m🔍 line \(i).\(k)\u{1B}[0m 📊 Change: Keys:CreationDate (missing)",
@@ -148,7 +148,7 @@ final class StreamingPerformanceTests: XCTestCase {
         defer { NotificationCenter.default.removeObserver(observer) }
 
         for i in 0..<40 {
-            state.diffTableRows.append(row(i))
+            state.transcript.rows.append(row(i))
             for k in 0..<8 {
                 state.logOutput.append(LogLine(
                     text: "\u{1B}[36m🔍 line \(i).\(k)\u{1B}[0m 📊 Change: Keys:CreationDate (missing)",

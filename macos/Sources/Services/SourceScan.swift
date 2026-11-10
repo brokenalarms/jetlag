@@ -14,27 +14,25 @@ enum SourceScan {
     }
 
     static func mediaFileCount(source: String, extensions: [String],
-                               scriptsDirectory: String, profilesPath: String) async -> Int? {
+                               launcher: any ScriptLaunching) async -> Int? {
         await scan(Count.self, flag: "--count", source: source, extensions: extensions,
-                   scriptsDirectory: scriptsDirectory, profilesPath: profilesPath)?.mediaFiles
+                   launcher: launcher)?.mediaFiles
     }
 
     static func hasTimestampedNames(source: String, extensions: [String],
-                                    scriptsDirectory: String, profilesPath: String) async -> Bool {
+                                    launcher: any ScriptLaunching) async -> Bool {
         await scan(TimestampedNames.self, flag: "--timestamped-names", source: source, extensions: extensions,
-                   scriptsDirectory: scriptsDirectory, profilesPath: profilesPath)?.hasTimestampedNames ?? false
+                   launcher: launcher)?.hasTimestampedNames ?? false
     }
 
     private static func scan<Result: Decodable>(
         _ type: Result.Type, flag: String, source: String, extensions: [String],
-        scriptsDirectory: String, profilesPath: String
+        launcher: any ScriptLaunching
     ) async -> Result? {
         guard !source.isEmpty, !extensions.isEmpty else { return nil }
-        let (process, stream) = ScriptRunner.run(
+        let (process, stream) = launcher.run(
             script: "scan-source.sh",
-            args: [source, flag, "--extensions"] + extensions,
-            workingDir: scriptsDirectory,
-            profilesPath: profilesPath
+            args: [source, flag, "--extensions"] + extensions
         )
         return await withTaskCancellationHandler {
             var result: Result?

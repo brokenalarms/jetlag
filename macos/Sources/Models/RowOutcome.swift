@@ -45,12 +45,20 @@ struct RowOutcome {
         case userChoice = "user_choice"
     }
 
+    /// The `pipeline_result.result` tokens: the pipeline's verdict on the file.
+    enum FileResult: String, CaseIterable {
+        case changed
+        case wouldChange = "would_change"
+        case unchanged
+        case failed
+    }
+
     init(timestampAction: String?, organizeAction: String?,
          organizeReason: String? = nil, pipelineResult: String? = nil) {
         correction = timestampAction.flatMap(Correction.init(rawValue:))
         movement = organizeAction.flatMap(Movement.init(rawValue:))
         reason = organizeReason.flatMap(SkipReason.init(rawValue:))
-        dryRun = pipelineResult == "would_change"
+        dryRun = pipelineResult.flatMap(FileResult.init(rawValue:)) == .wouldChange
     }
 
     /// The row's status, or nil when neither token describes a change and the
