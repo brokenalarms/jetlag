@@ -20,6 +20,30 @@ These are rules that prevent common agent mistakes — they explain why things a
 - **Why data is separated from presentation**: formatted text shouldn't be function args. Use structured dicts with descriptive key names as building blocks, then build formatted text at display time.
 - **Why batch files pass through all args transparently**: they're thin loops, not filtering layers.
 
+## Code layout
+
+The top level holds only command lines; the logic lives in `lib/` as ordinary
+modules, so the pipeline and the tests import exactly the code the CLI runs.
+
+| Command line (`.py` + `.sh`) | Logic in `lib/` |
+|---|---|
+| `media-pipeline` | `pipeline.py` — runs every step in-process |
+| `fix-media-timestamp` | `fix_timestamp.py`; `provenance.py` (the recovery record written with it) |
+| `tag-media` | `tagging.py` |
+| `organize-by-date` | `organize.py` |
+| `ingest-media` | `ingest.py` |
+| `generate-gyroflow` | `gyroflow.py` |
+| `archive-source` | `archive.py` |
+| `probe-camera`, `scan-source`, `report-file-dates` | small enough to stay in the script |
+
+Shared modules: `timestamp_source.py` (reading and ranking a file's timestamps),
+`exiftool.py` (the one metadata client), `countries.py` (country → timezone),
+`cli.py` (argument helpers), `results.py` (`@@key=value` output), `profiles.py`,
+`filesystem.py`, `file_timestamps.py`, `footage.py`.
+
+A script holds argument parsing, validation messages and output; anything another
+script or the pipeline could call belongs in its `lib/` module.
+
 ## External tool behavior
 
 These behaviors are not in our code — they're observed from external tools and must be understood to work on timestamp logic.

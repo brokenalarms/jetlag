@@ -12,16 +12,7 @@ import subprocess
 from pathlib import Path
 
 from conftest import create_test_video
-
-
-# Import hyphenated module name
-import importlib.util
-spec = importlib.util.spec_from_file_location(
-    "fix_media_timestamp",
-    str(Path(__file__).parent.parent / "fix-media-timestamp.py")
-)
-fmt = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(fmt)
+from lib.timestamp_source import clear_exif_cache, read_exif_data
 
 
 SCRIPT_DIR = Path(__file__).parent.parent
@@ -42,7 +33,7 @@ class TestTimezoneScenarios:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        fmt._exif_cache.clear()
+        clear_exif_cache()
 
     def create_video_shot_in_timezone(self, filename, shoot_time, shoot_tz_offset):
         video_path = os.path.join(self.temp_dir, filename)
@@ -91,8 +82,8 @@ class TestTimezoneScenarios:
         ], capture_output=True, check=True)
 
         # Verify DateTimeOriginal is preserved
-        fmt._exif_cache.clear()
-        exif = fmt.read_exif_data(video_path)
+        clear_exif_cache()
+        exif = read_exif_data(video_path)
         assert "2025:06:18 07:25:21" in exif.get("DateTimeOriginal", "")
         assert "+08:00" in exif.get("DateTimeOriginal", "")
 
@@ -133,8 +124,8 @@ class TestTimezoneScenarios:
             ], capture_output=True, check=True)
 
             # Each should preserve its original timezone
-            fmt._exif_cache.clear()
-            exif = fmt.read_exif_data(video_path)
+            clear_exif_cache()
+            exif = read_exif_data(video_path)
             assert shoot_time in exif.get("DateTimeOriginal", "")
             assert tz_offset in exif.get("DateTimeOriginal", "")
 
@@ -161,8 +152,8 @@ class TestTimezoneScenarios:
         ], capture_output=True, check=True)
 
         # Should have written DateTimeOriginal from filename + timezone
-        fmt._exif_cache.clear()
-        exif = fmt.read_exif_data(video_path)
+        clear_exif_cache()
+        exif = read_exif_data(video_path)
         assert "2025:06:18 07:25:21" in exif.get("DateTimeOriginal", "")
         assert "+08:00" in exif.get("DateTimeOriginal", "")
 
@@ -189,8 +180,8 @@ class TestTimezoneScenarios:
         ], capture_output=True, check=True)
 
         # Should have created DateTimeOriginal with local time + TZ
-        fmt._exif_cache.clear()
-        exif = fmt.read_exif_data(video_path)
+        clear_exif_cache()
+        exif = read_exif_data(video_path)
         dt_original = exif.get("DateTimeOriginal", "")
 
         # Should show local time (07:25:21 in +08:00, not 23:25:21 UTC)
@@ -219,8 +210,8 @@ class TestTimezoneScenarios:
         ], capture_output=True, check=True)
 
         # Verify negative timezone is preserved
-        fmt._exif_cache.clear()
-        exif = fmt.read_exif_data(video_path)
+        clear_exif_cache()
+        exif = read_exif_data(video_path)
         assert "-05:00" in exif.get("DateTimeOriginal", "")
 
         # Verify UTC conversion is correct
@@ -251,8 +242,8 @@ class TestTimezoneScenarios:
             "--apply"
         ], capture_output=True, check=True)
 
-        fmt._exif_cache.clear()
-        exif1 = fmt.read_exif_data(video1)
+        clear_exif_cache()
+        exif1 = read_exif_data(video1)
         qt1 = exif1.get("MediaCreateDate", "")
         # UTC should be 15:30:00 on same day
         assert "2025:06:18 15:30:00" in qt1
@@ -271,8 +262,8 @@ class TestTimezoneScenarios:
             "--apply"
         ], capture_output=True, check=True)
 
-        fmt._exif_cache.clear()
-        exif2 = fmt.read_exif_data(video2)
+        clear_exif_cache()
+        exif2 = read_exif_data(video2)
         qt2 = exif2.get("MediaCreateDate", "")
         # UTC should be 17:30:00 on previous day
         assert "2025:06:17 17:30:00" in qt2
@@ -292,7 +283,7 @@ class TestVideoEditorBehavior:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        fmt._exif_cache.clear()
+        clear_exif_cache()
 
     def test_timeline_uses_keys_creationdate(self):
         """
@@ -334,7 +325,7 @@ class TestRealWorldWorkflow:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        fmt._exif_cache.clear()
+        clear_exif_cache()
 
     def test_workflow_import_fix_organize(self):
         """
@@ -365,8 +356,8 @@ class TestRealWorldWorkflow:
         assert result.returncode == 0
 
         # Verify Keys:CreationDate is set
-        fmt._exif_cache.clear()
-        exif = fmt.read_exif_data(video_path)
+        clear_exif_cache()
+        exif = read_exif_data(video_path)
         assert exif.get("CreationDate") is not None
 
         # Step 2: Organize by date
@@ -383,8 +374,8 @@ class TestRealWorldWorkflow:
         assert os.path.exists(expected_path)
 
         # Verify all metadata is still correct after move
-        fmt._exif_cache.clear()
-        final_exif = fmt.read_exif_data(expected_path)
+        clear_exif_cache()
+        final_exif = read_exif_data(expected_path)
         assert "+08:00" in final_exif.get("DateTimeOriginal", "")
 
 

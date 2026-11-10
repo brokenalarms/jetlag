@@ -31,7 +31,6 @@ from lib.footage import footage_bytes, footage_ranges, footage_sha256
 SCRIPT_DIR = Path(__file__).parent.parent
 
 
-
 def box(box_type: bytes, payload: bytes) -> bytes:
     return struct.pack(">I4s", 8 + len(payload), box_type) + payload
 

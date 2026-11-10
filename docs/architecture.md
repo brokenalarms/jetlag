@@ -5,8 +5,8 @@
 ```
 /                         ← repo root
 ├── scripts/              ← Python/shell scripts (work standalone, no knowledge of app)
-│   ├── *.py / *.sh
-│   ├── lib/              ← shared Python utilities
+│   ├── *.py / *.sh       ← command lines: argument parsing and output only
+│   ├── lib/              ← the logic, as ordinary importable modules
 │   ├── media-profiles.yaml  ← shared config (scripts' own default; the app's shipped seed)
 │   └── tests/            ← script test suite (belongs with the scripts)
 ├── macos/                ← macOS SwiftUI app (sibling to scripts/, not nested inside)
@@ -28,7 +28,7 @@ At build time, the `Bundle scripts` build phase copies `scripts/` into `Contents
 
 Three components that share config:
 
-1. **Python scripts** (`scripts/`) — CLI tools for timestamp fixing, tagging, organizing, gyroflow generation. Run standalone or via shell wrappers.
+1. **Python scripts** (`scripts/`) — CLI tools for timestamp fixing, tagging, organizing, gyroflow generation. Run standalone or via shell wrappers. Each hyphenated script (`fix-media-timestamp.py`, `media-pipeline.py`, …) is a thin command line over a module in `scripts/lib/` (`fix_timestamp`, `pipeline`, …); the pipeline and the tests import those modules directly. See "Code layout" in `scripts/AGENTS.md`.
 2. **Jetlag macOS app** (`macos/`) — SwiftUI wrapper that reads the same `media-profiles.yaml`, edits profiles, and launches the scripts.
 3. **Marketing site** (`web/`) — static site sharing the design token palette with the macOS app.
 

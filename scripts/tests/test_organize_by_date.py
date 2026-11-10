@@ -4,7 +4,6 @@ Tests for organize-by-date.sh
 Validates file organization, template substitution, and idempotency
 """
 
-import importlib.util
 import io
 import os
 import subprocess
@@ -14,14 +13,10 @@ from pathlib import Path
 import pytest
 
 from conftest import create_test_video
+from lib import organize
 
 
 SCRIPT_DIR = Path(__file__).parent.parent
-
-_spec = importlib.util.spec_from_file_location(
-    "organize_by_date", str(SCRIPT_DIR / "organize-by-date.py"))
-organize = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(organize)
 
 
 class TestOrganizeByDate:

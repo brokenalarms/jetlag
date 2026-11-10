@@ -16,16 +16,9 @@ from pathlib import Path
 import pytest
 
 from conftest import create_test_video
+from lib import fix_timestamp
+from lib.timestamp_source import clear_exif_cache
 
-
-# Import hyphenated module name
-import importlib.util
-spec = importlib.util.spec_from_file_location(
-    "fix_media_timestamp",
-    str(Path(__file__).parent.parent / "fix-media-timestamp.py")
-)
-fmt = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(fmt)
 
 if sys.platform == "darwin":
     from lib.file_timestamps import (
@@ -49,7 +42,7 @@ class TestFileTimestamps:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        fmt._exif_cache.clear()
+        clear_exif_cache()
 
     def test_get_file_system_timestamps(self):
         """Test reading file system timestamps"""
@@ -121,7 +114,7 @@ class TestFileTimestamps:
             "SetFile", "-d", "06/18/2025 07:25:21", self.test_video
         ], capture_output=True, check=True)
 
-        changes = fmt.determine_needed_changes(self.test_video, dt, preserve_wallclock=True)
+        changes = fix_timestamp.determine_needed_changes(self.test_video, dt, preserve_wallclock=True)
         assert changes["file_timestamps"] is False
 
     def test_get_expected_file_system_time_display_mode(self):
@@ -197,7 +190,7 @@ class TestBirthTimeCalculation:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        fmt._exif_cache.clear()
+        clear_exif_cache()
 
     def _create_test_video(self, path: str, datetime_with_tz: str) -> None:
         create_test_video(path, DateTimeOriginal=datetime_with_tz)

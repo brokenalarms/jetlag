@@ -16,7 +16,6 @@ from lib.exiftool import ExifTool
 SCRIPTS_DIR = Path(__file__).parent.parent
 
 
-
 def _read_without_config(path: Path) -> str:
     return subprocess.run(
         ["exiftool", "-s3", "-XMP-jetlag:OriginalCreateDate", str(path)],

@@ -5,7 +5,6 @@ Test suite for generate-gyroflow.py
 Run with: pytest tests/test_generate_gyroflow.py -v
 """
 
-import importlib.util
 import json
 import os
 import shlex
@@ -20,21 +19,12 @@ import pytest
 import yaml
 
 from conftest import create_motion_video, create_test_video
+from lib import gyroflow
 
 SCRIPT_DIR = Path(__file__).parent.parent
 GENERATE_GYROFLOW = SCRIPT_DIR / "generate-gyroflow.sh"
 PROFILES_FILE = SCRIPT_DIR / "media-profiles.yaml"
 DOWNLOAD_GYROFLOW = SCRIPT_DIR / "tools" / "download-gyroflow.sh"
-
-
-def _load_generate_gyroflow():
-    """Load generate-gyroflow.py as a module (filename has a hyphen)."""
-    spec = importlib.util.spec_from_file_location(
-        "generate_gyroflow", SCRIPT_DIR / "generate-gyroflow.py"
-    )
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
 
 
 def run_generate_gyroflow(args: list[str]) -> subprocess.CompletedProcess:
@@ -51,11 +41,9 @@ def run_generate_gyroflow(args: list[str]) -> subprocess.CompletedProcess:
     )
 
 
-
 def get_test_preset() -> str:
     """Get a test preset JSON string."""
     return json.dumps({"stabilization": {"max_zoom": 105.0}})
-
 
 
 class TestNoMotionData:
@@ -174,19 +162,17 @@ class TestMotionDetection:
 
     def test_gyro_track_is_detected(self):
         """A video carrying a track named as gyro data has motion data."""
-        mod = _load_generate_gyroflow()
         with tempfile.TemporaryDirectory() as tmpdir:
             video = Path(tmpdir) / "motion.mp4"
             create_motion_video(video)
-            assert mod.has_motion_data(video) is True
+            assert gyroflow.has_motion_data(video) is True
 
     def test_plain_video_has_no_motion_data(self):
         """A video with only a picture track has no motion data — checked, not unknown."""
-        mod = _load_generate_gyroflow()
         with tempfile.TemporaryDirectory() as tmpdir:
             video = Path(tmpdir) / "plain.mp4"
             create_test_video(video)
-            assert mod.has_motion_data(video) is False
+            assert gyroflow.has_motion_data(video) is False
 
 
 class TestMissingBinary:
@@ -282,7 +268,6 @@ class TestBinaryResolution:
     def test_applications_install_wins_over_every_other_source(self):
         """A user's own /Applications/Gyroflow.app is the first choice, ahead of
         a Jetlag-installed copy, a $PATH binary, and a configured path."""
-        mod = _load_generate_gyroflow()
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             applications = root / "Applications"
@@ -296,12 +281,11 @@ class TestBinaryResolution:
             configured = self._make_path_binary(root)
 
             with self._isolated(applications, tools, path_dir):
-                assert mod.resolve_gyroflow_binary(str(configured)) == str(expected)
+                assert gyroflow.resolve_gyroflow_binary(str(configured)) == str(expected)
 
     def test_jetlag_tools_install_used_when_applications_empty(self):
         """The copy download-gyroflow.sh installs into Application Support is
         used when the user has no /Applications install."""
-        mod = _load_generate_gyroflow()
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             applications = root / "Applications"
@@ -314,12 +298,11 @@ class TestBinaryResolution:
             configured = self._make_path_binary(root)
 
             with self._isolated(applications, tools, path_dir):
-                assert mod.resolve_gyroflow_binary(str(configured)) == str(expected)
+                assert gyroflow.resolve_gyroflow_binary(str(configured)) == str(expected)
 
     def test_path_binary_used_when_no_app_bundle_installed(self):
         """A gyroflow on $PATH (e.g. a Homebrew install) is used when neither
         app-bundle location has one."""
-        mod = _load_generate_gyroflow()
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             applications = root / "Applications"
@@ -331,12 +314,11 @@ class TestBinaryResolution:
             configured = self._make_path_binary(root)
 
             with self._isolated(applications, tools, path_dir):
-                assert mod.resolve_gyroflow_binary(str(configured)) == str(expected)
+                assert gyroflow.resolve_gyroflow_binary(str(configured)) == str(expected)
 
     def test_configured_path_is_the_last_resort(self):
         """The media-profiles.yaml binary path is used only when no install is
         found in either app location or on $PATH."""
-        mod = _load_generate_gyroflow()
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             applications = root / "Applications"
@@ -346,12 +328,11 @@ class TestBinaryResolution:
             configured = self._make_path_binary(root)
 
             with self._isolated(applications, tools):
-                assert mod.resolve_gyroflow_binary(str(configured)) == str(configured)
+                assert gyroflow.resolve_gyroflow_binary(str(configured)) == str(configured)
 
     def test_returns_none_when_nothing_found(self):
         """When no install exists anywhere, returns None so the caller can skip
         gracefully instead of crashing the pipeline."""
-        mod = _load_generate_gyroflow()
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             applications = root / "Applications"
@@ -360,7 +341,7 @@ class TestBinaryResolution:
                 d.mkdir()
 
             with self._isolated(applications, tools):
-                assert mod.resolve_gyroflow_binary("/no/such/binary") is None
+                assert gyroflow.resolve_gyroflow_binary("/no/such/binary") is None
 
 
 class TestDownloadGyroflowCheck:

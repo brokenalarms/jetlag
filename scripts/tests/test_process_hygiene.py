@@ -17,7 +17,6 @@ import lib.exiftool as exiftool_module
 SCRIPTS_DIR = Path(__file__).parent.parent
 
 
-
 def _executable(path: Path, body: str) -> Path:
     path.write_text(body)
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
