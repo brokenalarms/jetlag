@@ -140,6 +140,42 @@ def metadata_client():
         yield stack.enter_context
 
 
+class FakeMetadata:
+    """Stands in for exiftool behind the shared metadata client.
+
+    files maps a path to the tags a read returns for it, keyed as exiftool's
+    short output names them (DateTimeOriginal, MediaCreateDate, …); a file it
+    does not know reads as having no tags. Every write is recorded in writes as
+    (path, tag_args) and reported as made.
+    """
+
+    def __init__(self):
+        self.files: dict[str, dict[str, str]] = {}
+        self.writes: list[tuple[str, list[str]]] = []
+
+    def read_tags(self, file_path, tags, extra_args=None):
+        return dict(self.files.get(str(file_path), {}))
+
+    def write_tags(self, file_path, tag_args):
+        self.writes.append((str(file_path), list(tag_args)))
+        exiftool.cache.pop(str(file_path), None)
+        return True
+
+    def execute(self, *args):
+        raise AssertionError(f"exiftool run with a fake metadata client: {args}")
+
+
+@pytest.fixture
+def fake_metadata(monkeypatch):
+    """Route the metadata client's reads and writes to a FakeMetadata, so a test
+    runs the real lib code with no exiftool process behind it."""
+    fake = FakeMetadata()
+    monkeypatch.setattr(exiftool, "read_tags", fake.read_tags)
+    monkeypatch.setattr(exiftool, "write_tags", fake.write_tags)
+    monkeypatch.setattr(exiftool, "execute", fake.execute)
+    return fake
+
+
 def _leaked_metadata_pids():
     """Pids of exiftool -stay_open children this process spawned (via
     lib.exiftool) that are still alive."""

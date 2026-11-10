@@ -2832,14 +2832,15 @@ class TestWorkingDirIsTransient:
         organize.process_file = lambda *a, **k: errored
         working = pipeline.WorkingDir(str(working_dir), created=True)
         try:
-            result = pipeline.process_file(
-                temp_workspace["source"] / name, None, str(temp_workspace["target"]),
-                working, None, None, True, False, tasks=set(),
+            opts = pipeline.RunOptions(
+                source_dir=str(temp_workspace["source"]), target_dir=str(temp_workspace["target"]),
+                working_dir=str(working_dir), extensions=[".mp4"], apply=True,
             )
+            result = pipeline.process_file(temp_workspace["source"] / name, opts, working)
         finally:
             organize.process_file = original
 
-        assert result["failed"], "Actual: the run succeeded, Expected: organize's error to fail it"
+        assert result.failed, "Actual: the run succeeded, Expected: organize's error to fail it"
         assert self._leftovers(working_dir) == [name], \
             f"Actual: working dir holds {self._leftovers(working_dir)}, Expected: the staged copy"
         assert working.staged == [], \
