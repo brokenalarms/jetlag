@@ -15,7 +15,8 @@ import sys
 from pathlib import Path
 
 from conftest import create_insta360_file
-from lib import tag_media, timestamp_source
+from lib import tag_media
+from lib.timestamps import sources
 
 SCRIPT_DIR = Path(__file__).parent.parent
 
@@ -49,10 +50,10 @@ def test_other_suffixes_are_read_without_embedded_data(tmp_path, monkeypatch):
         seen[Path(file_path).name] = extra_args
         return {}
 
-    monkeypatch.setattr(timestamp_source.exiftool, "read_tags", fake_read_tags)
+    monkeypatch.setattr(sources.exiftool, "read_tags", fake_read_tags)
 
     for name in ("a.insv", "b.INSP", "c.mp4", "d.jpg"):
-        timestamp_source.read_exif_data(str(tmp_path / name))
+        sources.read_exif_data(str(tmp_path / name))
 
     assert seen == {"a.insv": ["-ee"], "b.INSP": ["-ee"], "c.mp4": None, "d.jpg": None}
 

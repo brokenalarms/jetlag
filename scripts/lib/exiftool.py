@@ -48,7 +48,7 @@ class ExifTool:
     binary is the exiftool to run; it defaults to default_binary(), read when
     the client is constructed, so a test can hand a client a stand-in directly.
 
-    cache holds each file's parsed metadata as lib.timestamp_source's
+    cache holds each file's parsed metadata as lib.timestamps.sources's
     read_exif_data() built it. It lives here so that write_tags() can drop a
     file's entry whenever it writes that file: no caller has to remember to.
     """

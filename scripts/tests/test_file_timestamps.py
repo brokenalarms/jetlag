@@ -20,7 +20,7 @@ from lib import fix_media_timestamp
 
 
 if sys.platform == "darwin":
-    from lib.file_timestamps import (
+    from lib.timestamps.file_times import (
         get_file_system_timestamps,
         set_file_system_timestamps,
         check_file_system_timestamps_need_update,

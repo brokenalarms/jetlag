@@ -12,7 +12,7 @@ from pathlib import Path
 
 from conftest import create_test_video
 from lib.exiftool import ExifTool, MetadataWriteRefused, exiftool
-from lib.timestamp_source import read_exif_data
+from lib.timestamps.sources import read_exif_data
 
 
 class TestWritesDropTheCachedRead:

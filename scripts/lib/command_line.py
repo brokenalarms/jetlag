@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from lib.countries import get_timezone_for_country
 from lib.exiftool import exiftool
-from lib.timestamp_source import is_zone_name
+from lib.timestamps.sources import is_zone_name
 
 # ---------------------------------------------------------------------------
 # Interrupts

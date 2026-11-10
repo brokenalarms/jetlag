@@ -11,7 +11,7 @@ import sys
 from typing import Dict
 
 from lib.exiftool import exiftool
-from lib.timestamp_source import (
+from lib.timestamps.sources import (
     LEGACY_PROVENANCE_TAG,
     MOVIE_HEADER_CREATE_DATE_TAG,
     PRESERVED_FILENAME_TAG,

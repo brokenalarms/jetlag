@@ -14,7 +14,7 @@ import pytest
 from conftest import create_test_video
 from lib import tag_media
 from lib.exiftool import MetadataWriteRefused
-from lib.timestamp_source import clear_exif_cache, read_exif_data
+from lib.timestamps.sources import clear_exif_cache, read_exif_data
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags don't exist on Linux")
@@ -191,7 +191,7 @@ class TestGetExistingExifCamera:
 
 class TestExifReadSharedWithTimestampSource:
     """get_existing_exif_camera() must share the per-file EXIF read used by the
-    fix-timestamp step (lib.timestamp_source.read_exif_data), not spawn its own
+    fix-timestamp step (lib.timestamps.sources.read_exif_data), not spawn its own
     independent exiftool subprocess."""
 
     def setup_method(self):

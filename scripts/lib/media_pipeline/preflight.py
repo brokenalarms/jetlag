@@ -16,7 +16,7 @@ from lib import ingest_media, tag_media
 from lib.media_pipeline.consent import require_consent
 from lib.media_pipeline.events import emit_event
 from lib.media_pipeline.options import FIX_TIMESTAMP, RunOptions
-from lib.timestamp_source import (
+from lib.timestamps.sources import (
     extract_metadata_timezone, normalize_timezone_input, parse_filename_timestamp,
     resolve_file_timezone_offset,
 )

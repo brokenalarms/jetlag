@@ -17,13 +17,13 @@ from conftest import create_test_photo, create_test_video
 from lib import fix_media_timestamp
 from lib.countries import get_country_name, get_timezone_for_country
 from lib.exiftool import exiftool
-from lib.provenance import read_provenance_record
-from lib.timestamp_source import clear_exif_cache, get_best_timestamp, normalize_timezone_input, parse_datetime_original, parse_filename_timestamp, read_exif_data
+from lib.timestamps.provenance import read_provenance_record
+from lib.timestamps.sources import clear_exif_cache, get_best_timestamp, normalize_timezone_input, parse_datetime_original, parse_filename_timestamp, read_exif_data
 
 
-from lib.timestamp_source import TimestampSource
+from lib.timestamps.sources import TimestampSource
 if sys.platform == "darwin":
-    from lib.file_timestamps import get_file_system_timestamps, set_file_system_timestamps
+    from lib.timestamps.file_times import get_file_system_timestamps, set_file_system_timestamps
 
 
 class TestTimestampParsing:

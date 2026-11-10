@@ -13,7 +13,7 @@ import pytest
 from pathlib import Path
 
 from conftest import create_test_video
-from lib.timestamp_source import clear_exif_cache, extract_metadata_timezone, read_exif_data
+from lib.timestamps.sources import clear_exif_cache, extract_metadata_timezone, read_exif_data
 
 
 SCRIPT_DIR = Path(__file__).parent.parent

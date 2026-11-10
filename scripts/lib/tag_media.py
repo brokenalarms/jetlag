@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 from lib.exiftool import exiftool
-from lib.timestamp_source import read_exif_data
+from lib.timestamps.sources import read_exif_data
 
 
 @dataclass
@@ -79,7 +79,7 @@ def apply_finder_tags(file_path: str, tags: List[str], apply: bool = True) -> Tu
 def get_existing_exif_camera(file_path: str) -> dict:
     """Get existing Make and Model from EXIF data
 
-    Reads through the shared per-file EXIF cache (lib.timestamp_source) instead of
+    Reads through the shared per-file EXIF cache (lib.timestamps.sources) instead of
     spawning its own exiftool subprocess, so a file already read by the
     fix-timestamp step (or vice versa) doesn't pay a second round-trip.
     """

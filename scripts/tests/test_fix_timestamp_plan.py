@@ -21,7 +21,7 @@ from lib.fix_media_timestamp import (
     NO_TIMESTAMP, REFUSED_WITHOUT_FORCE, ZONE_NEEDED, CorrectionOptions, apply_correction,
     plan_correction, read_current,
 )
-from lib.timestamp_source import TimestampSource
+from lib.timestamps.sources import TimestampSource
 
 CLIP = "/cards/C0001.MP4"
 NAMED_CLIP = "/cards/VID_20251005_100000_00_001.mp4"

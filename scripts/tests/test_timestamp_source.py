@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for lib/timestamp_source.py
+Tests for lib/timestamps/sources.py
 Validates filename parsing, build_filename round-trips, and timestamp report generation.
 """
 
@@ -14,7 +14,7 @@ from conftest import create_test_photo, create_test_video
 
 
 from lib.exiftool import exiftool
-from lib.timestamp_source import (
+from lib.timestamps.sources import (
     parse_filename_timestamp,
     build_filename,
     read_timestamp_sources,

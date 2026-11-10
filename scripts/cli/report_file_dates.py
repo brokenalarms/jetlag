@@ -15,7 +15,7 @@ import sys
 
 from lib.command_line import install_interrupt_handlers
 from lib.filesystem import find_media_files
-from lib.timestamp_source import read_timestamp_sources
+from lib.timestamps.sources import read_timestamp_sources
 
 
 def main():

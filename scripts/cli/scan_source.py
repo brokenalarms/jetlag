@@ -15,7 +15,7 @@ from pathlib import Path
 
 from lib.command_line import install_interrupt_handlers
 from lib.filesystem import find_media_files, iter_media_files
-from lib.timestamp_source import parse_filename_timestamp
+from lib.timestamps.sources import parse_filename_timestamp
 
 
 def has_timestamped_names(path: Path, extensions: list[str]) -> bool:

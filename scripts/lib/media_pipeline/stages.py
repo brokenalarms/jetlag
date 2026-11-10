@@ -23,7 +23,7 @@ from lib.exiftool import MetadataWriteRefused
 from lib.media_pipeline.events import emit_event
 from lib.media_pipeline.options import FIX_TIMESTAMP, GYROFLOW, TAG, RunOptions
 from lib.media_pipeline.working_dir import WorkingDir
-from lib.timestamp_source import build_filename, carry_exif_cache, parse_datetime_original, read_exif_data
+from lib.timestamps.sources import build_filename, carry_exif_cache, parse_datetime_original, read_exif_data
 
 
 @dataclass

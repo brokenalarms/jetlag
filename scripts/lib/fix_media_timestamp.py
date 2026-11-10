@@ -17,8 +17,8 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Optional
 
 from lib.exiftool import MetadataWriteRefused, exiftool
-from lib.provenance import provenance_field_args
-from lib.timestamp_source import (
+from lib.timestamps.provenance import provenance_field_args
+from lib.timestamps.sources import (
     MOVIE_HEADER_CREATE_DATE_TAG,
     TimestampSource,
     camera_zone_offset_for_file,
@@ -34,7 +34,7 @@ from lib.timestamp_source import (
     resolve_timezone_offset,
 )
 
-from lib.file_timestamps import (
+from lib.timestamps.file_times import (
     birth_time_needs_update,
     check_file_system_timestamps_need_update,
     get_expected_file_system_time,
