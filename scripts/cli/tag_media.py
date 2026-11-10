@@ -11,13 +11,13 @@ import sys
 
 from lib.cli import install_interrupt_handlers
 from lib.exiftool import MetadataWriteRefused
-from lib.results import emit_result
+from cli.results import emit_result
 from lib.tagging import parse_tag_list, tag_media_file
 
 
 def main():
     install_interrupt_handlers()
-    parser = argparse.ArgumentParser(description='Tag media files with Finder tags and camera EXIF')
+    parser = argparse.ArgumentParser(prog="tag-media.sh", description='Tag media files with Finder tags and camera EXIF')
     parser.add_argument('files', nargs='+', help='Media files to tag')
     parser.add_argument('--make', help='Camera make/manufacturer to add to EXIF')
     parser.add_argument('--model', help='Camera model to add to EXIF')

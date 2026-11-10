@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for scan-source.py, which tells the app how much media a source holds and
+Tests for scan-source, which tells the app how much media a source holds and
 whether its filenames carry dates, so the app keeps no copy of that logic.
 """
 
@@ -13,7 +13,7 @@ SCRIPT_DIR = Path(__file__).parent.parent
 
 
 def scan(path, *args) -> dict:
-    result = subprocess.run([sys.executable, str(SCRIPT_DIR / "scan-source.py"), str(path), *args],
+    result = subprocess.run([sys.executable, str(SCRIPT_DIR / "cli" / "scan_source.py"), str(path), *args],
                             capture_output=True, text=True, cwd=SCRIPT_DIR)
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
@@ -67,7 +67,7 @@ def test_undated_filenames_are_reported(tmp_path):
 
 def test_missing_path_exits_with_error(tmp_path):
     """A source that was removed fails loudly rather than reporting zero."""
-    result = subprocess.run([sys.executable, str(SCRIPT_DIR / "scan-source.py"), str(tmp_path / "gone"),
+    result = subprocess.run([sys.executable, str(SCRIPT_DIR / "cli" / "scan_source.py"), str(tmp_path / "gone"),
                              "--extensions", ".mp4", "--count"],
                             capture_output=True, text=True, cwd=SCRIPT_DIR)
     assert result.returncode == 1 and "does not exist" in result.stderr

@@ -5,7 +5,7 @@ Pipeline: INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → 
 
 Source files are read-only inputs — ingest copies them to a working directory,
 all processing happens there, then output moves files to the target. Each step
-is a call into its lib module; media-pipeline.py is the command line.
+is a call into its lib module; media-pipeline is the command line.
 
 - options:     RunOptions, the command line resolved against the profile
 - preflight:   batch-level checks before the first file (camera, timezones, …)

@@ -75,7 +75,7 @@ def probe(path: Path, extensions: list[str], sample: int) -> list[dict]:
 
 def main() -> int:
     install_interrupt_handlers()
-    parser = argparse.ArgumentParser(description="Report the camera that shot a folder's media")
+    parser = argparse.ArgumentParser(prog="probe-camera.sh", description="Report the camera that shot a folder's media")
     parser.add_argument("path", help="Folder (searched recursively) or a single media file")
     parser.add_argument("--extensions", nargs="+", default=DEFAULT_EXTENSIONS,
                         help="Extensions to look for in a folder")

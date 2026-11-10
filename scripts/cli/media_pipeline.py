@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-media-pipeline.py
+media-pipeline.sh
 Orchestrates media processing: ingest from source, process, output to target.
 
-Usage: media-pipeline.py --profile PROFILE [--group GROUP] [OPTIONS]
-       media-pipeline.py --source DIR --target DIR [--group GROUP] [OPTIONS]
+Usage: media-pipeline.sh --profile PROFILE [--group GROUP] [OPTIONS]
+       media-pipeline.sh --source DIR --target DIR [--group GROUP] [OPTIONS]
 
 Command line for lib/pipeline.py, which runs
 INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow] → [archive-source].
@@ -22,6 +22,7 @@ from lib.pipeline import WORKING_DIR_NAME, WorkingDir, cancel_handler, emit_even
 def build_parser():
     """Build the argument parser for media-pipeline."""
     parser = argparse.ArgumentParser(
+        prog="media-pipeline.sh",
         description="Orchestrates video timestamp fixing and organization into date-based folders."
     )
     parser.add_argument("--profile", help="Profile from media-profiles.yaml")

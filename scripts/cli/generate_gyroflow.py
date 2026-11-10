@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-generate-gyroflow.py
+generate-gyroflow.sh
 Generates a .gyroflow project file for a video with gyroscope data.
 
-Usage: generate-gyroflow.py FILE --preset '{"stabilization": {...}}' [--apply]
+Usage: generate-gyroflow.sh FILE --preset '{"stabilization": {...}}' [--apply]
 
 Command line for lib/gyroflow.py; prints the result as @@key=value lines.
 """
@@ -16,7 +16,7 @@ from pathlib import Path
 from lib.cli import install_interrupt_handlers
 from lib.gyroflow import generate_gyroflow_project
 from lib.profiles import ProfilesFileMissing, load_config
-from lib.results import emit_result
+from cli.results import emit_result
 
 
 def load_gyroflow_config() -> dict:
@@ -38,6 +38,7 @@ def main():
     install_interrupt_handlers()
 
     parser = argparse.ArgumentParser(
+        prog="generate-gyroflow.sh",
         description="Generate a .gyroflow project file for a video with gyroscope data."
     )
     parser.add_argument("file", help="Video file to process")

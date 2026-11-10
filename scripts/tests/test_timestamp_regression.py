@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Regression tests for fix-media-timestamp.py
+Regression tests for fix-media-timestamp
 Tests critical behaviors documented in AGENTS.md
 """
 
@@ -46,7 +46,7 @@ class TestFilenameSourceOfTruth:
         create_test_video(video_path, DateTimeOriginal="2025:06:19 09:38:09+08:00")
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--infer-from-filename",
             "--timezone", "+0800",
@@ -74,7 +74,7 @@ class TestFilenameSourceOfTruth:
 
         # Run fix (even with wrong EXIF data)
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "+0800",
             "--apply"
@@ -102,7 +102,7 @@ class TestDateTimeOriginalPreservation:
 
         # Run fix without --infer-from-filename
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "+08:00",
             "--apply"
@@ -129,7 +129,7 @@ class TestInferFromFilenameRequiresTimezone:
         create_test_video(video_path)
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--infer-from-filename",
             "--apply"
@@ -177,7 +177,7 @@ class TestTimezoneMismatchDetection:
         dto_before = read_exif_data(video_path).get("DateTimeOriginal", "")
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "+0900",
         ], capture_output=True, text=True)
@@ -201,7 +201,7 @@ class TestTimezoneMismatchDetection:
         create_test_video(video_path, DateTimeOriginal="2025:06:19 06:38:09+08:00")
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "+0900",
             "--force-timezone",
@@ -240,7 +240,7 @@ class TestTimezoneConversion:
 
         # Run fix
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "+08:00",
             "--apply"
@@ -285,7 +285,7 @@ class TestMissingDateTimeOriginalWithTimezoneChange:
 
         # Run with timezone
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "+0800",
             "--apply"
@@ -375,7 +375,7 @@ class TestExtractMetadataTimezone:
         ], capture_output=True, check=True)
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path, "--timezone", "+08:00"
         ], capture_output=True, text=True)
 
@@ -387,7 +387,7 @@ class TestExtractMetadataTimezone:
         self._create_test_video(video_path)
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path, "--timezone", "+09:00"
         ], capture_output=True, text=True)
 

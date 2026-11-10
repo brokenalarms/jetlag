@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for archive-source.py
+Tests for archive-source
 
 Covers: archive rename, delete only passed files,
 empty dir cleanup, non-empty dir preservation, read-only source error,
@@ -18,13 +18,13 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = str(Path(__file__).parent.parent / "archive-source.py")
+SCRIPT = str(Path(__file__).parent.parent / "cli" / "archive_source.py")
 
 NOT_ROOT = os.getuid() != 0
 
 
 def run_archive_source(*args: str) -> subprocess.CompletedProcess:
-    """Run archive-source.py with the given arguments."""
+    """Run archive-source with the given arguments."""
     return subprocess.run(
         [sys.executable, SCRIPT, *args],
         capture_output=True,

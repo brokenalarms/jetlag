@@ -20,13 +20,13 @@ from lib.cli import (
 )
 from lib.countries import get_country_name
 from lib.fix_timestamp import fix_media_timestamps
-from lib.results import emit_result
+from cli.results import emit_result
 
 
 def main():
     """Command line interface"""
     install_interrupt_handlers()
-    parser = argparse.ArgumentParser(description='Fix media timestamps - ensures file system timestamps match EXIF data')
+    parser = argparse.ArgumentParser(prog="fix-media-timestamp.sh", description='Fix media timestamps - ensures file system timestamps match EXIF data')
     parser.add_argument('file', help='Media file (photo or video) to process')
     add_timezone_args(parser, '--country')
     parser.add_argument('--apply', action='store_true', help='Apply changes (default: dry run)')

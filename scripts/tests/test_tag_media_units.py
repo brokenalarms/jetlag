@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit tests for lib/tagging.py, the logic behind tag-media.py
+Unit tests for lib/tagging.py, the logic behind tag-media
 Tests individual functions focusing on data rather than presentation
 """
 

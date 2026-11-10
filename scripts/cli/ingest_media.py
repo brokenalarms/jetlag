@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-ingest-media.py
+ingest-media.sh
 Copies a single source file into a flat working directory.
 
-Usage: ingest-media.py <source_file> --target <working_dir> [--apply]
+Usage: ingest-media.sh <source_file> --target <working_dir> [--apply]
 
 Command line for lib/ingest.py. Source files are treated as read-only inputs —
 this script copies, never moves.
@@ -22,6 +22,7 @@ from lib.ingest import ingest_file
 def main():
     install_interrupt_handlers()
     parser = argparse.ArgumentParser(
+        prog="ingest-media.sh",
         description="Copy a single source file into a flat working directory."
     )
     parser.add_argument("file", help="Source file to ingest")

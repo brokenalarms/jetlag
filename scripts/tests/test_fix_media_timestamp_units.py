@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit tests for lib/fix_timestamp.py, the logic behind fix-media-timestamp.py
+Unit tests for lib/fix_timestamp.py, the logic behind fix-media-timestamp
 Tests individual functions without relying on output strings
 """
 
@@ -601,7 +601,7 @@ class TestTimeOffset:
         video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
 
         result = subprocess.run([
-            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            sys.executable, str(Path(__file__).parent.parent / "cli" / "fix_media_timestamp.py"),
             video,
             "--timezone", "+0800",
             "--time-offset", "3600",
@@ -619,7 +619,7 @@ class TestTimeOffset:
         video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
 
         result = subprocess.run([
-            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            sys.executable, str(Path(__file__).parent.parent / "cli" / "fix_media_timestamp.py"),
             video,
             "--timezone", "+0800",
             "--time-offset", "-3600",
@@ -636,7 +636,7 @@ class TestTimeOffset:
         video = self._create_video("VID_20250618_072521.mp4")
 
         result = subprocess.run([
-            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            sys.executable, str(Path(__file__).parent.parent / "cli" / "fix_media_timestamp.py"),
             video,
             "--timezone", "+0800",
             "--infer-from-filename",
@@ -654,7 +654,7 @@ class TestTimeOffset:
         video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
 
         result = subprocess.run([
-            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            sys.executable, str(Path(__file__).parent.parent / "cli" / "fix_media_timestamp.py"),
             video,
             "--time-offset", "3600",
             "--apply"
@@ -668,7 +668,7 @@ class TestTimeOffset:
         video = self._create_video("test.mp4", ["-DateTimeOriginal=2025:06:18 07:25:21+08:00"])
 
         result = subprocess.run([
-            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            sys.executable, str(Path(__file__).parent.parent / "cli" / "fix_media_timestamp.py"),
             video,
             "--timezone", "+0800",
             "--time-offset", "93784",
@@ -702,7 +702,7 @@ class TestForceTimezoneGate:
 
     def _run(self, *extra_args):
         return subprocess.run([
-            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            sys.executable, str(Path(__file__).parent.parent / "cli" / "fix_media_timestamp.py"),
             self.video, *extra_args,
         ], capture_output=True, text=True)
 
@@ -777,7 +777,7 @@ class TestForceTimezoneGate:
         clear_exif_cache()
 
         result = subprocess.run([
-            sys.executable, str(Path(__file__).parent.parent / "fix-media-timestamp.py"),
+            sys.executable, str(Path(__file__).parent.parent / "cli" / "fix_media_timestamp.py"),
             video, "--timezone", "+01:00", "--apply",
         ], capture_output=True, text=True)
 

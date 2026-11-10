@@ -24,7 +24,7 @@ def has_timestamped_names(path: Path, extensions: list[str]) -> bool:
 
 def main() -> int:
     install_interrupt_handlers()
-    parser = argparse.ArgumentParser(description="Report a source's media count or filename dates")
+    parser = argparse.ArgumentParser(prog="scan-source.sh", description="Report a source's media count or filename dates")
     parser.add_argument("path", help="Folder to scan")
     parser.add_argument("--extensions", nargs="+", required=True, help="Media extensions to look for")
     mode = parser.add_mutually_exclusive_group(required=True)

@@ -82,7 +82,7 @@ class TestScriptsAcceptTheSameTimezones:
         source = tmp_path / "source"
         create_test_video(source / "clip.mp4", **{"QuickTime:CreateDate": "2025:06:17 23:25:21"})
         return subprocess.run(
-            [sys.executable, str(SCRIPT_DIR / "media-pipeline.py"),
+            [sys.executable, str(SCRIPT_DIR / "cli" / "media_pipeline.py"),
              "--source", str(source), "--target", str(tmp_path / "target"),
              "--extensions", ".mp4", "--tasks", "fix-timestamp", "--timezone", timezone],
             capture_output=True, text=True, stdin=subprocess.DEVNULL,
@@ -105,7 +105,7 @@ class TestScriptsAcceptTheSameTimezones:
         create_test_video(video)
 
         result = subprocess.run(
-            [sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), str(video),
+            [sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), str(video),
              "--timezone", "Pacific/Atlantis"],
             capture_output=True, text=True,
         )

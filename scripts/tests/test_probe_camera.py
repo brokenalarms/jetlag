@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for probe-camera.py, which tells the app what camera shot a folder's media.
+Tests for probe-camera, which tells the app what camera shot a folder's media.
 
 The app builds a new profile's camera from the source chosen for it, and picks
 the profile whose camera's media is in a profile's source, so each extension has
@@ -19,7 +19,7 @@ SCRIPT_DIR = Path(__file__).parent.parent
 
 
 def probe(*args) -> list[dict]:
-    result = subprocess.run([sys.executable, str(SCRIPT_DIR / "probe-camera.py"), *map(str, args)],
+    result = subprocess.run([sys.executable, str(SCRIPT_DIR / "cli" / "probe_camera.py"), *map(str, args)],
                             capture_output=True, text=True, cwd=SCRIPT_DIR)
     assert result.returncode == 0, result.stderr
     return [json.loads(line) for line in result.stdout.splitlines() if line.strip()]

@@ -18,22 +18,18 @@ from pipeline_helpers import SCRIPT_DIR, PipelineResult, create_test_video, run_
 # The pipeline stages every file through a working directory before organize
 # places it. These runs exercise the default location, so they cannot go
 # through run_pipeline(), which supplies a --working-dir of its own. The spy
-# runner loads media-pipeline as a module, records where ingest staged each
+# runner imports media-pipeline's module, records where ingest staged each
 # file and the inode organize was handed just before it moved it, then runs
 # main() exactly as the CLI would.
 _PIPELINE_SPY_RUNNER = '''
-import importlib.util
 import json
 import os
 import sys
 
+from cli import media_pipeline as pipeline
 from lib import ingest, organize
 
-spec = importlib.util.spec_from_file_location("media_pipeline_under_test", sys.argv[1])
-pipeline = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(pipeline)
-
-record_path = sys.argv[2]
+record_path = sys.argv[1]
 
 
 def record(**entry):
@@ -61,7 +57,7 @@ def organize_spy(file_path, *args, **kwargs):
 
 ingest.ingest_file = ingest_spy
 organize.process_file = organize_spy
-sys.argv = [sys.argv[0]] + sys.argv[3:]
+sys.argv = [sys.argv[0]] + sys.argv[2:]
 pipeline.main()
 '''
 
@@ -93,12 +89,11 @@ class TestDefaultWorkingDirIsOnTheTargetVolume:
         # directory these runs assert stays empty. That is the interpreter's
         # doing, not the pipeline's, so turn it off rather than carve it out.
         environment["PYTHONDONTWRITEBYTECODE"] = "1"
-        # The runner loads media-pipeline.py by path, so lib/ is not on its path
-        # the way it is when the script itself is run.
+        # The runner imports cli.media_pipeline from scripts/, as lib/launch.sh
+        # arranges for the command itself.
         environment["PYTHONPATH"] = str(SCRIPT_DIR)
         completed = subprocess.run(
-            [sys.executable, str(runner), str(SCRIPT_DIR / "media-pipeline.py"),
-             str(record), *args],
+            [sys.executable, str(runner), str(record), *args],
             cwd=str(SCRIPT_DIR), capture_output=True, text=True, env=environment,
         )
         entries = [json.loads(line) for line in record.read_text().splitlines()] \

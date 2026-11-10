@@ -58,7 +58,7 @@ script or the pipeline could call belongs in its `lib/` module.
 Adding a pipeline step means one `Stage` subclass in `STAGES` plus its entries in
 `pipeline-schema.yaml`: the `stage_complete` token and a `cli.steps` entry. The
 `cli` section also lists every flag the app passes; `build_parser()`'s `--tasks`
-choices and options are tested against it. `media-pipeline.py` keeps
+choices and options are tested against it. `media-pipeline` keeps
 `build_parser()` and builds the `WorkingDir` its cancel handler closes over.
 
 ## External tool behavior
@@ -103,7 +103,7 @@ Diagnostic knowledge for understanding unexpected timestamp offsets:
 
 ## Workflow design
 
-`media-pipeline.py` is the single entry point for all media processing. The pipeline has a fixed frame — **ingest** and **output** always run — with optional processing steps in between:
+`media-pipeline` is the single entry point for all media processing. The pipeline has a fixed frame — **ingest** and **output** always run — with optional processing steps in between:
 
 ```
 INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow] → [archive-source]

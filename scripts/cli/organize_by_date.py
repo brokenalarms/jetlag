@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-organize-by-date.py
+organize-by-date.sh
 Organizes a single file into date-based directory structure.
 
 Command line for lib/organize.py; prints the result as @@key=value lines.
@@ -12,12 +12,13 @@ import sys
 
 from lib.cli import install_interrupt_handlers
 from lib.organize import DEFAULT_FOLDER_TEMPLATE, process_file
-from lib.results import emit_result
+from cli.results import emit_result
 
 
 def main():
     install_interrupt_handlers()
     parser = argparse.ArgumentParser(
+        prog="organize-by-date.sh",
         description='Organize a single file into date-based directory structure'
     )
     parser.add_argument('file', help='File to organize')

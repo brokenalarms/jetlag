@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test suite for generate-gyroflow.py
+Test suite for generate-gyroflow
 
 Run with: pytest tests/test_generate_gyroflow.py -v
 """
@@ -206,7 +206,7 @@ class TestMissingBinary:
             env["JETLAG_TOOLS_DIR"] = tmpdir
 
             result = subprocess.run(
-                [sys.executable, str(SCRIPT_DIR / "generate-gyroflow.py"),
+                [sys.executable, str(SCRIPT_DIR / "cli" / "generate_gyroflow.py"),
                  str(video), "--preset", get_test_preset(), "--apply"],
                 capture_output=True, text=True, env=env, cwd=SCRIPT_DIR,
             )

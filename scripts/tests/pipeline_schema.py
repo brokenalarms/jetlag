@@ -1,7 +1,7 @@
 """Validator for JSONL pipeline events against scripts/pipeline-schema.yaml.
 
 The schema is the one place a token is defined. This module lets the test suite
-hold the emitting side to it: any event media-pipeline.py writes to stdout must
+hold the emitting side to it: any event media-pipeline writes to stdout must
 declare every field it carries and stay inside the enumerations. A token added to
 the script without being declared here fails, and so does a declared-but-unemitted
 required field. `load_cli` reads the schema's command-line section, which the tests

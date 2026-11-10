@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for tag-media.py
+Tests for tag-media
 Validates tagging behavior, idempotency, and check-before-write
 """
 
@@ -21,7 +21,7 @@ pytestmark = pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS
 
 
 class TestTagMedia:
-    """Test suite for tag-media.py"""
+    """Test suite for tag-media"""
 
     @pytest.fixture
     def temp_dir(self):
@@ -56,7 +56,7 @@ class TestTagMedia:
 
         # Run without --apply (dry run mode)
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--tags", "test-tag",
             "--make", "TestMake",
@@ -95,7 +95,7 @@ class TestTagMedia:
         has_another_tag_before = "another-tag" in tag_result_before.stdout
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--tags", "test-tag,another-tag",
             "--apply"
@@ -129,7 +129,7 @@ class TestTagMedia:
         has_model_before = "HERO12 Black" in exif_result_before.stdout
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--make", "GoPro",
             "--model", "HERO12 Black",
@@ -158,7 +158,7 @@ class TestTagMedia:
         """
         # First run
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--tags", "test-tag",
             "--apply"
@@ -172,7 +172,7 @@ class TestTagMedia:
 
         # Second run
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--tags", "test-tag",
             "--apply"
@@ -197,7 +197,7 @@ class TestTagMedia:
         """
         # First run
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--make", "GoPro",
             "--model", "HERO12 Black",
@@ -216,7 +216,7 @@ class TestTagMedia:
 
         # Second run
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--make", "GoPro",
             "--model", "HERO12 Black",
@@ -247,7 +247,7 @@ class TestTagMedia:
         """
         # Add first tag
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--tags", "existing-tag",
             "--apply"
@@ -262,7 +262,7 @@ class TestTagMedia:
 
         # Add second tag (first should be skipped)
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--tags", "existing-tag,new-tag",
             "--apply"
@@ -290,7 +290,7 @@ class TestTagMedia:
         """
         # Set Make only
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--make", "GoPro",
             "--apply"
@@ -305,7 +305,7 @@ class TestTagMedia:
 
         # Set both Make and Model (only Model should be written)
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--make", "GoPro",
             "--model", "HERO12 Black",
@@ -336,7 +336,7 @@ class TestTagMedia:
 
         # Process all files at once
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             *videos,
             "--tags", "batch-tag",
             "--apply"
@@ -358,7 +358,7 @@ class TestTagMedia:
         create_test_video(lrv_path)
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             lrv_path,
             "--make", "GoPro",
             "--tags", "test-tag",
@@ -380,7 +380,7 @@ class TestTagMedia:
             f.write("not a video")
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             unwritable, "--make", "GoPro", "--apply"
         ], capture_output=True, text=True)
 
@@ -390,7 +390,7 @@ class TestTagMedia:
     def test_output_format(self, test_video):
         """Test that output follows presentation format"""
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--tags", "test-tag",
             "--make", "GoPro",
@@ -422,7 +422,7 @@ class TestTagMedia:
         has_model_before = "HERO12 Black" in exif_result_before.stdout
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--tags", "gopro-hero-12",
             "--make", "GoPro",
@@ -453,7 +453,7 @@ class TestTagMedia:
 
 
 class TestTagMediaDataPresentation:
-    """Test data/presentation separation in tag-media.py"""
+    """Test data/presentation separation in tag-media"""
 
     @pytest.fixture
     def temp_dir(self):
@@ -474,7 +474,7 @@ class TestTagMediaDataPresentation:
         # Functions should return what changed, presentation formats it
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--tags", "tag1,tag2",
             "--make", "TestMake",
@@ -491,7 +491,7 @@ class TestTagMediaDataPresentation:
         """Test that already-correct files report already_correct action"""
         # Add tags
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--tags", "test-tag",
             "--apply"
@@ -499,7 +499,7 @@ class TestTagMediaDataPresentation:
 
         # Run again - should report already correct
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--tags", "test-tag",
             "--apply"
@@ -514,7 +514,7 @@ class TestTagMediaDataPresentation:
 
 
 class TestTagMediaMachineOutput:
-    """Test @@ machine-readable output from tag-media.py"""
+    """Test @@ machine-readable output from tag-media"""
 
     @pytest.fixture
     def temp_dir(self):
@@ -545,7 +545,7 @@ class TestTagMediaMachineOutput:
         Expected: tagged action when new tags are applied
         """
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video,
             "--tags", "test-tag,other-tag",
             "--make", "GoPro",
@@ -568,13 +568,13 @@ class TestTagMediaMachineOutput:
         """
         # First run
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video, "--tags", "test-tag", "--apply"
         ], capture_output=True, check=True)
 
         # Second run - already correct
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video, "--tags", "test-tag", "--apply"
         ], capture_output=True, text=True)
 
@@ -589,7 +589,7 @@ class TestTagMediaMachineOutput:
         Expected: clean machine-readable output on stdout
         """
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "tag-media.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"),
             test_video, "--tags", "test-tag", "--make", "GoPro"
         ], capture_output=True, text=True)
 

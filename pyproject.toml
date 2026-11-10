@@ -6,7 +6,7 @@ pythonpath = ["scripts"]
 testpaths = ["scripts/tests"]
 
 [tool.pyrefly]
-project_includes = ["scripts/*.py", "scripts/lib/*.py"]
+project_includes = ["scripts/cli/*.py", "scripts/lib/**/*.py"]
 project_excludes = ["scripts/tests/*"]
 search_path = ["scripts"]
 # The scripts run on macOS; file flags (chflags, st_flags) exist only there.

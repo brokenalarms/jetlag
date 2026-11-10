@@ -61,7 +61,7 @@ def test_probe_camera_reports_an_insv_folder(tmp_path):
     """A folder probe finds .insv files and reports the camera in their trailer."""
     create_insta360_file(tmp_path / "VID_0003.insv", "Insta360 X4")
 
-    result = subprocess.run([sys.executable, str(SCRIPT_DIR / "probe-camera.py"), str(tmp_path)],
+    result = subprocess.run([sys.executable, str(SCRIPT_DIR / "cli" / "probe_camera.py"), str(tmp_path)],
                             capture_output=True, text=True, cwd=SCRIPT_DIR)
     found = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
 

@@ -135,7 +135,7 @@ class TestFileTimestamps:
     def test_apply_mode_changes_birth_time(self):
         """Test that apply mode updates birth time"""
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             self.test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
@@ -150,7 +150,7 @@ class TestFileTimestamps:
         original_mtime = os.stat(self.test_video).st_mtime
 
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             self.test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, check=True)
 
@@ -160,7 +160,7 @@ class TestFileTimestamps:
     def test_import_screen_uses_birth_time(self):
         """Verify that file birth time is set correctly for video editor import screen"""
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             self.test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, check=True)
 
@@ -212,7 +212,7 @@ class TestBirthTimeCalculation:
         self._create_test_video(video_path, "2025:06:18 07:15:30+08:00")
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "+0800",
             "--apply"
@@ -239,7 +239,7 @@ class TestBirthTimeCalculation:
         self._create_test_video(video_path, "2025:06:18 07:15:30+08:00")
 
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "+0800",
             "--apply"
@@ -248,7 +248,7 @@ class TestBirthTimeCalculation:
         birth_after_first = self._get_birth_time_local(video_path)
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "+0800"
         ], capture_output=True, text=True, check=True)

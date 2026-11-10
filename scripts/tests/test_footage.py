@@ -89,8 +89,8 @@ CARD_FORMATS = {
 def _run_pipeline_writers(path: Path):
     env = {**os.environ, "PATH": f"{SCRIPT_DIR / 'tools'}{os.pathsep}{os.environ['PATH']}"}
     for args in (
-        ["tag-media.py", "--make", "Sony", "--model", "ILCE-7M5", "--apply"],
-        ["fix-media-timestamp.py", "--timezone", "+09:00", "--infer-from-filename", "--apply"],
+        ["cli/tag_media.py", "--make", "Sony", "--model", "ILCE-7M5", "--apply"],
+        ["cli/fix_media_timestamp.py", "--timezone", "+09:00", "--infer-from-filename", "--apply"],
     ):
         result = subprocess.run([sys.executable, str(SCRIPT_DIR / args[0]), *args[1:], str(path)],
                                 capture_output=True, text=True, env=env, cwd=SCRIPT_DIR)

@@ -74,7 +74,7 @@ class TestTimezoneScenarios:
 
         # Run fix-media-timestamp (simulating user in Japan, but this should work regardless)
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "+08:00",
             "--apply"
@@ -116,7 +116,7 @@ class TestTimezoneScenarios:
             video_path = self.create_video_shot_in_timezone(filename, shoot_time, tz_offset)
 
             subprocess.run([
-                sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+                sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
                 video_path,
                 "--timezone", tz_offset,
                 "--apply"
@@ -144,7 +144,7 @@ class TestTimezoneScenarios:
 
         # Run with timezone flag
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "+0800",
             "--apply"
@@ -172,7 +172,7 @@ class TestTimezoneScenarios:
 
         # Run with timezone - should convert UTC to local time
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "+0800",
             "--apply"
@@ -202,7 +202,7 @@ class TestTimezoneScenarios:
         )
 
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "-05:00",
             "--apply"
@@ -235,7 +235,7 @@ class TestTimezoneScenarios:
         )
 
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video1,
             "--timezone", "+08:00",
             "--apply"
@@ -255,7 +255,7 @@ class TestTimezoneScenarios:
         )
 
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video2,
             "--timezone", "+08:00",
             "--apply"
@@ -293,7 +293,7 @@ class TestVideoEditorBehavior:
         create_test_video(video_path, DateTimeOriginal="2025:06:18 07:25:21+08:00")
 
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "+08:00",
             "--apply"
@@ -344,7 +344,7 @@ class TestRealWorldWorkflow:
 
         # Step 1: Fix timestamp
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "+08:00",
             "--apply"

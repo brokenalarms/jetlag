@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-archive-source.py
+archive-source.sh
 Acts on the source directory after all pipeline files have been processed.
 
 Command line for lib/archive.py; prints the result as @@key=value lines.
@@ -17,7 +17,7 @@ import sys
 
 from lib.archive import archive_source, delete_files
 from lib.cli import install_interrupt_handlers
-from lib.results import emit_result
+from cli.results import emit_result
 
 
 def main():
@@ -25,6 +25,7 @@ def main():
     install_interrupt_handlers()
 
     parser = argparse.ArgumentParser(
+        prog="archive-source.sh",
         description="Act on source directory after pipeline processing."
     )
     parser.add_argument("--source", required=True, help="Source directory to act on")

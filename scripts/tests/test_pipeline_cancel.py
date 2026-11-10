@@ -30,7 +30,7 @@ from lib import pipeline
 from lib.exiftool import exiftool
 
 SCRIPT_DIR = Path(__file__).parent.parent
-MEDIA_PIPELINE_PY = SCRIPT_DIR / "media-pipeline.py"
+MEDIA_PIPELINE_PY = SCRIPT_DIR / "cli" / "media_pipeline.py"
 
 SIGTERM_EXIT_CODE = 128 + signal.SIGTERM
 

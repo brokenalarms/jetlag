@@ -20,7 +20,7 @@ SCRIPT_DIR = Path(__file__).parent.parent
 MIN_VERSION = (3, 9)
 
 SOURCES = sorted(
-    list(SCRIPT_DIR.glob("*.py"))
+    list((SCRIPT_DIR / "cli").rglob("*.py"))
     + list((SCRIPT_DIR / "lib").rglob("*.py"))
     + list((SCRIPT_DIR / "tests").glob("*.py"))
 )

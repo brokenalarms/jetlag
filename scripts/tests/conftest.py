@@ -276,6 +276,11 @@ def pytest_configure(config):
     """Install missing tools and check Python packages before tests run."""
     platform = "darwin" if sys.platform == "darwin" else "linux"
 
+    # Tests run cli/<command>.py directly; lib/launch.sh gives a command scripts/
+    # on PYTHONPATH, so give every subprocess the same.
+    pythonpath = os.environ.get("PYTHONPATH")
+    os.environ["PYTHONPATH"] = str(SCRIPT_DIR) + (os.pathsep + pythonpath if pythonpath else "")
+
     for tool, commands in REQUIRED_TOOLS.items():
         if not shutil.which(tool):
             if platform in commands:

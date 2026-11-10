@@ -2,7 +2,7 @@
 Shared timestamp source analysis.
 
 Reads a file and reports what timestamps are available from which sources.
-Used by lib/fix_timestamp.py, lib/pipeline.py, lib/tagging.py and report-file-dates.py.
+Used by lib/fix_timestamp.py, lib/pipeline.py, lib/tagging.py and report-file-dates.
 
 Public API:
     read_timestamp_sources(file_path, ...) -> TimestampReport

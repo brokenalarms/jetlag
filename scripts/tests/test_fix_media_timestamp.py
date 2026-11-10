@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for fix-media-timestamp.py
+Tests for fix-media-timestamp
 Validates timestamp fixing behavior, idempotency, and edge cases
 """
 
@@ -43,7 +43,7 @@ def _parse_at_lines(stdout: str) -> dict:
 
 
 class TestFixMediaTimestamp:
-    """Test suite for fix-media-timestamp.py"""
+    """Test suite for fix-media-timestamp"""
 
     @pytest.fixture
     def temp_dir(self):
@@ -71,7 +71,7 @@ class TestFixMediaTimestamp:
         original_mtime = os.stat(test_video).st_mtime
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             test_video, "--timezone", "+08:00"
         ], capture_output=True, text=True)
 
@@ -83,7 +83,7 @@ class TestFixMediaTimestamp:
     def test_idempotency(self, test_video):
         """Test that running twice doesn't change anything the second time"""
         result1 = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
@@ -97,7 +97,7 @@ class TestFixMediaTimestamp:
 
         # Second run should report "No change"
         result2 = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
@@ -108,7 +108,7 @@ class TestFixMediaTimestamp:
         """Test --timezone flag adds timezone to DateTimeOriginal without timezone"""
         # File has DateTimeOriginal but no timezone - should add it
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             test_video_no_timezone,
             "--timezone", "+0800",
             "--apply"
@@ -129,7 +129,7 @@ class TestFixMediaTimestamp:
         """Test that Keys:CreationDate is written correctly"""
         # Run with --apply
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, check=True)
 
@@ -149,7 +149,7 @@ class TestFixMediaTimestamp:
 
         # Should use filename with provided timezone
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video_path,
             "--timezone", "+0800"
         ], capture_output=True, text=True)
@@ -161,7 +161,7 @@ class TestFixMediaTimestamp:
     def test_missing_timezone_error(self, test_video_no_timezone):
         """--timezone is required even for a naive source with a usable DateTimeOriginal"""
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             test_video_no_timezone
         ], capture_output=True, text=True)
 
@@ -171,7 +171,7 @@ class TestFixMediaTimestamp:
     def test_missing_timezone_error_even_when_source_already_zoned(self, test_video):
         """--timezone is required for the step even when DateTimeOriginal already carries a zone"""
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             test_video
         ], capture_output=True, text=True)
 
@@ -196,7 +196,7 @@ class TestFixMediaTimestamp:
         assert "+" not in before.split("DateTimeOriginal")[1].split("\n")[0]
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             test_video_no_timezone, "--apply"
         ], capture_output=True, text=True)
 
@@ -208,7 +208,7 @@ class TestFixMediaTimestamp:
     def test_output_formatting(self, test_video):
         """Test that output follows data/presentation separation"""
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             test_video, "--timezone", "+08:00"
         ], capture_output=True, text=True)
 
@@ -230,7 +230,7 @@ class TestFixMediaTimestamp:
 
         # Run fix
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
@@ -258,7 +258,7 @@ class TestFixMediaTimestamp:
         ], capture_output=True, check=True)
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             test_video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
@@ -287,7 +287,7 @@ class TestFixMediaTimestamp:
         ], capture_output=True, check=True)
 
         dry = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video, "--timezone", "+09:00", "--force-timezone"
         ], capture_output=True, text=True)
         assert dry.returncode == 0, dry.stderr
@@ -295,7 +295,7 @@ class TestFixMediaTimestamp:
         assert "No change" not in dry.stderr
 
         applied = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video, "--timezone", "+09:00", "--force-timezone", "--apply"
         ], capture_output=True, text=True)
         assert applied.returncode == 0, applied.stderr
@@ -401,7 +401,7 @@ class TestIdempotenceAcrossRanking:
         shutil.copy2(pristine, reprocessed)
         shutil.copy2(pristine, processed_once)
 
-        cmd = [sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py")]
+        cmd = [sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py")]
 
         first = subprocess.run(cmd + [reprocessed] + apply_args, capture_output=True, text=True)
         assert first.returncode == 0, first.stderr
@@ -422,7 +422,7 @@ class TestIdempotenceAcrossRanking:
         photo = os.path.join(temp_dir, "IMG_0042.jpg")
         create_test_photo(photo, DateTimeOriginal="2025:06:18 07:25:21")
 
-        cmd = [sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py")]
+        cmd = [sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py")]
         args = ["--timezone", "+0800", "--force-timezone", "--apply"]
 
         first = subprocess.run(cmd + [photo] + args, capture_output=True, text=True)
@@ -444,7 +444,7 @@ class TestIdempotenceAcrossRanking:
         shutil.copy2(pristine, reprocessed)
         shutil.copy2(pristine, processed_once)
 
-        cmd = [sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py")]
+        cmd = [sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py")]
         args = ["--timezone", "+0800", "--force-timezone", "--apply"]
 
         first = subprocess.run(cmd + [reprocessed] + args, capture_output=True, text=True)
@@ -469,7 +469,7 @@ class TestIdempotenceAcrossRanking:
         create_test_video(video, **exif_tags)
 
         dry_args = [arg for arg in apply_args if arg != "--apply"]
-        cmd = [sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video] + dry_args
+        cmd = [sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), video] + dry_args
 
         result = subprocess.run(cmd, capture_output=True, text=True)
         assert result.returncode == 0, result.stderr
@@ -491,7 +491,7 @@ class TestIdempotenceAcrossRanking:
         create_test_video(video, **{"QuickTime:CreateDate": "2026:01:03 18:35:32"})
 
         cmd = [
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
             video, "--timezone", "+13:00", "--time-offset", "-7200",
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -507,7 +507,7 @@ class TestIdempotenceAcrossRanking:
 
 
 class TestFixMediaTimestampIntegration:
-    """Integration tests for fix-media-timestamp.py with various file types"""
+    """Integration tests for fix-media-timestamp with various file types"""
 
     @pytest.fixture
     def temp_dir(self):
@@ -527,7 +527,7 @@ class TestFixMediaTimestampIntegration:
         results = []
         for video in videos:
             result = subprocess.run([
-                sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
+                sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"),
                 video, "--timezone", "+08:00", "--apply"
             ], capture_output=True, text=True)
             results.append(result)
@@ -543,7 +543,7 @@ class TestFixMediaTimestampIntegration:
 
 
 class TestFixMediaTimestampMachineOutput:
-    """Test @@ machine-readable output from fix-media-timestamp.py"""
+    """Test @@ machine-readable output from fix-media-timestamp"""
 
     @pytest.fixture
     def temp_dir(self):
@@ -561,7 +561,7 @@ class TestFixMediaTimestampMachineOutput:
         create_test_video(video, DateTimeOriginal="2025:06:18 07:25:21+08:00")
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--timezone", "+08:00"
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), video, "--timezone", "+08:00"
         ], capture_output=True, text=True)
 
         at_lines = _parse_at_lines(result.stdout)
@@ -583,12 +583,12 @@ class TestFixMediaTimestampMachineOutput:
 
         # First apply
         subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--timezone", "+08:00", "--apply"
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
         # Second run - should be no_change
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--timezone", "+08:00", "--apply"
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
         at_lines = _parse_at_lines(result.stdout)
@@ -604,7 +604,7 @@ class TestFixMediaTimestampMachineOutput:
         create_test_video(video, DateTimeOriginal="2025:06:18 07:25:21+08:00")
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video, "--timezone", "+08:00", "--apply"
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), video, "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
         at_lines = _parse_at_lines(result.stdout)
@@ -620,7 +620,7 @@ class TestFixMediaTimestampMachineOutput:
         create_test_video(video)
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), video,
             "--timezone", "+0800"
         ], capture_output=True, text=True)
 
@@ -639,7 +639,7 @@ class TestFixMediaTimestampMachineOutput:
         create_test_video(video, **{"QuickTime:CreateDate": "2025:06:17 23:25:21"})
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), video,
             "--timezone", "+08:00"
         ], capture_output=True, text=True)
 
@@ -658,7 +658,7 @@ class TestFixMediaTimestampMachineOutput:
         create_test_video(video, DateTimeOriginal="2025:06:18 07:25:21")
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), video,
             "--timezone", "+08:00"
         ], capture_output=True, text=True)
 
@@ -683,7 +683,7 @@ class TestFixMediaTimestampMachineOutput:
         )
 
         first = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), video,
             "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
@@ -691,7 +691,7 @@ class TestFixMediaTimestampMachineOutput:
             "Keys:CreationDate,QuickTime:MediaCreateDate"
 
         second = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), video,
             "--timezone", "+08:00", "--apply"
         ], capture_output=True, text=True)
 
@@ -711,7 +711,7 @@ class TestFixMediaTimestampMachineOutput:
         create_test_video(video, **{"QuickTime:CreateDate": "2026:01:03 18:35:32"})
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), video,
             "--timezone", "+13:00"
         ], capture_output=True, text=True)
 
@@ -733,7 +733,7 @@ class TestFixMediaTimestampMachineOutput:
                            **{"QuickTime:CreateDate": "2026:01:03 18:35:32"})
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), video,
             "--timezone", "+13:00"
         ], capture_output=True, text=True)
 
@@ -752,7 +752,7 @@ class TestFixMediaTimestampMachineOutput:
         create_test_video(video)
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video,
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), video,
             "--timezone", "+0800"
         ], capture_output=True, text=True)
 
@@ -769,7 +769,7 @@ class TestFixMediaTimestampMachineOutput:
         create_test_video(video, DateTimeOriginal="2025:06:18 07:25:21+08:00")
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"), video
+            sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), video
         ], capture_output=True, text=True)
 
         for line in result.stdout.strip().split("\n"):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for ingest-media.py
+Tests for ingest-media
 
 Covers: apply copies file, dry-run no-op, flat copy from subdirectory,
 missing source file error.
@@ -16,11 +16,11 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = str(Path(__file__).parent.parent / "ingest-media.py")
+SCRIPT = str(Path(__file__).parent.parent / "cli" / "ingest_media.py")
 
 
 def run_ingest(*args: str) -> subprocess.CompletedProcess:
-    """Run ingest-media.py with the given arguments."""
+    """Run ingest-media with the given arguments."""
     return subprocess.run(
         [sys.executable, SCRIPT, *args],
         capture_output=True,

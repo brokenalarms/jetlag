@@ -1,11 +1,11 @@
 # Pipeline JSONL event and command-line schema
 #
-# Each stdout line from media-pipeline.py is a single JSON object (JSONL).
+# Each stdout line from media-pipeline is a single JSON object (JSONL).
 # The "event" field discriminates event types. All other fields depend on event type.
 # Optional fields are omitted when absent (not null).
 #
 # The macOS app parses these events via JSONDecoder into PipelineEvent structs.
-# Standalone scripts still use @@key=value via lib/results.emit_result() for CLI output.
+# Standalone scripts still use @@key=value via cli/results.emit_result() for CLI output.
 #
 # This file is the one place a token is defined. The script decides an outcome and
 # emits it as an enumerated token; the app renders the token and never re-derives
@@ -316,7 +316,7 @@ events:
       mode: applied
 
 # The command line the app builds for media-pipeline. The app's PipelineStep tokens
-# and flag constants, and media-pipeline.py's build_parser(), are both held to this
+# and flag constants, and media-pipeline's build_parser(), are both held to this
 # section by the same contract tests as the events above.
 cli:
   # Every step in pipeline order. `stage` is the token stage_complete carries; `task`

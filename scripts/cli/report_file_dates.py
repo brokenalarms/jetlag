@@ -6,7 +6,7 @@ Calls read_timestamp_sources() on each file and emits machine-readable
 @@key=value lines summarising parseability and a sample preview.
 
 Usage:
-    report-file-dates.py <source-dir> --file-extensions .mp4 .mov
+    report-file-dates.sh <source-dir> --file-extensions .mp4 .mov
 """
 
 import argparse
@@ -20,7 +20,7 @@ from lib.timestamp_source import read_timestamp_sources
 
 def main():
     install_interrupt_handlers()
-    parser = argparse.ArgumentParser(description="Report timestamp sources for media files")
+    parser = argparse.ArgumentParser(prog="report-file-dates.sh", description="Report timestamp sources for media files")
     parser.add_argument("source_dir", help="Directory to scan")
     parser.add_argument(
         "--file-extensions",

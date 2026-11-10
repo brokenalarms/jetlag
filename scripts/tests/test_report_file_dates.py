@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for report-file-dates.py
+Tests for report-file-dates
 Validates pre-flight scanner output.
 """
 
@@ -42,7 +42,7 @@ class TestReportFileDates:
         create_test_video(os.path.join(self.temp_dir, "VID_20250506_140000.mp4"))
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "report-file-dates.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "report_file_dates.py"),
             self.temp_dir,
             "--file-extensions", ".mp4"
         ], capture_output=True, text=True)
@@ -59,7 +59,7 @@ class TestReportFileDates:
         create_test_video(os.path.join(self.temp_dir, "random_file.mp4"))
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "report-file-dates.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "report_file_dates.py"),
             self.temp_dir,
             "--file-extensions", ".mp4"
         ], capture_output=True, text=True)
@@ -73,7 +73,7 @@ class TestReportFileDates:
     def test_empty_folder(self):
         """Empty folder — graceful no-op."""
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "report-file-dates.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "report_file_dates.py"),
             self.temp_dir,
             "--file-extensions", ".mp4"
         ], capture_output=True, text=True)
@@ -93,7 +93,7 @@ class TestReportFileDates:
         create_test_video(os.path.join(self.temp_dir, "VID_20250506_140000.mp4"))
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "report-file-dates.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "report_file_dates.py"),
             self.temp_dir,
             "--file-extensions", ".mp4"
         ], capture_output=True, text=True)
@@ -111,7 +111,7 @@ class TestReportFileDates:
         create_test_video(os.path.join(self.temp_dir, "VID_20250505_130334.mp4"))
 
         result = subprocess.run([
-            sys.executable, str(SCRIPT_DIR / "report-file-dates.py"),
+            sys.executable, str(SCRIPT_DIR / "cli" / "report_file_dates.py"),
             self.temp_dir,
             "--file-extensions", ".mp4"
         ], capture_output=True, text=True)
