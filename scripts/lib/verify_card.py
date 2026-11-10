@@ -20,6 +20,7 @@ import bisect
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -27,8 +28,9 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Optional
 
-from lib.data_portion import data_bytes
+from lib.data_portion import data_bytes, data_ranges, data_ranges_of, data_sha256
 from lib.exiftool import exiftool
+from lib.volumes import is_network
 
 SCHEMA_PATH = Path(__file__).parent / "verify-card-schema.yaml"
 
@@ -63,6 +65,8 @@ class CardFile:
     kind: str
     size: int
     data_bytes: Optional[int]
+    # With --verify-hashes: two copies recorded different hashes for this file.
+    recorded_hashes_disagree: bool = False
 
     @property
     def name(self) -> str:
@@ -137,6 +141,8 @@ class Location:
     remote: bool
     entries: list[Entry] = field(default_factory=list)
     reachable: bool = True
+    # Reading it crosses a network: a host:/path root, a share, or an unknown mount.
+    network: bool = True
 
 
 def _listable(rel: PurePosixPath, extensions: set[str]) -> bool:
@@ -194,24 +200,38 @@ def open_location(name: str, root: str, extensions: set[str]) -> Location:
     if not path.is_dir():
         print(f"❌ Backup location {name} is not reachable: {root}", file=sys.stderr)
         return Location(name, root, remote=False, reachable=False)
-    return Location(name, root, remote=False, entries=list_local(path, extensions))
+    return Location(name, root, remote=False, entries=list_local(path, extensions),
+                    network=is_network(root))
 
 
 @dataclass
 class CopyFacts:
-    """What is known of a copy: the card name it records, and its data portion size."""
+    """What is known of a copy: the card name and hash cache it records, and its data
+    portion size. read_path is a local file with the copy's bytes: the copy itself, or
+    for a remote copy its local twin."""
     recorded_name: Optional[str]
     data_bytes: Optional[int]
     known: bool
+    recorded_hash: Optional[str] = None
+    recorded_bytes: Optional[int] = None
+    read_path: Optional[Path] = None
 
 
-def recorded_names(paths: list[Path]) -> dict[Path, Optional[str]]:
-    """The card name each file records in its provenance, in one exiftool call."""
+@dataclass
+class Recorded:
+    name: Optional[str] = None
+    content_sha256: Optional[str] = None
+    content_bytes: Optional[int] = None
+
+
+def recorded_facts(paths: list[Path]) -> dict[Path, Recorded]:
+    """The card name and hash cache each file records, in one exiftool call."""
     if not paths:
         return {}
     raw = exiftool.execute("-j", "-XMP-xmpMM:PreservedFileName", "-XMP-xmpDM:LogComment",
+                           "-XMP-jetlag:ContentSHA256", "-XMP-jetlag:ContentBytes",
                            *[str(p) for p in paths])
-    names: dict[Path, Optional[str]] = {p: None for p in paths}
+    facts: dict[Path, Recorded] = {p: Recorded() for p in paths}
     for record in json.loads(raw or "[]"):
         path = Path(record["SourceFile"])
         name = record.get("PreservedFileName")
@@ -221,8 +241,13 @@ def recorded_names(paths: list[Path]) -> dict[Path, Optional[str]]:
                 name = json.loads(record["LogComment"]).get("filename")
             except (ValueError, AttributeError):
                 name = None
-        names[path] = str(name) if name else None
-    return names
+        content_bytes = record.get("ContentBytes")
+        facts[path] = Recorded(
+            name=str(name) if name else None,
+            content_sha256=str(record["ContentSHA256"]) if record.get("ContentSHA256") else None,
+            content_bytes=int(content_bytes) if str(content_bytes or "").isdigit() else None,
+        )
+    return facts
 
 
 class Matcher:
@@ -232,6 +257,7 @@ class Matcher:
         self.location = location
         self.local_twins = local_twins
         self.by_name: dict[str, list[Entry]] = {}
+        self.by_rel: dict[str, Entry] = {e.rel: e for e in location.entries}
         self.by_stem: dict[tuple[str, str], list[Entry]] = {}
         by_suffix: dict[str, list[Entry]] = {}
         for entry in location.entries:
@@ -268,9 +294,12 @@ class Matcher:
                     local[rel] = twin.local_path
                 else:
                     self.facts[rel] = CopyFacts(None, None, known=False)
-        names = recorded_names(list(local.values()))
+        recorded = recorded_facts(list(local.values()))
         for rel, path in local.items():
-            self.facts[rel] = CopyFacts(names.get(path), data_bytes(path), known=True)
+            facts = recorded.get(path, Recorded())
+            self.facts[rel] = CopyFacts(facts.name, data_bytes(path), known=True,
+                                        recorded_hash=facts.content_sha256,
+                                        recorded_bytes=facts.content_bytes, read_path=path)
 
     def copies(self, card_file: CardFile) -> list[Entry]:
         """Copies of a media file: its recorded card name, or else its own name, matches."""
@@ -320,6 +349,8 @@ class Verdict:
     verdict: str
     basis: Optional[str]
     copies: list[str]
+    # With --verify-hashes, for a matched copy in scope: match, mismatch or not_hashable.
+    hash: Optional[str] = None
 
 
 @dataclass
@@ -327,6 +358,8 @@ class Report:
     locations: list[Location]
     scan: Scan
     verdicts: dict[str, dict[str, Verdict]]
+    hashes_checked: int = 0
+    hash_cache_written: int = 0
 
     @property
     def on_every_location(self) -> int:
@@ -336,8 +369,13 @@ class Report:
 
 def verify_card(source: Path, locations: list[tuple[str, str]], media_extensions: list[str],
                 companion_extensions: list[str], include_companions: bool,
-                ignore_paths: list[str]) -> Report:
-    """Judge every checked card file on every location."""
+                ignore_paths: list[str], verify_hashes: bool = False,
+                include_network: bool = False) -> Report:
+    """Judge every checked card file on every location.
+
+    verify_hashes also hashes every matched media copy on a local location (and with
+    include_network, on a network one) and compares it with the card file's hash.
+    """
     media = normalize_extensions(media_extensions)
     companions = normalize_extensions(companion_extensions) - media
     scan = scan_source(source, media, companions, include_companions,
@@ -373,7 +411,10 @@ def verify_card(source: Path, locations: list[tuple[str, str]], media_extensions
                 copies = companion_copies(card_file, media_copies[location.name], matcher)
             verdict, basis = judge(card_file, copies, matcher.facts)
             verdicts[card_file.rel][location.name] = Verdict(verdict, basis, sorted(c.rel for c in copies))
-    return Report(opened, scan, verdicts)
+    report = Report(opened, scan, verdicts)
+    if verify_hashes:
+        check_hashes(report, matchers, include_network)
+    return report
 
 
 def cleared_files(report: Report, source: Path) -> set[Path]:
@@ -388,3 +429,134 @@ def parse_location(spec: str) -> tuple[str, str]:
     if not sep or not name or not root:
         raise ValueError(f"expected NAME=ROOT, got {spec!r}")
     return name, root
+
+
+def _remote_parts(root: str) -> tuple[str, str]:
+    match = _REMOTE_ROOT.match(root)
+    assert match is not None
+    return match["host"], match["path"].rstrip("/")
+
+
+def _ssh(host: str, script: str) -> subprocess.CompletedProcess:
+    ssh = os.environ.get("JETLAG_SSH", "ssh")
+    return subprocess.run([ssh, host, script], capture_output=True)
+
+
+class RemoteFile:
+    """A file on another host, read in small aligned blocks with dd over ssh: enough
+    to find a data portion from its headers without copying the file."""
+
+    BLOCK = 64 * 1024
+
+    def __init__(self, host: str, path: str):
+        self.host, self.path, self.position = host, path, 0
+        self.blocks: dict[int, bytes] = {}
+
+    def seek(self, position: int, whence: int = 0) -> int:
+        self.position = position
+        return position
+
+    def tell(self) -> int:
+        return self.position
+
+    def read(self, size: int) -> bytes:
+        first, last = self.position // self.BLOCK, (self.position + size - 1) // self.BLOCK
+        missing = [b for b in range(first, last + 1) if b not in self.blocks]
+        if missing:
+            start, count = missing[0], missing[-1] - missing[0] + 1
+            result = _ssh(self.host, f"dd if={shlex.quote(self.path)} bs={self.BLOCK} "
+                                     f"skip={start} count={count} 2>/dev/null")
+            data = result.stdout
+            for i in range(count):
+                self.blocks[start + i] = data[i * self.BLOCK:(i + 1) * self.BLOCK]
+        data = b"".join(self.blocks.get(b, b"") for b in range(first, last + 1))
+        offset = self.position - first * self.BLOCK
+        chunk = data[offset:offset + size]
+        self.position += len(chunk)
+        return chunk
+
+
+def remote_sha256(location: Location, entry: Entry, twin: Optional[Path]) -> Optional[str]:
+    """sha256 of a host:/path copy's data portion, computed on its host so only the
+    digest crosses the network. The ranges come from a local twin's headers, or from
+    the copy's own headers read on the host."""
+    host, root = _remote_parts(location.root)
+    path = f"{root}/{entry.rel}"
+    ranges = data_ranges(twin) if twin else data_ranges_of(RemoteFile(host, path), entry.size)
+    if ranges is None:
+        return None
+    quoted = shlex.quote(path)
+    parts = "; ".join(f"tail -c +{offset + 1} {quoted} | head -c {length}" for offset, length in ranges)
+    script = (f"{{ {parts}; }} | {{ if command -v sha256sum >/dev/null; then sha256sum; "
+              f"else shasum -a 256; fi; }}")
+    result = _ssh(host, script)
+    digest = result.stdout.decode(errors="replace").split()
+    return digest[0] if result.returncode == 0 and digest and len(digest[0]) == 64 else None
+
+
+def check_hashes(report: Report, matchers: dict[str, Matcher], include_network: bool) -> None:
+    """Hash every matched media copy in scope against its card file's data portion.
+
+    The reference is the hash a matched copy records (written only after it matched
+    the card), else the card's own data hashed. A copy that hashes equal to a
+    reference read from the card, on a local location, and records none, gets the
+    hash written into it as a cache, so a later run need not read the card again.
+    """
+    locations = {loc.name: loc for loc in report.locations}
+    # Written only once every copy is hashed: a write moves a local copy's metadata,
+    # and a remote twin's ranges are read from that local copy.
+    cache_writes: list[tuple[Path, str, Optional[int]]] = []
+    in_scope = {name for name, loc in locations.items()
+                if loc.reachable and (include_network or not loc.network)}
+    for card_file in report.scan.checked:
+        if card_file.kind != "media":
+            continue
+        by_location = report.verdicts[card_file.rel]
+        targets = []
+        for name, verdict in by_location.items():
+            if name in in_scope and verdict.verdict == "matched":
+                entry = matchers[name].by_rel[verdict.copies[0]]
+                targets.append((name, verdict, entry, matchers[name].facts.get(entry.rel)))
+        if not targets:
+            continue
+        recorded = {f.recorded_hash for _, _, _, f in targets
+                    if f and f.recorded_hash and f.recorded_bytes == card_file.data_bytes}
+        reference = next(iter(recorded)) if len(recorded) == 1 else None
+        from_card = reference is None
+        # The card settles which recorded hash is right; nothing is cached for it.
+        card_file.recorded_hashes_disagree = len(recorded) > 1
+        if from_card:
+            reference = data_sha256(card_file.path)
+        for name, verdict, entry, facts in targets:
+            location = locations[name]
+            if reference is None:
+                verdict.hash = "not_hashable"
+                continue
+            report.hashes_checked += 1
+            if location.remote:
+                twin = facts.read_path if facts and facts.read_path else None
+                digest = remote_sha256(location, entry, twin)
+            else:
+                digest = data_sha256(entry.local_path) if entry.local_path else None
+            if digest == reference:
+                verdict.hash = "match"
+                if (from_card and not card_file.recorded_hashes_disagree
+                        and not location.network and entry.local_path
+                        and not (facts and facts.recorded_hash)):
+                    cache_writes.append((entry.local_path, reference, card_file.data_bytes))
+            else:
+                verdict.hash = "mismatch"
+                verdict.verdict = "hash_mismatch"
+                verdict.basis = None
+    for path, digest, content_bytes in cache_writes:
+        write_hash_cache(path, digest, content_bytes)
+        report.hash_cache_written += 1
+
+
+def write_hash_cache(path: Path, digest: str, content_bytes: Optional[int]) -> None:
+    """Record a copy's data hash in its provenance, once. Metadata only: the data
+    portion, and so the hash, is unchanged by the write."""
+    tags = [f"-XMP-jetlag:ContentSHA256={digest}"]
+    if content_bytes is not None:
+        tags.append(f"-XMP-jetlag:ContentBytes={content_bytes}")
+    exiftool.write_tags(str(path), tags)

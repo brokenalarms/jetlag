@@ -48,7 +48,14 @@ def main() -> int:
                         help="Require companion files on every location too")
     parser.add_argument("--ignore-paths", nargs="*", default=[],
                         help="Folder names whose contents are not checked (e.g. MISC)")
+    parser.add_argument("--verify-hashes", action="store_true",
+                        help="Also hash every matched copy on a local location and compare it with "
+                             "the card file's; records the hash in matching local copies")
+    parser.add_argument("--include-network", action="store_true",
+                        help="With --verify-hashes, hash copies on network locations too (slow)")
     args = parser.parse_args()
+    if args.include_network and not args.verify_hashes:
+        parser.error("--include-network needs --verify-hashes")
 
     source = Path(args.source)
     if not source.is_dir():
@@ -60,23 +67,28 @@ def main() -> int:
         return 1
 
     report = verify_card(source, args.location, args.media_extensions,
-                         args.companion_extensions, args.include_companions, args.ignore_paths)
+                         args.companion_extensions, args.include_companions, args.ignore_paths,
+                         verify_hashes=args.verify_hashes, include_network=args.include_network)
 
     for location in report.locations:
         emit("verify_location", location=location.name, root=location.root,
-             remote=location.remote, reachable=location.reachable,
+             remote=location.remote, network=location.network, reachable=location.reachable,
              files=len(location.entries) if location.reachable else None)
     for card_file in report.scan.checked:
         emit("verify_file", file=card_file.rel, kind=card_file.kind, size=card_file.size,
-             data_bytes=card_file.data_bytes)
+             data_bytes=card_file.data_bytes,
+             recorded_hashes_disagree=card_file.recorded_hashes_disagree or None)
         for location_name, result in report.verdicts[card_file.rel].items():
             emit("verify_result", file=card_file.rel, location=location_name,
-                 verdict=result.verdict, basis=result.basis, copies=result.copies)
+                 verdict=result.verdict, basis=result.basis, copies=result.copies,
+                 hash=result.hash)
 
     checked = len(report.scan.checked)
     emit("verify_summary", checked=checked, on_every_location=report.on_every_location,
          need_attention=checked - report.on_every_location, not_checked=report.scan.not_checked,
-         not_checked_kinds=sorted(report.scan.not_checked_kinds))
+         not_checked_kinds=sorted(report.scan.not_checked_kinds),
+         hashes_checked=report.hashes_checked if args.verify_hashes else None,
+         hash_cache_written=report.hash_cache_written if args.verify_hashes else None)
     return 0
 
 
