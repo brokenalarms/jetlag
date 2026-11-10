@@ -137,7 +137,7 @@ INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow]
 - Optional steps (**tag**, **fix-timestamp**) operate on the working copy.
 - **Output** moves processed files from the working directory to `ready_dir` via organize-by-date (date-based folder structure).
 - **Gyroflow** generates stabilization projects on the file now in `ready_dir`.
-- **Archive-source** acts on the source folder after all files are processed (archive/rename or delete processed files).
+- **Archive-source** acts on the source folder after all files are processed (archive/rename, or delete processed files). Delete removes only files verify-card matches on every `--backup-location` (or that `archive-source --accept` names); with no location it deletes nothing.
 
 ## Scenario test specs
 

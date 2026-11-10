@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from cli.verify_card import location_arg
 from lib.command_line import add_timezone_args, attach_negative_option_values, install_interrupt_handlers
 from lib.media_pipeline import WORKING_DIR_NAME, WorkingDir, cancel_handler, emit_event, run
 
@@ -52,6 +53,11 @@ def build_parser():
     parser.add_argument(
         "--archived-name",
         help="Name for the archived source folder (default: '<source> - copied <YYYY-MM-DD>')."
+    )
+    parser.add_argument(
+        "--backup-location", action="append", type=location_arg, default=[], metavar="NAME=ROOT",
+        help="A backup location the source is verified against before --source-action delete "
+             "removes anything; repeat for each. Only files on every location are deleted."
     )
     parser.add_argument(
         "--copy-companion-files", action="store_true",

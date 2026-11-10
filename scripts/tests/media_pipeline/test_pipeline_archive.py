@@ -50,11 +50,45 @@ class TestArchiveSourceIntegration:
             "--group", "Test",
             "--tasks", "tag", "fix-timestamp", "archive-source",
             "--source-action", "delete",
+            "--backup-location", f"Library={temp_workspace['target']}",
             "--apply",
         ])
 
         assert not video.exists(), "Processed video should be deleted from source"
         assert unrelated.exists(), "Unrelated file should survive"
+
+    def test_delete_without_a_backup_location_deletes_nothing(self, temp_workspace, test_profile):
+        """Delete removes only files verified on every backup location; with none
+        given, nothing is verified, so the card keeps everything."""
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        run_pipeline([
+            "--profile", test_profile, "--source", str(source), "--timezone", "+0900",
+            "--group", "Test", "--tasks", "tag", "fix-timestamp", "archive-source",
+            "--source-action", "delete", "--apply",
+        ])
+
+        assert video.exists(), "Nothing may be deleted without a backup location to verify against"
+
+    def test_delete_keeps_a_file_missing_from_one_backup_location(self, temp_workspace, test_profile):
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+        empty_nas = temp_workspace["root"] / "NAS"
+        empty_nas.mkdir()
+
+        run_pipeline([
+            "--profile", test_profile, "--source", str(source), "--timezone", "+0900",
+            "--group", "Test", "--tasks", "tag", "fix-timestamp", "archive-source",
+            "--source-action", "delete",
+            "--backup-location", f"Library={temp_workspace['target']}",
+            "--backup-location", f"NAS={empty_nas}",
+            "--apply",
+        ])
+
+        assert video.exists(), "A file not on every backup location keeps its card copy"
 
     def test_archive_destination_and_name_move_the_source_dir(self, temp_workspace, test_profile):
         """The pipeline passes --archive-destination and --archived-name through
@@ -152,6 +186,7 @@ class TestArchiveSourceIntegration:
             "--group", "Test",
             "--tasks", "tag", "fix-timestamp", "archive-source",
             "--source-action", "delete",
+            "--backup-location", f"Library={temp_workspace['target']}",
             "--copy-companion-files",
             "--apply",
         ])

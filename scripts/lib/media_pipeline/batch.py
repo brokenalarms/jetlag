@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import NoReturn
 
 from lib import archive_source
+from lib.verify_card import cleared_files, verify_card
 from lib.filesystem import find_media_files
 from lib.media_pipeline.events import emit_event
 from lib.media_pipeline.options import ARCHIVE_SOURCE, RunOptions, resolve_options, with_gyroflow_preset
@@ -107,7 +108,8 @@ def act_on_source(opts: RunOptions, stats: BatchStats) -> None:
         return
     print("📦 Archive source...", file=sys.stderr)
     if opts.source_action == "delete":
-        arc_result = archive_source.delete_files(opts.source_dir, stats.source_files, opts.apply)
+        arc_result = archive_source.delete_files(opts.source_dir, stats.source_files, opts.apply,
+                                                 verified_on_backups(opts))
     else:
         arc_result = archive_source.archive_source(
             opts.source_dir, opts.apply,
@@ -116,6 +118,21 @@ def act_on_source(opts: RunOptions, stats: BatchStats) -> None:
         )
     if arc_result.failed:
         print("   ⚠️  Archive-source failed", file=sys.stderr)
+
+
+def verified_on_backups(opts: RunOptions) -> set[Path]:
+    """The source files verify-card matches on every --backup-location.
+
+    Delete removes nothing else: a file not provably backed up keeps its last copy.
+    """
+    if not opts.backup_locations:
+        print("   Delete needs --backup-location to verify the source against; "
+              "nothing is deleted without it.", file=sys.stderr)
+        return set()
+    companions = list(opts.companion_extensions or [])
+    report = verify_card(Path(opts.source_dir), list(opts.backup_locations), list(opts.extensions),
+                         companions, opts.copy_companion_files, [])
+    return cleared_files(report, Path(opts.source_dir))
 
 
 def finish_working_dir(opts: RunOptions, stats: BatchStats) -> None:

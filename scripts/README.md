@@ -40,7 +40,7 @@ directory, e.g. `~/jetlag/scripts/media-pipeline.sh …`.
 | `tag-media.sh` | Add Finder tags and camera make/model to files | `--tags`, `--make`, `--model`, `--apply` |
 | `organize-by-date.sh` | Move (or copy) one file into a dated folder | `--target`, `--template`, `--copy`, `--overwrite`, `--apply` |
 | `ingest-media.sh` | Copy one file (and its companion files) into a working folder | `--target`, `--companion-extensions`, `--apply` |
-| `archive-source.sh` | Rename and move a source folder once it is imported, or delete the imported files | `--source`, `--action archive\|delete`, `--destination`, `--archived-name`, `--apply` |
+| `archive-source.sh` | Rename and move a source folder once it is imported, or delete the imported files that are verified on every backup location (or that you accept) | `--source`, `--action archive\|delete`, `--destination`, `--archived-name`, `--location NAME=ROOT`, `--media-extensions`, `--accept`, `--apply` |
 | `generate-gyroflow.sh` | Write a Gyroflow stabilization project for a video with gyro data | `--preset`, `--apply` |
 | `probe-camera.sh` | Report which camera shot the media in a folder | `--extensions`, `--sample` |
 | `scan-source.sh` | Report how many media files a folder holds, or whether their names carry dates | `--extensions`, `--count` or `--timestamped-names` |
@@ -126,7 +126,7 @@ by a different camera, unless `--allow-camera-mismatch` is given.
 - **Gyroflow projects** are written next to their video in the target.
 - **The source** is left as it was, unless `--tasks … archive-source` renames and
   moves it (`<source> - copied <date>`) or `--source-action delete` removes the
-  imported files.
+  imported files that are on every `--backup-location` (none without one).
 - **What the terminal shows** is on stderr: a line per step per file and a summary.
   stdout carries machine-readable results for the app: JSON lines from
   media-pipeline, probe-camera and scan-source, and `@@key=value` lines from the

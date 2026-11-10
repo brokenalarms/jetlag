@@ -2,7 +2,9 @@
 
 archive — move the source folder to <destination>/<archived-name>, defaulting
           to an in-place rename to "<source> - copied <YYYY-MM-DD>"
-delete  — remove only the files given, then clean up emptied directories
+delete  — remove only the files given that are cleared for deletion (matched on
+          every backup location by verify-card, or accepted by the user), then
+          clean up emptied directories. Any other file is kept and reported.
 """
 
 from __future__ import annotations
@@ -11,7 +13,8 @@ import os
 import sys
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from pathlib import Path
+from typing import Collection, Optional
 
 from lib.filesystem import cleanup_empty_parent_dirs
 
@@ -20,6 +23,7 @@ from lib.filesystem import cleanup_empty_parent_dirs
 class ArchiveResult:
     action: str  # "archived" | "deleted" | "would_archive" | "would_delete"
     failed: bool
+    kept: Optional[int] = None  # delete only: files kept because nothing cleared them
 
 
 def default_archived_name(source: str, today: Optional[datetime] = None) -> str:
@@ -56,15 +60,27 @@ def archive_source(
         return ArchiveResult(action="archived", failed=True)
 
 
-def delete_files(source: str, files: list[str], apply: bool) -> ArchiveResult:
-    """Delete listed files from source, then clean up empty directories."""
+def delete_files(source: str, files: list[str], apply: bool,
+                 cleared: Collection[Path]) -> ArchiveResult:
+    """Delete the listed files that are cleared, then clean up empty directories.
+
+    cleared holds the resolved paths verify-card matched on every backup location,
+    plus any the user accepted. A listed file outside it is never deleted: the card
+    is the last copy of anything not provably backed up.
+    """
     if not files:
         print("No files to delete", file=sys.stderr)
-        return ArchiveResult(action="would_delete" if not apply else "deleted", failed=False)
+        return ArchiveResult(action="would_delete" if not apply else "deleted", failed=False, kept=0)
 
     failed = False
+    cleared = set(cleared)
+    kept = [f for f in files if os.path.exists(f) and Path(f).resolve() not in cleared]
+    for file_path in kept:
+        print(f"Kept, not verified on every backup location: {os.path.relpath(file_path, source)}",
+              file=sys.stderr)
+    deleting = [f for f in files if f not in kept]
 
-    for file_path in files:
+    for file_path in deleting:
         if not os.path.exists(file_path):
             continue
 
@@ -82,7 +98,7 @@ def delete_files(source: str, files: list[str], apply: bool) -> ArchiveResult:
     # Clean up empty directories (only in apply mode)
     if apply:
         cleaned_dirs = set()
-        for file_path in files:
+        for file_path in deleting:
             parent = os.path.dirname(file_path)
             if parent not in cleaned_dirs and parent != source:
                 cleanup_empty_parent_dirs(parent, stop_at=source)
@@ -91,4 +107,5 @@ def delete_files(source: str, files: list[str], apply: bool) -> ArchiveResult:
     return ArchiveResult(
         action="would_delete" if not apply else "deleted",
         failed=failed,
+        kept=len(kept),
     )

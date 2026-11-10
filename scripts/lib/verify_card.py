@@ -374,3 +374,17 @@ def verify_card(source: Path, locations: list[tuple[str, str]], media_extensions
             verdict, basis = judge(card_file, copies, matcher.facts)
             verdicts[card_file.rel][location.name] = Verdict(verdict, basis, sorted(c.rel for c in copies))
     return Report(opened, scan, verdicts)
+
+
+def cleared_files(report: Report, source: Path) -> set[Path]:
+    """The card files matched on every location: the only ones safe to delete."""
+    return {(source / rel).resolve() for rel, by_location in report.verdicts.items()
+            if by_location and all(v.verdict == "matched" for v in by_location.values())}
+
+
+def parse_location(spec: str) -> tuple[str, str]:
+    """A NAME=ROOT command-line value as (name, root); ValueError when malformed."""
+    name, sep, root = spec.partition("=")
+    if not sep or not name or not root:
+        raise ValueError(f"expected NAME=ROOT, got {spec!r}")
+    return name, root
