@@ -35,10 +35,10 @@ def build_parser():
     parser.add_argument("--apply", action="store_true", help="Apply changes (default: dry run)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed processing info")
     parser.add_argument(
-        "--tasks", nargs="+",
-        choices=["tag", "fix-timestamp", "gyroflow", "archive-source"],
-        default=["tag", "fix-timestamp", "gyroflow"],
-        help="Optional pipeline steps to run (default: tag, fix-timestamp, gyroflow). Ingest and output are always on."
+        "--tasks", nargs="*",
+        choices=["tag", "gyroflow", "archive-source"],
+        default=["tag", "gyroflow"],
+        help="Optional pipeline steps to run (default: tag, gyroflow). Ingest, fix-timestamp and output always run."
     )
     parser.add_argument(
         "--source-action",

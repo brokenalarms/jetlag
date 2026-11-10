@@ -85,7 +85,58 @@ class TestPreflightTimezones:
         assert preflight_timezones(zones).kind == MIXED_TIMEZONES
 
 
+class TestCameraZonesInTheGuard:
+    """A file's zone is the hierarchy's: a zoned tag's, else the camera's zone
+    setting from its UTC clock against its filename (FileReading.zone). The
+    Comedy night Insta360 X6 batch carries no zoned tag, so the guard saw no
+    zones at all, while the camera named five clips in UTC-7 and two in Perth
+    time: one batch, two camera zones, which should have stopped as mixed.
+    """
+
+    def test_two_camera_zones_are_mixed(self):
+        zones = [FileZone("001.insv", "-0700", "+0800", tagged=False),
+                 FileZone("005.insv", "+0800", "+0800", tagged=False)]
+
+        conflict = preflight_timezones(zones)
+
+        assert conflict == TimezoneConflict(
+            MIXED_TIMEZONES, {"-0700": ["001.insv"], "+0800": ["005.insv"]}, {})
+
+    def test_a_camera_zone_differing_from_the_timezone_given_is_not_a_mismatch(self):
+        """A camera left on the previous country's zone is the case jetlag exists
+        to correct: only a zoned tag needs --force-timezone to be relabelled."""
+        zones = [FileZone("a.insv", "+0900", "+1300", tagged=False),
+                 FileZone("b.insv", "+0900", "+1300", tagged=False)]
+
+        assert preflight_timezones(zones) is None
+
+    def test_a_camera_zone_and_a_tagged_zone_that_agree_are_not_mixed(self):
+        """Korea: half the batch tagged +09:00 by an earlier run, half naive with
+        the camera on +09:00."""
+        zones = [FileZone("a.insv", "+0900", "+0900", tagged=True),
+                 FileZone("b.insv", "+0900", "+0900", tagged=False)]
+
+        assert preflight_timezones(zones) is None
+
+
 class TestReadFileZones:
+
+    def test_the_camera_zone_counts_where_no_tag_gives_one(self, fake_metadata):
+        """Actual: the X6-shaped clips' zones from their UTC clock and filename
+        Expected: -0700 and +0800, not tagged; a clip with neither is left out"""
+        utc_minus_7 = Path("/cards/VID_20261006_002802_00_001.insv")
+        perth = Path("/cards/VID_20261006_203505_00_005.insv")
+        no_evidence = Path("/cards/clip.insv")
+        fake_metadata.files[str(utc_minus_7)] = {"MovieHeaderCreateDate": "2026:10:06 07:28:02"}
+        fake_metadata.files[str(perth)] = {"MovieHeaderCreateDate": "2026:10:06 12:35:05"}
+        fake_metadata.files[str(no_evidence)] = {"MovieHeaderCreateDate": "2026:10:06 12:35:05"}
+
+        zones = read_file_zones([utc_minus_7, perth, no_evidence], "+0800")
+
+        assert zones == [
+            FileZone(utc_minus_7.name, "-0700", "+0800", tagged=False),
+            FileZone(perth.name, "+0800", "+0800", tagged=False),
+        ]
 
     def test_a_zone_name_resolves_per_file_across_a_dst_change(self, fake_metadata):
         """A run spanning a DST changeover compares each file with the offset its

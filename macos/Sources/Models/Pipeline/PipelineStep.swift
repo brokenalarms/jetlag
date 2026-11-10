@@ -6,24 +6,26 @@ import SwiftUI
 enum PipelineStep: String, CaseIterable, Identifiable {
     case ingest = "Ingest"
     case tag = "Tag"
-    case fixTimestamps = "Fix Timestamps"
+    case fixTimestamps = "Set Timestamps"
     case organize = "Organize"
     case gyroflow = "Gyroflow"
     case archiveSource = "Archive Source"
 
     var id: String { rawValue }
 
+    /// The pipeline's fixed frame: the steps whose cli.steps entry has no task, so
+    /// no run can leave them out. Set Timestamps is one of them — every file is
+    /// stamped with the hierarchy's time, which leaves a correct file as it is.
     var isAlwaysOn: Bool {
-        self == .ingest || self == .organize
+        taskToken == nil
     }
 
     /// The token `--tasks` accepts for this step; nil for the fixed frame, which
     /// always runs and cannot be named.
     var taskToken: String? {
         switch self {
-        case .ingest, .organize: nil
+        case .ingest, .fixTimestamps, .organize: nil
         case .tag: "tag"
-        case .fixTimestamps: "fix-timestamp"
         case .gyroflow: "gyroflow"
         case .archiveSource: "archive-source"
         }

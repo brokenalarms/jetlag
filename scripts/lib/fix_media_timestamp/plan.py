@@ -5,7 +5,6 @@ the file holds now before either happens. Pure — no file is read or written he
 from __future__ import annotations
 
 import os
-import re
 from dataclasses import dataclass, field as dataclass_field
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
@@ -14,7 +13,9 @@ from lib.fix_media_timestamp.clock_fields import is_quicktime_container, needed_
 from lib.fix_media_timestamp.read import CorrectionOptions, CurrentTimestamps
 from lib.timestamps.file_times import birth_time_in_future, birth_time_needs_update, get_expected_file_system_time
 from lib.timestamps.provenance import provenance_field_args
-from lib.timestamps.sources import MOVIE_HEADER_CREATE_DATE_TAG, TimestampSource, normalize_timezone_format
+from lib.timestamps.sources import (
+    MOVIE_HEADER_CREATE_DATE_TAG, TimestampSource, ensure_colon_tz, normalize_timezone_format, trailing_zone,
+)
 
 
 @dataclass
@@ -56,7 +57,7 @@ def _apply_source_zone(value: str, source: TimestampSource) -> str:
     """Mark a UTC source's stored value as UTC; leave any other source alone."""
     if not value or not source.is_utc:
         return value
-    if value.endswith("Z") or re.search(r'[+-]\d{2}:?\d{2}$', value):
+    if trailing_zone(value):
         return value
     return f"{value}Z"
 
@@ -208,7 +209,7 @@ def plan_correction(current: CurrentTimestamps, opts: CorrectionOptions) -> Corr
     corrected, corrected_str = original, data["datetime_original_str"]
     if opts.moves_time:
         corrected = original + timedelta(seconds=opts.time_offset_seconds or 0)
-        corrected_str = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', corrected.strftime('%Y:%m:%d %H:%M:%S%z'))
+        corrected_str = ensure_colon_tz(corrected.strftime('%Y:%m:%d %H:%M:%S%z'))
 
     # DateTimeOriginal is a field this correction owns when:
     # 1. It's missing and we have timezone info, OR

@@ -18,15 +18,13 @@ from lib.timestamps.sources import (
     parse_filename_timestamp,
     build_filename,
     read_timestamp_sources,
-    extract_metadata_timezone,
+    read_file,
     get_best_timestamp,
     TimestampSource,
     read_exif_data,
     clear_exif_cache,
     is_zone_name,
     resolve_timezone_offset,
-    resolve_file_timezone_offset,
-    camera_zone_offset_for_file,
 )
 
 
@@ -185,7 +183,7 @@ class TestReadTimestampSources:
 
 
 class TestExtractMetadataTimezone:
-    """Preserved behavior from original extract_metadata_timezone()."""
+    """FileReading.tagged_zone: the zone a zoned tag gives the file."""
 
     def setup_method(self):
         self.temp_dir = tempfile.mkdtemp()
@@ -197,14 +195,14 @@ class TestExtractMetadataTimezone:
         video = os.path.join(self.temp_dir, "test.mp4")
         create_test_video(video, DateTimeOriginal="2025:06:18 07:25:21+08:00")
 
-        result = extract_metadata_timezone(video)
+        result = read_file(video).tagged_zone
         assert result == "+08:00"
 
     def test_none_when_no_timezone(self):
         video = os.path.join(self.temp_dir, "test.mp4")
         create_test_video(video)
 
-        result = extract_metadata_timezone(video)
+        result = read_file(video).tagged_zone
         assert result is None
 
 
@@ -422,30 +420,30 @@ class TestCameraZoneOffsetForFile:
         """Camera left on Japan time while shooting in New Zealand — QuickTime wins."""
         video = self._video("VID_20260104_033532_00_001.mp4", "2026:01:03 18:35:32")
 
-        assert camera_zone_offset_for_file(video) == "+09:00"
+        assert read_file(video).camera_zone == "+09:00"
 
     def test_present_when_the_filename_wins_the_priority_race(self):
         """No --timezone declared, so the filename wins get_best_timestamp() outright —
         the camera zone offset is still computable from the raw fields on disk."""
         video = self._video("VID_20260104_033532_00_001.mp4", "2026:01:03 18:35:32")
 
-        assert camera_zone_offset_for_file(video) == "+09:00"
+        assert read_file(video).camera_zone == "+09:00"
 
     def test_absent_without_a_quicktime_date(self):
         video = self._video("VID_20250505_130334_00_001.mp4")
 
-        assert camera_zone_offset_for_file(video) is None
+        assert read_file(video).camera_zone is None
 
     def test_absent_without_a_filename_timestamp(self):
         video = self._video("clip.mp4", "2026:01:03 18:35:32")
 
-        assert camera_zone_offset_for_file(video) is None
+        assert read_file(video).camera_zone is None
 
     def test_absent_when_the_delta_is_not_a_legal_zone_offset(self):
         """A battery-reset camera: years from any legal offset."""
         video = self._video("VID_20250505_120334_00_029.mp4", "2018:11:24 17:03:34")
 
-        assert camera_zone_offset_for_file(video) is None
+        assert read_file(video).camera_zone is None
 
 
 class TestResolveTimezoneOffset:
@@ -499,20 +497,20 @@ class TestResolveFileTimezoneOffset:
         create_test_video(summer)
         create_test_video(winter)
 
-        assert resolve_file_timezone_offset(summer, "Pacific/Auckland") == "+13:00"
-        assert resolve_file_timezone_offset(winter, "Pacific/Auckland") == "+12:00"
+        assert read_file(summer).declared_offset("Pacific/Auckland") == "+13:00"
+        assert read_file(winter).declared_offset("Pacific/Auckland") == "+12:00"
 
     def test_fixed_offset_applies_to_every_file(self):
         video = os.path.join(self.temp_dir, "VID_20250315_100000.mp4")
         create_test_video(video)
 
-        assert resolve_file_timezone_offset(video, "+0900") == "+09:00"
+        assert read_file(video).declared_offset("+0900") == "+09:00"
 
     def test_no_spec_resolves_to_nothing(self):
         video = os.path.join(self.temp_dir, "VID_20250315_100000.mp4")
         create_test_video(video)
 
-        assert resolve_file_timezone_offset(video, None) is None
+        assert read_file(video).declared_offset(None) is None
 
 
 if __name__ == "__main__":
@@ -560,7 +558,7 @@ class TestOffsetTimeOriginalCompletesBareDateTimeOriginal:
                           DateTimeOriginal="2025:06:18 07:25:21",
                           OffsetTimeOriginal="-05:00")
 
-        assert extract_metadata_timezone(photo) == "-05:00"
+        assert read_file(photo).tagged_zone == "-05:00"
 
     def test_bare_dto_without_offset_stays_naive(self):
         """Behaviour is unchanged for a still that never recorded a zone: it still
@@ -572,7 +570,7 @@ class TestOffsetTimeOriginalCompletesBareDateTimeOriginal:
         timestamp, source = get_best_timestamp(photo)
         assert source is TimestampSource.DATETIME_ORIGINAL
         assert timestamp == "2025:06:18 07:25:21"
-        assert extract_metadata_timezone(photo) is None
+        assert read_file(photo).tagged_zone is None
 
     def test_malformed_offset_is_ignored(self):
         """A zone that is not a legal offset cannot silently corrupt the timestamp —

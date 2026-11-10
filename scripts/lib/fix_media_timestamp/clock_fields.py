@@ -6,12 +6,11 @@ write; needed_changes() is that comparison for a correction to one time.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Dict
 
-from lib.timestamps.sources import MOVIE_HEADER_CREATE_DATE_TAG, ensure_colon_tz, normalize_exif_value
+from lib.timestamps.sources import MOVIE_HEADER_CREATE_DATE_TAG, ensure_colon_tz, normalize_exif_value, trailing_zone
 
 
 @dataclass(frozen=True)
@@ -84,8 +83,7 @@ def clock_field_targets(exif: Dict[str, str], datetime_original: datetime,
     place its zone can live, while on a video exiftool keeps the zone inline in
     XMP and drops the offset tag. One uniform write is right for both.
     """
-    zoned = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
-    zoned = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', zoned)
+    zoned = ensure_colon_tz(datetime_original.strftime('%Y:%m:%d %H:%M:%S%z'))
     zone = ensure_colon_tz(datetime_original.strftime('%z'))
     utc = datetime_original.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
     container = is_quicktime_container(exif)
@@ -132,10 +130,10 @@ def stored_zone(exif: Dict[str, str]) -> str:
     if offset:
         return offset
 
-    inline = re.search(r'([+-]\d{2}:?\d{2}|Z)$', exif.get("DateTimeOriginal", ""))
+    inline = trailing_zone(exif.get("DateTimeOriginal", ""))
     if not inline:
         return ""
-    return "+00:00" if inline.group(1) == "Z" else ensure_colon_tz(inline.group(1))
+    return "+00:00" if inline == "Z" else inline
 
 
 def stale_clock_fields(exif: Dict[str, str], targets: Dict[str, str]) -> list:

@@ -263,8 +263,10 @@ class TestWorkingDirIsTransient:
         """
         working_dir = temp_workspace["root"] / "working"
         names = ["VID_20251005_100000_00_001.mp4", "VID_20251005_110000_00_002.mp4"]
-        for name in names:
-            create_test_video(temp_workspace["source"] / name)
+        # Each clock is its name's time less nine hours: one camera set to +09:00
+        # throughout, so the batch is not mixed.
+        for name, clock in zip(names, ["01:00:00", "02:00:00"]):
+            create_test_video(temp_workspace["source"] / name, media_create_date=f"2025:10:05 {clock}")
 
         self._run(temp_workspace, test_profile, working_dir, "--apply")
         organized = sorted(temp_workspace["target"].rglob("*.mp4"))

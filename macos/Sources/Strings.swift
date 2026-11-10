@@ -28,20 +28,20 @@ enum Strings {
     enum Pipeline {
         static let ingestLabel = String(localized: "pipeline.ingest.label", defaultValue: "Ingest")
         static let tagLabel = String(localized: "pipeline.tag.label", defaultValue: "Tag")
-        static let fixTimestampsLabel = String(localized: "pipeline.fixTimestamps.label", defaultValue: "Fix Timestamps")
+        static let fixTimestampsLabel = String(localized: "pipeline.fixTimestamps.label", defaultValue: "Set Timestamps")
         static let organizeLabel = String(localized: "pipeline.organize.label", defaultValue: "Organize")
         static let gyroflowLabel = String(localized: "pipeline.gyroflow.label", defaultValue: "Gyroflow")
         static let archiveSourceLabel = String(localized: "pipeline.archiveSource.label", defaultValue: "Archive Source")
-        /// Fix Timestamps' name in a results row's status column, where the full
+        /// Set Timestamps' name in a results row's status column, where the full
         /// label does not fit.
-        static let fixTimestampsStageLabel = String(localized: "pipeline.fixTimestamps.stageLabel", defaultValue: "Fix TS")
+        static let fixTimestampsStageLabel = String(localized: "pipeline.fixTimestamps.stageLabel", defaultValue: "Set TS")
 
         static let ingestHelp = String(localized: "pipeline.ingest.help",
             defaultValue: "Copy files from source to working directory for processing")
         static let tagHelp = String(localized: "pipeline.tag.help",
             defaultValue: "Apply Finder tags and EXIF metadata from profile")
         static let fixTimestampsHelp = String(localized: "pipeline.fixTimestamps.help",
-            defaultValue: "Correct timezone labelling and/or camera clock errors")
+            defaultValue: "Stamp every file with the time it was shot, in the zone it was shot in; a file already right is left as it is")
         static let organizeHelp = String(localized: "pipeline.organize.help",
             defaultValue: "Move processed files into date-based folders in ready directory")
         static let gyroflowHelp = String(localized: "pipeline.gyroflow.help",
@@ -127,7 +127,7 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let updateFilenameDatesHelp = String(localized: "workflow.updateFilenameDates.help",
             defaultValue: "Rename files to reflect corrected timestamps after fixing. Only affects files with parseable date patterns in their names.")
 
-        // Fix Timestamps preview
+        // Set Timestamps preview
         static let fixTimestampSourceFilenamesHint = String(localized: "workflow.fixTimestampPreview.sourceFilenames",
             defaultValue: "Use filename dates as timestamp source")
         static let fixTimestampRenameHint = String(localized: "workflow.fixTimestampPreview.rename",

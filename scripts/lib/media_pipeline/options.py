@@ -12,7 +12,8 @@ from lib import profiles, tag_media
 from lib.command_line import UnknownLocation, UnknownTimezone, resolve_timezone
 from lib.media_pipeline.working_dir import WORKING_DIR_NAME
 
-# The optional steps --tasks names. Ingest and output always run.
+# The optional steps --tasks names. Ingest, fix-timestamp (Set Timestamps) and
+# output always run.
 TAG = "tag"
 FIX_TIMESTAMP = "fix-timestamp"
 GYROFLOW = "gyroflow"
@@ -186,10 +187,12 @@ def resolve_options(args) -> RunOptions:
     except UnknownLocation:
         _fail(f"ERROR: Could not determine timezone for location '{args.location}'")
 
+    # Every run sets timestamps, and the date folder is the date where the footage
+    # was shot: neither has an answer without the zone it was shot in.
+    if not timezone_spec:
+        _fail("ERROR: --timezone (or --location) is required: it says where the footage was shot")
     if args.infer_from_filename and not args.timezone:
         _fail("ERROR: --infer-from-filename requires --timezone")
-    if args.time_offset is not None and not args.timezone:
-        _fail("ERROR: --time-offset requires --timezone")
 
     return RunOptions.from_args(args, profile, config, source_dir, target_dir,
                                 extensions, timezone_spec)

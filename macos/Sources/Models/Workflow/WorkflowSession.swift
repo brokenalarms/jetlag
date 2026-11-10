@@ -392,7 +392,6 @@ final class WorkflowSession {
     }
 
     func validateTimezone() -> String? {
-        if !enabledSteps.contains(.fixTimestamps) { return nil }
         if timezone.current.isEmpty { return Strings.Workflow.timezoneRequired }
         if timezoneOption == nil { return Strings.Workflow.timezoneUnknown }
         return nil
@@ -441,9 +440,9 @@ final class WorkflowSession {
         let tasks = availableSteps
             .filter { enabledSteps.contains($0) }
             .compactMap(\.taskToken)
-        if !tasks.isEmpty {
-            args += ["--tasks"] + tasks
-        }
+        // Always passed: without it the pipeline runs its default optional steps,
+        // so a run with every optional step off would get them back.
+        args += ["--tasks"] + tasks
 
         if enabledSteps.contains(.archiveSource) {
             args += ["--archive-destination", archiveDestination]
@@ -453,13 +452,13 @@ final class WorkflowSession {
         if copyCompanionFiles {
             args.append("--copy-companion-files")
         }
-        if enabledSteps.contains(.fixTimestamps), let option = timezoneOption {
+        if let option = timezoneOption {
             args += ["--timezone", option.id]
         }
-        if enabledSteps.contains(.fixTimestamps) && inferFromFilenames {
+        if inferFromFilenames {
             args.append("--infer-from-filename")
         }
-        if enabledSteps.contains(.fixTimestamps), let offset = timeOffsetSeconds, offset != 0 {
+        if let offset = timeOffsetSeconds, offset != 0 {
             args += ["--time-offset", String(offset)]
         }
         if updateFilenameDates {
@@ -527,11 +526,9 @@ final class WorkflowSession {
         }
     }
 
-    /// One line under the Fix Timestamps step saying what the run will do to
-    /// each file's time, or nil when the step is off or changes nothing yet.
+    /// One line under the Set Timestamps step saying what the run will do to
+    /// each file's time, or nil when it changes nothing yet.
     var fixTimestampPreview: String? {
-        guard enabledSteps.contains(.fixTimestamps) else { return nil }
-
         var parts: [String] = []
         if inferFromFilenames {
             if let option = timezoneOption {

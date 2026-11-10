@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import time
 from datetime import datetime, timezone
 from typing import Optional
@@ -10,7 +9,7 @@ from typing import Optional
 from lib.fix_media_timestamp.clock_fields import CLOCK_FIELDS
 from lib.fix_media_timestamp.plan import BIRTH_TIME_IN_FUTURE, NO_TIMESTAMP, REFUSED_WITHOUT_FORCE, ZONE_NEEDED, CorrectionPlan
 from lib.fix_media_timestamp.read import FIELD_LABELS
-from lib.timestamps.sources import MOVIE_HEADER_CREATE_DATE_TAG, TimestampSource, parse_filename_timestamp
+from lib.timestamps.sources import MOVIE_HEADER_CREATE_DATE_TAG, TimestampSource, trailing_zone
 
 
 def format_exif_timestamp_display(ts: str) -> str:
@@ -39,7 +38,7 @@ def format_original_timestamps(current_data: dict) -> str:
             parts.append(f"{format_exif_timestamp_display(birth_ts)} local (file)")
     elif source in (TimestampSource.FILENAME, TimestampSource.FILENAME_INFERRED):
         # Show the parsed filename timestamp
-        filename_ts, _ = parse_filename_timestamp(current_data.get("file_path", ""))
+        filename_ts = current_data.get("filename_timestamp")
         if filename_ts:
             parts.append(f"{format_exif_timestamp_display(filename_ts)} (from filename)")
         else:
@@ -131,9 +130,8 @@ def format_change_description(changes: dict, timestamp_data: Optional[dict] = No
 
                 # Extract current timezone from existing CreationDate if present
                 if creation_date:
-                    current_tz_match = re.search(r'([+-]\d{2}):?(\d{2})$', creation_date)
-                    if current_tz_match:
-                        old_tz = f"{current_tz_match.group(1)}:{current_tz_match.group(2)}"
+                    old_tz = trailing_zone(creation_date)
+                    if old_tz and old_tz != "Z":
                         parts.append(f"Keys:CreationDate ({old_tz} → {current_tz_formatted}, preserving {time_display} shooting time)")
                     else:
                         parts.append(f"Keys:CreationDate (adding {current_tz_formatted}, preserving {time_display} shooting time)")

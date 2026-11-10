@@ -15,11 +15,8 @@ from typing import Optional
 from lib import ingest_media, tag_media
 from lib.media_pipeline.consent import require_consent
 from lib.media_pipeline.events import emit_event
-from lib.media_pipeline.options import FIX_TIMESTAMP, RunOptions
-from lib.timestamps.sources import (
-    extract_metadata_timezone, normalize_timezone_input, parse_filename_timestamp,
-    resolve_file_timezone_offset,
-)
+from lib.media_pipeline.options import RunOptions
+from lib.timestamps.sources import normalize_timezone_input, read_file
 
 
 def check_stale_exiftool_tmp(source_dir: str) -> None:
@@ -121,22 +118,27 @@ PROVIDED_MISMATCH = "provided_mismatch"
 
 @dataclass(frozen=True)
 class FileZone:
-    """A file's embedded zone and the zone --timezone gives it, both as ±HHMM.
+    """A file's zone (FileReading.zone) and the zone --timezone gives it, both as ±HHMM.
 
+    tagged says the zone is a zoned tag's, which a correction to another zone
+    would relabel; otherwise it is the camera's zone setting, which the UTC clock
+    and the filename show and which correcting it is what the run is for.
     expected is None without --timezone. A zone name resolves per file, so each
     file is compared against the offset that zone had when that file was shot.
     """
     name: str
     embedded: str
     expected: Optional[str] = None
+    tagged: bool = True
 
 
 @dataclass(frozen=True)
 class TimezoneConflict:
     """Why a batch's timezones stop the run.
 
-    file_timezones groups every file with an embedded zone by that zone, in file
-    order; mismatched holds, per embedded zone, the files --timezone disagrees with.
+    file_timezones groups files by zone, in file order: every file with a zone
+    for mixed zones, the files with a zoned tag for a provided mismatch;
+    mismatched holds, per tagged zone, the files --timezone disagrees with.
     """
     kind: str
     file_timezones: dict
@@ -144,17 +146,20 @@ class TimezoneConflict:
 
 
 def read_file_zones(files: list[Path], timezone_spec: Optional[str]) -> list[FileZone]:
-    """The embedded and expected zone of every file that carries one."""
+    """The zone and expected zone of every file with zone evidence; a file with
+    none adds nothing to the comparison."""
     zones = []
     for fp in files:
-        tz = extract_metadata_timezone(str(fp))
+        reading = read_file(str(fp))
+        tz = reading.zone
         if not tz:
             continue
-        expected = resolve_file_timezone_offset(str(fp), timezone_spec)
+        expected = reading.declared_offset(timezone_spec)
         zones.append(FileZone(
             name=fp.name,
             embedded=normalize_timezone_input(tz).replace(":", ""),
             expected=expected.replace(":", "") if expected else None,
+            tagged=reading.tagged_zone is not None,
         ))
     return zones
 
@@ -163,28 +168,36 @@ def preflight_timezones(zones: list[FileZone], allow_mixed: bool = False,
                         force: bool = False) -> Optional[TimezoneConflict]:
     """The batch's timezone conflict, or None when the run may go on.
 
-    Files embedding different zones are mixed unless allow_mixed. Otherwise files
-    whose embedded zone differs from the --timezone they were given are a
-    provided mismatch unless force.
+    Files in different zones are mixed unless allow_mixed: a camera whose zone
+    setting changed partway through a batch is as mixed as two zoned tags.
+    Otherwise files whose zoned tag differs from the --timezone they were given
+    are a provided mismatch unless force. A camera zone setting that differs is
+    not: relabelling it is what the correction is for.
     """
     file_timezones: dict[str, list[str]] = {}
-    expected_by_file = {}
     for zone in zones:
         file_timezones.setdefault(zone.embedded, []).append(zone.name)
-        if zone.expected:
-            expected_by_file[zone.name] = zone.expected
 
     if len(file_timezones) > 1 and not allow_mixed:
         return TimezoneConflict(MIXED_TIMEZONES, file_timezones, {})
 
+    tagged_timezones: dict[str, list[str]] = {}
+    expected_by_file = {}
+    for zone in zones:
+        if not zone.tagged:
+            continue
+        tagged_timezones.setdefault(zone.embedded, []).append(zone.name)
+        if zone.expected:
+            expected_by_file[zone.name] = zone.expected
+
     if expected_by_file and not force:
         mismatched = {
             tz: [name for name in names if expected_by_file.get(name, tz) != tz]
-            for tz, names in file_timezones.items()
+            for tz, names in tagged_timezones.items()
         }
         mismatched = {tz: names for tz, names in mismatched.items() if names}
         if mismatched:
-            return TimezoneConflict(PROVIDED_MISMATCH, file_timezones, mismatched)
+            return TimezoneConflict(PROVIDED_MISMATCH, tagged_timezones, mismatched)
     return None
 
 
@@ -194,9 +207,18 @@ def check_timezones(files: list[Path], opts: RunOptions) -> None:
     A dry run previews a provided mismatch per file (each timestamp_result
     carries requires_force_timezone); only applying is refused.
     """
-    if not opts.runs(FIX_TIMESTAMP) or opts.infer_from_filename:
+    if opts.infer_from_filename:
         return
-    conflict = preflight_timezones(read_file_zones(files, opts.timezone_spec),
+    zones = read_file_zones(files, opts.timezone_spec)
+    compared = {zone.name for zone in zones}
+    without_zone = [fp.name for fp in files if fp.name not in compared]
+    if zones and without_zone:
+        print(f"ℹ️  {len(without_zone)} file(s) hold no zone evidence and were not compared:",
+              file=sys.stderr)
+        for name in without_zone:
+            print(f"   {name}", file=sys.stderr)
+        print(file=sys.stderr)
+    conflict = preflight_timezones(zones,
                                    allow_mixed=opts.allow_mixed_timezones,
                                    force=opts.force_timezone)
     if conflict is None:
@@ -236,7 +258,7 @@ def check_filename_timestamps(files: list[Path], opts: RunOptions) -> None:
     """With --infer-from-filename, stop if any filename has no parseable timestamp."""
     if not opts.infer_from_filename:
         return
-    unparseable = [fp.name for fp in files if parse_filename_timestamp(str(fp))[0] is None]
+    unparseable = [fp.name for fp in files if read_file(str(fp)).filename_timestamp is None]
     if unparseable:
         print("⚠️  --infer-from-filename specified but these files have no parseable timestamp in their filename:", file=sys.stderr)
         for name in unparseable:

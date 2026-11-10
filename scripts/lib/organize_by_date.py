@@ -1,20 +1,19 @@
 """Move (or copy) one file into a date-based directory structure.
 
-The date comes from DateTimeOriginal first, then filename date patterns, then
-the file's modification time.
+The date is the file's own, from the timestamp hierarchy
+(FileReading.date_folder() in lib/timestamps/sources.py) in the declared
+timezone, or the date a caller already holds for it.
 """
 
 from __future__ import annotations
 
 import os
-import re
 import shutil
 import sys
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Optional
 
-from lib.exiftool import exiftool
+from lib.timestamps.sources import read_file
 
 
 @dataclass
@@ -31,49 +30,6 @@ class OrganizeResult:
 
 MONTH_ABBREVS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
-
-def get_file_date_for_organization(file_path: str, datetime_original: Optional[str] = None) -> Optional[str]:
-    """Get date in YYYY-MM-DD format for file organization.
-
-    Priority: DateTimeOriginal > filename patterns > file mtime
-
-    datetime_original is the file's DateTimeOriginal as a caller already holds it
-    ("" when the file has none); only when it is not given is the file read.
-    """
-    if datetime_original is None:
-        try:
-            data = exiftool.read_tags(file_path, ["DateTimeOriginal"], extra_args=["-fast2"])
-            datetime_original = data.get("DateTimeOriginal", "")
-        except Exception:
-            datetime_original = ""
-    if datetime_original:
-        return datetime_original.split(' ')[0].replace(':', '-')
-
-    # Try filename patterns
-    base = os.path.basename(file_path)
-
-    m = re.match(r'^(?:VID|LRV|IMG)_(\d{8})_(\d{6})', base)
-    if m:
-        d = m.group(1)
-        return f'{d[:4]}-{d[4:6]}-{d[6:8]}'
-
-    m = re.search(r'DJI_(\d{4})(\d{2})(\d{2})\d{6}_', base)
-    if m:
-        return f'{m.group(1)}-{m.group(2)}-{m.group(3)}'
-
-    m = re.search(r'(\d{4})(\d{2})(\d{2})', base)
-    if m:
-        year, month, day = int(m.group(1)), int(m.group(2)), int(m.group(3))
-        if 2000 <= year <= 2099 and 1 <= month <= 12 and 1 <= day <= 31:
-            return f'{m.group(1)}-{m.group(2)}-{m.group(3)}'
-
-    # Fallback: file mtime
-    try:
-        mtime = os.path.getmtime(file_path)
-        return datetime.fromtimestamp(mtime).strftime('%Y-%m-%d')
-    except OSError:
-        return None
 
 
 # The folder a file goes to when its caller names no template: a group folder
@@ -185,8 +141,9 @@ def _handle_existing_target(file_path, target_file, target_path, abs_target,
 def process_file(file_path: str, target_dir: str, template: Optional[str],
                  copy_mode: bool, overwrite: bool, apply: bool,
                  verbose: bool, dest_name: Optional[str] = None,
-                 datetime_original: Optional[str] = None,
-                 group: Optional[str] = None) -> OrganizeResult:
+                 file_date: Optional[str] = None,
+                 group: Optional[str] = None,
+                 timezone_spec: Optional[str] = None) -> OrganizeResult:
     """Process a single file for organization.
 
     Printed messages name file_path: they report the operation this function
@@ -197,8 +154,9 @@ def process_file(file_path: str, target_dir: str, template: Optional[str],
     dry run previewing a rename that has not happened, the destination carries
     the name apply will produce while every read still uses the real file_path.
 
-    datetime_original, when given, is the date the destination is built from in
-    place of reading the file.
+    file_date, when given, is the 'YYYY-MM-DD' the destination is built from in
+    place of reading the file; otherwise the file's own date is read in
+    timezone_spec, the zone the footage was shot in.
 
     template and group are as expand_path_template() takes them.
 
@@ -210,7 +168,8 @@ def process_file(file_path: str, target_dir: str, template: Optional[str],
     if verbose:
         print(f"Processing: {file_path}", file=sys.stderr)
 
-    file_date = get_file_date_for_organization(file_path, datetime_original)
+    if file_date is None:
+        file_date = read_file(file_path).date_folder(timezone_spec)
     if not file_date:
         print(f"ERROR: Cannot determine date for {base}", file=sys.stderr)
         return OrganizeResult(dest="", action="error")
