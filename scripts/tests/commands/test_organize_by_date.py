@@ -5,6 +5,7 @@ Validates file organization, template substitution, and idempotency
 """
 
 import io
+from datetime import datetime
 import os
 import subprocess
 import tempfile
@@ -804,3 +805,58 @@ def test_folder_template_case(case):
     change on one side without the other fails here or in the Swift test."""
     assert organize_by_date.expand_path_template(
         case["template"], "2025-08-15", case["group"] or None) == case["expected"]
+
+
+class TestDateFolderFromTheHierarchy:
+    """The date folder is the file's own date where it was shot, from the timestamp
+    hierarchy (FileReading.date_folder()), never the modification time read in the
+    zone of the machine the run is on.
+
+    The Comedy night Sony clip C0199.MP4 (6 Oct 2026, Perth) carries no
+    DateTimeOriginal and no date in its name. Its card modification time, NZ
+    clock digits read in India where the import ran, filed it under 2026-10-07.
+    Its UTC clock, expressed in the declared +08:00, is the right date.
+    """
+
+    @pytest.fixture
+    def temp_dir(self):
+        tmpdir = tempfile.mkdtemp()
+        yield tmpdir
+        shutil.rmtree(tmpdir)
+
+    def _sony_clip(self, temp_dir: str) -> str:
+        path = os.path.join(temp_dir, "source", "C0199.MP4")
+        # 17:30 UTC on 6 Oct is 01:30 on 7 Oct in Perth: the UTC date and the
+        # Perth date differ, so the folder shows which zone it was read in.
+        create_test_video(path, **{"QuickTime:CreateDate": "2026:10:06 17:30:00"})
+        # A modification time on neither date, as a card from another zone leaves.
+        stamp = datetime(2026, 10, 9, 12, 0, 0).timestamp()
+        os.utime(path, (stamp, stamp))
+        return path
+
+    def _organize(self, path: str, target: str, *extra: str) -> dict:
+        result = subprocess.run([
+            "bash", str(SCRIPT_DIR / "organize-by-date.sh"), path,
+            "--target", target, "--template", "{{YYYY}}-{{MM}}-{{DD}}", *extra,
+        ], capture_output=True, text=True, env={**os.environ, "TZ": "Asia/Kolkata"})
+        return {k: v for k, v in (line[2:].split("=", 1) for line in result.stdout.splitlines()
+                                  if line.startswith("@@"))}
+
+    def test_declared_timezone_gives_the_date_where_it_was_shot(self, temp_dir):
+        """Actual: dest folder for a UTC-clock clip with --timezone +08:00
+        Expected: 2026-10-07, its Perth date — not the UTC date, not the mtime's"""
+        target = os.path.join(temp_dir, "target")
+        out = self._organize(self._sony_clip(temp_dir), target, "--timezone", "+08:00")
+
+        assert out.get("dest") == os.path.join(target, "2026-10-07", "C0199.MP4"), \
+            f"Actual: {out.get('dest')}, Expected: the 2026-10-07 folder"
+
+    def test_without_a_timezone_the_utc_date_not_the_machines(self, temp_dir):
+        """Actual: dest folder for the same clip with no --timezone
+        Expected: 2026-10-06, the clock's own UTC date — never the modification
+        time, and never a date that depends on the machine's zone"""
+        target = os.path.join(temp_dir, "target")
+        out = self._organize(self._sony_clip(temp_dir), target)
+
+        assert out.get("dest") == os.path.join(target, "2026-10-06", "C0199.MP4"), \
+            f"Actual: {out.get('dest')}, Expected: the 2026-10-06 folder"

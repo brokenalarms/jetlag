@@ -38,7 +38,7 @@ directory, e.g. `~/jetlag/scripts/media-pipeline.sh …`.
 | `media-pipeline.sh` | The whole workflow for a card or folder: copy, tag, fix timestamps, file by date, then optionally make Gyroflow projects and archive the source | `--profile`, or `--source` and `--target`; `--timezone` or `--location`; `--group`; `--tasks`; `--apply` |
 | `fix-media-timestamp.sh` | Correct one file's timestamps | `--timezone` or `--country`; `--infer-from-filename`; `--time-offset`; `--force-timezone`; `--apply` |
 | `tag-media.sh` | Add Finder tags and camera make/model to files | `--tags`, `--make`, `--model`, `--apply` |
-| `organize-by-date.sh` | Move (or copy) one file into a dated folder | `--target`, `--template`, `--copy`, `--overwrite`, `--apply` |
+| `organize-by-date.sh` | Move (or copy) one file into a dated folder, by its date where it was shot | `--target`, `--template`, `--timezone`, `--copy`, `--overwrite`, `--apply` |
 | `ingest-media.sh` | Copy one file (and its companion files) into a working folder | `--target`, `--companion-extensions`, `--apply` |
 | `archive-source.sh` | Rename and move a source folder once it is imported, or delete the imported files that are verified on every backup location (or that you accept) | `--source`, `--action archive\|delete`, `--destination`, `--archived-name`, `--location NAME=ROOT`, `--media-extensions`, `--accept`, `--apply` |
 | `generate-gyroflow.sh` | Write a Gyroflow stabilization project for a video with gyro data | `--preset`, `--apply` |

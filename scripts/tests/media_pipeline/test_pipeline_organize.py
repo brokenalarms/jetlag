@@ -309,6 +309,31 @@ class TestOutputAlwaysOn:
         assert len(output_files) == 1, f"File should be in target, found: {output_files}"
 
 
+class TestDateFolderWithoutACorrection:
+    """With the timestamp step off, the date folder still comes from the file's own
+    reading in the run's declared timezone (FileReading.date_folder()), as the
+    Comedy night Sony clip should have: no DateTimeOriginal, no date in its name,
+    a UTC clock, and a modification time from another zone."""
+
+    def test_folder_is_the_date_where_it_was_shot(self, temp_workspace, test_profile):
+        """Actual: the folder the clip lands in, fix-timestamp not run
+        Expected: 2026-10-07 — 17:30 UTC on the 6th is 01:30 on the 7th in +08:00"""
+        source = temp_workspace["source"]
+        clip = source / "C0199.MP4"
+        create_test_video(clip, media_create_date="2026:10:06 17:30:00")
+        stamp = 1791547200  # 2026-10-09, a date neither zone gives the clip
+        os.utime(clip, (stamp, stamp))
+
+        run_in_process(
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0800",
+             "--tasks", "tag", "--apply"],
+        )
+
+        landed = list(temp_workspace["target"].rglob("C0199.MP4"))
+        assert [p.parent.name for p in landed] == ["2026-10-07"], \
+            f"Actual: {[str(p) for p in landed]}, Expected: one file in a 2026-10-07 folder"
+
+
 class TestOverwriteDestination:
     """A file already sitting at the organize destination blocks the move.
 

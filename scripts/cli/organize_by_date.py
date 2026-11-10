@@ -10,7 +10,7 @@ import argparse
 import os
 import sys
 
-from lib.command_line import install_interrupt_handlers
+from lib.command_line import UnknownTimezone, install_interrupt_handlers, resolve_timezone
 from lib.organize_by_date import DEFAULT_FOLDER_TEMPLATE, process_file
 from cli.results import emit_result
 
@@ -26,6 +26,9 @@ def main():
                         help='Target directory for organized files')
     parser.add_argument('--template',
                         help=f'Path template (default: {DEFAULT_FOLDER_TEMPLATE.replace("{{GROUP}}/", "")})')
+    parser.add_argument('--timezone',
+                        help='Where the footage was shot (zone name or +HHMM): the date folder '
+                             'is the file\'s date there, never the date where this Mac is')
     parser.add_argument('--copy', action='store_true',
                         help='Copy instead of move')
     parser.add_argument('--overwrite', action='store_true',
@@ -41,12 +44,20 @@ def main():
         print(f"ERROR: File not found: {args.file}", file=sys.stderr)
         sys.exit(1)
 
+    try:
+        timezone_spec = resolve_timezone(args.timezone, None)
+    except UnknownTimezone:
+        print(f"ERROR: unknown timezone '{args.timezone}' — use an IANA zone name "
+              "(e.g., Pacific/Auckland) or a +HHMM offset", file=sys.stderr)
+        sys.exit(1)
+
     target_dir = os.path.expanduser(args.target)
 
     result = process_file(
         args.file, target_dir, args.template,
         copy_mode=args.copy, overwrite=args.overwrite,
-        apply=args.apply, verbose=args.verbose
+        apply=args.apply, verbose=args.verbose,
+        timezone_spec=timezone_spec,
     )
 
     emit_result(result)

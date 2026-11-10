@@ -24,7 +24,7 @@ from lib.media_pipeline.events import emit_event
 from lib.media_pipeline.options import FIX_TIMESTAMP, GYROFLOW, TAG, RunOptions
 from lib.media_pipeline.working_dir import WorkingDir
 from lib.timestamps.provenance import provenance_field_args
-from lib.timestamps.sources import build_filename, carry_exif_cache, parse_datetime_original, read_exif_data
+from lib.timestamps.sources import build_filename, carry_exif_cache, parse_datetime_original, read_exif_data, read_file
 
 
 @dataclass
@@ -41,9 +41,10 @@ class FileContext:
     active: Path
     companions: list[str] = field(default_factory=list)
     source_files: list[str] = field(default_factory=list)
-    # The DateTimeOriginal organize dates the file by, so it never reads the file
-    # again; a timestamp correction replaces it with the corrected value.
-    organize_datetime: str = ""
+    # The date folder organize files the file under (FileReading.date_folder()),
+    # so it never reads the file again; a timestamp correction replaces it with
+    # the corrected time's date.
+    organize_date: Optional[str] = None
     # tag's camera fields, written in the file's one metadata write: fix-timestamp's
     # when it runs, the provenance stage's otherwise.
     camera_fields: dict = field(default_factory=dict)
@@ -121,7 +122,7 @@ class IngestStage(Stage):
         # The file's one metadata read (or the pre-flight's, carried to the copy
         # above). Taken before any step writes, so organize never reads the file
         # again.
-        ctx.organize_datetime = read_exif_data(str(ctx.active)).get("DateTimeOriginal", "")
+        ctx.organize_date = read_file(str(ctx.active)).date_folder(opts.timezone_spec)
 
         if opts.copy_companion_files and companion_dests:
             for ext in opts.companion_extensions or []:
@@ -235,8 +236,9 @@ class FixTimestampStage(Stage):
             return StageOutcome(error=ts_result.error or "Timestamp fix failed")
 
         ctx.corrected_time = ts_result.corrected_time
-        if ts_result.corrected_time:
-            ctx.organize_datetime = ts_result.corrected_time
+        corrected_dt = parse_datetime_original(ts_result.corrected_time) if ts_result.corrected_time else None
+        if corrected_dt:
+            ctx.organize_date = corrected_dt.strftime("%Y-%m-%d")
         return StageOutcome(
             changed=ts_result.timestamp_action in ("would_fix", "fixed", "would_add", "added"))
 
@@ -372,7 +374,8 @@ class OutputStage(Stage):
         org_result = organize_by_date.process_file(
             str(active), opts.target_dir, folder_template or None, group=opts.group,
             copy_mode=False, overwrite=opts.overwrite, apply=opts.apply, verbose=opts.verbose,
-            dest_name=ctx.pending_rename, datetime_original=ctx.organize_datetime,
+            dest_name=ctx.pending_rename, file_date=ctx.organize_date,
+            timezone_spec=opts.timezone_spec,
         )
         staged_action = staged_organize_action(org_result.action)
         emit_event("organize_result",

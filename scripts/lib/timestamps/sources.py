@@ -743,6 +743,21 @@ class FileReading:
             text = f"{timestamp}{offset}"
         return LocalTime(timestamp, source, offset, parse_datetime_original(text), text, declared=True)
 
+    def date_folder(self, timezone_spec: Optional[str] = None) -> Optional[str]:
+        """The 'YYYY-MM-DD' a file is filed under: the date of its local_time().
+
+        Where nothing gives the winning digits a zone, the digits' own date: a
+        naive source's digits are already the wall clock, and a UTC source with no
+        declared timezone keeps its UTC date. Never the zone of the machine the
+        run happens on.
+        """
+        local = self.local_time(timezone_spec)
+        if local.time is not None:
+            return local.time.strftime("%Y-%m-%d")
+        if local.timestamp:
+            return local.timestamp[:10].replace(":", "-")
+        return None
+
 
 def read_file(file_path: str) -> FileReading:
     """The file's FileReading, from its one cached exiftool read."""

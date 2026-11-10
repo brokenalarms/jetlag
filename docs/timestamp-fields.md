@@ -86,6 +86,14 @@ tags: its specification says what its digits mean, a bare tag's does not. Read p
 consume: corrections rewrite **all** clock fields, so FCP reads a corrected
 `Keys:CreationDate` no matter which source won.
 
+### The date folder is the file's date where it was shot
+
+Organize files each file under the date of the time the ranking gives, expressed in
+the declared `--timezone` (`FileReading.date_folder()`); after a correction, the
+corrected time's date. Where nothing gives the winning digits a zone, their own date:
+a naive source's digits are already the wall clock, and a UTC source with no declared
+zone keeps its UTC date. The zone of the machine the run is on never decides it.
+
 ### `--timezone`, `--force-timezone`, `--time-offset`
 
 - `--timezone` declares where the footage was shot. For UTC sources (rows 3, 4, 6) it is the
