@@ -106,6 +106,13 @@ def check_file_system_timestamps_need_update(file_path: str, datetime_original: 
         True if birth time needs updating, False otherwise
     """
     current_fs = get_file_system_timestamps(file_path)
+    return birth_time_needs_update(current_fs.get("birth", ""), datetime_original, preserve_wallclock)
+
+
+def birth_time_needs_update(current_birth: str, datetime_original: datetime,
+                            preserve_wallclock: bool = False) -> bool:
+    """Whether a birth time read as current_birth ("YYYY:MM:DD HH:MM:SS", or "" when
+    unknown) is more than a minute from what datetime_original makes it."""
     expected_time = get_expected_file_system_time(datetime_original, preserve_wallclock)
 
     # Parse expected timestamp
@@ -115,10 +122,10 @@ def check_file_system_timestamps_need_update(file_path: str, datetime_original: 
         return True  # Can't parse expected time, assume update needed
 
     # Check birth time (essential for video editor import)
-    if current_fs.get("birth"):
+    if current_birth:
         try:
-            current_birth = datetime.strptime(current_fs["birth"], '%Y:%m:%d %H:%M:%S')
-            diff = abs((current_birth - expected_dt).total_seconds())
+            birth = datetime.strptime(current_birth, '%Y:%m:%d %H:%M:%S')
+            diff = abs((birth - expected_dt).total_seconds())
             # Allow 60 second tolerance - matches bash version behavior
             # Small differences from file copies or system timing shouldn't trigger updates
             return diff > 60
