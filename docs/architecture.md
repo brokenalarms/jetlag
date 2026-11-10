@@ -113,6 +113,8 @@ An exiftool write rebuilds a QuickTime file (`moov` moves ahead of `mdat`), so a
 
 Every file the pipeline moves carries a provenance record — its card name in `XMP-xmpMM:PreservedFileName` and its clock fields as they were before jetlag's first write, in `XMP-jetlag` — written once and never overwritten. It rides in the file's single metadata write: fix-timestamp's when that step runs (a missing record is reason enough for it to write), the pipeline's own otherwise, together with the tag step's camera fields. verify-card finds a renamed copy by that card name.
 
+`scripts/verify-card.py` checks a card against backup locations before it is wiped. Like the other base scripts it knows nothing of profiles: it takes the source folder, each location as `--location NAME=ROOT`, and the extension lists as arguments, and writes JSONL events declared in `scripts/verify-card-schema.yaml` (kept apart from the pipeline's schema). It is read-only. Copies are compared by total size or by data portion (`scripts/lib/data_portion.py`: the footage of QuickTime/HEIF files, everything from start-of-scan in a JPEG); a `host:/path` location is listed with `rsync --list-only` and never read. See `docs/specs/verify-card.md`.
+
 ---
 
 ## Distribution

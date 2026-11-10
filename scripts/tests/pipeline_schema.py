@@ -32,8 +32,8 @@ _TYPE_CHECKS = {
 }
 
 
-def load_schema() -> dict[str, Any]:
-    with open(SCHEMA_PATH) as f:
+def load_schema(path: Path = SCHEMA_PATH) -> dict[str, Any]:
+    with open(path) as f:
         return yaml.safe_load(f)["events"]
 
 

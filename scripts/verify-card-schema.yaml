@@ -1,0 +1,99 @@
+# verify-card JSONL event schema
+#
+# Each stdout line from verify-card.py is a single JSON object. The "event" field
+# discriminates event types. Optional fields are omitted when absent (not null).
+# Kept apart from pipeline-schema.yaml, which the app decodes as pipeline events.
+#
+# This file is the one place a verdict token is defined; scripts/tests/test_verify_card.py
+# validates every event the suite emits against it. Each event carries an `example`.
+
+events:
+  verify_location:
+    description: "One per backup location, before any file, saying whether it could be listed"
+    fields:
+      location: { type: string, description: "The location's name" }
+      root: { type: string, description: "The folder, or host:/path, its copies are looked for under" }
+      remote:
+        type: boolean
+        description: "A host:/path root, listed by its host over ssh and never read"
+      reachable: { type: boolean }
+      files:
+        type: integer
+        optional: true
+        description: "Files of a checked type found under the root; absent when unreachable"
+    example:
+      event: verify_location
+      location: T9
+      root: /Volumes/T9/Videos/Source Video
+      remote: false
+      reachable: true
+      files: 5120
+
+  verify_file:
+    description: "A checked card file, followed by one verify_result per location"
+    fields:
+      file: { type: string, description: "Path relative to the source folder" }
+      kind:
+        type: string
+        enum: [media, companion]
+      size: { type: integer, description: "Total size on the card, in bytes" }
+      data_bytes:
+        type: integer
+        optional: true
+        description: "Size of its data portion; absent for companions and formats with no reader"
+    example:
+      event: verify_file
+      file: DCIM/Camera01/VID_20250619_042028_00_004.insv
+      kind: media
+      size: 3221225472
+      data_bytes: 3221160000
+
+  verify_result:
+    description: "A card file's verdict on one backup location"
+    fields:
+      file: { type: string, description: "Path relative to the source folder" }
+      location: { type: string }
+      verdict:
+        type: string
+        enum: [matched, missing, duplicate, data_differs, size_differs, unverifiable, unreachable]
+        description: >-
+          matched: one copy, equal in total size or data portion. missing: no copy.
+          duplicate: more than one copy, for the user to resolve. data_differs: the
+          copy's data portion differs, or cannot be read (a truncated copy).
+          size_differs: a companion whose copy differs in size. unverifiable: a copy
+          whose size differs and whose data portion cannot be compared without reading
+          it over the network, or whose format has no reader. unreachable: the
+          location could not be listed.
+      basis:
+        type: string
+        enum: [size, data]
+        optional: true
+        description: "For matched: equal total size (an untouched copy) or equal data portion (a written copy)"
+      copies:
+        type: "list[string]"
+        description: "The copies found, relative to the location's root"
+    example:
+      event: verify_result
+      file: DCIM/Camera01/VID_20250619_042028_00_004.insv
+      location: T9
+      verdict: matched
+      basis: data
+      copies: [2025/Japan/2025-06-19/VID_20250619_072028_00_004.insv]
+
+  verify_summary:
+    description: "Once, after every file"
+    fields:
+      checked: { type: integer }
+      on_every_location: { type: integer, description: "Checked files matched on every location" }
+      need_attention: { type: integer }
+      not_checked: { type: integer, description: "Files not checked, hidden files aside" }
+      not_checked_kinds:
+        type: "list[string]"
+        description: "Extensions and ignored folders (MISC/) of the files not checked"
+    example:
+      event: verify_summary
+      checked: 203
+      on_every_location: 195
+      need_attention: 8
+      not_checked: 41
+      not_checked_kinds: [.lrv, .thm, MISC/]

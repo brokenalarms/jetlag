@@ -73,7 +73,11 @@ to. That costs an exiftool rewrite of the working copy (same volume) for that fi
 The user adds backup locations on a configuration screen of their own; there can be
 any number. Every location is a mirror of the imported library; none is primary. A
 location is a name and a root, in a top-level `backups:` mapping in
-`media-profiles.yaml`, keyed by name — for example:
+`media-profiles.yaml`, keyed by name. `verify-card.py` never reads that file: like every
+base script it takes what it needs as arguments (`--location NAME=ROOT` per enabled
+location), and the app passes them. The app rewrites `media-profiles.yaml` from its own
+model when a profile is saved, so that model must carry `backups:` (and the check's
+lists below), or a save drops them. For example:
 
 ```yaml
 backups:
@@ -91,7 +95,11 @@ its way out, not backed up.
 The default check never reads a location over the network. A local one is walked; a
 remote one is listed with `rsync --list-only --recursive` (path, size, mtime), which the
 remote host produces itself in seconds. Header reads for footage size and provenance happen on a
-local copy; a remote copy with the same path, size and mtime shares its result.
+local copy; a remote copy with the same path, size and mtime shares its result. A
+remote copy that differs from its card file in total size and has no such local twin
+cannot be judged without reading it, so it is "unverifiable", never matched; and a
+remote copy is matched by its own name only, since its recorded card name is only
+known through a twin.
 
 ### Local or network
 
@@ -123,7 +131,8 @@ of its own.
 one card holds files from several cameras and profiles can be deleted.
 
 Under the source, files are sorted by lists the check owns (seeded once from the
-profiles' extensions, then independent of them):
+profiles' extensions, then independent of them), passed to `verify-card.py` as
+`--media-extensions`, `--companion-extensions` and `--ignore-paths`:
 
 | File | Verdict |
 |---|---|
@@ -136,12 +145,31 @@ profiles' extensions, then independent of them):
 Archived card folders (`DCIM - copied <date>`) are under the source and checked like
 any other.
 
-**Match** a card file to a file on a location when that file has the same name, or its
-`PreservedFileName` equals the card name. Nothing looser counts.
+**Match** a card file to a file on a location when that file's recorded card name
+(`PreservedFileName`, or the legacy `LogComment` record's `filename`) equals the card
+name, or it records none and has the same name. A file recording another card name is
+that file's copy, whatever it is called now. Nothing looser counts. Recorded names are
+read, in one exiftool call per location, only for files with the card file's name or
+of its type and within its size range (at least its data portion, at most its size
+plus room for added metadata); the range only narrows the reads, never the verdict.
 
-**Verdict per location**: matched with equal total size (an untouched copy) or equal
-footage size (a jetlag-written copy); otherwise missing or footage differs. Two
-matches on one location are listed as duplicates for the user to resolve.
+A companion carries no record, and an import renames it with its clip, so it is also
+found beside its media file's matched copy, under that copy's stem.
+
+**Verdict per location** (`verify_result` tokens in `scripts/verify-card-schema.yaml`):
+
+| Verdict | When |
+|---|---|
+| `matched` (basis `size`) | one copy, equal in total size: an untouched copy |
+| `matched` (basis `data`) | one copy, equal in data portion: a copy jetlag has written |
+| `missing` | no copy |
+| `duplicate` | two or more copies, for the user to resolve |
+| `data_differs` | one copy whose data portion differs, or cannot be read (truncated) |
+| `size_differs` | a companion whose copy differs in size (companions are never written) |
+| `unverifiable` | sizes differ and the data portion cannot be compared: a format with no reader yet, or a remote copy with no local twin |
+| `unreachable` | the location could not be listed |
+
+Only `matched` on every enabled location passes a file.
 
 ## Verify screen
 
@@ -252,9 +280,15 @@ its data portion is unchanged by tag + fix-timestamp.
 2. Footage-size reader for QuickTime-family files, with a regression test that footage
    size and hash are unchanged by tag + fix-timestamp on each profile's format.
 3. Provenance on every moved file.
-4. `verify-card.py`: source scan, location listings, matching, JSONL verdicts.
-5. Verify screen in the app; backup-location configuration screen.
+4. `verify-card.py`: source scan, location listings, matching, JSONL verdicts; data
+   portion readers for QuickTime/HEIF and JPEG.
+5. Verify screen in the app; backup-location configuration screen; the app's profiles
+   model round-trips `backups:` and the check's lists. The per-clip details for
+   unmatched clips (duration, neighbouring clip numbers, `ffprobe`) are gathered here.
 6. `archive-source` delete mode accepts only verified or user-accepted files.
 7. Local/network detection and label per location; "Verify hashes" and "Include
    network locations (slow)": reference hash from the hash cache or the card, ssh
    copies hashed on their host, hash cache written to matching local copies.
+8. Data portion readers for TIFF-based RAW (`.arw .dng`) and `.raf`, and the phase 2
+   regression test on each, HEIF included. Until then a RAW copy jetlag has written
+   reads as "unverifiable".
