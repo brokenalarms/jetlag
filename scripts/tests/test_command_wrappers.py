@@ -11,11 +11,11 @@ which is how a user in their footage folder runs it.
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path
 
 import pytest
 
-SCRIPT_DIR = Path(__file__).parent.parent
+from helpers import SCRIPT_DIR
+
 ENTRY_POINTS = sorted(
     p.stem for p in (SCRIPT_DIR / "cli").glob("*.py")
     if p.stem not in ("__init__", "results")

@@ -10,7 +10,7 @@
 # This file is the one place a token is defined. The script decides an outcome and
 # emits it as an enumerated token; the app renders the token and never re-derives
 # an outcome from whether some other field happens to be populated. Both sides are
-# pinned to this file by contract tests — scripts/tests/test_pipeline_schema.py
+# pinned to this file by contract tests — scripts/tests/media_pipeline/test_pipeline_schema.py
 # validates every event the suite emits, and PipelineSchemaContractTests decodes the
 # examples below and requires a status label for every organize_result token. Adding
 # a token here without handling it in the app, or in the app without declaring it

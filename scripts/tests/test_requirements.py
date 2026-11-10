@@ -8,7 +8,8 @@ scripts/requirements-dev.txt instead, which the bundle build deletes.
 
 from pathlib import Path
 
-SCRIPT_DIR = Path(__file__).parent.parent
+from helpers import SCRIPT_DIR
+
 DEV_PACKAGES = {"pytest", "pytest-xdist", "pyrefly", "ruff"}
 
 

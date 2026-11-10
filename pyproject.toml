@@ -1,8 +1,8 @@
 [tool.pytest.ini_options]
 addopts = "-q"
-# The scripts import each other as `lib.*`, exactly as they do when run from
-# scripts/; tests import them the same way without touching sys.path.
-pythonpath = ["scripts"]
+# The commands import `cli.*` and `lib.*` from scripts/, as lib/launch.sh arranges;
+# tests import them the same way, and their shared `helpers.*` from scripts/tests/.
+pythonpath = ["scripts", "scripts/tests"]
 testpaths = ["scripts/tests"]
 
 [tool.pyrefly]
