@@ -59,7 +59,8 @@ Shared modules: `timestamps/` (`sources.py` reads and ranks a file's timestamps,
 recovery record written with a correction), `exiftool.py` (the one metadata
 client), `countries.py` (country → timezone), `command_line.py` (timezone flags and
 their resolution, interrupt handling), `profiles.py`, `filesystem.py`, `footage.py`, `data_portion.py` (the data portion
-verify-card compares: QuickTime/HEIF footage, a JPEG from start-of-scan).
+verify-card compares, per format: QuickTime footage, HEIF/AVIF image items, JPEG from
+start-of-scan, TIFF raw strips, RAF raw block).
 `cli/results.py` prints a single-file command's result as `@@key=value` lines.
 
 A `cli/` module holds argument parsing, validation messages and output; anything

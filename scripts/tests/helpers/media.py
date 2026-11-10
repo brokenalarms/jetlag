@@ -105,3 +105,79 @@ def create_test_photo(path, **exif_tags):
     if exif_tags:
         tag_args = [f"-{field}={value}" for field, value in exif_tags.items()]
         exiftool.write_tags(str(path), tag_args)
+
+
+def create_test_tiff_raw(path) -> Path:
+    """A TIFF-based raw file laid out as cameras write them: IFD0 holds a reduced-size
+    preview strip and points, through SubIFDs, at the full-size image in two strips.
+    Carries a DNGVersion so exiftool will write it as .dng as well as .arw."""
+    endian = "<"
+    preview, strip1, strip2 = bytes(range(256)) * 4, bytes([7]) * 3000, bytes([9]) * 2500
+
+    def ifd(entries):
+        body = struct.pack(endian + "H", len(entries))
+        for tag, field_type, count, value in sorted(entries):
+            body += struct.pack(endian + "HHI", tag, field_type, count) + value
+        return body + struct.pack(endian + "I", 0)
+
+    def short(v):
+        return struct.pack(endian + "HH", v, 0)
+
+    def long(v):
+        return struct.pack(endian + "I", v)
+
+    sub_offset = 8 + 2 + 12 * 11 + 4
+    arrays = sub_offset + 2 + 12 * 7 + 4
+    preview_offset = arrays + 16
+    strip1_offset = preview_offset + len(preview)
+    strip2_offset = strip1_offset + len(strip1)
+    ifd0 = ifd([
+        (0x00FE, 4, 1, long(1)), (0x0100, 3, 1, short(32)), (0x0101, 3, 1, short(32)),
+        (0x0103, 3, 1, short(1)), (0x0106, 3, 1, short(2)), (0x0111, 4, 1, long(preview_offset)),
+        (0x0115, 3, 1, short(1)), (0x0116, 3, 1, short(32)), (0x0117, 4, 1, long(len(preview))),
+        (0x014A, 4, 1, long(sub_offset)), (0xC612, 1, 4, bytes([1, 4, 0, 0])),
+    ])
+    full_size = ifd([
+        (0x00FE, 4, 1, long(0)), (0x0100, 3, 1, short(100)), (0x0101, 3, 1, short(55)),
+        (0x0103, 3, 1, short(1)), (0x0111, 4, 2, long(arrays)), (0x0116, 3, 1, short(30)),
+        (0x0117, 4, 2, long(arrays + 8)),
+    ])
+    content = (b"II*\x00" + long(8) + ifd0 + full_size
+               + struct.pack(endian + "IIII", strip1_offset, strip2_offset, len(strip1), len(strip2))
+               + preview + strip1 + strip2)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_bytes(content)
+    return Path(path)
+
+
+def create_test_raf(path) -> Path:
+    """A Fujifilm RAF: the 0x94-byte header exiftool checks, the embedded JPEG it
+    rewrites, an empty RAF directory, then the raw data the header points to at 0x64."""
+    jpeg = _ensure_template_photo().read_bytes()
+    jpeg += b"\x00" * ((4 - len(jpeg) % 4) % 4)
+    raw = bytes(range(200)) * 20
+    header = bytearray(0x94)
+    header[0:16] = b"FUJIFILMCCD-RAW "
+    header[16:28] = b"0201FF383501"
+    header[28:60] = b"X-T5".ljust(32, b"\x00")
+    header[0x3C:0x40] = b"0100"
+    jpeg_offset = 0x94
+    directory_offset = jpeg_offset + len(jpeg)
+    raw_offset = directory_offset + 4
+    header[0x54:0x5C] = struct.pack(">II", jpeg_offset, len(jpeg))
+    header[0x5C:0x64] = struct.pack(">II", directory_offset, 4)
+    header[0x64:0x6C] = struct.pack(">II", raw_offset, len(raw))
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_bytes(bytes(header) + jpeg + struct.pack(">I", 0) + raw)
+    return Path(path)
+
+
+def create_test_heif(path) -> Path:
+    """A one-item AVIF still from ffmpeg: the same item-table structure (meta, iinf,
+    iloc, mdat) as a camera's HEIF, which ffmpeg cannot encode."""
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run([
+        "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=gray:s=64x64:d=0.04",
+        "-frames:v", "1", "-f", "avif", str(path),
+    ], capture_output=True, check=True)
+    return Path(path)
