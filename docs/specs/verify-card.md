@@ -190,6 +190,16 @@ The right-hand panel reuses the table machinery with a row type of its own, not
   recording)
 - "Show matched", off by default
 
+## Deleting from the card
+
+`archive-source --action delete` deletes a file only when it is cleared: verify-card
+matches it on every location passed with `--location` (the check is run again at
+delete time, never taken from an earlier report), or the user accepted it with
+`--accept`. Any other file passed in `--files` is kept and reported, and the count
+of kept files is part of the result. With neither a location nor an acceptance it
+refuses. The pipeline's `--source-action delete` verifies the same way against its
+`--backup-location` values and, with none, deletes nothing.
+
 ## Deep check
 
 Two checkboxes on the Verify screen, both off by default:

@@ -50,6 +50,7 @@ class RunOptions:
     source_action: str = "archive"
     archive_destination: Optional[str] = None
     archived_name: Optional[str] = None
+    backup_locations: tuple = ()
     gyroflow_preset: Optional[str] = None
     gyroflow_config: Optional[dict] = None
 
@@ -84,6 +85,7 @@ class RunOptions:
             source_action=args.source_action,
             archive_destination=args.archive_destination,
             archived_name=args.archived_name,
+            backup_locations=tuple(args.backup_location),
             gyroflow_preset=args.gyroflow_preset,
             gyroflow_config=config.get("gyroflow"),
         )

@@ -4,7 +4,8 @@ Tests for archive-source
 
 Covers: archive rename, delete only passed files,
 empty dir cleanup, non-empty dir preservation, read-only source error,
-dry-run no-op.
+dry-run no-op. The delete mechanics are exercised on files the user has accepted
+(--accept); TestDeleteOnlyVerified covers what clears a file for deletion.
 """
 
 import os
@@ -101,6 +102,7 @@ class TestDelete:
             "--source", self.source,
             "--action", "delete",
             "--files", self.file_a, self.file_b,
+            "--accept", self.file_a, self.file_b,
             "--apply",
         )
 
@@ -116,6 +118,7 @@ class TestDelete:
             "--source", self.source,
             "--action", "delete",
             "--files", self.file_d,
+            "--accept", self.file_d,
             "--apply",
         )
 
@@ -130,6 +133,7 @@ class TestDelete:
             "--source", self.source,
             "--action", "delete",
             "--files", self.file_a,
+            "--accept", self.file_a,
             "--apply",
         )
 
@@ -147,6 +151,7 @@ class TestDelete:
             "--source", self.source,
             "--action", "delete",
             "--files", *all_files,
+            "--accept", *all_files,
             "--apply",
         )
 
@@ -181,6 +186,7 @@ class TestDelete:
             "--source", self.source,
             "--action", "delete",
             "--files", main_file, companion,
+            "--accept", main_file, companion,
             "--apply",
         )
 
@@ -199,6 +205,7 @@ class TestDelete:
             "--source", self.source,
             "--action", "delete",
             "--files", missing, self.file_d,
+            "--accept", missing, self.file_d,
             "--apply",
         )
 
@@ -247,6 +254,7 @@ class TestReadOnlySource:
             "--source", self.source,
             "--action", "delete",
             "--files", self.file_a,
+            "--accept", self.file_a,
             "--apply",
         )
 
@@ -283,6 +291,7 @@ class TestDryRun:
             "--source", self.source,
             "--action", "delete",
             "--files", self.file_a,
+            "--accept", self.file_a,
         )
 
         assert result.returncode == 0
@@ -376,3 +385,71 @@ class TestArchiveDestinationAndName:
         assert os.path.isdir(self.source), "Source should still exist in dry run"
         assert os.listdir(self.elsewhere) == [], "Destination should still be empty"
         assert "Would rename" in result.stderr
+
+
+class TestDeleteOnlyVerified:
+    """Delete removes a card file only when verify-card matches it on every backup
+    location, or the user has accepted it. The card holds the last copy of anything
+    not provably backed up, so nothing else may go."""
+
+    def setup_method(self):
+        self.temp_dir = Path(tempfile.mkdtemp())
+        self.source = self.temp_dir / "card"
+        self.backup = self.temp_dir / "T9"
+        self.nas = self.temp_dir / "NAS"
+        self.backed_up = self.source / "DCIM" / "VID_0001.MP4"
+        self.not_backed_up = self.source / "DCIM" / "VID_0002.MP4"
+        for path, content in ((self.backed_up, b"clip-one"), (self.not_backed_up, b"clip-two")):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        (self.backup / "2025").mkdir(parents=True)
+        shutil.copy2(self.backed_up, self.backup / "2025" / self.backed_up.name)
+        self.nas.mkdir()
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir)
+
+    def delete(self, *extra: str) -> subprocess.CompletedProcess:
+        return run_archive_source(
+            "--source", str(self.source), "--action", "delete",
+            "--files", str(self.backed_up), str(self.not_backed_up),
+            "--media-extensions", ".mp4", *extra,
+        )
+
+    def test_only_files_on_every_location_are_deleted(self):
+        result = self.delete("--location", f"T9={self.backup}", "--apply")
+
+        assert result.returncode == 0, result.stderr
+        remaining = {p.name for p in (self.backed_up, self.not_backed_up) if p.exists()}
+        assert remaining == {"VID_0002.MP4"}, f"Actual: {remaining} left on the card"
+        assert "@@kept=1" in result.stdout
+
+    def test_a_file_missing_from_one_location_is_kept(self):
+        result = self.delete("--location", f"T9={self.backup}", "--location", f"NAS={self.nas}", "--apply")
+
+        assert result.returncode == 0, result.stderr
+        assert self.backed_up.exists() and self.not_backed_up.exists()
+        assert "@@kept=2" in result.stdout
+
+    def test_accepted_file_is_deleted_without_a_copy(self):
+        result = self.delete("--location", f"T9={self.backup}", "--accept", str(self.not_backed_up), "--apply")
+
+        assert result.returncode == 0, result.stderr
+        assert not self.backed_up.exists() and not self.not_backed_up.exists()
+
+    def test_delete_without_a_location_or_acceptance_is_refused(self):
+        result = run_archive_source(
+            "--source", str(self.source), "--action", "delete",
+            "--files", str(self.backed_up), "--apply",
+        )
+
+        assert result.returncode == 1
+        assert self.backed_up.exists(), "Nothing may be deleted when nothing was verified"
+
+    def test_dry_run_previews_only_what_would_be_deleted(self):
+        result = self.delete("--location", f"T9={self.backup}")
+
+        assert result.returncode == 0, result.stderr
+        assert self.backed_up.exists() and self.not_backed_up.exists()
+        assert "Would delete: DCIM/VID_0001.MP4" in result.stderr
+        assert "Would delete: DCIM/VID_0002.MP4" not in result.stderr

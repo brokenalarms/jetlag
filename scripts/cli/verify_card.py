@@ -16,7 +16,7 @@ from pathlib import Path
 
 from lib.command_line import install_interrupt_handlers
 from lib.exiftool import exiftool
-from lib.verify_card import verify_card
+from lib.verify_card import parse_location, verify_card
 
 
 def emit(event: str, **fields) -> None:
@@ -24,11 +24,11 @@ def emit(event: str, **fields) -> None:
           flush=True)
 
 
-def parse_location(spec: str) -> tuple[str, str]:
-    name, sep, root = spec.partition("=")
-    if not sep or not name or not root:
-        raise argparse.ArgumentTypeError(f"expected NAME=ROOT, got {spec!r}")
-    return name, root
+def location_arg(spec: str) -> tuple[str, str]:
+    try:
+        return parse_location(spec)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(str(e)) from None
 
 
 def main() -> int:
@@ -37,7 +37,7 @@ def main() -> int:
         prog="verify-card.sh",
         description="Check that every file on a card is on each backup location")
     parser.add_argument("source", help="Folder to check, usually the card root")
-    parser.add_argument("--location", action="append", type=parse_location, required=True,
+    parser.add_argument("--location", action="append", type=location_arg, required=True,
                         metavar="NAME=ROOT",
                         help="A backup location to check against; repeat for each")
     parser.add_argument("--media-extensions", nargs="+", required=True,
