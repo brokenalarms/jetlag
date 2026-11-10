@@ -147,7 +147,7 @@ def _leaked_metadata_pids():
     leaked = []
     for pid, name in tracked:
         result = subprocess.run(
-            ["ps", "-p", str(pid), "-o", "command="],
+            ["ps", "-ww", "-p", str(pid), "-o", "command="],
             capture_output=True, text=True,
         )
         cmd = result.stdout.strip()
