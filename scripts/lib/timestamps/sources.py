@@ -660,6 +660,13 @@ class FileReading:
             return None
         return trailing_zone(self.exif.get(source.field, ""))
 
+    @property
+    def zone(self) -> Optional[str]:
+        """The file's zone ('+HH:MM') as the hierarchy shows it: a zoned tag's
+        zone, else the camera's zone setting from its UTC clock and filename.
+        None where the file holds no zone evidence."""
+        return self.tagged_zone or self.camera_zone
+
     def best(self, timezone_offset: Optional[str] = None) -> Tuple[Optional[str], TimestampSource]:
         """The file's best timestamp and the source it came from, per RANKING."""
         inputs = _RankingInputs(

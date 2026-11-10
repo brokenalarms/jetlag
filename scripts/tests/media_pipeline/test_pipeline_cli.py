@@ -741,6 +741,38 @@ class TestPipelineMachineOutput:
         assert len(conflict_events) == 1
         assert conflict_events[0]["conflict_type"] == "mixed_timezones"
 
+    def test_a_camera_whose_zone_changed_mid_batch_stops_as_mixed(self, temp_workspace, test_profile):
+        """The Comedy night Insta360 X6 batch, shaped down to two clips: no zoned
+        tag on either, a correct UTC clock on both, and the camera naming one clip
+        in UTC-7 and the next in Perth time.
+
+        Actual: the run's timezone_conflict event
+        Expected: mixed_timezones, -0700 for the first clip and +0800 for the
+        second — the zones the clock and filename show, which the guard used to
+        miss because it looked only at zoned tags
+        """
+        source = temp_workspace["source"]
+        _create_video_raw(source / "VID_20261006_002802_00_001.mp4",
+                          CreateDate="2026:10:06 07:28:02", MediaCreateDate="2026:10:06 07:28:02")
+        _create_video_raw(source / "VID_20261006_203505_00_005.mp4",
+                          CreateDate="2026:10:06 12:35:05", MediaCreateDate="2026:10:06 12:35:05")
+
+        result = run_pipeline([
+            "--profile", test_profile,
+            "--source", str(source),
+            "--timezone", "+0800",
+            "--tasks", "fix-timestamp",
+        ])
+
+        events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
+        conflicts = [e for e in events if e.get("event") == "timezone_conflict"]
+        assert [(c["conflict_type"], c["file_timezones"]) for c in conflicts] == [(
+            "mixed_timezones",
+            {"-0700": ["VID_20261006_002802_00_001.mp4"], "+0800": ["VID_20261006_203505_00_005.mp4"]},
+        )], f"Actual: {conflicts}, Expected: one mixed_timezones conflict, -0700 and +0800"
+        assert not [e for e in events if e.get("event") == "timestamp_result"], \
+            "Actual: a file was processed, Expected: the batch stops before the first file"
+
     def test_mixed_timezones_bypassed_by_allow_mixed(self, temp_workspace, test_profile):
         """--allow-mixed-timezones bypasses the mixed timezones check.
 

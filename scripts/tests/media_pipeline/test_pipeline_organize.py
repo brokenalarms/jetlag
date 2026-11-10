@@ -555,9 +555,11 @@ class TestOrganizeReportsTheUserFacingOutcome:
         names = ["VID_20251005_100000_00_001.mp4",
                  "VID_20251005_110000_00_002.mp4",
                  "VID_20251005_120000_00_003.mp4"]
-        for name in names:
+        # Each clock is its name's time less nine hours: one camera set to +09:00
+        # throughout, so the batch is not mixed.
+        for name, clock in zip(names, ["01:00:00", "02:00:00", "03:00:00"]):
             create_test_video(workspace["source"] / name,
-                              media_create_date="2025:10:05 01:00:00")
+                              media_create_date=f"2025:10:05 {clock}")
         return names
 
     def test_dry_run_and_apply_report_the_same_copy_token_for_every_file(
