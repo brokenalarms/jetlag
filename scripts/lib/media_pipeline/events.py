@@ -1,4 +1,4 @@
-"""The pipeline's JSONL events on stdout; scripts/pipeline-schema.yaml defines them."""
+"""The pipeline's JSONL events on stdout; scripts/lib/media_pipeline/pipeline-schema.yaml defines them."""
 
 from __future__ import annotations
 

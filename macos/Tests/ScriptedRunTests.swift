@@ -37,7 +37,7 @@ final class ScriptedRunTests: XCTestCase {
         .deletingLastPathComponent()   // Tests
         .deletingLastPathComponent()   // macos
         .deletingLastPathComponent()   // repo root
-        .appendingPathComponent("scripts/pipeline-schema.yaml")
+        .appendingPathComponent("scripts/lib/media_pipeline/pipeline-schema.yaml")
 
     private static let file = "DJI_20250815_101112_0001.MP4"
 

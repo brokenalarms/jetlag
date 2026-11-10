@@ -1,4 +1,4 @@
-"""Validator for JSONL pipeline events against scripts/pipeline-schema.yaml.
+"""Validator for JSONL pipeline events against scripts/lib/media_pipeline/pipeline-schema.yaml.
 
 The schema is the one place a token is defined. This module lets the test suite
 hold the emitting side to it: any event media-pipeline writes to stdout must
@@ -17,7 +17,7 @@ from typing import Any
 
 import yaml
 
-SCHEMA_PATH = Path(__file__).parent.parent / "pipeline-schema.yaml"
+SCHEMA_PATH = Path(__file__).parent.parent / "lib" / "media_pipeline" / "pipeline-schema.yaml"
 
 _TYPE_CHECKS = {
     "string": lambda v: isinstance(v, str),

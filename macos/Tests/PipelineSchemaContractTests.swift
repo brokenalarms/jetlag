@@ -21,7 +21,7 @@ final class PipelineSchemaContractTests: XCTestCase {
         .deletingLastPathComponent()   // Tests
         .deletingLastPathComponent()   // macos
         .deletingLastPathComponent()   // repo root
-        .appendingPathComponent("scripts/pipeline-schema.yaml")
+        .appendingPathComponent("scripts/lib/media_pipeline/pipeline-schema.yaml")
 
     private func schema() throws -> [String: [String: Any]] {
         let text = try String(contentsOf: Self.schemaURL, encoding: .utf8)

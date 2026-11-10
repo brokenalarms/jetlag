@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Contract tests binding media-pipeline's JSONL output to scripts/pipeline-schema.yaml.
+Contract tests binding media-pipeline's JSONL output to scripts/lib/media_pipeline/pipeline-schema.yaml.
 
 The app renders emitted tokens 1:1 and never re-derives an outcome from whether a
 field is populated. That only holds if the token set is pinned: these tests fail

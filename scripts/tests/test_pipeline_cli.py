@@ -3,7 +3,7 @@ media-pipeline's command line and JSONL contract, end to end.
 
 These run media-pipeline.sh as the app does — a fresh process with stdout piped —
 and hold its argument handling, its dry-run and apply modes, the summary, and
-the JSONL events the app reads (scripts/pipeline-schema.yaml).
+the JSONL events the app reads (scripts/lib/media_pipeline/pipeline-schema.yaml).
 """
 
 import json
