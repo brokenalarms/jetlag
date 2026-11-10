@@ -10,21 +10,11 @@ import tempfile
 import shutil
 import subprocess
 import pytest
-from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from conftest import create_test_video
+from lib.timestamp_source import clear_exif_cache, extract_metadata_timezone, read_exif_data
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-# Import hyphenated module name
-import importlib.util
-spec = importlib.util.spec_from_file_location(
-    "fix_media_timestamp",
-    str(Path(__file__).parent.parent / "fix-media-timestamp.py")
-)
-fmt = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(fmt)
 
 SCRIPT_DIR = Path(__file__).parent.parent
 
@@ -40,7 +30,6 @@ class TestFilenameSourceOfTruth:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        fmt._exif_cache.clear()
 
     def test_insta360_filename_is_source_of_truth_with_infer(self):
         """
@@ -67,8 +56,8 @@ class TestFilenameSourceOfTruth:
         assert result.returncode == 0
 
         # Verify DateTimeOriginal was corrected from filename
-        fmt._exif_cache.clear()
-        exif = fmt.read_exif_data(video_path)
+        clear_exif_cache()
+        exif = read_exif_data(video_path)
         dt_original = exif.get("DateTimeOriginal", "")
 
         # Should be 06:38:09 (from filename), not 09:38:09 (corrupted value)
@@ -104,7 +93,6 @@ class TestDateTimeOriginalPreservation:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        fmt._exif_cache.clear()
 
     def test_datetimeoriginal_preserved_by_default(self):
         """Without --infer-from-filename, DateTimeOriginal should never change."""
@@ -121,8 +109,8 @@ class TestDateTimeOriginalPreservation:
         ], capture_output=True, check=True)
 
         # DateTimeOriginal should be unchanged
-        fmt._exif_cache.clear()
-        exif = fmt.read_exif_data(video_path)
+        clear_exif_cache()
+        exif = read_exif_data(video_path)
         assert exif.get("DateTimeOriginal") == original_datetime
 
 
@@ -134,7 +122,6 @@ class TestInferFromFilenameRequiresTimezone:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        fmt._exif_cache.clear()
 
     def test_infer_without_timezone_fails(self):
         """--infer-from-filename without --timezone should fail."""
@@ -166,7 +153,6 @@ class TestTimezoneMismatchDetection:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        fmt._exif_cache.clear()
 
     def _parse_at_lines(self, stdout: str) -> dict:
         result = {}
@@ -187,8 +173,8 @@ class TestTimezoneMismatchDetection:
         """
         video_path = os.path.join(self.temp_dir, "test_video.mp4")
         create_test_video(video_path, DateTimeOriginal="2025:06:19 06:38:09+08:00")
-        fmt._exif_cache.clear()
-        dto_before = fmt.read_exif_data(video_path).get("DateTimeOriginal", "")
+        clear_exif_cache()
+        dto_before = read_exif_data(video_path).get("DateTimeOriginal", "")
 
         result = subprocess.run([
             sys.executable, str(SCRIPT_DIR / "fix-media-timestamp.py"),
@@ -202,8 +188,8 @@ class TestTimezoneMismatchDetection:
         assert at_lines.get("timestamp_action") in ("would_fix", "no_change")
         assert "2025:06:19 07:38:09+09:00" in at_lines.get("corrected_time", ""), \
             "preview must show the same moment re-expressed at +09:00"
-        fmt._exif_cache.clear()
-        assert fmt.read_exif_data(video_path).get("DateTimeOriginal", "") == dto_before, \
+        clear_exif_cache()
+        assert read_exif_data(video_path).get("DateTimeOriginal", "") == dto_before, \
             "dry run must not modify the file"
 
     def test_force_timezone_converts_preserving_instant(self):
@@ -242,7 +228,6 @@ class TestTimezoneConversion:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        fmt._exif_cache.clear()
 
     def test_timezone_conversion_display_mode(self):
         """
@@ -282,7 +267,6 @@ class TestMissingDateTimeOriginalWithTimezoneChange:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        fmt._exif_cache.clear()
 
     def test_missing_datetimeoriginal_updates_all_fields(self):
         """
@@ -295,8 +279,8 @@ class TestMissingDateTimeOriginalWithTimezoneChange:
         create_test_video(video_path)
 
         # No DateTimeOriginal initially
-        fmt._exif_cache.clear()
-        exif_before = fmt.read_exif_data(video_path)
+        clear_exif_cache()
+        exif_before = read_exif_data(video_path)
         assert not exif_before.get("DateTimeOriginal")
 
         # Run with timezone
@@ -308,8 +292,8 @@ class TestMissingDateTimeOriginalWithTimezoneChange:
         ], capture_output=True, check=True)
 
         # All fields should now be set
-        fmt._exif_cache.clear()
-        exif_after = fmt.read_exif_data(video_path)
+        clear_exif_cache()
+        exif_after = read_exif_data(video_path)
 
         # DateTimeOriginal should be written
         assert "2025:06:19 06:38:09" in exif_after.get("DateTimeOriginal", "")
@@ -336,7 +320,6 @@ class TestExtractMetadataTimezone:
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        fmt._exif_cache.clear()
 
     def _create_test_video(self, path: str) -> None:
         create_test_video(path)
@@ -352,8 +335,8 @@ class TestExtractMetadataTimezone:
             video_path
         ], capture_output=True, check=True)
 
-        fmt._exif_cache.clear()
-        result = fmt.extract_metadata_timezone(video_path)
+        clear_exif_cache()
+        result = extract_metadata_timezone(video_path)
         assert result == "+08:00"
 
     def test_extracts_timezone_from_creationdate(self):
@@ -367,8 +350,8 @@ class TestExtractMetadataTimezone:
             video_path
         ], capture_output=True, check=True)
 
-        fmt._exif_cache.clear()
-        result = fmt.extract_metadata_timezone(video_path)
+        clear_exif_cache()
+        result = extract_metadata_timezone(video_path)
         assert result == "+13:00"
 
     def test_returns_none_when_no_timezone(self):
@@ -376,8 +359,8 @@ class TestExtractMetadataTimezone:
         video_path = os.path.join(self.temp_dir, "test_no_tz.mp4")
         self._create_test_video(video_path)
 
-        fmt._exif_cache.clear()
-        result = fmt.extract_metadata_timezone(video_path)
+        clear_exif_cache()
+        result = extract_metadata_timezone(video_path)
         assert result is None
 
     def test_stdout_contains_timezone_marker(self):

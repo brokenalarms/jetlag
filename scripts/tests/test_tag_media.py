@@ -76,10 +76,10 @@ class TestTagMedia:
 
         # Verify behavior: dry run should not modify file
         assert result.returncode == 0, f"Script should succeed: {result.stderr}"
-        assert has_tag_before == False, "Tag should not exist before"
-        assert has_tag_after == False, f"Actual: tag added in dry run, Expected: no changes in dry run"
-        assert has_make_before == False, "Make should not exist before"
-        assert has_make_after == False, f"Actual: EXIF added in dry run, Expected: no changes in dry run"
+        assert has_tag_before is False, "Tag should not exist before"
+        assert has_tag_after is False, "Actual: tag added in dry run, Expected: no changes in dry run"
+        assert has_make_before is False, "Make should not exist before"
+        assert has_make_after is False, "Actual: EXIF added in dry run, Expected: no changes in dry run"
 
     def test_apply_mode_adds_tags(self, test_video):
         """Test that apply mode adds tags
@@ -110,10 +110,10 @@ class TestTagMedia:
 
         # Verify behavior: tags should be added
         assert result.returncode == 0, f"Script should succeed: {result.stderr}"
-        assert has_test_tag_before == False, "test-tag should not exist before"
-        assert has_another_tag_before == False, "another-tag should not exist before"
-        assert has_test_tag_after == True, f"Actual: test-tag not added, Expected: test-tag present"
-        assert has_another_tag_after == True, f"Actual: another-tag not added, Expected: another-tag present"
+        assert has_test_tag_before is False, "test-tag should not exist before"
+        assert has_another_tag_before is False, "another-tag should not exist before"
+        assert has_test_tag_after is True, "Actual: test-tag not added, Expected: test-tag present"
+        assert has_another_tag_after is True, "Actual: another-tag not added, Expected: another-tag present"
 
     def test_apply_mode_adds_exif(self, test_video):
         """Test that apply mode adds EXIF data
@@ -145,10 +145,10 @@ class TestTagMedia:
 
         # Verify behavior: EXIF should be added
         assert result.returncode == 0, f"Script should succeed: {result.stderr}"
-        assert has_make_before == False, "Make should not exist before"
-        assert has_model_before == False, "Model should not exist before"
-        assert has_make_after == True, f"Actual: Make not added, Expected: Make=GoPro"
-        assert has_model_after == True, f"Actual: Model not added, Expected: Model=HERO12 Black"
+        assert has_make_before is False, "Make should not exist before"
+        assert has_model_before is False, "Model should not exist before"
+        assert has_make_after is True, "Actual: Make not added, Expected: Make=GoPro"
+        assert has_model_after is True, "Actual: Model not added, Expected: Model=HERO12 Black"
 
     def test_idempotency_tags(self, test_video):
         """Test that adding same tags twice doesn't duplicate
@@ -235,9 +235,9 @@ class TestTagMedia:
 
         # Verify idempotent behavior
         assert result.returncode == 0, f"Script should succeed: {result.stderr}"
-        assert has_make_after_first == True and has_model_after_first == True, "EXIF should be set after first run"
-        assert has_make_after_second == True and has_model_after_second == True, "EXIF should still be set after second run"
-        assert abs(mtime_after_second - mtime_after_first) < 1, f"Actual: file was modified (mtime changed), Expected: no file write on idempotent second run"
+        assert has_make_after_first is True and has_model_after_first is True, "EXIF should be set after first run"
+        assert has_make_after_second is True and has_model_after_second is True, "EXIF should still be set after second run"
+        assert abs(mtime_after_second - mtime_after_first) < 1, "Actual: file was modified (mtime changed), Expected: no file write on idempotent second run"
 
     def test_partial_update_tags(self, test_video):
         """Test that only missing tags are added
@@ -277,10 +277,10 @@ class TestTagMedia:
 
         # Verify partial update behavior
         assert result.returncode == 0, f"Script should succeed: {result.stderr}"
-        assert has_existing_tag_after_first == True, "existing-tag should be added in first run"
-        assert has_new_tag_after_first == False, "new-tag should not exist after first run"
-        assert has_existing_tag_after_second == True, "existing-tag should still be present"
-        assert has_new_tag_after_second == True, f"Actual: new-tag not added, Expected: new-tag added in second run (partial update)"
+        assert has_existing_tag_after_first is True, "existing-tag should be added in first run"
+        assert has_new_tag_after_first is False, "new-tag should not exist after first run"
+        assert has_existing_tag_after_second is True, "existing-tag should still be present"
+        assert has_new_tag_after_second is True, "Actual: new-tag not added, Expected: new-tag added in second run (partial update)"
 
     def test_partial_update_exif(self, test_video):
         """Test that only missing EXIF fields are updated
@@ -321,10 +321,10 @@ class TestTagMedia:
 
         # Verify partial update behavior
         assert result.returncode == 0, f"Script should succeed: {result.stderr}"
-        assert has_make_after_first == True, "Make should be added in first run"
-        assert has_model_after_first == False, "Model should not exist after first run"
-        assert has_make_after_second == True, "Make should still be present"
-        assert has_model_after_second == True, f"Actual: Model not added, Expected: Model added in second run (partial update)"
+        assert has_make_after_first is True, "Make should be added in first run"
+        assert has_model_after_first is False, "Model should not exist after first run"
+        assert has_make_after_second is True, "Make should still be present"
+        assert has_model_after_second is True, "Actual: Model not added, Expected: Model added in second run (partial update)"
 
     def test_multiple_files(self, temp_dir):
         """Test processing multiple files"""
@@ -444,12 +444,12 @@ class TestTagMedia:
 
         # Verify combined behavior
         assert result.returncode == 0, f"Script should succeed: {result.stderr}"
-        assert has_tag_before == False, "Tag should not exist before"
-        assert has_make_before == False, "Make should not exist before"
-        assert has_model_before == False, "Model should not exist before"
-        assert has_tag_after == True, f"Actual: tag not added, Expected: gopro-hero-12 tag present"
-        assert has_make_after == True, f"Actual: Make not added, Expected: Make=GoPro"
-        assert has_model_after == True, f"Actual: Model not added, Expected: Model=HERO12 Black"
+        assert has_tag_before is False, "Tag should not exist before"
+        assert has_make_before is False, "Make should not exist before"
+        assert has_model_before is False, "Model should not exist before"
+        assert has_tag_after is True, "Actual: tag not added, Expected: gopro-hero-12 tag present"
+        assert has_make_after is True, "Actual: Make not added, Expected: Make=GoPro"
+        assert has_model_after is True, "Actual: Model not added, Expected: Model=HERO12 Black"
 
 
 class TestTagMediaDataPresentation:

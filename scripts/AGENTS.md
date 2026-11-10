@@ -18,7 +18,30 @@ These are rules that prevent common agent mistakes — they explain why things a
 - **Why Python uses functional composition**: declarative readability — build up a picture of what needs to be read, what needs to be set, what needs to be done, then do it in the last step. Python was chosen over bash for this reason.
 - **Why no hardcoded defaults**: portability across machines. All configuration must come from configuration files (media-profiles.yaml) or environment variables (.env.local). If required config is missing, fail immediately with a clear error directing the user where to add it.
 - **Why data is separated from presentation**: formatted text shouldn't be function args. Use structured dicts with descriptive key names as building blocks, then build formatted text at display time.
-- **Why batch files pass through all args transparently**: they're thin loops, not filtering layers.
+
+## Code layout
+
+The top level holds only command lines; the logic lives in `lib/` as ordinary
+modules, so the pipeline and the tests import exactly the code the CLI runs.
+
+| Command line (`.py` + `.sh`) | Logic in `lib/` |
+|---|---|
+| `media-pipeline` | `pipeline.py` — runs every step in-process |
+| `fix-media-timestamp` | `fix_timestamp.py`; `provenance.py` (the recovery record written with it) |
+| `tag-media` | `tagging.py` |
+| `organize-by-date` | `organize.py` |
+| `ingest-media` | `ingest.py` |
+| `generate-gyroflow` | `gyroflow.py` |
+| `archive-source` | `archive.py` |
+| `probe-camera`, `scan-source`, `report-file-dates` | small enough to stay in the script |
+
+Shared modules: `timestamp_source.py` (reading and ranking a file's timestamps),
+`exiftool.py` (the one metadata client), `countries.py` (country → timezone),
+`cli.py` (timezone flags and their resolution, interrupt handling), `results.py` (`@@key=value` output), `profiles.py`,
+`filesystem.py`, `file_timestamps.py`, `footage.py`.
+
+A script holds argument parsing, validation messages and output; anything another
+script or the pipeline could call belongs in its `lib/` module.
 
 ## External tool behavior
 

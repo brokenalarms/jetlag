@@ -26,11 +26,9 @@ from pathlib import Path
 import pytest
 
 from conftest import create_insta360_file, create_test_photo, create_test_video, insta360_trailer
+from lib.footage import footage_bytes, footage_ranges, footage_sha256
 
 SCRIPT_DIR = Path(__file__).parent.parent
-sys.path.insert(0, str(SCRIPT_DIR))
-
-from lib.footage import footage_bytes, footage_ranges, footage_sha256
 
 
 def box(box_type: bytes, payload: bytes) -> bytes:

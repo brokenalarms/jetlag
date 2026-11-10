@@ -11,14 +11,12 @@ stderr before answering and require the client to still get its answer.
 
 import os
 import stat
-import sys
 import threading
 from pathlib import Path
 
 import pytest
 
 SCRIPTS_DIR = Path(__file__).parent.parent
-sys.path.insert(0, str(SCRIPTS_DIR))
 
 FLOOD = 200 * 1024  # well past any pipe buffer
 

@@ -24,12 +24,13 @@ from typing import Optional
 import pytest
 import yaml
 
+from conftest import create_test_video as _create_video_raw
+from lib import organize, pipeline
+from lib.exiftool import exiftool
 from pipeline_schema import validate_event
 
 SCRIPT_DIR = Path(__file__).parent.parent
 MEDIA_PIPELINE = SCRIPT_DIR / "media-pipeline.sh"
-
-sys.path.insert(0, str(SCRIPT_DIR))
 
 
 def _has_tag_cmd() -> bool:
@@ -80,16 +81,6 @@ def run_pipeline(args: list[str], cwd: Optional[Path] = None) -> PipelineResult:
         returncode=result.returncode,
     )
 
-
-from conftest import create_test_video as _create_video_raw
-
-import importlib.util as _importlib_util
-
-_pipeline_spec = _importlib_util.spec_from_file_location(
-    "media_pipeline_under_test", SCRIPT_DIR / "media-pipeline.py"
-)
-pipeline = _importlib_util.module_from_spec(_pipeline_spec)
-_pipeline_spec.loader.exec_module(pipeline)
 
 
 def create_test_video(path: Path, media_create_date: str = "2025:10:05 01:00:00"):
@@ -260,7 +251,7 @@ class TestFileDiscovery:
         )
 
         lines = result.stderr.split("\n")
-        processing_lines = [l for l in lines if "Processing:" in l]
+        processing_lines = [line for line in lines if "Processing:" in line]
         assert "apple.mp4" in processing_lines[0]
         assert "mango.mp4" in processing_lines[1]
         assert "zebra.mp4" in processing_lines[2]
@@ -729,7 +720,7 @@ class TestTagging:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
-        event_types = [json.loads(l)["event"] for l in result.stdout.strip().split("\n") if l.strip()]
+        event_types = [json.loads(line)["event"] for line in result.stdout.strip().split("\n") if line.strip()]
         assert "tag_result" in event_types, \
             f"Actual: event types {event_types}, Expected: tag_result present"
 
@@ -1083,7 +1074,7 @@ class TestArchiveSourceIntegration:
         not_expected = source.parent / f"{source.name} - copied {today}"
         assert not not_expected.exists(), "Source should not have been renamed"
         assert "Skipping archive source" in result.stderr
-        skip_line = next(l for l in result.stderr.split("\n") if "Skipping archive source" in l)
+        skip_line = next(line for line in result.stderr.split("\n") if "Skipping archive source" in line)
         assert "1" in skip_line, f"Skip line should mention the failed count: {skip_line}"
         assert "Archive source..." not in result.stderr
 
@@ -1216,7 +1207,7 @@ class TestPipelineMachineOutput:
             "--group", "Test",
         ])
 
-        raw_events = [json.loads(l) for l in result.stdout.strip().split("\n") if l.strip()]
+        raw_events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
         event_types = [e["event"] for e in raw_events]
         assert "timestamp_result" in event_types, \
             f"Actual: event types {event_types}, Expected: timestamp_result present"
@@ -1951,7 +1942,7 @@ class TestUpdateFilenameDates:
             "--update-filename-dates",
         ])
 
-        events = [json.loads(l) for l in result.stdout.strip().split("\n") if l.strip()]
+        events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
         rename_events = [e for e in events if e["event"] == "rename_result"]
         assert rename_events, \
             f"Actual: no rename_result events in {[e['event'] for e in events]}, " \
@@ -1997,7 +1988,7 @@ class TestUpdateFilenameDates:
 
         assert "No such file or directory" not in result.output, \
             "Organize statted the would-be renamed path instead of the real file"
-        events = [json.loads(l) for l in result.stdout.strip().split("\n") if l.strip()]
+        events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
         assert not [e for e in events if e["event"] == "pipeline_error"], \
             "The run must not die on a pending rename"
         organize_events = [e for e in events if e["event"] == "organize_result"]
@@ -2030,7 +2021,7 @@ class TestUpdateFilenameDates:
             "--update-filename-dates",
         ])
 
-        event_types = [json.loads(l)["event"] for l in result.stdout.strip().split("\n") if l.strip()]
+        event_types = [json.loads(line)["event"] for line in result.stdout.strip().split("\n") if line.strip()]
         assert "rename_result" not in event_types, \
             f"Actual: rename_result found in {event_types}, " \
             "Expected: no rename_result for unparseable filename 'test.mp4'"
@@ -2057,7 +2048,7 @@ class TestUpdateFilenameDates:
             "--update-filename-dates",
         ])
 
-        event_types = [json.loads(l)["event"] for l in result.stdout.strip().split("\n") if l.strip()]
+        event_types = [json.loads(line)["event"] for line in result.stdout.strip().split("\n") if line.strip()]
         assert "rename_result" not in event_types, \
             f"Actual: rename_result found in {event_types}, " \
             "Expected: no rename_result when filename time is already correct"
@@ -2160,11 +2151,11 @@ class TestOverwriteDestination:
         result = self._run(temp_workspace, test_profile, "--apply")
 
         events = self._events(result.stdout)
-        organize = next(e for e in events if e["event"] == "organize_result")
-        assert organize["action"] == "skipped", \
-            f"Actual: organize_result.action={organize['action']!r}, Expected: 'skipped'"
-        assert organize.get("reason") == "exists_differs", \
-            f"Actual: organize_result.reason={organize.get('reason')!r}, Expected: 'exists_differs'"
+        organize_event = next(e for e in events if e["event"] == "organize_result")
+        assert organize_event["action"] == "skipped", \
+            f"Actual: organize_result.action={organize_event['action']!r}, Expected: 'skipped'"
+        assert organize_event.get("reason") == "exists_differs", \
+            f"Actual: organize_result.reason={organize_event.get('reason')!r}, Expected: 'exists_differs'"
 
         conflicts = [e for e in events if e["event"] == "organize_conflict"]
         assert len(conflicts) == 1, \
@@ -2189,9 +2180,9 @@ class TestOverwriteDestination:
         result = self._run(temp_workspace, test_profile, "--apply", "--overwrite")
 
         events = self._events(result.stdout)
-        organize = next(e for e in events if e["event"] == "organize_result")
-        assert organize["action"] == "overwrote", \
-            f"Actual: organize_result.action={organize['action']!r}, Expected: 'overwrote'"
+        organize_event = next(e for e in events if e["event"] == "organize_result")
+        assert organize_event["action"] == "overwrote", \
+            f"Actual: organize_result.action={organize_event['action']!r}, Expected: 'overwrote'"
         assert not [e for e in events if e["event"] == "organize_conflict"], \
             "Actual: a conflict was reported, Expected: none — --overwrite resolved them"
 
@@ -2213,9 +2204,9 @@ class TestOverwriteDestination:
         result = self._run(temp_workspace, test_profile, "--overwrite")
 
         events = self._events(result.stdout)
-        organize = next(e for e in events if e["event"] == "organize_result")
-        assert organize["action"] == "would_overwrite", \
-            f"Actual: organize_result.action={organize['action']!r}, Expected: 'would_overwrite'"
+        organize_event = next(e for e in events if e["event"] == "organize_result")
+        assert organize_event["action"] == "would_overwrite", \
+            f"Actual: organize_result.action={organize_event['action']!r}, Expected: 'would_overwrite'"
         assert organized.read_bytes() == before, \
             "Actual: a dry run changed the destination, Expected: untouched"
 
@@ -2275,12 +2266,11 @@ class TestOverwriteDestination:
         result = self._run(temp_workspace, test_profile)
 
         events = self._events(result.stdout)
-        organize = next(e for e in events if e["event"] == "organize_result")
-        assert organize.get("reason") == "identical", \
-            f"Actual: organize_result.reason={organize.get('reason')!r}, Expected: 'identical'"
+        organize_event = next(e for e in events if e["event"] == "organize_result")
+        assert organize_event.get("reason") == "identical", \
+            f"Actual: organize_result.reason={organize_event.get('reason')!r}, Expected: 'identical'"
         assert not [e for e in events if e["event"] == "organize_conflict"], \
             "Actual: organize_conflict emitted for an identical copy, Expected: none"
-
 
 
 @pytest.mark.skipif(not hasattr(os, "chflags"), reason="BSD file flags only")
@@ -2490,6 +2480,8 @@ import json
 import os
 import sys
 
+from lib import ingest, organize
+
 spec = importlib.util.spec_from_file_location("media_pipeline_under_test", sys.argv[1])
 pipeline = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pipeline)
@@ -2502,8 +2494,8 @@ def record(**entry):
         handle.write(json.dumps(entry) + "\\n")
 
 
-real_ingest = pipeline._ingest_mod.ingest_file
-real_organize = pipeline._organize_mod.process_file
+real_ingest = ingest.ingest_file
+real_organize = organize.process_file
 
 
 def ingest_spy(source, working_dir, apply, **kwargs):
@@ -2520,8 +2512,8 @@ def organize_spy(file_path, *args, **kwargs):
     return result
 
 
-pipeline._ingest_mod.ingest_file = ingest_spy
-pipeline._organize_mod.process_file = organize_spy
+ingest.ingest_file = ingest_spy
+organize.process_file = organize_spy
 sys.argv = [sys.argv[0]] + sys.argv[3:]
 pipeline.main()
 '''
@@ -2554,6 +2546,9 @@ class TestDefaultWorkingDirIsOnTheTargetVolume:
         # directory these runs assert stays empty. That is the interpreter's
         # doing, not the pipeline's, so turn it off rather than carve it out.
         environment["PYTHONDONTWRITEBYTECODE"] = "1"
+        # The runner loads media-pipeline.py by path, so lib/ is not on its path
+        # the way it is when the script itself is run.
+        environment["PYTHONPATH"] = str(SCRIPT_DIR)
         completed = subprocess.run(
             [sys.executable, str(runner), str(SCRIPT_DIR / "media-pipeline.py"),
              str(record), *args],
@@ -2832,16 +2827,16 @@ class TestWorkingDirIsTransient:
         name = "VID_20251005_100000_00_001.mp4"
         create_test_video(temp_workspace["source"] / name)
 
-        errored = pipeline._organize_mod.OrganizeResult(dest="", action="error")
-        original = pipeline.run_organize_by_date
-        pipeline.run_organize_by_date = lambda *a, **k: errored
+        errored = organize.OrganizeResult(dest="", action="error")
+        original = organize.process_file
+        organize.process_file = lambda *a, **k: errored
         try:
             result = pipeline.process_file(
                 temp_workspace["source"] / name, None, str(temp_workspace["target"]),
                 str(working_dir), None, None, True, False, tasks=set(),
             )
         finally:
-            pipeline.run_organize_by_date = original
+            organize.process_file = original
 
         assert result["failed"], "Actual: the run succeeded, Expected: organize's error to fail it"
         assert self._leftovers(working_dir) == [name], \
@@ -2904,7 +2899,7 @@ class TestCancelClearsTheWorkingDir:
         (working_dir / "VID_20251005_100000_00_001.mp4_exiftool_tmp").write_bytes(b"scratch")
 
         monkeypatch.setattr(pipeline, "_working_dir", str(working_dir))
-        monkeypatch.setattr(pipeline.exiftool, "close", lambda: None)
+        monkeypatch.setattr(exiftool, "close", lambda: None)
         pipeline.register_staged_paths([staged, companion])
         yield working_dir
         pipeline._staged_paths.clear()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit tests for tag-media.py
+Unit tests for lib/tagging.py, the logic behind tag-media.py
 Tests individual functions focusing on data rather than presentation
 """
 
@@ -9,24 +9,12 @@ import sys
 import tempfile
 import shutil
 import subprocess
-from pathlib import Path
 import pytest
 
 from conftest import create_test_video
-
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-# Import hyphenated module name
-import importlib.util
-spec = importlib.util.spec_from_file_location(
-    "tag_media",
-    str(Path(__file__).parent.parent / "tag-media.py")
-)
-tm = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(tm)
-
+from lib import tagging
 from lib.exiftool import MetadataWriteRefused
+from lib.timestamp_source import clear_exif_cache, read_exif_data
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags don't exist on Linux")
@@ -43,7 +31,7 @@ class TestGetExistingTags:
 
     def test_get_existing_tags_empty(self):
         """Test getting tags from file with no tags"""
-        tags = tm.get_existing_finder_tags(self.test_video)
+        tags = tagging.get_existing_finder_tags(self.test_video)
 
         assert isinstance(tags, list)
         assert len(tags) == 0
@@ -59,7 +47,7 @@ class TestGetExistingTags:
             "tag", "--add", "another-tag", self.test_video
         ], capture_output=True, check=True)
 
-        tags = tm.get_existing_finder_tags(self.test_video)
+        tags = tagging.get_existing_finder_tags(self.test_video)
 
         assert isinstance(tags, list)
         assert len(tags) == 2
@@ -68,7 +56,7 @@ class TestGetExistingTags:
 
     def test_get_existing_tags_nonexistent_file(self):
         """Test getting tags from nonexistent file"""
-        tags = tm.get_existing_finder_tags("/nonexistent/file.mp4")
+        tags = tagging.get_existing_finder_tags("/nonexistent/file.mp4")
 
         assert isinstance(tags, list)
         assert len(tags) == 0  # Should return empty list, not error
@@ -88,10 +76,10 @@ class TestApplyFinderTags:
 
     def test_apply_finder_tags_returns_added_tags(self):
         """Test that function returns list of tags actually added"""
-        success, tags_added = tm.apply_finder_tags(
+        success, tags_added = tagging.apply_finder_tags(
             self.test_video,
             ["tag1", "tag2"],
-            dry_run=False
+            apply=True
         )
 
         assert success is True
@@ -108,10 +96,10 @@ class TestApplyFinderTags:
         ], capture_output=True, check=True)
 
         # Try to add existing + new
-        success, tags_added = tm.apply_finder_tags(
+        success, tags_added = tagging.apply_finder_tags(
             self.test_video,
             ["existing-tag", "new-tag"],
-            dry_run=False
+            apply=True
         )
 
         assert success is True
@@ -122,10 +110,10 @@ class TestApplyFinderTags:
 
     def test_apply_finder_tags_dry_run(self):
         """Test that dry run returns data but doesn't modify file"""
-        success, tags_added = tm.apply_finder_tags(
+        success, tags_added = tagging.apply_finder_tags(
             self.test_video,
             ["tag1", "tag2"],
-            dry_run=True
+            apply=False
         )
 
         assert success is True
@@ -133,15 +121,15 @@ class TestApplyFinderTags:
         assert len(tags_added) == 2
 
         # But tags shouldn't actually be on file
-        actual_tags = tm.get_existing_finder_tags(self.test_video)
+        actual_tags = tagging.get_existing_finder_tags(self.test_video)
         assert len(actual_tags) == 0
 
     def test_apply_finder_tags_empty_list(self):
         """Test handling empty tag list"""
-        success, tags_added = tm.apply_finder_tags(
+        success, tags_added = tagging.apply_finder_tags(
             self.test_video,
             [],
-            dry_run=False
+            apply=True
         )
 
         assert success is True
@@ -155,10 +143,10 @@ class TestApplyFinderTags:
         ], capture_output=True, check=True)
 
         # Try to add same tag
-        success, tags_added = tm.apply_finder_tags(
+        success, tags_added = tagging.apply_finder_tags(
             self.test_video,
             ["tag1"],
-            dry_run=False
+            apply=True
         )
 
         assert success is True
@@ -178,7 +166,7 @@ class TestGetExistingExifCamera:
 
     def test_get_existing_exif_empty(self):
         """Test getting EXIF from file with no camera data"""
-        data = tm.get_existing_exif_camera(self.test_video)
+        data = tagging.get_existing_exif_camera(self.test_video)
 
         assert isinstance(data, dict)
         # May be empty or have some default fields
@@ -194,7 +182,7 @@ class TestGetExistingExifCamera:
             self.test_video
         ], capture_output=True, check=True)
 
-        data = tm.get_existing_exif_camera(self.test_video)
+        data = tagging.get_existing_exif_camera(self.test_video)
 
         assert isinstance(data, dict)
         assert data.get("Make") == "GoPro"
@@ -210,11 +198,10 @@ class TestExifReadSharedWithTimestampSource:
         self.temp_dir = tempfile.mkdtemp()
         self.test_video = os.path.join(self.temp_dir, "test.mp4")
         create_test_video(self.test_video, Make="GoPro", Model="HERO12 Black")
-        tm.clear_exif_cache()
+        clear_exif_cache()
 
     def teardown_method(self):
         shutil.rmtree(self.temp_dir)
-        tm.clear_exif_cache()
 
     def test_camera_read_reuses_timestamp_source_cache(self, monkeypatch):
         """A file already read via read_exif_data() (the fix-timestamp step's
@@ -232,10 +219,10 @@ class TestExifReadSharedWithTimestampSource:
         monkeypatch.setattr(exiftool, "read_tags", counting_read_tags)
 
         # Simulate the fix-timestamp step reading this file first.
-        tm.read_exif_data(self.test_video)
+        read_exif_data(self.test_video)
         assert call_count["n"] == 1
 
-        data = tm.get_existing_exif_camera(self.test_video)
+        data = tagging.get_existing_exif_camera(self.test_video)
 
         assert call_count["n"] == 1  # no independent subprocess for tag-media
         assert data.get("Make") == "GoPro"
@@ -255,11 +242,11 @@ class TestAddCameraToExif:
 
     def test_add_camera_returns_fields_updated(self):
         """Test that function returns which fields were updated"""
-        fields_updated = tm.add_camera_to_exif(
+        fields_updated = tagging.add_camera_to_exif(
             self.test_video,
             make="GoPro",
             model="HERO12 Black",
-            dry_run=False
+            apply=True
         )
 
         assert isinstance(fields_updated, list)
@@ -277,11 +264,11 @@ class TestAddCameraToExif:
         ], capture_output=True, check=True)
 
         # Add both Make and Model
-        fields_updated = tm.add_camera_to_exif(
+        fields_updated = tagging.add_camera_to_exif(
             self.test_video,
             make="GoPro",
             model="HERO12 Black",
-            dry_run=False
+            apply=True
         )
 
         # Should only update Model
@@ -302,15 +289,15 @@ class TestAddCameraToExif:
             self.test_video
         ], capture_output=True, check=True)
 
-        fields_updated = tm.add_camera_to_exif(
+        fields_updated = tagging.add_camera_to_exif(
             self.test_video,
             make="Sony",
             model="ILCE-7M4",
-            dry_run=False
+            apply=True
         )
 
-        tm.clear_exif_cache(self.test_video)
-        after = tm.get_existing_exif_camera(self.test_video)
+        clear_exif_cache(self.test_video)
+        after = tagging.get_existing_exif_camera(self.test_video)
         assert fields_updated == [], \
             f"Actual: would update {fields_updated}, Expected: nothing (the camera's values stand)"
         assert after == {"Make": "SONY", "Model": "ILCE-7M5"}, \
@@ -318,27 +305,27 @@ class TestAddCameraToExif:
 
     def test_add_camera_dry_run(self):
         """Test that dry run returns data but doesn't modify file"""
-        fields_updated = tm.add_camera_to_exif(
+        fields_updated = tagging.add_camera_to_exif(
             self.test_video,
             make="GoPro",
             model="HERO12 Black",
-            dry_run=True
+            apply=False
         )
 
         # Should return what WOULD be updated
         assert len(fields_updated) == 2
 
         # But file shouldn't be modified
-        data = tm.get_existing_exif_camera(self.test_video)
+        data = tagging.get_existing_exif_camera(self.test_video)
         assert data.get("Make") != "GoPro"
 
     def test_add_camera_make_only(self):
         """Test adding only Make"""
-        fields_updated = tm.add_camera_to_exif(
+        fields_updated = tagging.add_camera_to_exif(
             self.test_video,
             make="GoPro",
             model=None,
-            dry_run=False
+            apply=True
         )
 
         assert len(fields_updated) == 1
@@ -346,11 +333,11 @@ class TestAddCameraToExif:
 
     def test_add_camera_model_only(self):
         """Test adding only Model"""
-        fields_updated = tm.add_camera_to_exif(
+        fields_updated = tagging.add_camera_to_exif(
             self.test_video,
             make=None,
             model="HERO12 Black",
-            dry_run=False
+            apply=True
         )
 
         assert len(fields_updated) == 1
@@ -367,22 +354,22 @@ class TestAddCameraToExif:
         ], capture_output=True, check=True)
 
         # Try to set same values
-        fields_updated = tm.add_camera_to_exif(
+        fields_updated = tagging.add_camera_to_exif(
             self.test_video,
             make="GoPro",
             model="HERO12 Black",
-            dry_run=False
+            apply=True
         )
 
         assert len(fields_updated) == 0
 
     def test_add_camera_empty_params(self):
         """Test with no make or model"""
-        fields_updated = tm.add_camera_to_exif(
+        fields_updated = tagging.add_camera_to_exif(
             self.test_video,
             make=None,
             model=None,
-            dry_run=False
+            apply=True
         )
 
         assert len(fields_updated) == 0
@@ -392,11 +379,11 @@ class TestAddCameraToExif:
         renamed = os.path.join(self.temp_dir, "test.lrv")
         shutil.copy(self.test_video, renamed)
 
-        fields_updated = tm.add_camera_to_exif(renamed, make="GoPro", model="HERO12", dry_run=False)
+        fields_updated = tagging.add_camera_to_exif(renamed, make="GoPro", model="HERO12", apply=True)
 
-        tm.clear_exif_cache(renamed)
+        clear_exif_cache(renamed)
         assert fields_updated == ["Make", "Model"]
-        assert tm.get_existing_exif_camera(renamed) == {"Make": "GoPro", "Model": "HERO12"}
+        assert tagging.get_existing_exif_camera(renamed) == {"Make": "GoPro", "Model": "HERO12"}
 
     def test_add_camera_refused_write_raises_with_exiftool_reason(self):
         """A file exiftool cannot write is an error carrying exiftool's reason, never a quiet skip."""
@@ -405,7 +392,7 @@ class TestAddCameraToExif:
             f.write("not a video")
 
         with pytest.raises(MetadataWriteRefused, match="Not a valid MP4"):
-            tm.add_camera_to_exif(unwritable, make="GoPro", model="HERO12", dry_run=False)
+            tagging.add_camera_to_exif(unwritable, make="GoPro", model="HERO12", apply=True)
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags don't exist on Linux")
@@ -423,20 +410,20 @@ class TestIdempotency:
     def test_tags_idempotent(self):
         """Test that applying tags twice is idempotent"""
         # First application
-        success1, added1 = tm.apply_finder_tags(
+        success1, added1 = tagging.apply_finder_tags(
             self.test_video,
             ["tag1", "tag2"],
-            dry_run=False
+            apply=True
         )
 
         assert success1 is True
         assert len(added1) == 2
 
         # Second application
-        success2, added2 = tm.apply_finder_tags(
+        success2, added2 = tagging.apply_finder_tags(
             self.test_video,
             ["tag1", "tag2"],
-            dry_run=False
+            apply=True
         )
 
         assert success2 is True
@@ -445,11 +432,11 @@ class TestIdempotency:
     def test_exif_idempotent(self):
         """Test that applying EXIF twice is idempotent"""
         # First application
-        updated1 = tm.add_camera_to_exif(
+        updated1 = tagging.add_camera_to_exif(
             self.test_video,
             make="GoPro",
             model="HERO12",
-            dry_run=False
+            apply=True
         )
 
         assert len(updated1) == 2
@@ -458,11 +445,11 @@ class TestIdempotency:
         mtime1 = os.stat(self.test_video).st_mtime
 
         # Second application
-        updated2 = tm.add_camera_to_exif(
+        updated2 = tagging.add_camera_to_exif(
             self.test_video,
             make="GoPro",
             model="HERO12",
-            dry_run=False
+            apply=True
         )
 
         assert len(updated2) == 0  # Nothing to update
@@ -487,10 +474,10 @@ class TestDataPresentation:
     def test_functions_return_data_not_strings(self):
         """Test that core functions return structured data, not formatted strings"""
         # apply_finder_tags returns (bool, List[str])
-        success, tags_added = tm.apply_finder_tags(
+        success, tags_added = tagging.apply_finder_tags(
             self.test_video,
             ["tag1"],
-            dry_run=True
+            apply=False
         )
 
         assert isinstance(success, bool)
@@ -499,10 +486,10 @@ class TestDataPresentation:
         assert all(isinstance(tag, str) for tag in tags_added)
 
         # add_camera_to_exif returns List[str]
-        fields_updated = tm.add_camera_to_exif(
+        fields_updated = tagging.add_camera_to_exif(
             self.test_video,
             make="GoPro",
-            dry_run=True
+            apply=False
         )
 
         assert isinstance(fields_updated, list)
@@ -511,11 +498,11 @@ class TestDataPresentation:
     def test_read_functions_return_raw_data(self):
         """Test that read functions return raw data structures"""
         # get_existing_finder_tags returns List[str]
-        tags = tm.get_existing_finder_tags(self.test_video)
+        tags = tagging.get_existing_finder_tags(self.test_video)
         assert isinstance(tags, list)
 
         # get_existing_exif_camera returns dict
-        exif = tm.get_existing_exif_camera(self.test_video)
+        exif = tagging.get_existing_exif_camera(self.test_video)
         assert isinstance(exif, dict)
 
 
@@ -536,10 +523,10 @@ class TestTagMediaFileResult:
         Actual: return type is TagResult with correct field types
         Expected: TagResult dataclass instance
         """
-        result = tm.tag_media_file(
-            self.test_video, [], None, None, dry_run=True
+        result = tagging.tag_media_file(
+            self.test_video, [], None, None, apply=False
         )
-        assert isinstance(result, tm.TagResult)
+        assert isinstance(result, tagging.TagResult)
         assert result.file == "test.mp4"
         assert isinstance(result.tags_added, list)
         assert isinstance(result.exif_make, str)
@@ -552,8 +539,8 @@ class TestTagMediaFileResult:
         Actual: TagResult.action is 'tagged' when EXIF fields are written
         Expected: action reflects that tagging occurred
         """
-        result = tm.tag_media_file(
-            self.test_video, [], "GoPro", "HERO12", dry_run=False
+        result = tagging.tag_media_file(
+            self.test_video, [], "GoPro", "HERO12", apply=True
         )
         assert result is not None
         assert result.action == "tagged"
@@ -566,11 +553,11 @@ class TestTagMediaFileResult:
         Actual: TagResult.action is 'already_correct' on idempotent re-run
         Expected: no changes reported
         """
-        tm.tag_media_file(
-            self.test_video, [], "GoPro", "HERO12", dry_run=False
+        tagging.tag_media_file(
+            self.test_video, [], "GoPro", "HERO12", apply=True
         )
-        result = tm.tag_media_file(
-            self.test_video, [], "GoPro", "HERO12", dry_run=False
+        result = tagging.tag_media_file(
+            self.test_video, [], "GoPro", "HERO12", apply=True
         )
         assert result is not None
         assert result.action == "already_correct"
@@ -583,8 +570,8 @@ class TestTagMediaFileResult:
         Actual: tag_media_file returns None for nonexistent path
         Expected: None (failure sentinel)
         """
-        result = tm.tag_media_file(
-            "/nonexistent/file.mp4", [], None, None, dry_run=True
+        result = tagging.tag_media_file(
+            "/nonexistent/file.mp4", [], None, None, apply=False
         )
         assert result is None
 
@@ -592,3 +579,15 @@ class TestTagMediaFileResult:
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__, "-v"])
+
+
+class TestParseTagList:
+    """tag-media's --tags and the pipeline's --tags parse through one function, so
+    "a, b" tags a file "b" from either; tag-media alone once kept the space."""
+
+    def test_whitespace_and_empty_entries_are_dropped(self):
+        assert tagging.parse_tag_list(" trip , gopro,, ") == ["trip", "gopro"]
+
+    def test_no_text_is_no_tags(self):
+        assert tagging.parse_tag_list(None) == []
+        assert tagging.parse_tag_list("") == []

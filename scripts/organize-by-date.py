@@ -2,258 +2,21 @@
 """
 organize-by-date.py
 Organizes a single file into date-based directory structure.
-Uses DateTimeOriginal first, filename date patterns, falls back to file timestamps.
+
+Command line for lib/organize.py; prints the result as @@key=value lines.
 """
 
 import argparse
 import os
-import re
-import shutil
 import sys
-from dataclasses import dataclass
-from datetime import datetime
-from pathlib import Path
-from typing import Optional
 
-sys.path.insert(0, str(Path(__file__).parent))
-from lib.exiftool import exiftool
+from lib.cli import install_interrupt_handlers
+from lib.organize import DEFAULT_FOLDER_TEMPLATE, process_file
 from lib.results import emit_result
 
 
-@dataclass
-class OrganizeResult:
-    """What the organize step did, as tokens the caller renders verbatim.
-
-    `reason` explains a skip and is set only when the file was not moved. Its
-    tokens are enumerated in pipeline-schema.yaml alongside `action`; nothing
-    downstream may re-derive either from the presence of `dest`.
-    """
-    dest: str
-    action: str
-    reason: Optional[str] = None
-
-MONTH_ABBREVS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
-
-def get_file_date_for_organization(file_path: str, datetime_original: Optional[str] = None) -> Optional[str]:
-    """Get date in YYYY-MM-DD format for file organization.
-
-    Priority: DateTimeOriginal > filename patterns > file mtime
-
-    datetime_original is the file's DateTimeOriginal as a caller already holds it
-    ("" when the file has none); only when it is not given is the file read.
-    """
-    if datetime_original is None:
-        try:
-            data = exiftool.read_tags(file_path, ["DateTimeOriginal"], extra_args=["-fast2"])
-            datetime_original = data.get("DateTimeOriginal", "")
-        except Exception:
-            datetime_original = ""
-    if datetime_original:
-        return datetime_original.split(' ')[0].replace(':', '-')
-
-    # Try filename patterns
-    base = os.path.basename(file_path)
-
-    m = re.match(r'^(?:VID|LRV|IMG)_(\d{8})_(\d{6})', base)
-    if m:
-        d = m.group(1)
-        return f'{d[:4]}-{d[4:6]}-{d[6:8]}'
-
-    m = re.search(r'DJI_(\d{4})(\d{2})(\d{2})\d{6}_', base)
-    if m:
-        return f'{m.group(1)}-{m.group(2)}-{m.group(3)}'
-
-    m = re.search(r'(\d{4})(\d{2})(\d{2})', base)
-    if m:
-        year, month, day = int(m.group(1)), int(m.group(2)), int(m.group(3))
-        if 2000 <= year <= 2099 and 1 <= month <= 12 and 1 <= day <= 31:
-            return f'{m.group(1)}-{m.group(2)}-{m.group(3)}'
-
-    # Fallback: file mtime
-    try:
-        mtime = os.path.getmtime(file_path)
-        return datetime.fromtimestamp(mtime).strftime('%Y-%m-%d')
-    except OSError:
-        return None
-
-
-def expand_path_template(template: str, file_date: str) -> str:
-    """Expand path template with date components.
-
-    Template variables: {{YYYY}}, {{MM}}, {{MMM}}, {{DD}}, {{YYYY-MM-DD}}
-    file_date: YYYY-MM-DD format
-    """
-    year = file_date[:4]
-    month = file_date[5:7]
-    day = file_date[8:10]
-    month_abbr = MONTH_ABBREVS[int(month)]
-
-    expanded = template
-    expanded = expanded.replace('{{YYYY}}', year)
-    expanded = expanded.replace('{{MM}}', month)
-    expanded = expanded.replace('{{MMM}}', month_abbr)
-    expanded = expanded.replace('{{DD}}', day)
-    expanded = expanded.replace('{{YYYY-MM-DD}}', file_date)
-
-    expanded = expanded.replace('//', '/')
-    expanded = expanded.rstrip('/')
-
-    return expanded
-
-
-SKIP_IDENTICAL = "identical"
-SKIP_EXISTS_DIFFERS = "exists_differs"
-SKIP_USER_CHOICE = "user_choice"
-
-
-def _skip_explanation(reason: Optional[str], src_size: int, dst_size: int) -> str:
-    """Human phrasing for a skip token. The token is the data; this is display."""
-    if reason == SKIP_IDENTICAL:
-        return f"identical, {src_size / 1048576:.1f} MB"
-    if reason == SKIP_USER_CHOICE:
-        return "user choice"
-    return f"exists at destination, different size: src {src_size} bytes, dst {dst_size} bytes"
-
-
-def _handle_existing_target(file_path, target_file, target_path, abs_target,
-                            base, organized_path, copy_mode, overwrite, apply):
-    """Handle case where target file already exists."""
-    src_size = os.path.getsize(file_path)
-    dst_size = os.path.getsize(target_file)
-
-    skip_reason = None
-
-    if overwrite:
-        action = "overwrite"
-    elif src_size == dst_size:
-        action = "skip"
-        skip_reason = SKIP_IDENTICAL
-    elif apply:
-        print(f"\u26a0\ufe0f  File exists: {base}", file=sys.stderr)
-        print(f"   Source: {src_size} bytes, Dest: {dst_size} bytes", file=sys.stderr)
-        action = "skip"
-        skip_reason = SKIP_EXISTS_DIFFERS
-        # Prompt only when a real terminal is attached. Reading /dev/tty from a
-        # background process group does not raise \u2014 the kernel SIGTTIN-stops the
-        # entire group, freezing any non-interactive runner (tests, the app, a
-        # supervisor) until its timeout. The OSError/EOFError fallback cannot
-        # catch that, so the tty read must be gated on an actual terminal.
-        if sys.stderr.isatty():
-            try:
-                sys.stderr.write("   (o)verwrite / (s)kip? ")
-                sys.stderr.flush()
-                with open('/dev/tty') as tty:
-                    choice = tty.readline().strip()
-                # An answer was read back, so the outcome is now the user's,
-                # whichever way it went.
-                action = "overwrite" if choice.lower().startswith('o') else "skip"
-                skip_reason = SKIP_USER_CHOICE
-            except (OSError, EOFError):
-                pass
-        else:
-            print("   No terminal attached \u2014 skipping (use --overwrite to replace)", file=sys.stderr)
-    else:
-        action = "skip"
-        skip_reason = SKIP_EXISTS_DIFFERS
-
-    if action == "overwrite":
-        if apply:
-            os.makedirs(target_path, exist_ok=True)
-            transfer = shutil.copy2 if copy_mode else shutil.move
-            transfer(file_path, target_file)
-            print(f"\u267b\ufe0f  Overwrote: {base} \u2192 {organized_path}/", file=sys.stderr)
-            return OrganizeResult(dest=abs_target, action="overwrote")
-        print(f"[DRY RUN] Would overwrite: {file_path} \u2192 {abs_target}", file=sys.stderr)
-        return OrganizeResult(dest=abs_target, action="would_overwrite")
-
-    print(f"\u23ed\ufe0f  Skipped ({_skip_explanation(skip_reason, src_size, dst_size)}): {base}",
-          file=sys.stderr)
-
-    return OrganizeResult(dest=abs_target, action="skipped", reason=skip_reason)
-
-
-def process_file(file_path: str, target_dir: str, template: str,
-                 copy_mode: bool, overwrite: bool, apply: bool,
-                 verbose: bool, dest_name: Optional[str] = None,
-                 datetime_original: Optional[str] = None) -> OrganizeResult:
-    """Process a single file for organization.
-
-    Printed messages name file_path: they report the operation this function
-    performed, on the file it was handed. A caller that staged a copy states
-    the outcome for the original in a line of its own.
-
-    dest_name overrides the basename used to build the destination path — for a
-    dry run previewing a rename that has not happened, the destination carries
-    the name apply will produce while every read still uses the real file_path.
-
-    datetime_original, when given, is the date the destination is built from in
-    place of reading the file.
-
-    Returns:
-        OrganizeResult with dest path and action taken
-    """
-    base = dest_name or os.path.basename(file_path)
-
-    if verbose:
-        print(f"Processing: {file_path}", file=sys.stderr)
-
-    file_date = get_file_date_for_organization(file_path, datetime_original)
-    if not file_date:
-        print(f"ERROR: Cannot determine date for {base}", file=sys.stderr)
-        return OrganizeResult(dest="", action="error")
-
-    if verbose:
-        print(f"  Date: {file_date}", file=sys.stderr)
-
-    organized_path = expand_path_template(template, file_date)
-
-    target_path = os.path.join(target_dir.rstrip('/'), organized_path.lstrip('/'))
-    target_file = os.path.join(target_path, base)
-
-    if os.path.isabs(target_file):
-        abs_target = target_file
-    else:
-        abs_target = os.path.join(os.getcwd(), target_file.lstrip('./'))
-
-    # Check if file is already in correct location
-    file_realdir = os.path.dirname(os.path.realpath(file_path))
-    try:
-        target_realpath = os.path.realpath(target_path)
-    except OSError:
-        target_realpath = target_path
-
-    if file_realdir == target_realpath:
-        print(f"\u2713 Already organized: {base} ({organized_path})", file=sys.stderr)
-        return OrganizeResult(dest=abs_target, action="skipped")
-
-    if os.path.exists(target_file):
-        return _handle_existing_target(
-            file_path, target_file, target_path, abs_target, base,
-            organized_path, copy_mode, overwrite, apply
-        )
-
-    if apply:
-        os.makedirs(target_path, exist_ok=True)
-        if copy_mode:
-            shutil.copy2(file_path, target_file)
-            print(f"\u2705 Copied: {file_path} \u2192 {abs_target}", file=sys.stderr)
-            return OrganizeResult(dest=abs_target, action="copied")
-        else:
-            shutil.move(file_path, target_file)
-            print(f"\u2705 Moved: {file_path} \u2192 {abs_target}", file=sys.stderr)
-            return OrganizeResult(dest=abs_target, action="moved")
-    else:
-        if copy_mode:
-            print(f"[DRY RUN] Would copy: {file_path} \u2192 {abs_target}", file=sys.stderr)
-            return OrganizeResult(dest=abs_target, action="would_copy")
-        else:
-            print(f"[DRY RUN] Would move: {file_path} \u2192 {abs_target}", file=sys.stderr)
-            return OrganizeResult(dest=abs_target, action="would_move")
-
-
 def main():
+    install_interrupt_handlers()
     parser = argparse.ArgumentParser(
         description='Organize a single file into date-based directory structure'
     )
@@ -261,8 +24,7 @@ def main():
     parser.add_argument('--target', required=True,
                         help='Target directory for organized files')
     parser.add_argument('--template',
-                        default='{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}',
-                        help='Path template (default: {{YYYY}}/{{YYYY}}-{{MM}}-{{DD}})')
+                        help=f'Path template (default: {DEFAULT_FOLDER_TEMPLATE.replace("{{GROUP}}/", "")})')
     parser.add_argument('--copy', action='store_true',
                         help='Copy instead of move')
     parser.add_argument('--overwrite', action='store_true',

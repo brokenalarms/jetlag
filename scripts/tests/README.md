@@ -33,13 +33,12 @@ Hold an interface or a cost fixed.
 
 ## Required External Tools
 
-Tests must never be skipped because a tool is missing. `conftest.py` installs what it can before collection:
+Tests must never be skipped because a tool is missing. `conftest.py` auto-installs missing tools before collection, and refuses to start when a Python package from `scripts/requirements.txt` is missing:
 
 | Tool | Where it comes from |
 |------|---------|
 | ffmpeg (creates test media) | auto-installed by `conftest.py` (`brew install ffmpeg` / `apt-get install ffmpeg`) |
 | exiftool | vendored in `scripts/tools/`. Some tests call `exiftool` directly, so it must also be on `PATH` (see Running Tests) |
-| humanize, pyyaml (Python) | auto-installed by `conftest.py` if missing |
 | tag (macOS) | vendored in `scripts/tools/` |
 | SetFile (macOS) | required on macOS: `xcode-select --install` |
 
@@ -49,24 +48,28 @@ On Linux, tests that need macOS-only behaviour (Finder tags, birth time) carry `
 
 ## Running Tests
 
-From the repo root:
+Python dependencies: runtime packages are in `scripts/requirements.txt`, test and lint
+tooling in `scripts/requirements-dev.txt`. `make test-scripts` builds `scripts/.venv`
+from both and runs the suite in parallel (stopping at the first failure). The pytest
+settings (`pythonpath`, `testpaths`) live in the root `pyproject.toml`, so run pytest
+from the repository root.
 
 ```bash
-# Bootstraps scripts/.venv on first run, then runs the suite in parallel (stops at the first failure)
+# Whole suite
 make test-scripts
 
 # Linux: exiftool is not on PATH there
 PATH=$PWD/scripts/tools:$PATH make test-scripts
-```
 
-Once the venv exists, run pytest directly for a single module, class or test:
-
-```bash
+# Specific file, class or test
 scripts/.venv/bin/pytest scripts/tests/test_timezone_scenarios.py
-scripts/.venv/bin/pytest scripts/tests/test_timezone_scenarios.py::TestTimezoneScenarios::test_scenario_viewing_in_japan_shot_in_taiwan -v
+scripts/.venv/bin/pytest scripts/tests/test_timezone_scenarios.py::TestTimezoneScenarios::test_scenario_viewing_in_japan_shot_in_taiwan
+
+# Lint
+make lint
 ```
 
-`python3 scripts/run-tests.py [pytest args]` also works with any Python that has pytest installed. Per-platform notes, including the tests known to fail when running as root, are in `docs/environment.md`.
+Per-platform notes, including the tests known to fail when running as root, are in `docs/environment.md`.
 
 ## What We Test (and Don't Test)
 

@@ -13,16 +13,15 @@ its video one. A readable summary goes to stderr.
 """
 
 import argparse
-import importlib
 import json
 import os
 import sys
 from collections import Counter
 from pathlib import Path
 
+from lib.cli import install_interrupt_handlers
 from lib.filesystem import _is_walked
-
-_tag_mod = importlib.import_module("tag-media")
+from lib.tagging import file_camera
 
 VIDEO_EXTENSIONS = [".insv", ".mp4", ".mov"]
 PHOTO_EXTENSIONS = [".arw", ".cr2", ".cr3", ".dng", ".heic", ".heif", ".hif", ".insp", ".jpeg", ".jpg",
@@ -61,7 +60,7 @@ def probe(path: Path, extensions: list[str], sample: int) -> list[dict]:
 
     found = []
     for extension, files in sorted(by_extension.items()):
-        cameras = Counter(_tag_mod.file_camera(str(f)) for f in files)
+        cameras = Counter(file_camera(str(f)) for f in files)
         for (make, model), count in cameras.most_common():
             entry = {"extension": extension,
                      "type": "photo" if extension in PHOTO_EXTENSIONS else "video",
@@ -75,6 +74,7 @@ def probe(path: Path, extensions: list[str], sample: int) -> list[dict]:
 
 
 def main() -> int:
+    install_interrupt_handlers()
     parser = argparse.ArgumentParser(description="Report the camera that shot a folder's media")
     parser.add_argument("path", help="Folder (searched recursively) or a single media file")
     parser.add_argument("--extensions", nargs="+", default=DEFAULT_EXTENSIONS,

@@ -1,0 +1,847 @@
+"""
+Timestamp correction for one photo or video file.
+
+Declaratively works out what every clock field and the file's birth time should
+hold, describes the change on stderr, and applies it in one exiftool write.
+The rules are in docs/timestamp-fields.md.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import sys
+import time
+from dataclasses import dataclass, field as dataclass_field
+from datetime import datetime, timezone, timedelta
+from typing import Any, Dict, Optional
+
+from lib.exiftool import MetadataWriteRefused, exiftool
+from lib.provenance import provenance_field_args
+from lib.timestamp_source import (
+    MOVIE_HEADER_CREATE_DATE_TAG,
+    TimestampSource,
+    camera_zone_offset_for_file,
+    ensure_colon_tz,
+    extract_metadata_timezone,
+    get_best_timestamp,
+    normalize_exif_value,
+    normalize_timezone_format,
+    parse_datetime_original,
+    parse_filename_timestamp,
+    read_exif_data,
+    read_timestamp_sources,
+    resolve_timezone_offset,
+)
+
+if sys.platform == "darwin":
+    from lib.file_timestamps import (
+        get_file_system_timestamps,
+        check_file_system_timestamps_need_update,
+        get_expected_file_system_time,
+    )
+else:
+    def get_file_system_timestamps(file_path: str) -> Dict[str, str]:
+        return {"birth": "", "modify": ""}
+    def check_file_system_timestamps_need_update(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False) -> bool:
+        return False
+    def get_expected_file_system_time(datetime_original: datetime, preserve_wallclock: bool = False) -> str:
+        return ""
+
+
+@dataclass
+class TimestampFixResult:
+    file: str
+    timestamp_action: str  # "fixed" | "would_fix" | "added" | "would_add" | "no_change" | "error"
+    original_time: Optional[str] = None
+    corrected_time: Optional[str] = None
+    timestamp_source: Optional[str] = None
+    correction_mode: Optional[str] = None
+    timezone: Optional[str] = None
+    time_offset_seconds: Optional[int] = None
+    time_offset_display: Optional[str] = None
+    original_epoch: Optional[float] = None
+    corrected_epoch: Optional[float] = None
+    requires_force_timezone: Optional[bool] = None
+    camera_zone_offset: Optional[str] = None
+    stale_fields: list = dataclass_field(default_factory=list)
+    stale_file_times: list = dataclass_field(default_factory=list)
+    error: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class ClockField:
+    """A metadata clock field a correction owns.
+
+    write_tag is what exiftool is given; read_key is what the value comes back
+    under in read_exif_data(). quicktime fields hold a raw UTC instant and exist
+    only in a QuickTime container; the rest hold zoned local time, except a
+    holds_zone field, whose value is that zone on its own.
+    container_only marks the fields that exist only in a QuickTime container:
+    exiftool refuses to write them to a still (verified on JPEG and HEIC), so
+    targeting them there would leave every still permanently reporting a stale
+    field it can never hold.
+    proves_container marks the fields whose presence identifies the file as a
+    QuickTime container — bare `CreateDate` is also an EXIF stills tag holding
+    local time, so it can never be the evidence.
+    owned_with_datetime_original marks the fields a correction owns only when it
+    owns DateTimeOriginal: they describe that one value, so they are written with
+    it or not at all.
+    """
+    write_tag: str
+    read_key: str
+    quicktime: bool
+    container_only: bool = False
+    proves_container: bool = False
+    owned_with_datetime_original: bool = False
+    holds_zone: bool = False
+
+
+# Every metadata clock field a correction owns, per the "jetlag writes" column of
+# docs/timestamp-fields.md. This one table drives both the comparison against a
+# file's stored values and the write, so a correction can never write a subset:
+# a stale movie header cannot survive a run that found the track atoms correct.
+CLOCK_FIELDS = [
+    ClockField("DateTimeOriginal", "DateTimeOriginal", quicktime=False,
+               owned_with_datetime_original=True),
+    ClockField("OffsetTimeOriginal", "OffsetTimeOriginal", quicktime=False,
+               owned_with_datetime_original=True, holds_zone=True),
+    ClockField("Keys:CreationDate", "CreationDate", quicktime=False, container_only=True),
+    ClockField("QuickTime:CreateDate", MOVIE_HEADER_CREATE_DATE_TAG, quicktime=True,
+               container_only=True, proves_container=True),
+    ClockField("QuickTime:MediaCreateDate", "MediaCreateDate", quicktime=True,
+               container_only=True, proves_container=True),
+    ClockField("QuickTime:TrackCreateDate", "TrackCreateDate", quicktime=True,
+               container_only=True, proves_container=True),
+]
+
+def is_quicktime_container(exif: Dict[str, str]) -> bool:
+    """Whether a file's clock fields come from a QuickTime container."""
+    return any(exif.get(field.read_key) for field in CLOCK_FIELDS if field.proves_container)
+
+
+def clock_field_targets(exif: Dict[str, str], datetime_original: datetime,
+                        write_datetime_original: bool = False,
+                        write_zone: bool = False) -> Dict[str, str]:
+    """The value every clock field a correction owns must end up holding.
+
+    Zoned local time for DateTimeOriginal and Keys:CreationDate; that value's zone
+    alone for OffsetTimeOriginal; the same instant as raw UTC for the QuickTime
+    atoms. Stills get no container-only entries. DateTimeOriginal and the zone that
+    completes it are owned only when the caller has decided to write it — an
+    existing tag is otherwise the source, not a target. write_zone additionally
+    owns the zone alone, for a bare DateTimeOriginal that stays as it is but is
+    being labelled with a declared zone.
+
+    OffsetTimeOriginal is targeted whatever the container holds it: a still's
+    binary EXIF DateTimeOriginal is 19 characters, so the offset tag is the only
+    place its zone can live, while on a video exiftool keeps the zone inline in
+    XMP and drops the offset tag. One uniform write is right for both.
+    """
+    zoned = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
+    zoned = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', zoned)
+    zone = ensure_colon_tz(datetime_original.strftime('%z'))
+    utc = datetime_original.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
+    container = is_quicktime_container(exif)
+
+    targets = {}
+    for field in CLOCK_FIELDS:
+        if field.container_only and not container:
+            continue
+        owned = write_datetime_original or (write_zone and field.holds_zone)
+        if field.owned_with_datetime_original and not owned:
+            continue
+        if field.quicktime:
+            targets[field.write_tag] = utc
+        elif field.holds_zone:
+            targets[field.write_tag] = zone
+        else:
+            targets[field.write_tag] = zoned
+    return targets
+
+
+def _utc_clock_differs(current: str, target: str) -> bool:
+    """Whether a stored UTC clock value differs from the expected one.
+
+    A one second tolerance absorbs rounding; an unparseable value counts as stale.
+    """
+    try:
+        current_dt = datetime.strptime(current, "%Y:%m:%d %H:%M:%S")
+        target_dt = datetime.strptime(target, "%Y:%m:%d %H:%M:%S")
+        return abs((current_dt - target_dt).total_seconds()) > 1
+    except ValueError:
+        return True
+
+
+def stored_zone(exif: Dict[str, str]) -> str:
+    """The zone the file already conveys for DateTimeOriginal's digits, as ±HH:MM.
+
+    The raw OffsetTimeOriginal is the whole answer where the file has one — not
+    the value _complete_datetime_original() joins into DateTimeOriginal, which
+    would report the zone as stored no matter what the offset tag holds. Where
+    the tag cannot exist, the zone rides inline in DateTimeOriginal instead
+    (XMP on a video), and it is that inline zone the file conveys.
+    """
+    offset = ensure_colon_tz((exif.get("OffsetTimeOriginal") or "").strip())
+    if offset:
+        return offset
+
+    inline = re.search(r'([+-]\d{2}:?\d{2}|Z)$', exif.get("DateTimeOriginal", ""))
+    if not inline:
+        return ""
+    return "+00:00" if inline.group(1) == "Z" else ensure_colon_tz(inline.group(1))
+
+
+def stale_clock_fields(exif: Dict[str, str], targets: Dict[str, str]) -> list:
+    """The write tags in targets whose stored value is missing or differs."""
+    stale = []
+    for field in CLOCK_FIELDS:
+        if field.write_tag not in targets:
+            continue
+        target = targets[field.write_tag]
+        if field.quicktime:
+            differs = _utc_clock_differs(exif.get(field.read_key, ""), target)
+        elif field.holds_zone:
+            differs = stored_zone(exif) != target
+        else:
+            differs = (normalize_exif_value(exif.get(field.read_key, ""))
+                       != normalize_exif_value(target))
+        if differs:
+            stale.append(field.write_tag)
+    return stale
+
+
+def missing_clock_fields(exif: Dict[str, str], stale: list) -> list:
+    """The stale write tags the file holds no value for at all.
+
+    A missing field is not evidence against the file's time: a camera that never
+    writes Keys:CreationDate has nothing wrong with it, only something to add.
+    """
+    stored = {
+        field.write_tag: stored_zone(exif) if field.holds_zone else exif.get(field.read_key, "")
+        for field in CLOCK_FIELDS
+    }
+    return [tag for tag in stale if not stored.get(tag)]
+
+
+# How each source field is named to people: CreationDate is read from the Keys
+# atom, which is the name a user sees in other tools.
+_FIELD_LABELS = {
+    "DateTimeOriginal": "DateTimeOriginal",
+    "CreationDate": "Keys:CreationDate",
+}
+
+
+def _timezone_from_offset(offset_str: str) -> Optional[timezone]:
+    """Build a tzinfo from a +HH:MM / +HHMM offset string."""
+    match = re.match(r'([+-])(\d{2}):?(\d{2})$', offset_str)
+    if not match:
+        return None
+    sign, hours, minutes = match.groups()
+    offset_seconds = int(hours) * 3600 + int(minutes) * 60
+    if sign == '-':
+        offset_seconds = -offset_seconds
+    return timezone(timedelta(seconds=offset_seconds))
+
+
+def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, infer_from_filename: bool = False) -> dict:
+    """Get all current timestamp data from file.
+
+    timezone_spec is either a fixed +HHMM offset or an IANA zone name. A zone
+    name resolves against this file's own timestamp, so a run spanning a DST
+    changeover gives each file the offset that applied when it was shot.
+
+    When infer_from_filename=True:
+    - Requires timezone_spec to be provided
+    - Uses filename timestamp with provided timezone as source of truth
+    - Ignores existing EXIF timestamps
+    """
+    data: Dict[str, Any] = {
+        "file_path": file_path,
+        "exif": read_exif_data(file_path),
+        "file_system": get_file_system_timestamps(file_path) if sys.platform == "darwin" else {"birth": "", "modify": ""},
+        "datetime_original_str": "",
+        "datetime_original": None,
+        "timestamp_source": TimestampSource.NONE,
+        "timezone_source": "",
+        "timezone_offset": None,
+        "camera_zone_offset": camera_zone_offset_for_file(file_path),
+    }
+
+    if infer_from_filename:
+        if not timezone_spec:
+            raise ValueError("--infer-from-filename requires --timezone to be specified")
+        report = read_timestamp_sources(file_path, timezone_spec)
+        if not report.filename_parseable:
+            raise ValueError("--infer-from-filename specified but filename has no parseable date")
+        fn_ts, _ = parse_filename_timestamp(file_path)
+        timezone_offset = resolve_timezone_offset(timezone_spec, fn_ts)
+        data["timezone_offset"] = timezone_offset
+        datetime_with_tz = f"{fn_ts}{timezone_offset}"
+        data["datetime_original_str"] = datetime_with_tz
+        data["datetime_original"] = parse_datetime_original(datetime_with_tz)
+        data["timestamp_source"] = TimestampSource.FILENAME_INFERRED
+        data["timezone_source"] = f"--timezone flag ({timezone_offset})"
+        return data
+
+    best_timestamp, source = get_best_timestamp(file_path, timezone_spec)
+    data["timestamp_source"] = source
+
+    timezone_offset = resolve_timezone_offset(
+        timezone_spec, best_timestamp, timestamp_is_utc=source.is_utc,
+    )
+    data["timezone_offset"] = timezone_offset
+
+    if best_timestamp:
+        if source.zoned and source.field:
+            raw_value = data["exif"].get(source.field, "")
+            data["timezone_source"] = f"{_FIELD_LABELS[source.field]} metadata"
+            data["datetime_original_str"] = raw_value
+            embedded = parse_datetime_original(raw_value) if raw_value else None
+            if embedded:
+                data["datetime_original"] = embedded
+                if timezone_spec:
+                    # The zoned tag defines an instant; the embedded offset is a label
+                    # from the camera's zone setting, which goes stale across a flight.
+                    # --timezone declares where the footage was shot, so the instant is
+                    # expressed in that zone rather than passed through unchanged.
+                    utc_str = embedded.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
+                    declared_offset = resolve_timezone_offset(timezone_spec, utc_str, timestamp_is_utc=True)
+                    declared_tz = _timezone_from_offset(declared_offset) if declared_offset else None
+                    if declared_offset and declared_tz is not None:
+                        converted = embedded.astimezone(declared_tz)
+                        data["timezone_offset"] = declared_offset
+                        data["datetime_original"] = converted
+                        data["datetime_original_str"] = converted.strftime("%Y:%m:%d %H:%M:%S") + declared_offset
+                        data["timezone_source"] = f"--timezone flag ({declared_offset})"
+        elif source is TimestampSource.DATETIME_ORIGINAL and not timezone_offset:
+            data["datetime_original_str"] = data["exif"].get("DateTimeOriginal", "")
+            data["timezone_source"] = "DateTimeOriginal metadata"
+            if data["datetime_original_str"]:
+                data["datetime_original"] = parse_datetime_original(data["datetime_original_str"])
+        elif source.is_utc:
+            # UTC digits are expressed in the declared zone: same instant, new label.
+            local_tz = _timezone_from_offset(timezone_offset) if timezone_offset else None
+            if timezone_offset and local_tz is not None:
+                utc_dt = datetime.strptime(best_timestamp, "%Y:%m:%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                local_dt = utc_dt.astimezone(local_tz)
+                datetime_with_tz = local_dt.strftime("%Y:%m:%d %H:%M:%S") + timezone_offset
+                data["datetime_original_str"] = datetime_with_tz
+                data["datetime_original"] = parse_datetime_original(datetime_with_tz)
+                data["timezone_source"] = f"--timezone flag ({timezone_offset})"
+        else:
+            if timezone_offset:
+                datetime_with_tz = f"{best_timestamp}{timezone_offset}"
+                data["datetime_original_str"] = datetime_with_tz
+                data["datetime_original"] = parse_datetime_original(datetime_with_tz)
+                data["timezone_source"] = f"--timezone flag ({timezone_offset})"
+
+    return data
+
+def determine_needed_changes(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False,
+                             write_datetime_original: bool = False,
+                             write_zone: bool = False) -> dict:
+    """Determine what changes are needed
+
+    Args:
+        file_path: Path to the media file
+        datetime_original: datetime object with timezone info
+        preserve_wallclock: If True, preserve wall-clock shooting time for birth time
+        write_datetime_original: If True, DateTimeOriginal is a field this correction owns
+        write_zone: If True, OffsetTimeOriginal is owned even where DateTimeOriginal is not
+
+    Returns:
+        Dict with the correction's target value per clock field, the write tags
+        whose stored value does not already match, and the file system flag.
+    """
+    exif = read_exif_data(file_path)
+    targets = clock_field_targets(exif, datetime_original, write_datetime_original, write_zone)
+    stale = stale_clock_fields(exif, targets)
+
+    return {
+        "clock_targets": targets,
+        "stale_clock_fields": stale,
+        "missing_clock_fields": missing_clock_fields(exif, stale),
+        "file_timestamps": (
+            check_file_system_timestamps_need_update(file_path, datetime_original, preserve_wallclock)
+            if sys.platform == "darwin" else False
+        ),
+    }
+
+
+def _machine_original_time(current_data: dict) -> str:
+    """The winning source's stored timestamp, carrying whether it is UTC.
+
+    A UTC clock stores bare digits, so the value alone cannot be told apart from a
+    naive local one: a consumer comparing it against the zoned corrected_time reads
+    a relabel as a shift. UTC sources are therefore emitted with a trailing Z -
+    "these digits are UTC" - which is a different claim from a +00:00 offset
+    ("local time in a zero-offset zone"). Naive sources - a filename, a bare
+    tag - have no zone, and stay bare rather than claiming one.
+    """
+    return _apply_source_zone(_stored_original_time(current_data),
+                              current_data.get("timestamp_source", TimestampSource.NONE))
+
+
+def _apply_source_zone(value: str, source: TimestampSource) -> str:
+    """Mark a UTC source's stored value as UTC; leave any other source alone."""
+    if not value or not source.is_utc:
+        return value
+    if value.endswith("Z") or re.search(r'[+-]\d{2}:?\d{2}$', value):
+        return value
+    return f"{value}Z"
+
+
+def _stored_original_time(current_data: dict) -> str:
+    """The EXIF field value the timestamp source was read from.
+
+    Falls back through the common fields when the source-specific one is empty.
+    """
+    exif = current_data.get("exif", {})
+    source = current_data.get("timestamp_source", TimestampSource.NONE)
+
+    if source.field and exif.get(source.field):
+        return exif[source.field]
+
+    # Fallback: first non-empty common timestamp field
+    for field in ["DateTimeOriginal", "CreationDate", MOVIE_HEADER_CREATE_DATE_TAG, "CreateDate"]:
+        val = exif.get(field, "")
+        if val:
+            return val
+    return ""
+
+
+def format_exif_timestamp_display(ts: str) -> str:
+    """Format EXIF timestamp with dashes for date, colons for time"""
+    # Convert YYYY:MM:DD HH:MM:SS to YYYY-MM-DD HH:MM:SS
+    return ts.replace(':', '-', 2) if ts else ts
+
+def format_original_timestamps(current_data: dict) -> str:
+    """Format original timestamp display from raw data"""
+    parts = []
+
+    # Show the timestamp source that was actually used
+    source = current_data.get("timestamp_source", TimestampSource.NONE)
+
+    if source.field in _FIELD_LABELS:
+        value = current_data["exif"].get(source.field, "")
+        if value:
+            utc_suffix = " UTC" if source.is_utc else ""
+            parts.append(f"{format_exif_timestamp_display(value)} ({_FIELD_LABELS[source.field]}{utc_suffix})")
+    elif source.field == MOVIE_HEADER_CREATE_DATE_TAG:
+        media_create = current_data["exif"].get(MOVIE_HEADER_CREATE_DATE_TAG, "")
+        birth_ts = current_data["file_system"].get("birth", "")
+        if media_create:
+            parts.append(f"{format_exif_timestamp_display(media_create)} UTC (QuickTime:CreateDate)")
+        if birth_ts:
+            parts.append(f"{format_exif_timestamp_display(birth_ts)} local (file)")
+    elif source in (TimestampSource.FILENAME, TimestampSource.FILENAME_INFERRED):
+        # Show the parsed filename timestamp
+        filename_ts, _ = parse_filename_timestamp(current_data.get("file_path", ""))
+        if filename_ts:
+            parts.append(f"{format_exif_timestamp_display(filename_ts)} (from filename)")
+        else:
+            parts.append("(from filename)")
+    elif source is TimestampSource.FILE_BIRTH:
+        birth_ts = current_data["file_system"].get("birth", "")
+        if birth_ts:
+            parts.append(f"{format_exif_timestamp_display(birth_ts)} (file birth)")
+    elif source is TimestampSource.FILE_MTIME:
+        mod_ts = current_data["file_system"].get("modify", "")
+        if mod_ts:
+            parts.append(f"{format_exif_timestamp_display(mod_ts)} (file modified)")
+
+    return ", ".join(parts) if parts else "(no timestamps available)"
+
+def format_timestamp_display(dt: datetime) -> str:
+    """Format timestamp with dashes for date, colons for time"""
+    return dt.strftime('%Y-%m-%d %H:%M:%S%z')
+
+def format_corrected_timestamp(datetime_original: datetime, timestamp_source: TimestampSource, timezone_source: str) -> str:
+    """Format corrected timestamp display"""
+    corrected_str = format_timestamp_display(datetime_original)
+    tz_value = datetime_original.strftime('%z')
+    # Format timezone with colon
+    tz_formatted = f"{tz_value[:3]}:{tz_value[3:]}" if len(tz_value) == 5 else tz_value
+
+    source_display = _FIELD_LABELS.get(timestamp_source.field or "", timestamp_source.display)
+
+    # Use the actual timezone source
+    tz_source_display = timezone_source if timezone_source else f"{source_display} metadata ({tz_formatted})"
+    if not timezone_source.startswith("--timezone"):
+        tz_source_display = f"{timezone_source} ({tz_formatted})"
+
+    return f"{corrected_str} (from {source_display} with timezone, tz: {tz_source_display})"
+
+def format_time_delta(seconds: float) -> str:
+    """Format time delta showing hours, rounded to nearest hour if within 2 minutes"""
+    sign = "+" if seconds > 0 else "-"
+    total_seconds = abs(seconds)
+    total_minutes = total_seconds / 60
+    hours = total_minutes / 60
+
+    # Round to nearest hour if within 2 minutes of a whole hour
+    nearest_hour = round(hours)
+    if nearest_hour > 0 and abs(hours - nearest_hour) * 60 < 2:  # within 2 minutes
+        return f"{sign}{nearest_hour} hour{'s' if nearest_hour != 1 else ''}"
+
+    # Otherwise show exact hours and minutes
+    hours = int(total_minutes // 60)
+    minutes = int(total_minutes % 60)
+
+    if minutes == 0:
+        return f"{sign}{hours} hour{'s' if hours != 1 else ''}"
+    elif hours == 0:
+        return f"{sign}{minutes} minute{'s' if minutes != 1 else ''}"
+    else:
+        return f"{sign}{hours}h {minutes}m"
+
+def format_change_description(changes: dict, timestamp_data: Optional[dict] = None, current_data: Optional[dict] = None, preserve_wallclock: bool = False, datetime_original: Optional[datetime] = None) -> str:
+    """Format change description from changes data"""
+    parts = []
+    stale = changes.get("stale_clock_fields", [])
+    targets = changes.get("clock_targets", {})
+    exif = current_data.get("exif", {}) if current_data else {}
+
+    if "DateTimeOriginal" in stale:
+        current_dto = exif.get("DateTimeOriginal", "")
+        if current_dto:
+            parts.append(f"DateTimeOriginal ({format_exif_timestamp_display(current_dto)}"
+                         f" → {format_exif_timestamp_display(targets['DateTimeOriginal'])})")
+        else:
+            parts.append("DateTimeOriginal (missing)")
+
+    if "OffsetTimeOriginal" in stale:
+        current_offset = exif.get("OffsetTimeOriginal", "")
+        parts.append(f"OffsetTimeOriginal ({current_offset or 'missing'}"
+                     f" → {targets['OffsetTimeOriginal']})")
+
+    if "Keys:CreationDate" in stale:
+        # Show helpful context for Keys:CreationDate change
+        if current_data and datetime_original:
+            creation_date = current_data.get("exif", {}).get("CreationDate", "")
+            time_display = datetime_original.strftime('%H:%M')
+
+            if preserve_wallclock:
+                # Preserving wall-clock time, updating timezone
+                current_tz_offset = time.strftime('%z')
+                current_tz_formatted = f"{current_tz_offset[:3]}:{current_tz_offset[3:]}"
+
+                # Extract current timezone from existing CreationDate if present
+                if creation_date:
+                    current_tz_match = re.search(r'([+-]\d{2}):?(\d{2})$', creation_date)
+                    if current_tz_match:
+                        old_tz = f"{current_tz_match.group(1)}:{current_tz_match.group(2)}"
+                        parts.append(f"Keys:CreationDate ({old_tz} → {current_tz_formatted}, preserving {time_display} shooting time)")
+                    else:
+                        parts.append(f"Keys:CreationDate (adding {current_tz_formatted}, preserving {time_display} shooting time)")
+                else:
+                    parts.append(f"Keys:CreationDate (missing, setting to {time_display} in {current_tz_formatted})")
+            else:
+                # Updating to match DateTimeOriginal
+                orig_tz = datetime_original.strftime('%z')
+                orig_tz_formatted = f"{orig_tz[:3]}:{orig_tz[3:]}"
+                if creation_date:
+                    parts.append(f"Keys:CreationDate (updating to {orig_tz_formatted})")
+                else:
+                    parts.append(f"Keys:CreationDate (missing, setting to {time_display} with {orig_tz_formatted})")
+        else:
+            parts.append("Keys:CreationDate")
+
+    if changes.get("file_timestamps"):
+        if timestamp_data and timestamp_data.get("expected_time"):
+            birth_delta = timestamp_data.get("birth_delta_seconds")
+            current_birth_str = timestamp_data.get("current_birth")
+
+            if birth_delta is not None and abs(birth_delta) > 1:
+                expected_dt = datetime.strptime(timestamp_data["expected_time"], '%Y:%m:%d %H:%M:%S')
+
+                # Check if dates differ (not just times)
+                current_birth_dt: Optional[datetime] = None
+                if current_birth_str:
+                    current_birth_dt = datetime.strptime(current_birth_str, '%Y:%m:%d %H:%M:%S')
+                    dates_differ = current_birth_dt.date() != expected_dt.date()
+                else:
+                    dates_differ = False
+
+                if dates_differ and current_birth_dt is not None:
+                    # Show full date change: "2025-12-06 → 2025-10-05 10:00"
+                    current_display = current_birth_dt.strftime('%Y-%m-%d %H:%M')
+                    expected_display = expected_dt.strftime('%Y-%m-%d %H:%M')
+                    parts.append(f"Birth time ({current_display} → {expected_display})")
+                else:
+                    # Same date, just show time change
+                    delta_str = format_time_delta(birth_delta)
+                    time_display = expected_dt.strftime('%H:%M')
+                    if preserve_wallclock:
+                        parts.append(f"Birth time ({delta_str} to {time_display}, shooting time)")
+                    else:
+                        system_tz_offset = time.strftime('%z')
+                        system_tz_formatted = f"{system_tz_offset[:3]}:{system_tz_offset[3:]}"
+                        parts.append(f"Birth time ({delta_str} to {time_display}, display time in {system_tz_formatted})")
+            else:
+                parts.append("Birth time")
+        else:
+            parts.append("Birth time")
+
+    for field in CLOCK_FIELDS:
+        if not field.quicktime or field.write_tag not in stale:
+            continue
+        current = exif.get(field.read_key, "")
+        target_display = f"{format_exif_timestamp_display(targets[field.write_tag])} UTC"
+        if current:
+            parts.append(f"{field.write_tag} ({format_exif_timestamp_display(current)} → {target_display})")
+        else:
+            parts.append(f"{field.write_tag} (missing → {target_display})")
+
+    return ", ".join(parts) if parts else "No change"
+
+def format_offset_display(seconds: int) -> str:
+    """Format a time offset in seconds to human-readable display.
+
+    Examples: +1d 2h 3m 4s, -0d 1h 30m 0s, +0d 0h 5m 0s
+    """
+    sign = "+" if seconds >= 0 else "-"
+    total = abs(seconds)
+    days = total // 86400
+    hours = (total % 86400) // 3600
+    minutes = (total % 3600) // 60
+    secs = total % 60
+    return f"{sign}{days}d {hours}h {minutes}m {secs}s"
+
+
+def fix_media_timestamps(file_path: str, apply: bool = True, timezone_spec: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None, force_timezone: bool = False, extra_write_fields: Optional[Dict[str, str]] = None) -> TimestampFixResult:
+    """Fix media (photo/video) timestamps.
+
+    extra_write_fields are other steps' field writes, sent in this step's exiftool
+    call so the file is rewritten once. They are written even when the timestamps
+    need no change.
+
+    Returns:
+        TimestampFixResult with all machine-readable fields populated.
+        The caller (main) serialises this to @@key=value via emit_result().
+    """
+
+    filename = os.path.basename(file_path)
+
+    detected_tz = extract_metadata_timezone(file_path) or None
+
+    # Get all data
+    current_data = get_all_timestamp_data(file_path, timezone_spec, infer_from_filename)
+
+    # Display header
+    print(f"\033[36m🔍 {filename}\033[0m", file=sys.stderr)
+
+    # --force-timezone is a confirmation gate, not arithmetic: relabelling a file whose
+    # winning source already carries a zone must be explicitly confirmed. The corrected
+    # value is the same instant either way — get_all_timestamp_data() already expressed
+    # it in the declared zone. A dry run always previews the relabel; applying is what
+    # the flag confirms.
+    requires_force_timezone = False
+    if timezone_spec and not infer_from_filename:
+        source = current_data["timestamp_source"]
+        declared_offset = current_data.get("timezone_offset")
+        if (source.zoned and detected_tz and declared_offset
+                and normalize_timezone_format(detected_tz) != normalize_timezone_format(declared_offset)):
+            requires_force_timezone = not force_timezone
+            if requires_force_timezone:
+                print(f"⚠️  File already carries timezone {detected_tz}; declared {declared_offset} relabels it", file=sys.stderr)
+                if not apply:
+                    print("   Applying requires --force-timezone.", file=sys.stderr)
+                else:
+                    print("❌ Refusing to apply without --force-timezone.", file=sys.stderr)
+                    return TimestampFixResult(
+                        file=filename,
+                        timestamp_action="error",
+                        original_time=_machine_original_time(current_data),
+                        timezone=detected_tz,
+                        requires_force_timezone=True,
+                    )
+
+    if not current_data["datetime_original"]:
+        # Check if we have CreateDate but missing timezone
+        create_date = current_data["exif"].get("CreateDate", "")
+        if create_date and not timezone_spec:
+            print("❌ File has CreateDate but no DateTimeOriginal", file=sys.stderr)
+            print(f"   CreateDate: {create_date}", file=sys.stderr)
+            print("   Use --timezone to specify timezone (e.g., --timezone +09:00)", file=sys.stderr)
+            return TimestampFixResult(
+                file=filename,
+                timestamp_action="error",
+                original_time=create_date,
+                timezone=detected_tz,
+            )
+        print("❌ No valid DateTimeOriginal found", file=sys.stderr)
+        return TimestampFixResult(
+            file=filename,
+            timestamp_action="error",
+            timezone=detected_tz,
+        )
+
+    datetime_original = current_data["datetime_original"]
+    datetime_original_str = current_data["datetime_original_str"]
+    datetime_before_offset = datetime_original
+
+    # Apply time offset if specified
+    if time_offset_seconds is not None and time_offset_seconds != 0:
+        datetime_original = datetime_original + timedelta(seconds=time_offset_seconds)
+        datetime_original_str = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
+        datetime_original_str = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', datetime_original_str)
+        current_data["datetime_original"] = datetime_original
+        current_data["datetime_original_str"] = datetime_original_str
+
+    # DateTimeOriginal is a field this correction owns when:
+    # 1. It's missing and we have timezone info, OR
+    # 2. infer_from_filename is set (filename is the source of truth, DTO may be wrong/missing)
+    # 3. force_timezone is set (the confirmed relabel must reach the stored tag)
+    should_write_datetime_original = bool(
+        (not current_data["exif"].get("DateTimeOriginal") and current_data["datetime_original_str"]) or
+        (infer_from_filename and current_data["datetime_original_str"]) or
+        (force_timezone and current_data["datetime_original_str"])
+    )
+
+    # A still's bare DateTimeOriginal labelled by --timezone keeps its digits but
+    # needs the declared zone stored beside it; a video carries its zone elsewhere.
+    should_write_zone = bool(
+        current_data["exif"].get("DateTimeOriginal")
+        and not is_quicktime_container(current_data["exif"])
+        and not stored_zone(current_data["exif"])
+        and current_data.get("timezone_source", "").startswith("--timezone flag")
+    )
+
+    # Determine needed changes
+    changes = determine_needed_changes(
+        file_path, datetime_original,
+        preserve_wallclock=preserve_wallclock,
+        write_datetime_original=should_write_datetime_original,
+        write_zone=should_write_zone,
+    )
+
+    # Format and display timestamps
+    original_display = format_original_timestamps(current_data)
+    print(f"📅 Original : {original_display}", file=sys.stderr)
+
+    timestamp_source = current_data["timestamp_source"]
+    timezone_source = current_data.get("timezone_source", "")
+    corrected_display = format_corrected_timestamp(datetime_original, timestamp_source, timezone_source)
+    print(f"⏱️ Corrected: {corrected_display}", file=sys.stderr)
+
+    utc_dt = datetime_original.astimezone(timezone.utc)
+    utc_display = utc_dt.strftime('%Y-%m-%d %H:%M:%S UTC')
+    print(f"🌐 UTC      : {utc_display}", file=sys.stderr)
+
+    # Gather timestamp data for display (separating data from presentation)
+    timestamp_data: Optional[Dict[str, Any]] = None
+    if changes.get("file_timestamps"):
+        current_fs = current_data["file_system"]
+        expected_file_time = get_expected_file_system_time(datetime_original, preserve_wallclock=preserve_wallclock)
+
+        timestamp_data = {
+            "expected_time": expected_file_time,
+            "current_birth": current_fs.get("birth"),
+            "birth_delta_seconds": None
+        }
+
+        try:
+            expected_dt = datetime.strptime(expected_file_time, '%Y:%m:%d %H:%M:%S')
+
+            # Calculate birth time delta
+            if current_fs.get("birth"):
+                current_birth = datetime.strptime(current_fs["birth"], '%Y:%m:%d %H:%M:%S')
+                timestamp_data["birth_delta_seconds"] = (expected_dt - current_birth).total_seconds()
+        except ValueError:
+            pass
+
+    # Display changes
+    change_desc = format_change_description(changes, timestamp_data, current_data, preserve_wallclock, datetime_original)
+    has_changes = bool(changes["stale_clock_fields"]) or changes["file_timestamps"]
+
+    # Build common result fields
+    correction_mode = "time" if (time_offset_seconds is not None and time_offset_seconds != 0) else "timezone"
+    # Writing only into fields the file left empty fills in what it never had; any
+    # stored value or file time that disagrees, or a moved time, is a fix.
+    only_adds_fields = (
+        correction_mode == "timezone"
+        and not changes["file_timestamps"]
+        and len(changes["missing_clock_fields"]) == len(changes["stale_clock_fields"])
+    )
+    result_base = dict(
+        file=filename,
+        original_time=_machine_original_time(current_data),
+        corrected_time=datetime_original_str,
+        stale_fields=changes["stale_clock_fields"],
+        stale_file_times=["FileCreateDate"] if changes["file_timestamps"] else [],
+        timestamp_source=timestamp_source.token,
+        correction_mode=correction_mode,
+        timezone=detected_tz,
+        time_offset_seconds=time_offset_seconds if (time_offset_seconds is not None and time_offset_seconds != 0) else None,
+        time_offset_display=format_offset_display(time_offset_seconds) if (time_offset_seconds is not None and time_offset_seconds != 0) else None,
+        original_epoch=datetime_before_offset.timestamp() if datetime_before_offset else None,
+        corrected_epoch=datetime_original.timestamp() if datetime_original else None,
+        requires_force_timezone=requires_force_timezone or None,
+        camera_zone_offset=current_data.get("camera_zone_offset"),
+    )
+
+    if not apply and has_changes:
+        print(f"📊 Change   : {change_desc} (DRY RUN)", file=sys.stderr)
+        return TimestampFixResult(**result_base,
+                                  timestamp_action="would_add" if only_adds_fields else "would_fix")
+    else:
+        print(f"📊 Change   : {change_desc}", file=sys.stderr)
+
+    extra_write_fields = extra_write_fields or {}
+    if not apply or not (has_changes or extra_write_fields):
+        return TimestampFixResult(**result_base, timestamp_action="no_change")
+
+    # Apply changes
+    success = True
+
+    # Capture what the file held before jetlag touches it, in the same write as the
+    # correction below.
+    provenance_args = provenance_field_args(file_path, current_data["exif"])
+
+    if should_write_datetime_original and infer_from_filename and current_data["exif"].get("DateTimeOriginal"):
+        print("   ⚠️  Overwriting existing DateTimeOriginal (--infer-from-filename flag)", file=sys.stderr)
+    elif should_write_datetime_original and force_timezone and current_data["exif"].get("DateTimeOriginal"):
+        print("   ⚠️  Overwriting existing DateTimeOriginal timezone (--force-timezone flag)", file=sys.stderr)
+
+    # A correction owns the whole clock-field table, so one stale field rewrites
+    # them all: a subset write is what let a stale movie header outlive a run that
+    # found the track atoms correct.
+    correction_args = [
+        f"-{tag}={value}" for tag, value in changes["clock_targets"].items()
+    ] if changes["stale_clock_fields"] else []
+
+    extra_args = [f"-{tag}={value}" for tag, value in extra_write_fields.items()]
+    field_args = provenance_args + correction_args + extra_args
+
+    # Rewriting the file for any field resets its birth time, so the birth time rides
+    # in the same exiftool call, which applies file system tags after the rewrite —
+    # whether or not the correction found it stale.
+    file_time_args = [
+        f"-FileCreateDate={get_expected_file_system_time(datetime_original, preserve_wallclock=preserve_wallclock)}"
+    ] if sys.platform == "darwin" and (changes["file_timestamps"] or field_args) else []
+
+    write_error = None
+    if field_args or file_time_args:
+        try:
+            written = exiftool.write_tags(file_path, field_args + file_time_args)
+        except MetadataWriteRefused as refusal:
+            written, write_error = False, str(refusal)
+            print(f"   ❌ exiftool could not write this file: {write_error}", file=sys.stderr)
+        if not written:
+            if provenance_args:
+                print("   ⚠️  Failed to record original timestamps for recovery", file=sys.stderr)
+            if correction_args:
+                print(f"   ❌ Failed to write clock fields: {', '.join(changes['clock_targets'])}", file=sys.stderr)
+            if extra_args:
+                print(f"   ❌ Failed to write {', '.join(extra_write_fields)}", file=sys.stderr)
+            if file_time_args:
+                print("   ❌ Failed to apply file timestamps", file=sys.stderr)
+            success = not (correction_args or extra_args or file_time_args)
+
+    if not success:
+        return TimestampFixResult(**result_base, timestamp_action="error", error=write_error)
+    if not has_changes:
+        return TimestampFixResult(**result_base, timestamp_action="no_change")
+    return TimestampFixResult(**result_base, timestamp_action="added" if only_adds_fields else "fixed")

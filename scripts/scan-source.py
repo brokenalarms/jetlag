@@ -13,6 +13,7 @@ import json
 import sys
 from pathlib import Path
 
+from lib.cli import install_interrupt_handlers
 from lib.filesystem import find_media_files, iter_media_files
 from lib.timestamp_source import parse_filename_timestamp
 
@@ -22,6 +23,7 @@ def has_timestamped_names(path: Path, extensions: list[str]) -> bool:
 
 
 def main() -> int:
+    install_interrupt_handlers()
     parser = argparse.ArgumentParser(description="Report a source's media count or filename dates")
     parser.add_argument("path", help="Folder to scan")
     parser.add_argument("--extensions", nargs="+", required=True, help="Media extensions to look for")

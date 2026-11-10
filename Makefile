@@ -76,9 +76,9 @@ generate:
 PYTEST := scripts/.venv/bin/pytest
 VENV_STAMP := scripts/.venv/.deps-stamp
 
-$(VENV_STAMP): scripts/requirements.txt scripts/requirements-dev.txt scripts/tests/requirements.txt
+$(VENV_STAMP): scripts/requirements.txt scripts/requirements-dev.txt
 	python3 -m venv --clear scripts/.venv
-	scripts/.venv/bin/pip install --quiet -r scripts/requirements.txt -r scripts/requirements-dev.txt -r scripts/tests/requirements.txt
+	scripts/.venv/bin/pip install --quiet -r scripts/requirements.txt -r scripts/requirements-dev.txt
 	touch $(VENV_STAMP)
 
 ## Run script tests (any platform); tests are profile-isolated so they parallelize
