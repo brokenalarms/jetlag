@@ -20,8 +20,8 @@ its own shape:
 
 Each check differs in when it refuses: mixed zones refuse a dry run too, the others
 refuse only an apply. The app re-derives that per check (`AppState`: "only an apply
-asks", except for mixed zones). Adding the one check this spec needs, the timestamp
-step being off, would be a seventh copy of all of it.
+asks", except for mixed zones). Every new check so far has added one more copy of all
+of it.
 
 ## Design
 
@@ -69,7 +69,6 @@ already finished; the flag applies to the re-run.
 |---|---|---|---|
 | `protected_sources` | apply | `--unlock-protected` | files with the user-immutable flag |
 | `camera_mismatch` | apply | `--allow-camera-mismatch` | files whose Make/Model differ from the profile's; groups by camera found |
-| `timestamps_unset` | apply | `--allow-unset-timestamps` | every file, when the Set Timestamps step is off. **New.** |
 | `mixed_timezones` | always | `--allow-mixed-timezones` | groups by `FileReading.zone`; files with no zone evidence form their own `none` group, so a mix of zoned and unzoned files is mixed |
 | `zone_relabel` | apply | `--force-timezone` | files whose zoned tag differs from `--timezone` (was `provided_mismatch`); groups by tag zone |
 | `filename_unparseable` | always | none | under `--infer-from-filename`, files with no date in their name |
@@ -98,12 +97,19 @@ contract tests make sure both sides move together.
 - The step is labelled **Set Timestamps** (results row: **Set TS**). It applies the
   hierarchy's time to every file whether or not anything was wrong, so "Fix" undersold
   it. The token stays `fix-timestamp`, and `fix-media-timestamp.sh` keeps its name.
-- It stays switchable. With it off, a dry run shows the `timestamps_unset` warning and
-  previews anyway. An apply stops on it until the user confirms, which sends
-  `--allow-unset-timestamps`. This is how the Comedy night C0199 import would have
-  been caught.
-- With the step off, the app still passes `--timezone`, so the date folder is the
-  date where the footage was shot (`FileReading.date_folder()`).
+- It is always on, like Ingest and Organize (`PipelineStep.isAlwaysOn`), and a run
+  needs `--timezone`. Turning it off bought nothing: the provenance stage rewrites
+  every file on an apply anyway, a correct file comes through a correction unchanged,
+  and a run with no timezone guesses the date folder too. Being able to turn it off is
+  how the Comedy night C0199 was organized without a correction.
+- The script owns this, as it does every step: in `pipeline-schema.yaml`'s `cli.steps`
+  the step loses its `task`, which puts it in the fixed frame
+  (`INGEST → [tag] → SET-TIMESTAMP → OUTPUT → …`). `PipelineSchemaContractTests`
+  already derives `isAlwaysOn` from that. `--tasks` stops accepting `fix-timestamp`,
+  every run needs `--timezone` (or `--location`), and `ProvenanceStage`, which only ran
+  when the step was off, is deleted.
+- The app always passes `--timezone`, so the date folder is the date where the
+  footage was shot (`FileReading.date_folder()`).
 
 ## Tests
 
