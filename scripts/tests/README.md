@@ -33,7 +33,7 @@ Run a script end to end against temporary media and compare file state before an
 ### Contract tests
 Hold an interface or a cost fixed.
 
-- `test_pipeline_schema.py` — the pipeline's JSONL output matches `scripts/pipeline-schema.yaml`
+- `test_pipeline_schema.py` — the pipeline's JSONL output and its parser's tasks and flags match `scripts/pipeline-schema.yaml`
 - `test_metadata_call_contract.py` — exact exiftool call counts per file (see `docs/testing.md`)
 - `test_metadata_stderr.py`, `test_process_hygiene.py`, `test_xmp_namespace.py` — the long-lived exiftool client and the XMP namespace
 - `test_requirements.py`, `test_python_compatibility.py` — runtime dependencies and the Python version macOS ships

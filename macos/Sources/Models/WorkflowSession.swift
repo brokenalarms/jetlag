@@ -88,11 +88,16 @@ final class WorkflowSession {
     var enabledSteps: Set<PipelineStep> = []
 
     /// Whether a Gyroflow install was found on this machine. Without one the
-    /// step could only ever skip files, so it is not offered at all.
+    /// step could only ever skip files, so it is not offered at all. An install
+    /// found while the session is open offers the step as a new session would:
+    /// on, if the profile asks for it. A re-check that finds the same install
+    /// leaves the user's choice alone.
     var gyroflowAvailable: Bool {
         didSet {
             if !gyroflowAvailable {
                 enabledSteps.remove(.gyroflow)
+            } else if !oldValue, availableSteps.contains(.gyroflow), Self.isOnByDefault(.gyroflow) {
+                enabledSteps.insert(.gyroflow)
             }
         }
     }
@@ -109,7 +114,13 @@ final class WorkflowSession {
         let availableSteps = Self.computeAvailableSteps(
             profile: profile, gyroflowAvailable: gyroflowAvailable
         )
-        self.enabledSteps = Set(availableSteps.filter { $0 != .archiveSource })
+        self.enabledSteps = Set(availableSteps.filter(Self.isOnByDefault))
+    }
+
+    /// Whether a step the session offers starts switched on. Archiving moves the
+    /// user's source folder, so it is only ever opted into.
+    private static func isOnByDefault(_ step: PipelineStep) -> Bool {
+        step != .archiveSource
     }
 
     var availableSteps: [PipelineStep] {
@@ -401,7 +412,7 @@ final class WorkflowSession {
 
     /// What the run carries because of an answer given for one click, rather
     /// than a setting the user chose — the same state `clearRunAssent()` drops.
-    private static let assentFlags = [
+    static let assentFlags = [
         forceTimezoneFlag, allowMixedTimezonesFlag, overwriteFlag, unlockProtectedFlag,
         allowCameraMismatchFlag, applyFlag,
     ]
@@ -427,16 +438,9 @@ final class WorkflowSession {
             args += ["--group", group]
         }
 
-        let optionalSteps = enabledSteps.filter { !$0.isAlwaysOn }
-        let taskNames: [PipelineStep: String] = [
-            .tag: "tag",
-            .fixTimestamps: "fix-timestamp",
-            .gyroflow: "gyroflow",
-            .archiveSource: "archive-source",
-        ]
         let tasks = availableSteps
-            .filter { optionalSteps.contains($0) }
-            .compactMap { taskNames[$0] }
+            .filter { enabledSteps.contains($0) }
+            .compactMap(\.taskToken)
         if !tasks.isEmpty {
             args += ["--tasks"] + tasks
         }

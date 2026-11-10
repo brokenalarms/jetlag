@@ -17,8 +17,8 @@ import json
 import pytest
 
 from conftest import create_test_video
-from pipeline_schema import enum_tokens, load_schema, validate_event, validate_events
-from pipeline_helpers import run_pipeline
+from pipeline_schema import enum_tokens, load_cli, load_schema, validate_event, validate_events
+from pipeline_helpers import pipeline_parser, run_pipeline
 
 
 def _events(stdout: str) -> list[dict]:
@@ -43,6 +43,52 @@ class TestSchemaIsSelfConsistent:
         """The skip reason is data with a closed token set, not free-form prose."""
         assert set(enum_tokens("organize_result", "reason")) == \
             {"identical", "exists_differs", "user_choice"}
+
+
+class TestCommandLineMatchesSchema:
+    """media-pipeline's parser accepts what the schema's cli section says the app passes.
+
+    The app builds its arguments from the same section (PipelineSchemaContractTests
+    holds its step tokens and flag constants to it), so a task or flag renamed on
+    one side only fails here or there instead of at the user's first run.
+    """
+
+    @staticmethod
+    def _option(flag: str):
+        return pipeline_parser()._option_string_actions.get(flag)
+
+    def test_tasks_choices_are_the_schema_task_tokens_in_pipeline_order(self):
+        """--tasks accepts exactly the optional steps; the fixed frame cannot be named."""
+        declared = [step["task"] for step in load_cli()["steps"] if "task" in step]
+        tasks = self._option("--tasks")
+
+        assert tasks is not None, "Actual: no --tasks option, Expected: one"
+        assert list(tasks.choices) == declared, \
+            f"Actual: --tasks choices {list(tasks.choices)}, Expected: {declared} (pipeline-schema.yaml cli.steps)"
+
+    def test_stage_complete_tokens_are_the_schema_steps_in_pipeline_order(self):
+        """The app orders a row's progress by the steps; the stage tokens must be the same list."""
+        declared = [step["stage"] for step in load_cli()["steps"]]
+
+        assert enum_tokens("stage_complete", "stage") == declared, \
+            f"Actual: stage_complete.stage {enum_tokens('stage_complete', 'stage')}, " \
+            f"Expected: {declared} (pipeline-schema.yaml cli.steps)"
+
+    def test_every_flag_the_app_passes_is_a_parser_option(self):
+        """A flag the app passes that the parser lacks would stop every run with a usage error."""
+        missing = [flag for flag in load_cli()["flags"] if self._option(flag) is None]
+
+        assert not missing, f"Actual: parser has no {missing}, Expected: every cli.flags entry"
+
+    def test_assent_flags_are_switches_the_app_passes(self):
+        """An assent is a yes for one run: a switch the app passes, never a value."""
+        cli = load_cli()
+        for flag in cli["assent_flags"]:
+            assert flag in cli["flags"], \
+                f"Actual: assent flag {flag} missing from cli.flags, Expected: listed there too"
+            option = self._option(flag)
+            assert option is not None and option.nargs == 0, \
+                f"Actual: {flag} takes a value or is missing, Expected: a switch"
 
 
 class TestEmittedEventsMatchSchema:

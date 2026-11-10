@@ -12,6 +12,9 @@ import Yams
 /// an outcome in `RowOutcome.Movement`, whose `statusLabel` switch has no default.
 /// Adding a token to the schema without the app, or to the app without the schema,
 /// fails here; adding one to the enum without a label fails to compile.
+/// Command line: `PipelineStep`'s cases and tokens, and every flag the app passes,
+/// have to be the ones the schema's `cli` section declares — the section
+/// media-pipeline's parser is held to on the Python side.
 final class PipelineSchemaContractTests: XCTestCase {
 
     private static let schemaURL = URL(fileURLWithPath: #filePath)
@@ -26,6 +29,20 @@ final class PipelineSchemaContractTests: XCTestCase {
         let events = try XCTUnwrap(root?["events"] as? [String: [String: Any]],
                                    "pipeline-schema.yaml has no events mapping")
         return events
+    }
+
+    private func cli() throws -> [String: Any] {
+        let text = try String(contentsOf: Self.schemaURL, encoding: .utf8)
+        let root = try Yams.load(yaml: text) as? [String: Any]
+        return try XCTUnwrap(root?["cli"] as? [String: Any], "pipeline-schema.yaml has no cli mapping")
+    }
+
+    private func cliSteps() throws -> [[String: Any]] {
+        try XCTUnwrap(cli()["steps"] as? [[String: Any]], "pipeline-schema.yaml declares no cli.steps")
+    }
+
+    private func cliList(_ key: String) throws -> [String] {
+        try XCTUnwrap(cli()[key] as? [String], "pipeline-schema.yaml declares no cli.\(key)")
     }
 
     private func tokens(_ events: [String: [String: Any]],
@@ -162,6 +179,68 @@ final class PipelineSchemaContractTests: XCTestCase {
 
         XCTAssertEqual(Set(TimezoneConflictKind.allCases.map(\.rawValue)), declared,
                        "TimezoneConflictKind and timezone_conflict.conflict_type have drifted apart")
+    }
+
+    /// The step list is the pipeline's, in its order: a row's progress label picks
+    /// the last stage it finished by this order, and `--tasks` is built from it.
+    func testPipelineStepsAreTheDeclaredStepsInPipelineOrder() throws {
+        let steps = try cliSteps()
+
+        XCTAssertEqual(PipelineStep.allCases.map(\.stageToken), steps.compactMap { $0["stage"] as? String },
+                       "PipelineStep and cli.steps have drifted apart (stage tokens or order)")
+        XCTAssertEqual(PipelineStep.allCases.map(\.taskToken), steps.map { $0["task"] as? String },
+                       "PipelineStep.taskToken and cli.steps' task tokens have drifted apart")
+        XCTAssertEqual(PipelineStep.allCases.map(\.isAlwaysOn), steps.map { $0["task"] == nil },
+                       "A step that always runs is exactly one --tasks cannot name")
+    }
+
+    /// The stage_complete tokens the app can label are the ones the pipeline emits.
+    func testEveryStageCompleteTokenIsAPipelineStep() throws {
+        let declared = try tokens(schema(), event: "stage_complete", field: "stage")
+
+        XCTAssertEqual(Set(PipelineStep.allCases.map(\.stageToken)), declared,
+                       "PipelineStep.stageToken and stage_complete.stage have drifted apart")
+    }
+
+    /// The flags a fully configured run passes — every step on, every option set,
+    /// every answer given — are exactly the ones media-pipeline's parser is held to.
+    func testEveryFlagTheAppPassesIsDeclared() throws {
+        var profile = MediaProfile(
+            type: .video, sourceDir: "/Volumes/TestCard/DCIM", readyDir: "/tmp/ready",
+            gyroflowEnabled: true, fileExtensions: [".mp4"]
+        )
+        profile.tags = ["travel"]
+        profile.exif = ExifConfig(make: "DJI", model: "Osmo Action 4")
+        profile.gyroflowSettings = StabilizationSettings(maxZoom: 110.0)
+        let session = WorkflowSession(profile: profile, profileName: "test-profile", gyroflowAvailable: true)
+        session.enabledSteps = Set(session.availableSteps)
+        session.timezone.value = "Asia/Tokyo"
+        session.group = "Japan"
+        session.copyCompanionFiles = true
+        session.inferFromFilenames = true
+        session.timeOffsetSeconds = 3600
+        session.updateFilenameDates = true
+        session.forceTimezone = true
+        session.allowMixedTimezones = true
+        session.overwriteDestination = true
+        session.unlockProtected = true
+        session.allowCameraMismatch = true
+        session.applyMode = true
+
+        let declared = try cliList("flags")
+        let passed = session.buildPipelineArgs().args.filter { $0.hasPrefix("--") }
+
+        XCTAssertEqual(Set(passed), Set(declared),
+                       "The flags the app passes and cli.flags have drifted apart")
+    }
+
+    /// The flags dropped from the dry-run comparison are the schema's assent flags:
+    /// an answer for one run never makes a preview look stale.
+    func testAssentFlagsAreTheDeclaredOnes() throws {
+        let declared = try cliList("assent_flags")
+
+        XCTAssertEqual(Set(WorkflowSession.assentFlags), Set(declared),
+                       "WorkflowSession.assentFlags and cli.assent_flags have drifted apart")
     }
 
     /// The mapping is 1:1: two tokens sharing a label would mean the app decides an

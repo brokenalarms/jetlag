@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// The pipeline's steps, declared in the order the pipeline runs them — the
+/// order of `cli.steps` in scripts/pipeline-schema.yaml, which
+/// PipelineSchemaContractTests holds these cases and tokens to.
 enum PipelineStep: String, CaseIterable, Identifiable {
     case ingest = "Ingest"
     case tag = "Tag"
@@ -12,6 +15,30 @@ enum PipelineStep: String, CaseIterable, Identifiable {
 
     var isAlwaysOn: Bool {
         self == .ingest || self == .organize
+    }
+
+    /// The token `--tasks` accepts for this step; nil for the fixed frame, which
+    /// always runs and cannot be named.
+    var taskToken: String? {
+        switch self {
+        case .ingest, .organize: nil
+        case .tag: "tag"
+        case .fixTimestamps: "fix-timestamp"
+        case .gyroflow: "gyroflow"
+        case .archiveSource: "archive-source"
+        }
+    }
+
+    /// The token the pipeline's `stage_complete` event carries for this step.
+    var stageToken: String {
+        switch self {
+        case .ingest: "ingest"
+        case .tag: "tag"
+        case .fixTimestamps: "fix-timestamp"
+        case .organize: "output"
+        case .gyroflow: "gyroflow"
+        case .archiveSource: "archive-source"
+        }
     }
 
     var systemImage: String {
@@ -41,6 +68,18 @@ enum PipelineStep: String, CaseIterable, Identifiable {
         case .ingest: Strings.Pipeline.ingestLabel
         case .tag: Strings.Pipeline.tagLabel
         case .fixTimestamps: Strings.Pipeline.fixTimestampsLabel
+        case .organize: Strings.Pipeline.organizeLabel
+        case .gyroflow: Strings.Pipeline.gyroflowLabel
+        case .archiveSource: Strings.Pipeline.archiveSourceLabel
+        }
+    }
+
+    /// The short name a results row shows while this is the last step it finished.
+    var stageLabel: String {
+        switch self {
+        case .ingest: Strings.Pipeline.ingestLabel
+        case .tag: Strings.Pipeline.tagLabel
+        case .fixTimestamps: Strings.Pipeline.fixTimestampsStageLabel
         case .organize: Strings.Pipeline.organizeLabel
         case .gyroflow: Strings.Pipeline.gyroflowLabel
         case .archiveSource: Strings.Pipeline.archiveSourceLabel

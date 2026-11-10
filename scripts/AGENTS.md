@@ -55,9 +55,11 @@ script or the pipeline could call belongs in its `lib/` module.
 | `working_dir.py` | `WorkingDir`, the staging directory and the copies a cancel clears |
 | `events.py` | `emit_event`, the JSONL on stdout |
 
-Adding a pipeline step means one `Stage` subclass in `STAGES` plus its entry in
-`pipeline-schema.yaml`. `media-pipeline.py` keeps `build_parser()` and builds the
-`WorkingDir` its cancel handler closes over.
+Adding a pipeline step means one `Stage` subclass in `STAGES` plus its entries in
+`pipeline-schema.yaml`: the `stage_complete` token and a `cli.steps` entry. The
+`cli` section also lists every flag the app passes; `build_parser()`'s `--tasks`
+choices and options are tested against it. `media-pipeline.py` keeps
+`build_parser()` and builds the `WorkingDir` its cancel handler closes over.
 
 ## External tool behavior
 
