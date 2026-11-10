@@ -5,20 +5,30 @@
 ```
 /                         ← repo root
 ├── scripts/              ← Python/shell scripts (work standalone, no knowledge of app)
-│   ├── *.py / *.sh
-│   ├── lib/              ← shared Python utilities
+│   ├── *.py / *.sh       ← command lines: argument parsing and output only
+│   ├── lib/              ← the logic, as ordinary importable modules
 │   ├── media-profiles.yaml  ← shared config (scripts' own default; the app's shipped seed)
 │   └── tests/            ← script test suite (belongs with the scripts)
 ├── macos/                ← macOS SwiftUI app (sibling to scripts/, not nested inside)
 │   ├── Sources/          ← Swift source files
+│   │   ├── Models/       ← AppState plus Pipeline/, Profiles/, Workflow/ state and value types
+│   │   ├── Services/     ← Scripts/ (launching, processes, line reading), Profiles/ (profiles file I/O)
+│   │   ├── Components/   ← reusable form controls; Results/ holds the Files panel and table
+│   │   └── Views/        ← screens; AppKit/ holds the AppKit bridges they host
+│   ├── Tests/            ← mirrors Sources/; Support/ holds the hosting helpers
 │   └── project.yml       ← XcodeGen project spec
 ├── web/                  ← Vite + Tailwind marketing site
-│   └── src/sections/     ← each section is a standalone render function
-├── design/               ← shared design tokens, app icon generation, screenshots
+│   ├── src/page.js       ← SECTIONS list; renders and initialises the page
+│   ├── src/content.js    ← product facts (price, URLs, free-file limit)
+│   ├── src/sections/     ← each section is a standalone render function
+│   ├── src/components/   ← shared pieces (section header, nav, timeline)
+│   ├── tokens.js         ← Tailwind plugin: design/tokens.json → CSS variables
+│   └── tests/            ← Vitest suite (`npm test`)
+├── design/               ← shared design tokens, product facts (product.json), app icon generation, screenshots
 └── docs/                 ← documentation
 ```
 
-`scripts/`, `macos/`, and `web/` are independent components. `scripts/` and `macos/` share `media-profiles.yaml`. `web/` and `macos/` share color tokens via `design/tokens.json`. The scripts have no knowledge of the app or website.
+`scripts/`, `macos/`, and `web/` are independent components. `scripts/` and `macos/` share `media-profiles.yaml`. `web/` and `macos/` share color tokens via `design/tokens.json`, and the free-file limit via `design/product.json`, which tests on both sides hold the app to. The scripts have no knowledge of the app or website.
 
 At build time, the `Bundle scripts` build phase copies `scripts/` into `Contents/Resources/scripts/` inside the app bundle.
 
@@ -28,7 +38,7 @@ At build time, the `Bundle scripts` build phase copies `scripts/` into `Contents
 
 Three components that share config:
 
-1. **Python scripts** (`scripts/`) — CLI tools for timestamp fixing, tagging, organizing, gyroflow generation. Run standalone or via shell wrappers.
+1. **Python scripts** (`scripts/`) — CLI tools for timestamp fixing, tagging, organizing, gyroflow generation, run standalone or by the app; `scripts/README.md` is the user's guide. Each command is a `<command>.sh` at the top of `scripts/`, which `lib/launch.sh` runs as `cli/<command>.py`, a thin command line over the module named after it in `scripts/lib/` (`fix_media_timestamp`, `media_pipeline`, …); the pipeline and the tests import those modules directly. The pipeline itself is a package (`lib/media_pipeline/`): pre-flight checks over the whole batch, then each file through a list of stages run by one loop. See "Code layout" in `scripts/AGENTS.md`.
 2. **Jetlag macOS app** (`macos/`) — SwiftUI wrapper that reads the same `media-profiles.yaml`, edits profiles, and launches the scripts.
 3. **Marketing site** (`web/`) — static site sharing the design token palette with the macOS app.
 
@@ -107,11 +117,11 @@ All user-facing text in the macOS app is centralized in `macos/Sources/Strings.s
 
 Every metadata read and write goes through `scripts/lib/exiftool.py`, the single exiftool client. It keeps one `exiftool -stay_open` process per script run and talks to it over stdin/stdout; scripts import its `exiftool` instance and never start exiftool themselves. It runs the exiftool on PATH — the vendored `scripts/tools/exiftool`, which the `.sh` wrappers put first — unless `JETLAG_EXIFTOOL` names another (tests use that to count calls).
 
-It starts exiftool with `scripts/lib/exiftool-jetlag.config`, which declares jetlag's own XMP namespace (`XMP-jetlag`, `http://ns.jetlag.app/1.0/`). Exiftool refuses to write a tag it has no definition for, so a client started without the config silently drops every provenance write.
+It starts exiftool with `scripts/lib/data/exiftool-jetlag.config`, which declares jetlag's own XMP namespace (`XMP-jetlag`, `http://ns.jetlag.app/1.0/`). Exiftool refuses to write a tag it has no definition for, so a client started without the config silently drops every provenance write.
 
 An exiftool write rebuilds a QuickTime file (`moov` moves ahead of `mdat`), so a copy jetlag has written never matches its card file byte for byte. `scripts/lib/footage.py` reads only the top-level box headers to find the footage — each `mdat` payload plus any trailer after the last box — which those writes leave unchanged; verify-card compares copies by its size and hash.
 
-Every file the pipeline moves carries a provenance record — its card name in `XMP-xmpMM:PreservedFileName` and its clock fields as they were before jetlag's first write, in `XMP-jetlag` — written once and never overwritten. It rides in the file's single metadata write: fix-timestamp's when that step runs (a missing record is reason enough for it to write), the pipeline's own otherwise, together with the tag step's camera fields. verify-card finds a renamed copy by that card name.
+Every file the pipeline moves carries a provenance record — its card name in `XMP-xmpMM:PreservedFileName` and its clock fields as they were before jetlag's first write, in `XMP-jetlag` — written once and never overwritten. It rides in the file's single metadata write: fix-timestamp's when that step runs (a missing record is reason enough for it to write), the pipeline's own otherwise (`ProvenanceStage` in `scripts/lib/media_pipeline/stages.py`), together with the tag step's camera fields. verify-card finds a renamed copy by that card name.
 
 ---
 
@@ -123,11 +133,5 @@ Direct distribution only via notarized DMG. No App Store version — the depende
 
 ## Testing
 
-Tests live in `scripts/tests/`.
-
-- **Regression tests** — assert actual file state before and after, not just exit codes or stdout. Structured as "record before → run script → compare after" with human-readable expected vs actual diffs.
-- **Performance tests** — see `docs/testing.md`'s "Performance tests" entry.
-
-Testing rules:
-- Testing `returncode == 0` is not testing behavior — it only confirms the script didn't crash.
-- Tests should not be updated without explicit confirmation unless following TDD (break test first, confirm expected failure, then update).
+Tests live in a `tests/` folder in each project (`scripts/tests/`, `macos/Tests/`).
+Testing rules and the cost contracts are in `docs/testing.md`; per-platform commands are in `docs/environment.md`.

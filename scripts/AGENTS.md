@@ -18,7 +18,68 @@ These are rules that prevent common agent mistakes — they explain why things a
 - **Why Python uses functional composition**: declarative readability — build up a picture of what needs to be read, what needs to be set, what needs to be done, then do it in the last step. Python was chosen over bash for this reason.
 - **Why no hardcoded defaults**: portability across machines. All configuration must come from configuration files (media-profiles.yaml) or environment variables (.env.local). If required config is missing, fail immediately with a clear error directing the user where to add it.
 - **Why data is separated from presentation**: formatted text shouldn't be function args. Use structured dicts with descriptive key names as building blocks, then build formatted text at display time.
-- **Why batch files pass through all args transparently**: they're thin loops, not filtering layers.
+
+## Code layout
+
+`README.md` is the user's guide; keep it in step when a command or flag changes.
+
+```
+<command>.sh          what users and the app run; each sources lib/launch.sh
+media-profiles.yaml   user config
+cli/                  one module per command: argument parsing, validation messages, output
+lib/                  the logic, which the pipeline and the tests import directly
+  data/               what the code reads rather than imports (filename patterns,
+                      timezone tables, exiftool config), found through lib.DATA_DIR
+tests/                mirrors lib/ (see tests/README.md)
+tools/                vendored binaries
+```
+
+A command's name is the same everywhere, in snake_case past the wrapper:
+`fix-media-timestamp.sh` → `cli/fix_media_timestamp.py` → `lib/fix_media_timestamp/`.
+`lib/launch.sh` resolves the interpreter (`lib/ensure-venv.sh`) and runs
+`cli/<command>.py` with `scripts/` on `PYTHONPATH`, so the cli modules import `cli.*`
+and `lib.*` from any working directory. A new command is a `cli/` module, a
+one-line `<command>.sh` like the others, and its logic in `lib/<command>`;
+`tests/test_command_wrappers.py` checks the pairing.
+
+| Command | Logic in `lib/` |
+|---|---|
+| `media-pipeline` | `media_pipeline/` — runs every step in-process (see below) |
+| `fix-media-timestamp` | `fix_media_timestamp/` — `read.read_current` → pure `plan.plan_correction` → `describe.describe_correction` (stderr) → `apply.apply_correction` (one write); `clock_fields` is the table of fields a correction owns |
+| `tag-media` | `tag_media.py` |
+| `organize-by-date` | `organize_by_date.py` |
+| `ingest-media` | `ingest_media.py` |
+| `generate-gyroflow` | `generate_gyroflow.py` |
+| `archive-source` | `archive_source.py` |
+| `probe-camera`, `scan-source`, `report-file-dates` | small enough to stay in the `cli/` module |
+
+Shared modules: `timestamps/` (`sources.py` reads and ranks a file's timestamps,
+`file_times.py` the file system's birth and modification times, `provenance.py` the
+recovery record written with a correction), `exiftool.py` (the one metadata
+client), `countries.py` (country → timezone), `command_line.py` (timezone flags and
+their resolution, interrupt handling), `profiles.py`, `filesystem.py`, `footage.py`.
+`cli/results.py` prints a single-file command's result as `@@key=value` lines.
+
+A `cli/` module holds argument parsing, validation messages and output; anything
+another command or the pipeline could call belongs in its `lib/` module.
+
+`lib/media_pipeline/` is split by what each part decides:
+
+| Module | Holds |
+|---|---|
+| `options.py` | `RunOptions`, the frozen command line resolved against the profile, and its validation |
+| `preflight.py` | batch checks before the first file: stale exiftool_tmp, protected files, camera, timezones (`preflight_timezones` is pure), filename timestamps |
+| `consent.py` | `require_consent`, the one terminal-only y/n prompt |
+| `stages.py` | one file's trip: a `Stage` per step (`name`, `enabled(opts)`, `run(ctx) -> StageOutcome`) run by `process_file`, which owns `stage_complete` and the single failure exit |
+| `batch.py` | `run()`: options → pre-flight → every file → organize conflicts → archive → summary |
+| `working_dir.py` | `WorkingDir`, the staging directory and the copies a cancel clears |
+| `events.py` | `emit_event`, the JSONL on stdout |
+
+Adding a pipeline step means one `Stage` subclass in `STAGES` plus its entries in
+`lib/media_pipeline/pipeline-schema.yaml`: the `stage_complete` token and a `cli.steps` entry. The
+`cli` section also lists every flag the app passes; `build_parser()`'s `--tasks`
+choices and options are tested against it. `cli/media_pipeline.py` keeps
+`build_parser()` and builds the `WorkingDir` its cancel handler closes over.
 
 ## External tool behavior
 
@@ -62,7 +123,7 @@ Diagnostic knowledge for understanding unexpected timestamp offsets:
 
 ## Workflow design
 
-`media-pipeline.py` is the single entry point for all media processing. The pipeline has a fixed frame — **ingest** and **output** always run — with optional processing steps in between:
+`media-pipeline` is the single entry point for all media processing. The pipeline has a fixed frame — **ingest** and **output** always run — with optional processing steps in between:
 
 ```
 INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow] → [archive-source]
@@ -92,12 +153,11 @@ Expected behaviors that regression tests must verify:
 - Directories left empty as a result of a file being moved are deleted immediately
 - Directories that were already empty and didn't become so from file moves are left alone
 - `.DS_Store` files should be deleted if they're the only thing preventing directory cleanup
-- The shell script entry point to each .py file sources `lib/ensure-venv.sh` to set up `PYTHONPATH`
 
 ## Python runtime
 
 - Scripts must run on the Python macOS ships (3.9) so users install nothing — see `docs/specs/python-runtime.md`
-- Wrappers exec `$JETLAG_PYTHON`, resolved by `lib/ensure-venv.sh`, never a bare `python3`
+- Wrappers exec `$JETLAG_PYTHON` through `lib/launch.sh`, resolved by `lib/ensure-venv.sh`, never a bare `python3`
 - A module using `X | None` annotations needs `from __future__ import annotations`; `tests/test_python_compatibility.py` enforces this
 
 ## Source of truth hierarchy

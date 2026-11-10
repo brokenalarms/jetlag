@@ -3,7 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var state: AppState
     @State private var licenseKey = ""
-    private var licenseStore: LicenseStore { LicenseStore.shared }
+    private var licenseStore: LicenseStore { state.licenseStore }
 
     var body: some View {
         Form {

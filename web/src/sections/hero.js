@@ -1,6 +1,10 @@
-export function renderHero() {
+import { PRICE } from '../content.js'
+
+export const id = 'hero'
+
+export function render() {
   return /* html */`
-    <section class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pt-24 pb-16">
+    <section id="${id}" class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pt-24 pb-16">
       <!-- Background glows: pink centre, green lower-left, pink upper-right -->
       <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
         <div class="h-[600px] w-[600px] rounded-full bg-neon-pink/10 blur-3xl"></div>
@@ -37,13 +41,13 @@ export function renderHero() {
           Download free for macOS
         </a>
         <a href="#pricing" class="btn-secondary text-base px-8 py-3.5">
-          Unlock Pro — one-time $29
+          Unlock Pro — one-time ${PRICE}
         </a>
       </div>
 
       <!-- Trust line -->
       <p class="animate-fade-up opacity-0 mt-6 text-sm text-white/30" style="animation-delay: 0.6s">
-        macOS 13 Ventura or later &nbsp;·&nbsp; No subscription &nbsp;·&nbsp; Free tier included
+        Native on Apple Silicon &nbsp;·&nbsp; No subscription &nbsp;·&nbsp; Free tier included
       </p>
 
       <!-- App preview / diagram -->

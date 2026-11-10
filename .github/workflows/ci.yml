@@ -34,8 +34,32 @@ jobs:
           sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15
           sudo apt-get install -y ffmpeg libimage-exiftool-perl
 
-      - name: Install Python deps
-        run: pip install -r scripts/requirements.txt -r scripts/requirements-dev.txt
+      # make builds scripts/.venv from both requirements files and runs the
+      # suite in parallel, the same way it runs locally
+      - name: Run script tests
+        run: make test-scripts
 
-      - name: Run tests
-        run: pytest scripts/tests/ -x
+      - name: Lint and type-check scripts
+        run: make lint
+
+  web-design:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Test and build the site
+        run: make test-web
+
+      - name: Check colour sets against design tokens
+        run: make test-design

@@ -1,22 +1,4 @@
 #!/bin/bash
-# fix-video-timestamp-v3.sh
-# Bash wrapper for Python implementation
-# Maintains compatibility with existing CLI interface while using clean Python implementation
-
-set -euo pipefail
-
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_SCRIPT="$SCRIPT_DIR/fix-media-timestamp.py"
-
-source "$SCRIPT_DIR/lib/ensure-venv.sh"
-
-# Check if Python script exists
-if [[ ! -f "$PYTHON_SCRIPT" ]]; then
-    echo "ERROR: Python implementation not found at $PYTHON_SCRIPT" >&2
-    exit 1
-fi
-
-# Pass all arguments directly to Python implementation
-# Python will handle path resolution
-exec "$JETLAG_PYTHON" "$PYTHON_SCRIPT" "$@"
+# fix-media-timestamp.sh — Correct one photo or video's timestamps so it sorts at the time it was shot.
+# Run with --help for its options; README.md describes every command.
+source "$(dirname "${BASH_SOURCE[0]}")/lib/launch.sh" fix_media_timestamp "$@"

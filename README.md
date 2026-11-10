@@ -8,6 +8,6 @@ Fix timestamps across GoPro, iPhone, drone, and cinema cameras so multi-camera f
 
 ## Components
 
-- **scripts/** — Python CLI tools for timestamp fixing, tagging, file organization, and gyroflow project generation. Work standalone with no knowledge of the app.
+- **scripts/** — Python CLI tools for timestamp fixing, tagging, file organization, and gyroflow project generation. Work standalone with no knowledge of the app; `scripts/README.md` explains how to use them.
 - **macos/** — SwiftUI app that reads `media-profiles.yaml`, edits camera profiles, and launches the scripts.
 - **web/** — Marketing site (Vite + Tailwind).

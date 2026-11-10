@@ -47,7 +47,7 @@ written in the same exiftool call as the correction — no read or write of its 
 | `XMP-jetlag:ContentSHA256`, `XMP-jetlag:ContentBytes` | sha256 and size of the file's content without its metadata (the data portion, see "What is hashed"). Not written at import: added later by the deep check, as a cache (see "Hash cache") |
 
 `jetlag` is a custom XMP namespace (`http://ns.jetlag.app/1.0/`) declared in
-`scripts/lib/exiftool-jetlag.config`. Exiftool only writes tags it has a definition
+`scripts/lib/data/exiftool-jetlag.config`. Exiftool only writes tags it has a definition
 for, so both metadata backends load that config. One property per value, so each is
 readable directly (`exiftool -XMP-jetlag:OriginalCreateDate`) with nothing to parse.
 
@@ -252,7 +252,7 @@ its data portion is unchanged by tag + fix-timestamp.
 2. Footage-size reader for QuickTime-family files, with a regression test that footage
    size and hash are unchanged by tag + fix-timestamp on each profile's format.
 3. Provenance on every moved file.
-4. `verify-card.py`: source scan, location listings, matching, JSONL verdicts.
+4. `verify-card` (`verify-card.sh`, `cli/verify_card.py`, `lib/verify_card.py`): source scan, location listings, matching, JSONL verdicts.
 5. Verify screen in the app; backup-location configuration screen.
 6. `archive-source` delete mode accepts only verified or user-accepted files.
 7. Local/network detection and label per location; "Verify hashes" and "Include

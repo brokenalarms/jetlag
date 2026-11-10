@@ -3,13 +3,19 @@
 Generate Xcode .colorset JSON files from design/tokens.json.
 
 Usage:
-    python3 design/generate-colorsets.py
+    python3 design/generate-colorsets.py           # write the color sets
+    python3 design/generate-colorsets.py --check   # exit 1 if any differ from tokens
 
 Writes color sets to macos/Sources/Assets.xcassets/ so the macOS app and
 website always share the same hex values from a single source of truth.
+
+COLORSET_MAP lists every token the app reads (Theme.swift). The background
+tokens are web-only: the app uses system backgrounds.
 """
+import argparse
 import json
 import os
+import sys
 
 COLORSET_MAP = {
     "accent":       "AccentColor",
@@ -50,19 +56,61 @@ def make_colorset(hex_color: str) -> dict:
     }
 
 
-with open(TOKENS_PATH) as f:
-    tokens = json.load(f)
+def colorset_text(hex_color: str) -> str:
+    return json.dumps(make_colorset(hex_color), indent=2) + "\n"
 
-colors = tokens["colors"]
 
-for token_key, colorset_name in COLORSET_MAP.items():
-    hex_color = colors[token_key]
-    colorset_dir = os.path.join(XCASSETS_PATH, f"{colorset_name}.colorset")
-    os.makedirs(colorset_dir, exist_ok=True)
-    contents_path = os.path.join(colorset_dir, "Contents.json")
-    with open(contents_path, "w") as f:
-        json.dump(make_colorset(hex_color), f, indent=2)
-        f.write("\n")
-    print(f"  {colorset_name}.colorset  ({hex_color})")
+def contents_path(colorset_name: str) -> str:
+    return os.path.join(XCASSETS_PATH, f"{colorset_name}.colorset", "Contents.json")
 
-print("Done.")
+
+def write(colors: dict) -> None:
+    for token_key, colorset_name in COLORSET_MAP.items():
+        hex_color = colors[token_key]
+        path = contents_path(colorset_name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            f.write(colorset_text(hex_color))
+        print(f"  {colorset_name}.colorset  ({hex_color})")
+    print("Done.")
+
+
+def check(colors: dict) -> int:
+    """Return the number of color sets that are missing or differ from tokens."""
+    drifted = 0
+    for token_key, colorset_name in COLORSET_MAP.items():
+        path = contents_path(colorset_name)
+        expected = make_colorset(colors[token_key])
+        try:
+            with open(path) as f:
+                actual = json.load(f)
+        except FileNotFoundError:
+            print(f"  missing: {colorset_name}.colorset (token {token_key})")
+            drifted += 1
+            continue
+        if actual != expected:
+            print(f"  differs: {colorset_name}.colorset (token {token_key} = {colors[token_key]})")
+            drifted += 1
+    if drifted:
+        print("Color sets are out of date. Run: python3 design/generate-colorsets.py")
+    else:
+        print("Color sets match design/tokens.json.")
+    return drifted
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
+    parser.add_argument("--check", action="store_true",
+                        help="compare color sets with tokens without writing; exit 1 on drift")
+    args = parser.parse_args()
+
+    with open(TOKENS_PATH) as f:
+        colors = json.load(f)["colors"]
+
+    if args.check:
+        sys.exit(1 if check(colors) else 0)
+    write(colors)
+
+
+if __name__ == "__main__":
+    main()

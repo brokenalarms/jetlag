@@ -1,0 +1,15 @@
+# Where organize puts a file shot on 2025-08-15, for a template and group.
+# Held on both sides: scripts/tests/commands/test_organize_by_date.py checks
+# expand_path_template against every case, and the app's
+# macos/Tests/Models/Workflow/DestinationPreviewTests.swift checks the Organize
+# preview against the same cases, so the two layouts cannot drift apart.
+# template null means the profile has no folder_template (the default layout);
+# group "" means no --group, which leaves the group folder out.
+cases:
+  - {template: null, group: "", expected: "2025/2025-08-15"}
+  - {template: null, group: "Japan", expected: "2025/Japan/2025-08-15"}
+  - {template: "{{YYYY}}/{{MM}}/{{GROUP}}/{{YYYY}}-{{MM}}-{{DD}}", group: "", expected: "2025/08/2025-08-15"}
+  - {template: "{{YYYY}}/{{MM}}/{{GROUP}}/{{YYYY}}-{{MM}}-{{DD}}", group: "Japan", expected: "2025/08/Japan/2025-08-15"}
+  - {template: "{{YYYY}}/{{MMM}}/{{GROUP}}", group: "Japan", expected: "2025/Aug/Japan"}
+  - {template: "{{YYYY}}/{{MMM}}/{{GROUP}}", group: "", expected: "2025/Aug"}
+  - {template: "{{GROUP}}/{{YYYY-MM-DD}}", group: "", expected: "2025-08-15"}

@@ -18,15 +18,15 @@ const colorMap = {
 }
 
 // Clip width as a percentage of the bar area container.
-const CLIP_WIDTH_PCT = 30
-const PAD_MINUTES    = 70
+export const CLIP_WIDTH_PCT = 30
+export const PAD_MINUTES    = 70
 
-function toMinutes({ time, day = 0 }) {
+export function toMinutes({ time, day = 0 }) {
   const [h, m] = time.split(':').map(Number)
   return day * 1440 + h * 60 + m
 }
 
-function buildScale(clips) {
+export function buildScale(clips) {
   const times      = clips.map(toMinutes)
   const minTime    = Math.min(...times)
   const maxTime    = Math.max(...times)
@@ -36,14 +36,14 @@ function buildScale(clips) {
 }
 
 /** Returns a percentage (0–(100-CLIP_WIDTH_PCT)) for the clip's left offset. */
-function clipOffset(clip, scale) {
+export function clipOffset(clip, scale) {
   const { scaleStart, scaleEnd } = scale
   const range = scaleEnd - scaleStart
   if (range === 0) return 0
   return ((toMinutes(clip) - scaleStart) / range) * (100 - CLIP_WIDTH_PCT)
 }
 
-function buildTicks(scale) {
+export function buildTicks(scale) {
   const { scaleStart, scaleEnd } = scale
   const durationMin = scaleEnd - scaleStart
   const interval    = durationMin > 15 * 60 ? 6 : durationMin > 6 * 60 ? 3 : 2
@@ -83,7 +83,7 @@ function renderAxis(scale) {
 
 const scenarioStore = []
 
-function formatMinutes(totalMin) {
+export function formatMinutes(totalMin) {
   const rounded = Math.round(totalMin)
   const day     = Math.floor(rounded / 1440)
   const rem     = rounded - day * 1440

@@ -1,0 +1,79 @@
+import Foundation
+
+struct DiffTableRow: Identifiable {
+    let id = UUID()
+    let file: String
+
+    /// The path the pipeline read this file from, emitted on `pipeline_file`.
+    /// The source of truth for where an unmoved row's file is: the source scan is
+    /// recursive, so a basename under the source directory would not locate it.
+    var sourcePath: String?
+
+    var tagAction: String?
+    /// Set when the file's own camera differs from the profile's.
+    var fileCamera: FileCamera?
+    var tagsAdded: String?
+    var originalTime: String?
+    var correctedTime: String?
+    var timestampSource: TimestampSource?
+    var timestampAction: String?
+    var timezone: String?
+    var correctionMode: String?
+    var timeOffsetDisplay: String?
+    var timestampError: String?
+    var renamedTo: String?
+    var dest: String?
+    var organizeAction: String?
+    var organizeReason: String?
+    var pipelineResult: String?
+    var originalEpoch: Double?
+    var correctedEpoch: Double?
+
+    /// The write tags whose stored value differs from what the correction would
+    /// give them. A row whose original and corrected times are the same string is
+    /// only explicable by this list — it is what "Would fix" would actually write.
+    var staleFields: [String] = []
+    var staleFileTimes: [String] = []
+
+    /// The file already carries a camera-set zone that the declared zone would
+    /// relabel; applying needs the user's explicit confirmation.
+    var requiresForceTimezone: Bool = false
+
+    /// What the pipeline reported doing to this file, as tokens. The status the
+    /// table shows is a function of these — never of whether `dest` is populated.
+    var outcome: RowOutcome {
+        RowOutcome(timestampAction: timestampAction, organizeAction: organizeAction,
+                   organizeReason: organizeReason, pipelineResult: pipelineResult)
+    }
+
+    /// Why the organize step left the file where it was, when it did.
+    var skipReason: RowOutcome.SkipReason? {
+        guard outcome.movement == .skipped else { return nil }
+        return organizeReason.flatMap(RowOutcome.SkipReason.init(rawValue:))
+    }
+
+    /// A different file is already at this row's destination, so the move was
+    /// refused. The table flags it because only these rows are what --overwrite
+    /// would replace — an identical copy costs nothing to leave alone.
+    var hasDestinationConflict: Bool {
+        skipReason == .existsDiffers
+    }
+
+    /// The original timestamp as the table shows it. A UTC clock's stored digits
+    /// carry no zone of their own, so the source decides how the value reads.
+    var originalTimeDisplay: String? {
+        guard let originalTime else { return nil }
+        return timestampSource?.originalDisplay(originalTime) ?? originalTime
+    }
+
+    var completedStages: Set<String> = []
+
+    mutating func markStageComplete(_ stage: String) {
+        completedStages.insert(stage)
+    }
+
+    /// Display label for the most recently completed stage, in pipeline order.
+    var lastCompletedStageLabel: String? {
+        PipelineStep.allCases.last(where: { completedStages.contains($0.stageToken) })?.stageLabel
+    }
+}

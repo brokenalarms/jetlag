@@ -112,7 +112,7 @@ the whole process group down.
 
 - **The script is the source of truth; the app composes arguments and renders tokens.** No
   label, status or outcome is inferred in Swift from the presence of a field. Tokens are
-  enumerated in `scripts/pipeline-schema.yaml` and pinned on both sides by contract tests
+  enumerated in `scripts/lib/media_pipeline/pipeline-schema.yaml` and pinned on both sides by contract tests
   (`test_pipeline_schema.py`, `PipelineSchemaContractTests`). Add a token on one side only
   and a test fails.
 - **The ingest directory is never touched.** The output is a new file at the destination;
@@ -140,7 +140,7 @@ the whole process group down.
 - Profiles live in `~/Library/Application Support/<app name>/media-profiles.yaml`, seeded from
   the bundled yaml on first launch (#169); the Settings override points a dev build at the
   repo's `scripts/media-profiles.yaml`.
-- `scripts/tests/test_metadata_call_contract.py` holds the pipeline to one exiftool read
+- `scripts/tests/media_pipeline/test_metadata_call_contract.py` holds the pipeline to one exiftool read
   per file on a dry run and one read plus one write on an apply.
 - `StreamingPerformanceTests` asserts the second half of a streamed run costs no more than
   the first; it is what stands between the app and O(n²) per line/row.

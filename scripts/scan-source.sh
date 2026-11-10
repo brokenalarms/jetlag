@@ -1,19 +1,4 @@
 #!/bin/bash
-# scan-source.sh
-# Bash wrapper for Python implementation
-
-set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_SCRIPT="$SCRIPT_DIR/scan-source.py"
-
-source "$SCRIPT_DIR/lib/ensure-venv.sh"
-
-# Check if Python script exists
-if [[ ! -f "$PYTHON_SCRIPT" ]]; then
-    echo "ERROR: Python implementation not found at $PYTHON_SCRIPT" >&2
-    exit 1
-fi
-
-# Pass all arguments directly to Python implementation
-exec "$JETLAG_PYTHON" "$PYTHON_SCRIPT" "$@"
+# scan-source.sh — Report how many media files a source holds, or whether their names carry dates.
+# Run with --help for its options; README.md describes every command.
+source "$(dirname "${BASH_SOURCE[0]}")/lib/launch.sh" scan_source "$@"

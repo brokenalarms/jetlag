@@ -30,16 +30,18 @@ final class SourceTimestampedNamesTests: XCTestCase {
         FileManager.default.createFile(atPath: url.path, contents: Data())
     }
 
+    private var launcher: LiveScriptLauncher {
+        LiveScriptLauncher(scriptsDirectory: scriptsDirectory, profilesPath: profilesPath)
+    }
+
     private func hasTimestampedNames(_ extensions: [String] = [".mp4"]) async -> Bool {
         await SourceScan.hasTimestampedNames(
-            source: source.path, extensions: extensions,
-            scriptsDirectory: scriptsDirectory, profilesPath: profilesPath)
+            source: source.path, extensions: extensions, launcher: launcher)
     }
 
     private func mediaFileCount(_ extensions: [String] = [".mp4"]) async -> Int? {
         await SourceScan.mediaFileCount(
-            source: source.path, extensions: extensions,
-            scriptsDirectory: scriptsDirectory, profilesPath: profilesPath)
+            source: source.path, extensions: extensions, launcher: launcher)
     }
 
     /// The count a run is checked against the free-tier limit with: the script's, so

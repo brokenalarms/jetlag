@@ -2,13 +2,6 @@ import SwiftUI
 
 struct WorkflowView: View {
     @Bindable var state: AppState
-    @State private var upgradePrompt: UpgradePrompt?
-    private var licenseStore: LicenseStore { LicenseStore.shared }
-
-    private struct UpgradePrompt: Identifiable {
-        let fileCount: Int
-        var id: Int { fileCount }
-    }
 
     /// The form's one design width. Its controls are text fields, which have no
     /// intrinsic width, so the form cannot be sized from its content; everything around
@@ -56,16 +49,6 @@ struct WorkflowView: View {
                 executionBar
             }
         }
-        .onAppear {
-            let name = state.workflowSession.profileName
-            if !name.isEmpty {
-                state.workflowSession = WorkflowSession(
-                    profile: state.profilesConfig?.profiles[name],
-                    profileName: name,
-                    gyroflowAvailable: state.gyroflowStatus.isInstalled
-                )
-            }
-        }
         .frame(width: Self.formWidth)
         .navigationTitle(Strings.Nav.workflow)
         .toolbar {
@@ -78,14 +61,14 @@ struct WorkflowView: View {
                 .help(state.showInspector ? Strings.Workflow.hideInspectorHelp : Strings.Workflow.showInspectorHelp)
             }
         }
-        .sheet(item: $upgradePrompt) { prompt in
+        .sheet(item: $state.upgradePrompt) { prompt in
             UpgradeView(
                 fileCount: prompt.fileCount,
-                store: licenseStore,
-                onDismiss: { upgradePrompt = nil },
+                store: state.licenseStore,
+                onDismiss: { state.upgradePrompt = nil },
                 onUnlocked: {
-                    upgradePrompt = nil
-                    runWorkflow()
+                    state.upgradePrompt = nil
+                    state.runWorkflow()
                 }
             )
         }
@@ -95,13 +78,13 @@ struct WorkflowView: View {
         ) {
             Button(Strings.Workflow.forceTimezoneButton, role: .destructive) {
                 state.workflowSession.grantTimezoneAssent()
-                runWorkflow()
+                state.runWorkflow()
             }
             Button(Strings.Common.cancel, role: .cancel) {
                 state.workflowSession.showTimezoneConflict = false
             }
         } message: {
-            Text(timezoneConflictMessage)
+            Text(state.workflowSession.timezoneConflictMessage)
         }
         .alert(
             Strings.Workflow.overwriteConflictTitle,
@@ -109,7 +92,7 @@ struct WorkflowView: View {
         ) {
             Button(Strings.Workflow.overwriteButton, role: .destructive) {
                 state.workflowSession.grantOverwriteAssent()
-                runWorkflow()
+                state.runWorkflow()
             }
             Button(Strings.Common.cancel, role: .cancel) {
                 state.workflowSession.showOverwriteConflict = false
@@ -124,7 +107,7 @@ struct WorkflowView: View {
         ) {
             Button(Strings.Workflow.allowCameraMismatchButton, role: .destructive) {
                 state.workflowSession.grantCameraMismatchAssent()
-                runWorkflow()
+                state.runWorkflow()
             }
             Button(Strings.Common.cancel, role: .cancel) {
                 state.workflowSession.showCameraMismatch = false
@@ -143,7 +126,7 @@ struct WorkflowView: View {
         ) {
             Button(Strings.Workflow.unlockProtectedButton) {
                 state.workflowSession.grantUnlockProtectedAssent()
-                runWorkflow()
+                state.runWorkflow()
             }
             Button(Strings.Common.cancel, role: .cancel) {
                 state.workflowSession.showProtectedSources = false
@@ -160,12 +143,12 @@ struct WorkflowView: View {
         ) {
             Button(Strings.Workflow.dryRunFirstButton) {
                 state.workflowSession.startDryRunInstead()
-                runWorkflow()
+                state.runWorkflow()
             }
             .keyboardShortcut(.defaultAction)
             Button(Strings.Workflow.applyAnywayButton, role: .destructive) {
                 state.workflowSession.grantDryRunStaleAssent()
-                runWorkflow()
+                state.runWorkflow()
             }
             Button(Strings.Common.cancel, role: .cancel) {
                 state.workflowSession.showDryRunStale = false
@@ -189,7 +172,7 @@ struct WorkflowView: View {
                 }
             }
         } message: {
-            Text(runSummaryMessage)
+            Text(state.runSummary?.message(cameraMismatch: state.workflowSession.cameraMismatch) ?? "")
         }
         .alert(
             Strings.Errors.commandLineToolsTitle,
@@ -204,51 +187,10 @@ struct WorkflowView: View {
         }
     }
 
-    private var runSummaryMessage: String {
-        guard let summary = state.runSummary else { return "" }
-        var lines = [Strings.Workflow.runSummaryCounts(
-            processed: summary.processed,
-            changed: summary.changed,
-            mode: summary.mode)]
-        lines.append(summary.mode == .applied
-                     ? Strings.Workflow.runSummaryApplied
-                     : Strings.Workflow.runSummaryDryRun)
-        if summary.failed > 0 {
-            lines.append(Strings.Workflow.runSummaryFailed(
-                count: summary.failed,
-                files: summary.failedFiles))
-        }
-        if summary.mode == .dryRun, let mismatch = state.workflowSession.cameraMismatch {
-            lines.append(Strings.Workflow.runSummaryCameraMismatch(
-                count: mismatch.files.count,
-                found: mismatch.foundName,
-                expected: mismatch.expected?.name ?? ""))
-        }
-        return lines.joined(separator: "\n\n")
-    }
-
-    private var timezoneConflictMessage: String {
-        let session = state.workflowSession
-        guard let fileTimezones = session.timezoneConflictFileTimezones else {
-            return ""
-        }
-        if session.timezoneConflictType == "mixed_timezones" {
-            let groups = fileTimezones.map { tz, files in
-                "\(tz): \(files.count) file\(files.count == 1 ? "" : "s")"
-            }.sorted().joined(separator: "\n")
-            return Strings.Workflow.mixedTimezonesMessage(groups: groups)
-        } else {
-            let provided = session.timezoneConflictProvidedTz ?? ""
-            let existing = fileTimezones.keys.sorted().joined(separator: ", ")
-            return Strings.Workflow.providedMismatchMessage(provided: provided, existing: existing)
-        }
-    }
-
     // MARK: - Profile selection
 
     private var profileSelector: some View {
-        @Bindable var session = state.workflowSession
-        return VStack(alignment: .leading, spacing: Theme.Space.xl) {
+        VStack(alignment: .leading, spacing: Theme.Space.xl) {
             if let error = state.profileLoadError {
                 VStack(alignment: .leading, spacing: Theme.Space.md) {
                     Label(error.message, systemImage: "exclamationmark.triangle.fill")
@@ -274,15 +216,11 @@ struct WorkflowView: View {
 
             HStack(spacing: Theme.Space.lg) {
                 Text(Strings.Workflow.profileLabel)
-                ProfilePicker(selection: $session.profileName, state: state)
-                    .onChange(of: session.profileName) { _, newValue in
-                        state.clearLog()
-                        state.workflowSession = WorkflowSession(
-                            profile: state.profilesConfig?.profiles[newValue],
-                            profileName: newValue,
-                            gyroflowAvailable: state.gyroflowStatus.isInstalled
-                        )
-                    }
+                ProfilePicker(
+                    selection: Binding(
+                        get: { state.workflowSession.profileName },
+                        set: { state.selectProfile($0) }),
+                    state: state)
             }
         }
     }
@@ -366,7 +304,7 @@ struct WorkflowView: View {
                 placeholder: Strings.Workflow.readyDirPlaceholder,
                 path: $session.readyDir.value,
                 error: validateDirectory(session.readyDir.current))
-            Text(session.readyDir.current.isEmpty ? Strings.Workflow.readyDirRequired : destinationPreview(readyDir: session.readyDir.current))
+            Text(session.readyDir.current.isEmpty ? Strings.Workflow.readyDirRequired : session.destinationPreview)
                 .font(Theme.Typography.caption)
                 .foregroundStyle(Theme.Text.secondary)
             OptionGroup {
@@ -413,7 +351,7 @@ struct WorkflowView: View {
                 isEnabled: parseable,
                 help: Strings.Workflow.updateFilenameDatesHelp)
 
-            if let preview = fixTimestampPreview {
+            if let preview = session.fixTimestampPreview {
                 Text(preview)
                     .font(Theme.Typography.caption)
                     .foregroundStyle(Theme.Text.tertiary)
@@ -424,8 +362,7 @@ struct WorkflowView: View {
             let found = await SourceScan.hasTimestampedNames(
                 source: source,
                 extensions: session.workingProfile.fileExtensions ?? [],
-                scriptsDirectory: state.scriptsDirectory,
-                profilesPath: state.profilesLocation.path)
+                launcher: state.launcher)
             guard !Task.isCancelled else { return }
             session.noteTimestampedNames(found, in: source)
         }
@@ -435,35 +372,6 @@ struct WorkflowView: View {
     private struct SourceRead: Hashable {
         let session: ObjectIdentifier
         let source: String
-    }
-
-    var fixTimestampPreview: String? {
-        let session = state.workflowSession
-        guard session.enabledSteps.contains(.fixTimestamps) else { return nil }
-
-        var parts: [String] = []
-        if session.inferFromFilenames {
-            if let option = session.timezoneOption {
-                parts.append(option.offsets.count > 1
-                    ? Strings.Workflow.fixTimestampSourceFilenamesZoneMultiHint(city: option.city)
-                    : Strings.Workflow.fixTimestampSourceFilenamesZoneHint(city: option.city, offsetLabel: option.offsetLabel))
-            } else {
-                parts.append(Strings.Workflow.fixTimestampSourceFilenamesHint)
-            }
-        }
-        if let offset = session.timeOffsetSeconds, offset != 0 {
-            let sign = offset > 0 ? "+" : ""
-            parts.append(Strings.Workflow.fixTimestampShiftHint(sign: sign, offset: offset))
-        }
-        if let option = session.timezoneOption, !session.inferFromFilenames {
-            parts.append(option.offsets.count > 1
-                ? Strings.Workflow.fixTimestampZoneMultiHint(city: option.city)
-                : Strings.Workflow.fixTimestampZoneHint(city: option.city, offsetLabel: option.offsetLabel))
-        }
-        if session.updateFilenameDates {
-            parts.append(Strings.Workflow.fixTimestampRenameHint)
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     private var archiveSourceOptions: some View {
@@ -507,71 +415,8 @@ struct WorkflowView: View {
             canRun: session.allStepsReady,
             onRun: {
                 state.workflowSession.clearRunAssent()
-                runWorkflow()
+                state.runWorkflow()
             },
             onCancel: { state.cancelRunning() })
-    }
-
-    // MARK: - Helpers
-
-    private func destinationPreview(readyDir: String) -> String {
-        let session = state.workflowSession
-        var path = readyDir + "/YYYY"
-        if !session.group.isEmpty {
-            path += "/\(session.group)"
-        }
-        path += "/YYYY-MM-DD"
-        return path
-    }
-
-    // MARK: - Actions
-
-    private func runWorkflow() {
-        state.workflowSession.chooseSource()
-        guard state.canRunPipeline() else { return }
-
-        // An apply the user never previewed, and applying over the files the last
-        // run reported blocked, both destroy files: the answers are taken before
-        // anything runs — cancelling runs nothing.
-        if state.workflowSession.requestDryRunAssentIfNeeded() { return }
-        if state.workflowSession.requestOverwriteAssentIfNeeded() { return }
-
-        let session = state.workflowSession
-        state.startRun(
-            afterCounting: { [state] in
-                await SourceScan.mediaFileCount(
-                    source: session.sourceDir.current,
-                    extensions: session.workingProfile.fileExtensions ?? [],
-                    scriptsDirectory: state.scriptsDirectory,
-                    profilesPath: state.profilesLocation.path)
-            },
-            exceedsLimit: { licenseStore.exceedsLimit(fileCount: $0) },
-            onOverLimit: { upgradePrompt = UpgradePrompt(fileCount: $0) },
-            start: startPipeline)
-    }
-
-    private func startPipeline() {
-        state.clearLog()
-        state.showInspector = true
-
-        let (script, args) = state.workflowSession.buildPipelineArgs()
-        state.workflowSession.noteRunStarted()
-
-        let (process, stream) = ScriptRunner.run(
-            script: script,
-            args: args,
-            workingDir: state.scriptsDirectory,
-            profilesPath: state.profilesLocation.path
-        )
-        state.currentProcess = process
-
-        state.currentRunTask = Task {
-            for await line in stream {
-                if Task.isCancelled { break }
-                await MainActor.run { state.appendLog(line) }
-            }
-            guard !Task.isCancelled else { return }
-            await MainActor.run { state.finishRun() }
-        }
     }
 }
