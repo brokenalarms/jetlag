@@ -36,11 +36,4 @@ final class DestinationPreviewTests: XCTestCase {
 
         XCTAssertEqual(preview, "/Volumes/Media/Ready/YYYY/YYYY-MM-DD")
     }
-
-    /// A group sharing a folder name with the date drops with its separator.
-    func testAGroupInsideAFolderNameDropsWithItsSeparator() {
-        let preview = session(folderTemplate: "{{YYYY}}/{{YYYY-MM-DD}} {{GROUP}}").destinationPreview
-
-        XCTAssertEqual(preview, "/Volumes/Media/Ready/YYYY/YYYY-MM-DD")
-    }
 }

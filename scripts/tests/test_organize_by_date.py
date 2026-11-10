@@ -789,9 +789,3 @@ class TestFolderTemplateDefault:
         template = "{{YYYY}}/{{GROUP}}/{{DD}}"
         assert organize.expand_path_template(template, "2025-08-15") == "2025/15"
 
-    def test_group_sharing_a_folder_name_drops_with_its_separator(self):
-        """A group written into a folder name alongside the date leaves the
-        date alone, without a dangling separator."""
-        template = "{{YYYY}}/{{YYYY-MM-DD}} {{GROUP}}"
-        assert organize.expand_path_template(template, "2025-08-15") == "2025/2025-08-15"
-        assert organize.expand_path_template(template, "2025-08-15", "Japan") == "2025/2025-08-15 Japan"

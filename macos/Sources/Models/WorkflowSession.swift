@@ -560,40 +560,19 @@ final class WorkflowSession {
     /// Where organized files land, laid out as the pipeline lays them out
     /// (`expand_path_template` in scripts/lib/organize.py): the profile's
     /// `folder_template` when it has one, otherwise year / [group /] date. The
-    /// group is an optional folder, so without one `{{GROUP}}` is left out.
+    /// group is an optional folder, so without one that folder is left out.
     /// Date parts show as their placeholders (YYYY, MM, …).
     var destinationPreview: String {
         var template = "{{YYYY}}/{{GROUP}}/{{YYYY}}-{{MM}}-{{DD}}"
         if let folderTemplate = workingProfile.folderTemplate, !folderTemplate.isEmpty {
             template = folderTemplate
         }
-        template = group.isEmpty
-            ? Self.droppingGroup(from: template)
-            : template.replacingOccurrences(of: "{{GROUP}}", with: group)
-        var relative = template
+        var relative = template.replacingOccurrences(of: "{{GROUP}}", with: group)
         for token in ["YYYY-MM-DD", "YYYY", "MMM", "MM", "DD"] {
             relative = relative.replacingOccurrences(of: "{{\(token)}}", with: token)
         }
-        relative = relative.replacingOccurrences(of: "//", with: "/")
-        while relative.hasSuffix("/") {
-            relative.removeLast()
-        }
+        // Without a group its folder is empty: drop it, and any other empty folder.
+        relative = relative.split(separator: "/").joined(separator: "/")
         return readyDir.current + "/" + relative
-    }
-
-    /// `{{GROUP}}` removed from each folder of a template, with the separator
-    /// that joined it to the rest of the folder name; folders left empty go.
-    static func droppingGroup(from template: String) -> String {
-        let joiners = CharacterSet(charactersIn: " _.-")
-        return template
-            .components(separatedBy: "/")
-            .compactMap { folder -> String? in
-                guard folder.contains("{{GROUP}}") else { return folder }
-                let remaining = folder
-                    .replacingOccurrences(of: #"[ _.-]*\{\{GROUP\}\}"#, with: "", options: .regularExpression)
-                    .trimmingCharacters(in: joiners)
-                return remaining.isEmpty ? nil : remaining
-            }
-            .joined(separator: "/")
     }
 }
