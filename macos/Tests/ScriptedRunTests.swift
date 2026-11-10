@@ -78,7 +78,10 @@ final class ScriptedRunTests: XCTestCase {
     }
 
     /// Press Run and wait for the run to end: first the media count, then the
-    /// pipeline the count started.
+    /// pipeline the count started. Run is pressed on the main actor, as in the
+    /// app: the replayed count answers at once, and only a busy main actor keeps
+    /// the count's task from starting the pipeline before Run has stored it.
+    @MainActor
     private func runToCompletion(_ state: AppState) async {
         state.runWorkflow(check: pythonReady)
         await state.currentRunTask?.value

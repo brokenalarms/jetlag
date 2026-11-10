@@ -34,4 +34,36 @@ final class CancelFeedbackTests: XCTestCase {
         XCTAssertEqual(state.visibleRows.first?.file, "completed.mp4")
         XCTAssertFalse(state.isRunning)
     }
+
+    /// The pipeline's output is drained off the main actor, so a line can already be
+    /// waiting for it when Cancel is pressed there. That line must not land after
+    /// the cancelled line, nor start a row the cancel just withdrew, nor finish the
+    /// run as if it had completed.
+    @MainActor
+    func testOutputWaitingForTheMainActorIsDroppedOnCancel() async {
+        let launcher = ReplayingLauncher(["media-pipeline.sh": [
+            LogLine(text: #"{"event": "pipeline_file", "file": "late.mp4"}"#, stream: .stdout),
+            LogLine(text: "late progress", stream: .stderr),
+        ]])
+        let state = AppState(launcher: launcher)
+        state.workflowSession = WorkflowSession(profile: MediaProfile(type: .video), profileName: "p")
+
+        state.startPipeline()
+        let drain = state.currentRunTask
+        // Hold the main actor while the drain reads the replayed output and queues
+        // its first line for it, as a busy main thread does during a real run.
+        holdCurrentThread(seconds: 0.2)
+        state.cancelRunning()
+        await drain?.value
+
+        XCTAssertEqual(state.logOutput.map(\.text), [Strings.LogOutput.cancelled])
+        XCTAssertTrue(state.visibleRows.isEmpty)
+        XCTAssertFalse(state.isRunning)
+        XCTAssertFalse(state.showRunSummary)
+    }
+
+    /// Blocks without suspending, so the actor the caller is on stays occupied.
+    private func holdCurrentThread(seconds: TimeInterval) {
+        Thread.sleep(forTimeInterval: seconds)
+    }
 }
