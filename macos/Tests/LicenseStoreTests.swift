@@ -38,6 +38,20 @@ final class LicenseStoreTests: XCTestCase {
         ))
     }
 
+    /// The free tier stops a run of more than 50 files. Unlocking lifts the limit,
+    /// and the choice is kept in the store's own defaults, not the app's.
+    func testFreeTierLimitsARunUntilUnlocked() {
+        let store = LicenseStore(defaults: defaults, environment: [:], developerBuild: false)
+
+        XCTAssertFalse(store.exceedsLimit(fileCount: 50))
+        XCTAssertTrue(store.exceedsLimit(fileCount: 51))
+
+        store.isUnlocked = true
+
+        XCTAssertFalse(store.exceedsLimit(fileCount: 10_000))
+        XCTAssertTrue(defaults.bool(forKey: "jetlag.pro.unlocked"))
+    }
+
     /// The build customers get cannot be unlocked by an environment variable,
     /// and starts on the free tier.
     func testShippingBuildIgnoresEnvironmentAndStartsLocked() {

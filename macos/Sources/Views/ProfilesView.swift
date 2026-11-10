@@ -179,9 +179,7 @@ struct ProfilesView: View {
         panel.message = Strings.Profiles.newProfilePanelMessage
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task {
-            let probes = await CameraProbe.probe(
-                path: url.path, scriptsDirectory: state.scriptsDirectory,
-                profilesPath: state.profilesLocation.path)
+            let probes = await CameraProbe.probe(path: url.path, launcher: state.launcher)
             let contents = ProfileMatcher.contents(of: probes, source: url.path,
                                                    profiles: state.profilesConfig?.profiles ?? [:])
             if contents.newCameras.count == 1 {

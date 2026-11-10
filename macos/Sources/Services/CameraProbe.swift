@@ -4,18 +4,13 @@ import Foundation
 /// always read from files by the scripts rather than typed in or re-derived here.
 enum CameraProbe {
     static func probe(path: String, extensions: [String]? = nil,
-                      scriptsDirectory: String, profilesPath: String) async -> [ProbedCamera] {
+                      launcher: any ScriptLaunching) async -> [ProbedCamera] {
         guard FileManager.default.fileExists(atPath: path) else { return [] }
         var args = [path]
         if let extensions, !extensions.isEmpty {
             args += ["--extensions"] + extensions
         }
-        let (process, stream) = ScriptRunner.run(
-            script: "probe-camera.sh",
-            args: args,
-            workingDir: scriptsDirectory,
-            profilesPath: profilesPath
-        )
+        let (process, stream) = launcher.run(script: "probe-camera.sh", args: args)
         var found: [ProbedCamera] = []
         for await line in stream where line.stream == .stdout && line.isMachineReadable {
             if let data = line.text.data(using: .utf8),

@@ -2,13 +2,6 @@ import SwiftUI
 
 struct WorkflowView: View {
     @Bindable var state: AppState
-    @State private var upgradePrompt: UpgradePrompt?
-    private var licenseStore: LicenseStore { LicenseStore.shared }
-
-    private struct UpgradePrompt: Identifiable {
-        let fileCount: Int
-        var id: Int { fileCount }
-    }
 
     /// The form's one design width. Its controls are text fields, which have no
     /// intrinsic width, so the form cannot be sized from its content; everything around
@@ -78,14 +71,14 @@ struct WorkflowView: View {
                 .help(state.showInspector ? Strings.Workflow.hideInspectorHelp : Strings.Workflow.showInspectorHelp)
             }
         }
-        .sheet(item: $upgradePrompt) { prompt in
+        .sheet(item: $state.upgradePrompt) { prompt in
             UpgradeView(
                 fileCount: prompt.fileCount,
-                store: licenseStore,
-                onDismiss: { upgradePrompt = nil },
+                store: state.licenseStore,
+                onDismiss: { state.upgradePrompt = nil },
                 onUnlocked: {
-                    upgradePrompt = nil
-                    runWorkflow()
+                    state.upgradePrompt = nil
+                    state.runWorkflow()
                 }
             )
         }
@@ -95,7 +88,7 @@ struct WorkflowView: View {
         ) {
             Button(Strings.Workflow.forceTimezoneButton, role: .destructive) {
                 state.workflowSession.grantTimezoneAssent()
-                runWorkflow()
+                state.runWorkflow()
             }
             Button(Strings.Common.cancel, role: .cancel) {
                 state.workflowSession.showTimezoneConflict = false
@@ -109,7 +102,7 @@ struct WorkflowView: View {
         ) {
             Button(Strings.Workflow.overwriteButton, role: .destructive) {
                 state.workflowSession.grantOverwriteAssent()
-                runWorkflow()
+                state.runWorkflow()
             }
             Button(Strings.Common.cancel, role: .cancel) {
                 state.workflowSession.showOverwriteConflict = false
@@ -124,7 +117,7 @@ struct WorkflowView: View {
         ) {
             Button(Strings.Workflow.allowCameraMismatchButton, role: .destructive) {
                 state.workflowSession.grantCameraMismatchAssent()
-                runWorkflow()
+                state.runWorkflow()
             }
             Button(Strings.Common.cancel, role: .cancel) {
                 state.workflowSession.showCameraMismatch = false
@@ -143,7 +136,7 @@ struct WorkflowView: View {
         ) {
             Button(Strings.Workflow.unlockProtectedButton) {
                 state.workflowSession.grantUnlockProtectedAssent()
-                runWorkflow()
+                state.runWorkflow()
             }
             Button(Strings.Common.cancel, role: .cancel) {
                 state.workflowSession.showProtectedSources = false
@@ -160,12 +153,12 @@ struct WorkflowView: View {
         ) {
             Button(Strings.Workflow.dryRunFirstButton) {
                 state.workflowSession.startDryRunInstead()
-                runWorkflow()
+                state.runWorkflow()
             }
             .keyboardShortcut(.defaultAction)
             Button(Strings.Workflow.applyAnywayButton, role: .destructive) {
                 state.workflowSession.grantDryRunStaleAssent()
-                runWorkflow()
+                state.runWorkflow()
             }
             Button(Strings.Common.cancel, role: .cancel) {
                 state.workflowSession.showDryRunStale = false
@@ -424,8 +417,7 @@ struct WorkflowView: View {
             let found = await SourceScan.hasTimestampedNames(
                 source: source,
                 extensions: session.workingProfile.fileExtensions ?? [],
-                scriptsDirectory: state.scriptsDirectory,
-                profilesPath: state.profilesLocation.path)
+                launcher: state.launcher)
             guard !Task.isCancelled else { return }
             session.noteTimestampedNames(found, in: source)
         }
@@ -507,7 +499,7 @@ struct WorkflowView: View {
             canRun: session.allStepsReady,
             onRun: {
                 state.workflowSession.clearRunAssent()
-                runWorkflow()
+                state.runWorkflow()
             },
             onCancel: { state.cancelRunning() })
     }
@@ -522,56 +514,5 @@ struct WorkflowView: View {
         }
         path += "/YYYY-MM-DD"
         return path
-    }
-
-    // MARK: - Actions
-
-    private func runWorkflow() {
-        state.workflowSession.chooseSource()
-        guard state.canRunPipeline() else { return }
-
-        // An apply the user never previewed, and applying over the files the last
-        // run reported blocked, both destroy files: the answers are taken before
-        // anything runs — cancelling runs nothing.
-        if state.workflowSession.requestDryRunAssentIfNeeded() { return }
-        if state.workflowSession.requestOverwriteAssentIfNeeded() { return }
-
-        let session = state.workflowSession
-        state.startRun(
-            afterCounting: { [state] in
-                await SourceScan.mediaFileCount(
-                    source: session.sourceDir.current,
-                    extensions: session.workingProfile.fileExtensions ?? [],
-                    scriptsDirectory: state.scriptsDirectory,
-                    profilesPath: state.profilesLocation.path)
-            },
-            exceedsLimit: { licenseStore.exceedsLimit(fileCount: $0) },
-            onOverLimit: { upgradePrompt = UpgradePrompt(fileCount: $0) },
-            start: startPipeline)
-    }
-
-    private func startPipeline() {
-        state.clearLog()
-        state.showInspector = true
-
-        let (script, args) = state.workflowSession.buildPipelineArgs()
-        state.workflowSession.noteRunStarted()
-
-        let (process, stream) = ScriptRunner.run(
-            script: script,
-            args: args,
-            workingDir: state.scriptsDirectory,
-            profilesPath: state.profilesLocation.path
-        )
-        state.currentProcess = process
-
-        state.currentRunTask = Task {
-            for await line in stream {
-                if Task.isCancelled { break }
-                await MainActor.run { state.appendLog(line) }
-            }
-            guard !Task.isCancelled else { return }
-            await MainActor.run { state.finishRun() }
-        }
     }
 }

@@ -7,16 +7,26 @@ final class LicenseStore {
 
     private static let unlockedKey = "jetlag.pro.unlocked"
 
+    /// Where the unlocked choice is kept: the app's own defaults, or a suite of
+    /// its own in a test, so a test never changes the developer's choice.
+    private let defaults: UserDefaults
+
     var isUnlocked: Bool {
-        didSet { UserDefaults.standard.set(isUnlocked, forKey: Self.unlockedKey) }
+        didSet { defaults.set(isUnlocked, forKey: Self.unlockedKey) }
     }
 
-    private init() {
+    init(
+        defaults: UserDefaults = .standard,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        developerBuild: Bool = LicenseStore.isDeveloperBuild
+    ) {
+        self.defaults = defaults
         // Assigning in init skips didSet, so an environment override stays for
         // this run only.
         isUnlocked = Self.initialUnlocked(
-            environment: ProcessInfo.processInfo.environment,
-            defaults: .standard
+            environment: environment,
+            defaults: defaults,
+            developerBuild: developerBuild
         )
     }
 

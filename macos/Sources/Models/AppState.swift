@@ -803,6 +803,21 @@ final class AppState {
     /// The user-owned profiles file, and the bundled copy it is seeded from.
     let profilesLocation: ProfilesLocation
 
+    /// Starts every script the app runs.
+    let launcher: any ScriptLaunching
+
+    /// The free-tier limit a run is checked against.
+    let licenseStore: LicenseStore
+
+    /// Set when a run was refused for having more files than the free tier
+    /// allows; the upgrade sheet shows while it is.
+    var upgradePrompt: UpgradePrompt?
+
+    struct UpgradePrompt: Identifiable {
+        let fileCount: Int
+        var id: Int { fileCount }
+    }
+
     var profilesConfig: ProfilesConfig?
     var profileLoadError: ProfileLoadError?
 
@@ -866,13 +881,22 @@ final class AppState {
     }
 
     /// Tests pass a location in a temporary directory: they run inside the app,
-    /// so the default is the user's own profiles file.
-    init(profilesLocation: ProfilesLocation? = nil) {
+    /// so the default is the user's own profiles file. They pass a launcher that
+    /// replays recorded output, and a license store on defaults of their own.
+    init(
+        profilesLocation: ProfilesLocation? = nil,
+        launcher: (any ScriptLaunching)? = nil,
+        licenseStore: LicenseStore = .shared
+    ) {
         let scriptsDirectory = (Bundle.main.resourcePath! as NSString)
             .appendingPathComponent("scripts")
         self.scriptsDirectory = scriptsDirectory
-        self.profilesLocation = profilesLocation
+        let location = profilesLocation
             ?? ProfilesLocation.userDomain(scriptsDirectory: scriptsDirectory)
+        self.profilesLocation = location
+        self.launcher = launcher
+            ?? LiveScriptLauncher(scriptsDirectory: scriptsDirectory, profilesPath: location.path)
+        self.licenseStore = licenseStore
     }
 
     /// Seed the user's profiles file from the bundled defaults when it is not
@@ -1107,12 +1131,7 @@ final class AppState {
     }
 
     private func runGyroflowScript(args: [String]) async -> GyroflowStatus {
-        let (process, stream) = ScriptRunner.run(
-            script: "tools/download-gyroflow.sh",
-            args: args,
-            workingDir: scriptsDirectory,
-            profilesPath: profilesLocation.path
-        )
+        let (process, stream) = launcher.run(script: "tools/download-gyroflow.sh", args: args)
         var presenceData: [String] = []
         for await line in stream {
             switch line.stream {
@@ -1165,6 +1184,55 @@ final class AppState {
                     start()
                 }
             }
+        }
+    }
+
+    /// Run the pipeline with the workflow's settings: Run, and every answer to a
+    /// question a run raised, comes here.
+    func runWorkflow(check: PythonRuntimeCheck = .system) {
+        workflowSession.chooseSource()
+        guard canRunPipeline(check: check) else { return }
+
+        // An apply the user never previewed, and applying over the files the last
+        // run reported blocked, both destroy files: the answers are taken before
+        // anything runs — cancelling runs nothing.
+        if workflowSession.requestDryRunAssentIfNeeded() { return }
+        if workflowSession.requestOverwriteAssentIfNeeded() { return }
+
+        let session = workflowSession
+        let launcher = self.launcher
+        let licenseStore = self.licenseStore
+        startRun(
+            afterCounting: {
+                await SourceScan.mediaFileCount(
+                    source: session.sourceDir.current,
+                    extensions: session.workingProfile.fileExtensions ?? [],
+                    launcher: launcher)
+            },
+            exceedsLimit: { licenseStore.exceedsLimit(fileCount: $0) },
+            onOverLimit: { self.upgradePrompt = UpgradePrompt(fileCount: $0) },
+            start: { self.startPipeline() })
+    }
+
+    /// Launch the pipeline and feed its output into the log and the table until
+    /// it ends.
+    func startPipeline() {
+        clearLog()
+        showInspector = true
+
+        let (script, args) = workflowSession.buildPipelineArgs()
+        workflowSession.noteRunStarted()
+
+        let (process, stream) = launcher.run(script: script, args: args)
+        currentProcess = process
+
+        currentRunTask = Task {
+            for await line in stream {
+                if Task.isCancelled { break }
+                await MainActor.run { appendLog(line) }
+            }
+            guard !Task.isCancelled else { return }
+            await MainActor.run { finishRun() }
         }
     }
 
