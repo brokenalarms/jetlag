@@ -11,6 +11,7 @@ import tempfile
 import shutil
 from pathlib import Path
 import pytest
+import yaml
 
 from helpers.media import create_test_video
 from helpers import SCRIPT_DIR
@@ -789,3 +790,17 @@ class TestFolderTemplateDefault:
         template = "{{YYYY}}/{{GROUP}}/{{DD}}"
         assert organize_by_date.expand_path_template(template, "2025-08-15") == "2025/15"
 
+
+
+FOLDER_TEMPLATE_CASES = yaml.safe_load(
+    (Path(__file__).parent / "folder-template-cases.yaml").read_text())["cases"]
+
+
+@pytest.mark.parametrize(
+    "case", FOLDER_TEMPLATE_CASES,
+    ids=[f"{c['template']}|{c['group'] or 'no-group'}" for c in FOLDER_TEMPLATE_CASES])
+def test_folder_template_case(case):
+    """The shared cases the app's Organize preview is also held to: a layout
+    change on one side without the other fails here or in the Swift test."""
+    assert organize_by_date.expand_path_template(
+        case["template"], "2025-08-15", case["group"] or None) == case["expected"]
