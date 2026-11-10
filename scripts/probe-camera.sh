@@ -1,19 +1,4 @@
 #!/bin/bash
-# probe-camera.sh
-# Bash wrapper for Python implementation
-
-set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_SCRIPT="$SCRIPT_DIR/probe-camera.py"
-
-source "$SCRIPT_DIR/lib/ensure-venv.sh"
-
-# Check if Python script exists
-if [[ ! -f "$PYTHON_SCRIPT" ]]; then
-    echo "ERROR: Python implementation not found at $PYTHON_SCRIPT" >&2
-    exit 1
-fi
-
-# Pass all arguments directly to Python implementation
-exec "$JETLAG_PYTHON" "$PYTHON_SCRIPT" "$@"
+# probe-camera.sh — Report which camera shot the media in a folder.
+# Run with --help for its options; README.md describes every command.
+source "$(dirname "${BASH_SOURCE[0]}")/lib/launch.sh" probe-camera.py "$@"
