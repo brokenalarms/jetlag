@@ -269,7 +269,7 @@ final class PipelineSchemaContractTests: XCTestCase {
     /// an outcome the script already decided — the bug this whole contract exists
     /// to prevent, one layer up from `dest`.
     func testStatusRenderingNamesNoStagingState() throws {
-        let sources = ["Sources/Models/RowOutcome.swift", "Sources/Views/DiffTableView.swift"]
+        let sources = ["Sources/Models/Pipeline/RowOutcome.swift", "Sources/Views/DiffTableView.swift"]
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()   // Tests
             .deletingLastPathComponent()   // macos

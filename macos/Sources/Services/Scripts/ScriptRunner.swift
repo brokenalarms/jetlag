@@ -27,9 +27,9 @@ struct ScriptRunner {
         let stream = AsyncStream<LogLine> { continuation in
             let group = DispatchGroup()
 
-            func reader(for pipe: Pipe, stream: LogLine.Stream) -> PipeLineReader {
+            func reader(for pipe: Pipe, stream: LogLine.Stream) -> PipelineReader {
                 group.enter()
-                return PipeLineReader(
+                return PipelineReader(
                     handle: pipe.fileHandleForReading,
                     stream: stream,
                     emit: { continuation.yield($0) },
