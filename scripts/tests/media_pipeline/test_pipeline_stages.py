@@ -7,12 +7,14 @@ failure exit that stops the trip, releases the staged copy without deleting it
 and reports the file failed.
 
 The end-to-end tests below them run whole pipelines through stages with real
-effects: tagging, and a file exiftool refuses to write.
+effects: tagging, the provenance record every moved file carries, and a file
+exiftool refuses to write.
 """
 
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -21,6 +23,7 @@ import pytest
 from lib.media_pipeline import RunOptions, WorkingDir, process_file
 from lib.media_pipeline import stages
 from lib.media_pipeline.stages import Stage, StageOutcome, enabled_stages, fix_writes_fields
+from helpers import SCRIPT_DIR
 from helpers.pipeline import create_test_video, get_exif_field, has_tag_cmd, run_in_process, run_pipeline
 
 DEFAULT_TASKS = frozenset({"tag", "fix-timestamp", "gyroflow"})
@@ -91,8 +94,20 @@ class TestStageRouting:
     ], ids=["apply", "dry-run", "no-fix-timestamp"])
     def test_tag_writes_ride_in_fix_timestamps_call_only_when_it_writes(self, apply, tasks, expected):
         """Tag's camera fields go out in fix-timestamp's exiftool write, so the file
-        is rewritten once; without that write, tag writes them itself."""
+        is rewritten once; without that write, the provenance stage writes them."""
         assert fix_writes_fields(_opts(apply=apply, tasks=tasks)) is expected
+
+    @pytest.mark.parametrize("apply,tasks,expected", [
+        (True, frozenset({"tag"}), ["ingest", "tag", "provenance", "output"]),
+        (True, frozenset({"gyroflow"}), ["ingest", "provenance", "output"]),
+        (True, DEFAULT_TASKS, ["ingest", "tag", "fix-timestamp", "output"]),
+        (False, frozenset({"tag"}), ["ingest", "tag", "output"]),
+    ], ids=["tag-only", "no-metadata-step", "fix-timestamp-writes", "dry-run"])
+    def test_provenance_stage_writes_only_when_fix_timestamp_does_not(self, apply, tasks, expected):
+        """Every file an apply moves gets one metadata write carrying its provenance:
+        fix-timestamp's when it runs, the provenance stage's, right after tag, otherwise.
+        A dry run writes nothing."""
+        assert _names(_opts(apply=apply, tasks=tasks, profile=CAMERA_PROFILE)) == expected
 
 
 class _Recorder:
@@ -222,6 +237,88 @@ class TestTagging:
         model = get_exif_field(moved, "Model")
         assert make == "Test"
         assert model == "Camera"
+
+
+class TestEveryMovedFileRecordsItsCardName:
+    """verify-card finds a file's backup copies by the name it had on the card, and a
+    timezone correction can rename it. So every file the pipeline moves carries its
+    card name in XMP-xmpMM:PreservedFileName, even when no step changes its metadata:
+    without it, a renamed copy could never be matched to its card file.
+    """
+
+    @staticmethod
+    def _events(stdout: str) -> list[dict]:
+        return [json.loads(line) for line in stdout.splitlines() if line.startswith("{")]
+
+    def test_file_needing_no_timestamp_change_still_records_its_card_name(self, temp_workspace, test_profile):
+        source, target = temp_workspace["source"], temp_workspace["target"]
+        video = source / "VID_20251005_100000.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+        # A file whose clock fields are already right: corrected once, then stripped of
+        # the record that correction wrote, as a file from another tool would be.
+        subprocess.run(
+            [sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py"), str(video),
+             "--timezone", "+09:00", "--apply"],
+            capture_output=True, check=True,
+        )
+        subprocess.run(
+            ["exiftool", "-overwrite_original", "-XMP-xmpMM:PreservedFileName=", "-XMP-jetlag:all=", str(video)],
+            capture_output=True, check=True,
+        )
+        assert get_exif_field(video, "XMP-xmpMM:PreservedFileName") == ""
+
+        result = run_in_process([
+            "--profile", test_profile, "--source", str(source), "--timezone", "+0900",
+            "--tasks", "fix-timestamp", "--apply",
+        ])
+
+        timestamp = next(e for e in self._events(result.stdout) if e["event"] == "timestamp_result")
+        assert timestamp["action"] == "no_change", \
+            f"Actual: {timestamp['action']}, Expected: no_change (the file is already correct)"
+        moved = list(target.rglob("*.mp4"))
+        assert len(moved) == 1, f"Actual: {moved}, Expected: one file in the library"
+        recorded = get_exif_field(moved[0], "XMP-xmpMM:PreservedFileName")
+        assert recorded == video.name, \
+            f"Actual: PreservedFileName={recorded!r}, Expected: {video.name!r}"
+
+    def test_file_no_metadata_step_touches_records_its_card_name_and_clock(self, temp_workspace, test_profile):
+        source, target = temp_workspace["source"], temp_workspace["target"]
+        video = source / "VID_20251005_100000.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+
+        run_in_process([
+            "--profile", test_profile, "--source", str(source), "--timezone", "+0900",
+            "--tasks", "gyroflow", "--apply",
+        ])
+
+        moved = list(target.rglob("*.mp4"))
+        assert len(moved) == 1, f"Actual: {moved}, Expected: one file in the library"
+        recorded = {
+            "PreservedFileName": get_exif_field(moved[0], "XMP-xmpMM:PreservedFileName"),
+            "OriginalCreateDate": get_exif_field(moved[0], "XMP-jetlag:OriginalCreateDate"),
+        }
+        expected = {"PreservedFileName": video.name, "OriginalCreateDate": "2025:10:05 01:00:00"}
+        assert recorded == expected, f"Actual: {recorded}, Expected: {expected}"
+
+    def test_existing_record_is_never_overwritten(self, temp_workspace, test_profile):
+        """A re-imported file keeps the record of its first import, not this run's name."""
+        source, target = temp_workspace["source"], temp_workspace["target"]
+        video = source / "VID_20251005_100000.mp4"
+        create_test_video(video, media_create_date="2025:10:05 01:00:00")
+        subprocess.run(
+            ["exiftool", "-overwrite_original", "-XMP-xmpMM:PreservedFileName=VID_20251005_090000.mp4", str(video)],
+            capture_output=True, check=True,
+        )
+
+        run_in_process([
+            "--profile", test_profile, "--source", str(source), "--timezone", "+0900",
+            "--tasks", "gyroflow", "--apply",
+        ])
+
+        moved = list(target.rglob("*.mp4"))
+        recorded = get_exif_field(moved[0], "XMP-xmpMM:PreservedFileName")
+        assert recorded == "VID_20251005_090000.mp4", \
+            f"Actual: PreservedFileName={recorded!r}, Expected: the first import's name"
 
 
 class TestFileExiftoolCannotWrite:

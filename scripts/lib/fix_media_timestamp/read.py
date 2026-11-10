@@ -171,6 +171,10 @@ class CorrectionOptions:
     extra_write_fields are other steps' field writes, sent in this correction's
     exiftool call so the file is rewritten once. They are written even when the
     timestamps need no change.
+
+    record_provenance makes a missing provenance record a reason to write on its
+    own, for a caller that records provenance on every file it moves. Without it
+    the record rides only on a write the file needed anyway.
     """
     apply: bool = True
     timezone_spec: Optional[str] = None
@@ -179,6 +183,7 @@ class CorrectionOptions:
     time_offset_seconds: Optional[int] = None
     force_timezone: bool = False
     extra_write_fields: Dict[str, str] = dataclass_field(default_factory=dict)
+    record_provenance: bool = False
 
     @property
     def moves_time(self) -> bool:

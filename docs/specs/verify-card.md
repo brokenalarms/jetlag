@@ -31,9 +31,9 @@ Timezone corrections can also rename a file (`VID_20250619_042028_00_004` become
   regrouped and moved after import (an import without a group, then moved into
   one), so any stored path goes stale; a copy is found by its name wherever it is.
 
-Exiftool's `ImageDataHash` is not used: it hashes the video and audio tracks one at a
-time via the `moov` sample tables, which on a card come after the footage, so it can
-never be computed while the import streams the file, only by a second full read.
+The content hash (see "Deep check") is jetlag's own sha256 of the file's data portion
+(see "What is hashed"), not exiftool's `ImageDataHash`: a byte range can be hashed with
+standard tools on a `host:/path` location's host, which has no exiftool.
 
 ## Provenance
 
@@ -44,7 +44,7 @@ written in the same exiftool call as the correction — no read or write of its 
 |---|---|
 | `XMP-xmpMM:PreservedFileName` | the name the file had on the card |
 | `XMP-jetlag:OriginalDateTimeOriginal` … `OriginalCreationDate` | each clock field as it was before jetlag's first write, for recovery outside the app |
-| `XMP-jetlag:ContentSHA256`, `XMP-jetlag:ContentBytes` | sha256 and size of the file's content without its metadata (for QuickTime, `mdat` + trailer; for photos, see "Photo content hash"), computed while ingest copies the file |
+| `XMP-jetlag:ContentSHA256`, `XMP-jetlag:ContentBytes` | sha256 and size of the file's content without its metadata (the data portion, see "What is hashed"). Not written at import: added later by the deep check, as a cache (see "Hash cache") |
 
 `jetlag` is a custom XMP namespace (`http://ns.jetlag.app/1.0/`) declared in
 `scripts/lib/data/exiftool-jetlag.config`. Exiftool only writes tags it has a definition
@@ -56,17 +56,12 @@ instead. That record also counts as "already recorded", because those files' clo
 fields are already corrected and recording them now would store corrected values as
 originals. Verify reads its `filename` key as the original name.
 
-### Content hash during ingest
+### No hash at import
 
-Ingest replaces `shutil.copy2` with a copy loop that feeds the `mdat` payload and any
-trailer into `hashlib.sha256` as the bytes pass, then applies `copystat`. Card reads
-run at 100–300 MB/s and sha256 at several GB/s, so the copy stays at card speed; the
-performance gate confirms it. The pipeline carries the hash to the fix-timestamp write.
-
-The hash is never part of the default verdict. It backs an opt-in deep check (see
-"Deep check") that catches damage to a backup copy after import or a mirror copy that
-was cut short with its size intact. It never reads the card, and it cannot catch a bad
-card read, which is baked into the hash.
+Ingest copies with `shutil.copy2` and computes no hash. Hashing during the copy would
+add its time to every import (unless overlapped on a second thread) for a check most
+runs never use, and it would only record the bytes as read, so it could not catch a bad
+card read. The deep check hashes the card itself instead, at the time the user asks.
 
 ### Provenance on every file
 
@@ -132,7 +127,7 @@ profiles' extensions, then independent of them):
 
 | File | Verdict |
 |---|---|
-| media extension (`.mp4 .mov .insv .insp .jpg .arw .dng .mxf` …) | must be on every enabled location |
+| media extension (`.mp4 .mov .insv .insp .jpg .arw .dng` …) | must be on every enabled location |
 | companion extension (`.lrv .thm .lrf`, Sony clip `.XML`) | required only with "Include companion files" ticked |
 | under an ignored path (`MISC/` — Insta360's 468 KB `.insv` stubs that copy real clip names and are not video) | not checked |
 | hidden (`.dcf_reserved_space`, `._*`) | not checked |
@@ -153,7 +148,8 @@ matches on one location are listed as duplicates for the user to resolve.
 Laid out like Workflow: the source folder, then one group per configured backup
 location showing its destination folder, each with a toggle to include it in this
 check. Below them "Include companion files" (defaulting to the workflow's
-copy-companion setting) and Run. The check is read-only, so there is no dry-run/apply
+copy-companion setting) and Run. The default check is read-only, and the deep check
+writes only the hash cache, which changes no content, so there is no dry-run/apply
 split.
 
 The right-hand panel reuses the table machinery with a row type of its own, not
@@ -173,31 +169,81 @@ The right-hand panel reuses the table machinery with a row type of its own, not
 Two checkboxes on the Verify screen, both off by default:
 
 - ☐ **Verify hashes** — every matched copy on a "Local" location has its content
-  hashed and compared with `XMP-jetlag:ContentSHA256`.
+  hashed and compared with the card file's.
   - ☐ **Include network locations (slow)** — enabled only while "Verify hashes" is
     ticked; adds the "Network" locations.
 
-How a network copy is hashed is not shown to the user:
+This is the only place jetlag hashes content. It catches a bad card read at import,
+damage to a copy since (bit rot, a bad sync), and a copy cut short with its size
+intact.
 
+### Reference hash
+
+For each card file the reference is, in order:
+
+1. the `XMP-jetlag:ContentSHA256` recorded on any of its matched copies, when that
+   copy's `XMP-jetlag:ContentBytes` equals the card file's footage size. The card is
+   not read. A recorded hash is only ever written after it matched the card (see
+   "Hash cache"), so it stands in for the card.
+2. otherwise, the card file's content hashed from the card. The card is only read,
+   so a read-only card works.
+
+Two copies recording different hashes for one card file are listed as "Recorded
+hashes disagree", and the card is hashed to settle which is right.
+
+### Hashing a copy
+
+How a copy is hashed is not shown to the user:
+
+- a local copy is read directly.
 - a `host:/path` copy is hashed on its host over ssh
   (`tail -c +OFFSET file | head -c LEN | sha256sum`), so only the digest crosses the
   network. Offsets come from a matching local copy's box headers; without one, the
   box headers are read on the host with small `dd` reads.
 - a network-mounted copy is hashed by reading its content across the network.
 
-A copy whose hash differs from the recorded one is listed as "Hash mismatch" on that
-location — it says what was found, not why (bit rot, a bad copy, an edit outside
-jetlag). Files with no recorded hash (imported before phase 3) are reported as "No
-hash recorded", never as a pass or a failure.
+A copy whose hash differs from the reference is listed as "Hash mismatch" on that
+location — it says what was found, not why. A copy is never passed on a recorded hash
+alone: every ticked copy is hashed on every run.
 
-### Photo content hash
+### Hash cache
 
-Open: the content hash so far is defined only for QuickTime files. For photos,
-exiftool's `ImageDataHash` hashes the image data apart from metadata. It was ruled out
-for video only because a card's `moov` follows the footage; in a JPEG or RAW the image
-data follows the headers, so it may be computable as ingest streams the file. To
-confirm before phase 3: that it is computable during the copy and unchanged by
-jetlag's writes on each photo profile's format.
+When a copy on a "Local" location hashes equal to a reference read from the card and
+records no hash yet, `XMP-jetlag:ContentSHA256` and `XMP-jetlag:ContentBytes` are
+written into it, once, never overwritten. A later run then takes the reference from
+the copy and does not read the card again, which is the slow part (100–300 MB/s
+against a local disk's GB/s).
+
+- Network copies are not written: a network-mounted write rewrites the whole file
+  across the network, and a `host:/path` host has no exiftool. They receive the cache
+  only if a sync tool mirrors a local copy onto them.
+- A copy that mismatches, or whose card file had disagreeing recorded hashes, is not
+  written.
+- The write is metadata only and leaves the content, and so the hash, unchanged (the
+  phase 2 regression test). It does change the file's size and mtime, so a sync tool
+  mirroring that location copies the file again on its next run.
+- The card is never written.
+
+### What is hashed
+
+The hash always covers the file's data portion and never its metadata, which jetlag
+and other tools rewrite. The data portion is the same bytes on the card and on every
+copy, however its metadata has changed, so one hash compares them all. For each format
+it is located from the file's own structure with small header reads, like footage size:
+
+| Format | Data portion |
+|---|---|
+| QuickTime family (`.mp4 .mov .insv`, recognised by its first box as `scripts/lib/footage.py` does) | each `mdat` payload plus any trailer after the last box |
+| HEIF (`.hif .heic`) | each `mdat` payload |
+| JPEG (`.jpg .insp`) | from the first start-of-scan marker to the end of the file, so images and camera trailers appended after the main image are included |
+| TIFF-based RAW (`.arw .dng`) | the strips or tiles of the full-size image |
+| Fujifilm `.raf` | the raw data block the RAF header points to |
+
+A copy on a `host:/path` location is hashed over the same range, with offsets from a
+matching local copy or read on the host with small `dd` reads. A format not in the
+table is not hashed and is reported "Not hashable", never passed or failed. Before
+phase 7, the regression test from phase 2 is extended to each photo profile's format:
+its data portion is unchanged by tag + fix-timestamp.
 
 ## Phases
 
@@ -205,11 +251,10 @@ jetlag's writes on each photo profile's format.
    config loaded by both metadata backends.
 2. Footage-size reader for QuickTime-family files, with a regression test that footage
    size and hash are unchanged by tag + fix-timestamp on each profile's format.
-3. Content hash during ingest; the hash joins the provenance write;
-   provenance on every moved file.
+3. Provenance on every moved file.
 4. `verify-card` (`verify-card.sh`, `cli/verify_card.py`, `lib/verify_card.py`): source scan, location listings, matching, JSONL verdicts.
 5. Verify screen in the app; backup-location configuration screen.
 6. `archive-source` delete mode accepts only verified or user-accepted files.
 7. Local/network detection and label per location; "Verify hashes" and "Include
-   network locations (slow)" against the content hash, hashing ssh copies on their
-   host.
+   network locations (slow)": reference hash from the hash cache or the card, ssh
+   copies hashed on their host, hash cache written to matching local copies.

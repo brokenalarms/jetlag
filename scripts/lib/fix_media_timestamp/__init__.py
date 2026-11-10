@@ -35,12 +35,17 @@ __all__ = [
 def fix_media_timestamps(file_path: str, apply: bool = True, timezone_spec: Optional[str] = None,
                          infer_from_filename: bool = False, preserve_wallclock: bool = False,
                          time_offset_seconds: Optional[int] = None, force_timezone: bool = False,
-                         extra_write_fields: Optional[Dict[str, str]] = None) -> TimestampFixResult:
+                         extra_write_fields: Optional[Dict[str, str]] = None,
+                         record_provenance: bool = False) -> TimestampFixResult:
     """Fix media (photo/video) timestamps: read, plan, describe on stderr, apply.
 
     extra_write_fields are other steps' field writes, sent in this step's exiftool
     call so the file is rewritten once. They are written even when the timestamps
     need no change.
+
+    record_provenance makes a missing provenance record a reason to write on its own,
+    for a caller that records provenance on every file it moves. Without it the record
+    rides only on a write the file needed anyway.
 
     Returns:
         TimestampFixResult with all machine-readable fields populated.
@@ -54,6 +59,7 @@ def fix_media_timestamps(file_path: str, apply: bool = True, timezone_spec: Opti
         time_offset_seconds=time_offset_seconds,
         force_timezone=force_timezone,
         extra_write_fields=dict(extra_write_fields or {}),
+        record_provenance=record_provenance,
     )
     plan = plan_correction(read_current(file_path, opts), opts)
     print(describe_correction(plan), file=sys.stderr)

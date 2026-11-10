@@ -32,6 +32,16 @@ Scripts and the web site only. Sessions usually run as root.
   - `media_pipeline/test_pipeline_cli.py::TestSummaryOutput::test_summary_shows_failed_files`
   - `media_pipeline/test_pipeline_organize.py::TestPipelineOutcomeLines::test_apply_mentions_working_dir_only_when_preserved_for_inspection`
   - `media_pipeline/test_pipeline_archive.py::TestArchiveSourceIntegration::test_archive_skipped_when_a_file_failed`
+
+  To run them for real, run them as an unprivileged user on a world-writable copy of `scripts/` and `pyproject.toml` (outside any root-only directory), with the venv's Python:
+
+  ```bash
+  R=$(mktemp -d /tmp/jetlag-unpriv.XXXX) && cp -r scripts pyproject.toml "$R" && chmod -R a+rwX "$R"
+  cd "$R" && runuser -u nobody -- env HOME=/tmp PATH=$R/scripts/tools:$PATH \
+    scripts/.venv/bin/python -m pytest -p no:cacheprovider scripts/tests/media_pipeline \
+    -k "test_summary_shows_failed_files or test_apply_mentions_working_dir_only_when_preserved_for_inspection or test_archive_skipped_when_a_file_failed"
+  ```
+- **ffmpeg:** the tests generate their media with `ffmpeg`. If a container lacks it, `apt-get install -y ffmpeg` (as CI does).
 - **macOS-only script tests** (Finder tags, birth time) carry `skipif` markers and are skipped on Linux.
 - **No Swift or Xcode:** `macos/` cannot be built or tested. For any change under `macos/` (or a `scripts/` change the app depends on), put a reviewer test plan in the PR: a checklist of steps to run in the live app and what each should show.
 - **Web:** Node and npm are available, so `web/` builds (`cd web && npm install && npm run build`) and Playwright with Chromium is preinstalled, so `npm run screenshot --prefix web` works.

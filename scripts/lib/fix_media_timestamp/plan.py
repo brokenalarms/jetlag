@@ -147,7 +147,8 @@ class CorrectionPlan:
     def writes(self) -> bool:
         """Whether applying this plan sends a write to exiftool's process."""
         return (self.problem is None and self.opts.apply
-                and (self.has_changes or bool(self.opts.extra_write_fields)))
+                and (self.has_changes or bool(self.opts.extra_write_fields)
+                     or (self.opts.record_provenance and bool(self.provenance_args))))
 
     def result(self, action: str, error: Optional[str] = None) -> TimestampFixResult:
         """The machine-readable result of this plan ending in action."""
@@ -243,8 +244,8 @@ def plan_correction(current: CurrentTimestamps, opts: CorrectionOptions) -> Corr
             pass
 
     # Capture what the file held before jetlag touches it, in the same write as the
-    # correction.
-    provenance_args = provenance_field_args(current.file_path, exif)
+    # correction. A dry run writes nothing, so it records nothing.
+    provenance_args = provenance_field_args(current.file_path, exif) if opts.apply else []
     # A correction owns the whole clock-field table, so one stale field rewrites
     # them all: a subset write is what let a stale movie header outlive a run that
     # found the track atoms correct.

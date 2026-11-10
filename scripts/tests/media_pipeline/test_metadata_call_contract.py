@@ -87,12 +87,14 @@ def metadata_calls(workspace, tasks: list[str], apply: bool) -> dict:
     }
 
 
-@pytest.mark.parametrize("tasks", [["fix-timestamp"], ["tag", "fix-timestamp"], ["tag"]])
+@pytest.mark.parametrize("tasks", [["fix-timestamp"], ["tag", "fix-timestamp"], ["tag"], ["gyroflow"]])
 def test_dry_run_reads_each_file_once(workspace, tasks):
     assert metadata_calls(workspace, tasks, apply=False) == {"read": FILE_COUNT, "write": 0}
 
 
-@pytest.mark.parametrize("tasks", [["fix-timestamp"], ["tag", "fix-timestamp"], ["tag"]])
+# ["gyroflow"] runs neither metadata step, and still writes once: every moved file
+# gets its provenance record, so verify-card can find it by its card name.
+@pytest.mark.parametrize("tasks", [["fix-timestamp"], ["tag", "fix-timestamp"], ["tag"], ["gyroflow"]])
 def test_apply_reads_and_writes_each_file_once(workspace, tasks):
     assert metadata_calls(workspace, tasks, apply=True) == {"read": FILE_COUNT, "write": FILE_COUNT}
 
