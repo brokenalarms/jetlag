@@ -5,16 +5,13 @@ Validates filename parsing, build_filename round-trips, and timestamp report gen
 """
 
 import os
-import sys
 import tempfile
 import shutil
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
+from datetime import datetime
 import pytest
 
 from conftest import create_test_photo, create_test_video
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from lib.exiftool import exiftool
 from lib.timestamp_source import (
@@ -31,7 +28,6 @@ from lib.timestamp_source import (
     resolve_timezone_offset,
     resolve_file_timezone_offset,
     camera_zone_offset_for_file,
-    TimestampReport,
 )
 
 

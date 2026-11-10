@@ -1,12 +1,9 @@
 """Tests for lib/filesystem.py media discovery."""
 
-import sys
 import types
-from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from lib.filesystem import find_media_files, iter_media_files
 

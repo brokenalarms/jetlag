@@ -7,16 +7,14 @@ XMP-jetlag property here and a plain exiftool, with no config, must read it back
 """
 
 import subprocess
-import sys
 from pathlib import Path
-
-import pytest
-
-SCRIPTS_DIR = Path(__file__).parent.parent
-sys.path.insert(0, str(SCRIPTS_DIR))
 
 from conftest import create_test_video
 from lib.exiftool import ExifTool
+
+
+SCRIPTS_DIR = Path(__file__).parent.parent
+
 
 
 def _read_without_config(path: Path) -> str:

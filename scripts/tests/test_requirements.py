@@ -2,14 +2,14 @@
 Runtime vs dev dependency split — the app bundle vendors scripts/requirements.txt
 verbatim into Contents/Resources/scripts/site-packages (see the `Bundle scripts`
 build phase in macos/project.yml), so anything listed there ships to every user.
-Dev-only tooling (pytest, pyrefly) belongs in scripts/requirements-dev.txt instead,
-which nothing in the bundle build reads.
+Dev-only tooling (pytest and its plugins, pyrefly, ruff) belongs in
+scripts/requirements-dev.txt instead, which the bundle build deletes.
 """
 
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent.parent
-DEV_PACKAGES = {"pytest", "pyrefly"}
+DEV_PACKAGES = {"pytest", "pytest-xdist", "pyrefly", "ruff"}
 
 
 def _package_names(requirements_path: Path) -> set[str]:
@@ -27,6 +27,6 @@ def test_runtime_requirements_excludes_dev_tooling():
     assert packages.isdisjoint(DEV_PACKAGES)
 
 
-def test_dev_requirements_holds_pytest_and_pyrefly():
+def test_dev_requirements_holds_test_and_lint_tooling():
     packages = _package_names(SCRIPT_DIR / "requirements-dev.txt")
     assert packages == DEV_PACKAGES

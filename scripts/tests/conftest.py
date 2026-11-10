@@ -19,7 +19,6 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
 import lib.exiftool as _exiftool_module
 from lib.exiftool import exiftool
 
@@ -157,11 +156,10 @@ REQUIRED_TOOLS = {
     },
 }
 
-# Python packages required at import time by the scripts under test.
-REQUIRED_PYTHON_PACKAGES = {
-    "humanize": "humanize",
-    "yaml": "pyyaml",
-}
+# Python packages required at import time by the scripts under test, by import
+# name. They come from scripts/requirements.txt via `make test-scripts`; the
+# suite never installs into whichever interpreter happens to run it.
+REQUIRED_PYTHON_PACKAGES = ["humanize", "yaml"]
 
 # macOS-only tools — required on macOS, skipped on Linux
 MACOS_TOOLS = ["tag", "SetFile"]
@@ -169,7 +167,6 @@ MACOS_TOOLS = ["tag", "SetFile"]
 
 def _install_tool(name, install_cmd):
     """Install a missing tool, raising UsageError on failure."""
-    platform = "darwin" if sys.platform == "darwin" else "linux"
     print(f"Installing {name}...")
     result = subprocess.run(install_cmd, capture_output=True, text=True)
     if result.returncode != 0:
@@ -185,22 +182,8 @@ def _install_tool(name, install_cmd):
         )
 
 
-def _install_python_package(import_name, pip_name):
-    """Install a missing Python package into the running interpreter's environment."""
-    print(f"Installing Python package {pip_name}...")
-    result = subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-q", pip_name],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        raise pytest.UsageError(
-            f"Failed to install {pip_name}: {result.stderr}\n"
-            f"Install manually: pip install {pip_name}"
-        )
-
-
 def pytest_configure(config):
-    """Install missing tools and packages before tests run."""
+    """Install missing tools and check Python packages before tests run."""
     platform = "darwin" if sys.platform == "darwin" else "linux"
 
     for tool, commands in REQUIRED_TOOLS.items():
@@ -213,11 +196,18 @@ def pytest_configure(config):
                     f"Install manually — see scripts/tests/README.md"
                 )
 
-    for import_name, pip_name in REQUIRED_PYTHON_PACKAGES.items():
+    missing_packages = []
+    for import_name in REQUIRED_PYTHON_PACKAGES:
         try:
             __import__(import_name)
         except ImportError:
-            _install_python_package(import_name, pip_name)
+            missing_packages.append(import_name)
+    if missing_packages:
+        raise pytest.UsageError(
+            f"Python packages missing from {sys.executable}: {', '.join(missing_packages)}\n"
+            "Run the suite with `make test-scripts`, which builds scripts/.venv from "
+            "scripts/requirements.txt and scripts/requirements-dev.txt."
+        )
 
     if sys.platform == "darwin":
         # tag is vendored at scripts/tools/tag; SetFile is from Xcode

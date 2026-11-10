@@ -15,8 +15,6 @@ import pytest
 
 from conftest import create_test_photo, create_test_video
 
-# Add parent directory to path to import the script
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import hyphenated module name
 import importlib.util

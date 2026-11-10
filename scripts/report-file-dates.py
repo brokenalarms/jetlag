@@ -12,7 +12,6 @@ Usage:
 import argparse
 import os
 import sys
-from pathlib import Path
 
 from lib.filesystem import find_media_files
 from lib.timestamp_source import read_timestamp_sources

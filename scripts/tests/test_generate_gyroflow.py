@@ -19,6 +19,8 @@ from typing import Optional
 import pytest
 import yaml
 
+from conftest import create_motion_video, create_test_video
+
 SCRIPT_DIR = Path(__file__).parent.parent
 GENERATE_GYROFLOW = SCRIPT_DIR / "generate-gyroflow.sh"
 PROFILES_FILE = SCRIPT_DIR / "media-profiles.yaml"
@@ -49,8 +51,6 @@ def run_generate_gyroflow(args: list[str]) -> subprocess.CompletedProcess:
     )
 
 
-from conftest import create_motion_video, create_test_video
-
 
 def get_test_preset() -> str:
     """Get a test preset JSON string."""
@@ -67,7 +67,7 @@ class TestNoMotionData:
             video = Path(tmpdir) / "test.mp4"
             create_test_video(video)
 
-            result = run_generate_gyroflow([
+            run_generate_gyroflow([
                 str(video), "--preset", get_test_preset(), "--apply"
             ])
 
@@ -122,7 +122,7 @@ class TestDryRun:
             video = Path(tmpdir) / "test.mp4"
             create_test_video(video)
 
-            result = run_generate_gyroflow([
+            run_generate_gyroflow([
                 str(video), "--preset", get_test_preset()
             ])
 

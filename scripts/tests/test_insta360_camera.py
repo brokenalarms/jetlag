@@ -18,7 +18,6 @@ from pathlib import Path
 from conftest import create_insta360_file
 
 SCRIPT_DIR = Path(__file__).parent.parent
-sys.path.insert(0, str(SCRIPT_DIR))
 
 from lib import timestamp_source
 

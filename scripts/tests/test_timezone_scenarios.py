@@ -9,12 +9,10 @@ import sys
 import tempfile
 import shutil
 import subprocess
-from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from conftest import create_test_video
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import hyphenated module name
 import importlib.util

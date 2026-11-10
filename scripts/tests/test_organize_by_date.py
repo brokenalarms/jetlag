@@ -8,7 +8,6 @@ import importlib.util
 import io
 import os
 import subprocess
-import sys
 import tempfile
 import shutil
 from pathlib import Path
@@ -18,7 +17,6 @@ from conftest import create_test_video
 
 
 SCRIPT_DIR = Path(__file__).parent.parent
-sys.path.insert(0, str(SCRIPT_DIR))
 
 _spec = importlib.util.spec_from_file_location(
     "organize_by_date", str(SCRIPT_DIR / "organize-by-date.py"))
@@ -70,10 +68,10 @@ class TestOrganizeByDate:
 
         # Verify behavior: dry run should not move file
         assert result.returncode == 0, f"Script failed: {result.stderr}"
-        assert source_exists_before == True, "Source should exist before"
-        assert target_exists_before == False, "Target should not exist before"
-        assert source_exists_after == True, f"Actual: source missing after dry run, Expected: source still exists"
-        assert target_exists_after == False, f"Actual: target created during dry run, Expected: target empty"
+        assert source_exists_before is True, "Source should exist before"
+        assert target_exists_before is False, "Target should not exist before"
+        assert source_exists_after is True, "Actual: source missing after dry run, Expected: source still exists"
+        assert target_exists_after is False, "Actual: target created during dry run, Expected: target empty"
 
     def test_apply_mode_moves_file(self, test_video_with_date, temp_dir):
         """Test that apply mode moves file to correct location
@@ -103,10 +101,10 @@ class TestOrganizeByDate:
 
         # Verify behavior: file should be moved
         assert result.returncode == 0, f"Script failed: {result.stderr}"
-        assert source_exists_before == True, "Source should exist before"
-        assert target_exists_before == False, "Target should not exist before"
-        assert source_exists_after == False, f"Actual: source still exists after apply, Expected: source moved away"
-        assert target_exists_after == True, f"Actual: target missing after apply, Expected: file at {target_path}"
+        assert source_exists_before is True, "Source should exist before"
+        assert target_exists_before is False, "Target should not exist before"
+        assert source_exists_after is False, "Actual: source still exists after apply, Expected: source moved away"
+        assert target_exists_after is True, f"Actual: target missing after apply, Expected: file at {target_path}"
 
     def test_template_substitution(self, test_video_with_date, temp_dir):
         """Test that template variables are substituted correctly
@@ -136,10 +134,10 @@ class TestOrganizeByDate:
 
         # Verify behavior: file should be organized with template pattern
         assert result.returncode == 0, f"Script failed: {result.stderr}"
-        assert source_exists_before == True, "Source should exist before"
-        assert target_exists_before == False, "Target should not exist before"
-        assert source_exists_after == False, f"Actual: source still exists, Expected: source moved"
-        assert target_exists_after == True, f"Actual: file not at expected location, Expected: {expected_path}"
+        assert source_exists_before is True, "Source should exist before"
+        assert target_exists_before is False, "Target should not exist before"
+        assert source_exists_after is False, "Actual: source still exists, Expected: source moved"
+        assert target_exists_after is True, f"Actual: file not at expected location, Expected: {expected_path}"
 
     def test_idempotency_already_organized(self, test_video_with_date, temp_dir):
         """Test that already-organized files are detected
@@ -184,8 +182,8 @@ class TestOrganizeByDate:
         # Verify idempotent behavior: file should not be moved/modified
         assert result.returncode == 0, f"Script should succeed: {result.stderr}"
         assert os.path.exists(moved_path), "File should still exist at original location"
-        assert inode_before == inode_after, f"Actual: file was moved (inode changed), Expected: file stays in place (same inode)"
-        assert abs(mtime_after - mtime_before) < 2, f"Actual: file was modified, Expected: file unchanged"
+        assert inode_before == inode_after, "Actual: file was moved (inode changed), Expected: file stays in place (same inode)"
+        assert abs(mtime_after - mtime_before) < 2, "Actual: file was modified, Expected: file unchanged"
 
     def test_creates_directories(self, test_video_with_date, temp_dir):
         """Test that directory structure is created"""

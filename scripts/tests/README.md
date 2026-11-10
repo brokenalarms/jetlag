@@ -29,13 +29,12 @@ Test bash scripts and full workflows.
 
 ## Required External Tools
 
-Tests must never be skipped because a tool is missing. `conftest.py` auto-installs missing tools before collection:
+Tests must never be skipped because a tool is missing. `conftest.py` auto-installs missing tools before collection, and refuses to start when a Python package from `scripts/requirements.txt` is missing:
 
 | Tool | All platforms | macOS only | Install (manual fallback) |
 |------|:---:|:---:|---------|
 | ffmpeg | **auto-installed** | | `brew install ffmpeg` / `apt install ffmpeg` |
-| exiftool | **auto-installed** | | `brew install exiftool` / `apt install libimage-exiftool-perl` |
-| humanize (Python) | **auto-installed** | | `pip install humanize` |
+| exiftool | vendored at `scripts/tools/exiftool` | | — |
 | tag | | **required** | `brew install tag` |
 | SetFile | | **required** | `xcode-select --install` |
 
@@ -45,44 +44,22 @@ On Linux, tests that call macOS-only tools (`tag`, `SetFile`) are skipped automa
 
 ## Running Tests
 
-### Prerequisites
+Python dependencies: runtime packages are in `scripts/requirements.txt`, test and lint
+tooling in `scripts/requirements-dev.txt`. `make test-scripts` builds `scripts/.venv`
+from both and runs the suite in parallel. The pytest settings (`pythonpath`,
+`testpaths`) live in the root `pyproject.toml`, so run pytest from the repository root.
 
 ```bash
-# Install Python dependencies
-pip install -r tests/requirements.txt
+# Whole suite (from the repository root)
+make test-scripts
 
-# Tools are auto-installed by conftest.py, but to verify manually:
-ffmpeg -version
-exiftool -ver
+# Specific file, class or test
+scripts/.venv/bin/pytest scripts/tests/test_timezone_scenarios.py
+scripts/.venv/bin/pytest scripts/tests/test_timezone_scenarios.py::TestTimezoneScenarios::test_scenario_viewing_in_japan_shot_in_taiwan
 
-# macOS only
-which tag SetFile
-```
-
-### Run All Tests
-
-```bash
-# Using Python runner (recommended)
-python3 run-tests.py
-
-# Or directly with pytest
-cd tests && pytest -v
-```
-
-### Run Specific Tests
-
-```bash
-# Specific test file
-python3 run-tests.py test_timezone_scenarios.py
-
-# Specific test class
-python3 run-tests.py test_timezone_scenarios.py::TestTimezoneScenarios
-
-# Specific test
-python3 run-tests.py test_timezone_scenarios.py::TestTimezoneScenarios::test_scenario_viewing_in_japan_shot_in_taiwan
-
-# With coverage
-python3 run-tests.py --cov=. --cov-report=html
+# Lint
+scripts/.venv/bin/ruff check scripts
+scripts/.venv/bin/pyrefly check
 ```
 
 ## What We Test (and Don't Test)

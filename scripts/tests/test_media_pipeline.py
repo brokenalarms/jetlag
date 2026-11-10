@@ -29,8 +29,6 @@ from pipeline_schema import validate_event
 SCRIPT_DIR = Path(__file__).parent.parent
 MEDIA_PIPELINE = SCRIPT_DIR / "media-pipeline.sh"
 
-sys.path.insert(0, str(SCRIPT_DIR))
-
 
 def _has_tag_cmd() -> bool:
     return shutil.which("tag") is not None
@@ -260,7 +258,7 @@ class TestFileDiscovery:
         )
 
         lines = result.stderr.split("\n")
-        processing_lines = [l for l in lines if "Processing:" in l]
+        processing_lines = [line for line in lines if "Processing:" in line]
         assert "apple.mp4" in processing_lines[0]
         assert "mango.mp4" in processing_lines[1]
         assert "zebra.mp4" in processing_lines[2]
@@ -729,7 +727,7 @@ class TestTagging:
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
         )
 
-        event_types = [json.loads(l)["event"] for l in result.stdout.strip().split("\n") if l.strip()]
+        event_types = [json.loads(line)["event"] for line in result.stdout.strip().split("\n") if line.strip()]
         assert "tag_result" in event_types, \
             f"Actual: event types {event_types}, Expected: tag_result present"
 
@@ -1083,7 +1081,7 @@ class TestArchiveSourceIntegration:
         not_expected = source.parent / f"{source.name} - copied {today}"
         assert not not_expected.exists(), "Source should not have been renamed"
         assert "Skipping archive source" in result.stderr
-        skip_line = next(l for l in result.stderr.split("\n") if "Skipping archive source" in l)
+        skip_line = next(line for line in result.stderr.split("\n") if "Skipping archive source" in line)
         assert "1" in skip_line, f"Skip line should mention the failed count: {skip_line}"
         assert "Archive source..." not in result.stderr
 
@@ -1216,7 +1214,7 @@ class TestPipelineMachineOutput:
             "--group", "Test",
         ])
 
-        raw_events = [json.loads(l) for l in result.stdout.strip().split("\n") if l.strip()]
+        raw_events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
         event_types = [e["event"] for e in raw_events]
         assert "timestamp_result" in event_types, \
             f"Actual: event types {event_types}, Expected: timestamp_result present"
@@ -1951,7 +1949,7 @@ class TestUpdateFilenameDates:
             "--update-filename-dates",
         ])
 
-        events = [json.loads(l) for l in result.stdout.strip().split("\n") if l.strip()]
+        events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
         rename_events = [e for e in events if e["event"] == "rename_result"]
         assert rename_events, \
             f"Actual: no rename_result events in {[e['event'] for e in events]}, " \
@@ -1997,7 +1995,7 @@ class TestUpdateFilenameDates:
 
         assert "No such file or directory" not in result.output, \
             "Organize statted the would-be renamed path instead of the real file"
-        events = [json.loads(l) for l in result.stdout.strip().split("\n") if l.strip()]
+        events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
         assert not [e for e in events if e["event"] == "pipeline_error"], \
             "The run must not die on a pending rename"
         organize_events = [e for e in events if e["event"] == "organize_result"]
@@ -2030,7 +2028,7 @@ class TestUpdateFilenameDates:
             "--update-filename-dates",
         ])
 
-        event_types = [json.loads(l)["event"] for l in result.stdout.strip().split("\n") if l.strip()]
+        event_types = [json.loads(line)["event"] for line in result.stdout.strip().split("\n") if line.strip()]
         assert "rename_result" not in event_types, \
             f"Actual: rename_result found in {event_types}, " \
             "Expected: no rename_result for unparseable filename 'test.mp4'"
@@ -2057,7 +2055,7 @@ class TestUpdateFilenameDates:
             "--update-filename-dates",
         ])
 
-        event_types = [json.loads(l)["event"] for l in result.stdout.strip().split("\n") if l.strip()]
+        event_types = [json.loads(line)["event"] for line in result.stdout.strip().split("\n") if line.strip()]
         assert "rename_result" not in event_types, \
             f"Actual: rename_result found in {event_types}, " \
             "Expected: no rename_result when filename time is already correct"

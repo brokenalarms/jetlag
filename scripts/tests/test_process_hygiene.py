@@ -9,15 +9,13 @@ nested pytest run.
 
 import stat
 import subprocess
-import sys
 from pathlib import Path
-
-SCRIPTS_DIR = Path(__file__).parent.parent
-sys.path.insert(0, str(SCRIPTS_DIR))
-sys.path.insert(0, str(Path(__file__).parent))
 
 from conftest import _leaked_metadata_pids
 import lib.exiftool as exiftool_module
+
+SCRIPTS_DIR = Path(__file__).parent.parent
+
 
 
 def _executable(path: Path, body: str) -> Path:
