@@ -29,9 +29,9 @@ Scripts and the web site only. Sessions usually run as root.
   ```
 
 - **Known failures as root:** root ignores `chmod 000`, so the tests that make a file unreadable to force a failure see it succeed instead. These three fail in a root container and pass on macOS; anything else failing is a real regression:
-  - `test_pipeline_cli.py::TestSummaryOutput::test_summary_shows_failed_files`
-  - `test_pipeline_organize.py::TestPipelineOutcomeLines::test_apply_mentions_working_dir_only_when_preserved_for_inspection`
-  - `test_pipeline_archive.py::TestArchiveSourceIntegration::test_archive_skipped_when_a_file_failed`
+  - `media_pipeline/test_pipeline_cli.py::TestSummaryOutput::test_summary_shows_failed_files`
+  - `media_pipeline/test_pipeline_organize.py::TestPipelineOutcomeLines::test_apply_mentions_working_dir_only_when_preserved_for_inspection`
+  - `media_pipeline/test_pipeline_archive.py::TestArchiveSourceIntegration::test_archive_skipped_when_a_file_failed`
 - **macOS-only script tests** (Finder tags, birth time) carry `skipif` markers and are skipped on Linux.
 - **No Swift or Xcode:** `macos/` cannot be built or tested. For any change under `macos/` (or a `scripts/` change the app depends on), put a reviewer test plan in the PR: a checklist of steps to run in the live app and what each should show.
 - **Web:** Node and npm are available, so `web/` builds (`cd web && npm install && npm run build`) and Playwright with Chromium is preinstalled, so `npm run screenshot --prefix web` works.

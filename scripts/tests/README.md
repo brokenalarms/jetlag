@@ -4,16 +4,33 @@ Comprehensive tests for media timestamp fixing, tagging, and organization script
 
 ## Test Structure
 
+The folders mirror `lib/`, so a module's tests sit where its code does:
+
+| Folder | Tests for |
+|---|---|
+| `media_pipeline/` | `lib/media_pipeline/` — the whole run, split by area |
+| `fix_media_timestamp/` | `lib/fix_media_timestamp/` — the correction, end to end and by step |
+| `timestamps/` | `lib/timestamps/` — reading and ranking timestamps, file times, provenance |
+| `commands/` | the single-module commands: tag, organize, ingest, archive, gyroflow, probe-camera, scan-source, report-file-dates |
+| `shared/` | the shared `lib/` modules: exiftool client, command-line helpers, filesystem, footage, profiles |
+| top level | the scripts as a whole: every wrapper runs, dependencies, the Python version macOS ships |
+
+`conftest.py` holds the fixtures and the session checks; everything else the tests
+share is the `helpers` package (`helpers.media` makes test videos and photos,
+`helpers.pipeline` runs the pipeline as the app does). `pyproject.toml` puts
+`scripts/` and `scripts/tests/` on the path, so any test folder imports `lib.*`,
+`cli.*` and `helpers.*` the same way. Test file names are unique across folders.
+
 Each `test_*.py` module opens with a docstring saying what it protects; read that first. The suites fall into four groups:
 
 ### Unit tests
 Call functions directly and assert on returned data, not output strings.
 
-- `test_fix_media_timestamp_units.py` — timezone parsing and normalisation, birth-time operations, change detection, the priority order for picking the best timestamp
-- `test_tag_media_units.py` — reading and adding Finder tags and EXIF camera fields, only adding what is missing, dry run vs apply
-- `test_fix_timestamp_plan.py` — `plan_correction` and `apply_correction`: source ranking, declared-zone relabelling, the `--force-timezone` gate, `--time-offset` and the one-write rule
-- `test_pipeline_stages.py`, `test_pipeline_preflight.py`, `test_pipeline_consent.py` — which stages a run's options route a file through, the stage loop's completion and failure exit, the timezone pre-flight decision, and the consent prompts (each file also holds the end-to-end tests of its area)
-- `test_filesystem.py`, `test_timestamp_source.py`, `test_footage.py` — `lib/` modules
+- `fix_media_timestamp/test_fix_media_timestamp_units.py` — timezone parsing and normalisation, birth-time operations, change detection, the priority order for picking the best timestamp
+- `commands/test_tag_media_units.py` — reading and adding Finder tags and EXIF camera fields, only adding what is missing, dry run vs apply
+- `fix_media_timestamp/test_fix_media_timestamp_plan.py` — `plan_correction` and `apply_correction`: source ranking, declared-zone relabelling, the `--force-timezone` gate, `--time-offset` and the one-write rule
+- `media_pipeline/test_pipeline_stages.py`, `test_pipeline_preflight.py`, `test_pipeline_consent.py` — which stages a run's options route a file through, the stage loop's completion and failure exit, the timezone pre-flight decision, and the consent prompts (each file also holds the end-to-end tests of its area)
+- `shared/test_filesystem.py`, `timestamps/test_sources.py`, `shared/test_footage.py` — `lib/` modules
 
 Unit tests that would otherwise call exiftool take the `fake_metadata` fixture
 (`conftest.py`): reads return the tags a test gives each path and writes are
@@ -22,21 +39,21 @@ recorded, with no exiftool process behind them.
 ### Scenario tests
 Real timezone combinations users hit.
 
-- `test_timezone_scenarios.py` — viewing in a different timezone from the one shot in, preserving wall-clock shooting time, UTC conversion and date-boundary crossing, video-editor behaviour (birth time for import, `Keys:CreationDate` for the timeline), and the import → fix → organise workflow
+- `fix_media_timestamp/test_timezone_scenarios.py` — viewing in a different timezone from the one shot in, preserving wall-clock shooting time, UTC conversion and date-boundary crossing, video-editor behaviour (birth time for import, `Keys:CreationDate` for the timeline), and the import → fix → organise workflow
 
 ### Integration and regression tests
 Run a script end to end against temporary media and compare file state before and after.
 
-- media-pipeline, split by area: `test_pipeline_cli.py` (arguments, modes, summary, JSONL events), `test_pipeline_discovery.py`, `test_pipeline_timezones.py`, `test_pipeline_organize.py`, `test_pipeline_companions.py`, `test_pipeline_archive.py`, `test_pipeline_working_dir.py`, `test_pipeline_cancel.py`; `pipeline_helpers.py` runs the pipeline as the app does, and the `temp_workspace` / `test_profile` fixtures are in `conftest.py`
-- `test_timestamp_regression.py`, `test_fix_media_timestamp.py`, `test_tag_media.py`, `test_organize_by_date.py`, `test_ingest_media.py`, `test_archive_source.py`, `test_generate_gyroflow.py`, `test_probe_camera.py`, `test_scan_source.py`, `test_report_file_dates.py`, `test_insta360_camera.py`
+- `media_pipeline/`, split by area: `test_pipeline_cli.py` (arguments, modes, summary, JSONL events), `test_pipeline_discovery.py`, `test_pipeline_timezones.py`, `test_pipeline_organize.py`, `test_pipeline_companions.py`, `test_pipeline_archive.py`, `test_pipeline_working_dir.py`, `test_pipeline_cancel.py`; `helpers/pipeline.py` runs the pipeline as the app does, and the `temp_workspace` / `test_profile` fixtures are in `conftest.py`
+- `fix_media_timestamp/test_timestamp_regression.py`, `fix_media_timestamp/test_fix_media_timestamp.py`, and every module in `commands/`
 
 ### Contract tests
 Hold an interface or a cost fixed.
 
-- `test_pipeline_schema.py` — the pipeline's JSONL output and its parser's tasks and flags match `scripts/pipeline-schema.yaml`
-- `test_metadata_call_contract.py` — exact exiftool call counts per file (see `docs/testing.md`)
-- `test_metadata_stderr.py`, `test_process_hygiene.py`, `test_xmp_namespace.py` — the long-lived exiftool client and the XMP namespace
-- `test_requirements.py`, `test_python_compatibility.py` — runtime dependencies and the Python version macOS ships
+- `media_pipeline/test_pipeline_schema.py` — the pipeline's JSONL output and its parser's tasks and flags match `scripts/lib/media_pipeline/pipeline-schema.yaml`
+- `media_pipeline/test_metadata_call_contract.py` — exact exiftool call counts per file (see `docs/testing.md`)
+- `shared/test_metadata_stderr.py`, `shared/test_process_hygiene.py`, `timestamps/test_xmp_namespace.py` — the long-lived exiftool client and the XMP namespace
+- `test_command_wrappers.py`, `test_requirements.py`, `test_python_compatibility.py` — every command's wrapper, runtime dependencies and the Python version macOS ships
 
 ## Required External Tools
 
@@ -69,8 +86,8 @@ make test-scripts
 PATH=$PWD/scripts/tools:$PATH make test-scripts
 
 # Specific file, class or test
-scripts/.venv/bin/pytest scripts/tests/test_timezone_scenarios.py
-scripts/.venv/bin/pytest scripts/tests/test_timezone_scenarios.py::TestTimezoneScenarios::test_scenario_viewing_in_japan_shot_in_taiwan
+scripts/.venv/bin/pytest scripts/tests/fix_media_timestamp/test_timezone_scenarios.py
+scripts/.venv/bin/pytest scripts/tests/fix_media_timestamp/test_timezone_scenarios.py::TestTimezoneScenarios::test_scenario_viewing_in_japan_shot_in_taiwan
 
 # Lint
 make lint

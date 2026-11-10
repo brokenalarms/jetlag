@@ -1,20 +1,4 @@
 #!/bin/bash
-# archive-source.sh
-# Bash wrapper for Python implementation
-
-set -euo pipefail
-
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_SCRIPT="$SCRIPT_DIR/archive-source.py"
-
-source "$SCRIPT_DIR/lib/ensure-venv.sh"
-
-# Check if Python script exists
-if [[ ! -f "$PYTHON_SCRIPT" ]]; then
-    echo "ERROR: Python implementation not found at $PYTHON_SCRIPT" >&2
-    exit 1
-fi
-
-# Pass all arguments directly to Python implementation
-exec "$JETLAG_PYTHON" "$PYTHON_SCRIPT" "$@"
+# archive-source.sh — Archive (move and rename) or delete a source folder once its media is processed.
+# Run with --help for its options; README.md describes every command.
+source "$(dirname "${BASH_SOURCE[0]}")/lib/launch.sh" archive_source "$@"
