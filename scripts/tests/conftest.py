@@ -134,6 +134,11 @@ REQUIRED_TOOLS = {
         "linux": ["apt-get", "install", "-y", "-qq", "ffmpeg"],
         "darwin": ["brew", "install", "ffmpeg"],
     },
+    # verify-card lists a host:/path backup location with rsync --list-only.
+    "rsync": {
+        "linux": ["apt-get", "install", "-y", "-qq", "rsync"],
+        "darwin": ["brew", "install", "rsync"],
+    },
 }
 
 # Python packages required at import time by the scripts under test, by import

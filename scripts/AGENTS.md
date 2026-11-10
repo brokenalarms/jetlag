@@ -51,13 +51,15 @@ one-line `<command>.sh` like the others, and its logic in `lib/<command>`;
 | `ingest-media` | `ingest_media.py` |
 | `generate-gyroflow` | `generate_gyroflow.py` |
 | `archive-source` | `archive_source.py` |
+| `verify-card` | `verify_card.py`; its JSONL events are declared in `verify-card-schema.yaml` |
 | `probe-camera`, `scan-source`, `report-file-dates` | small enough to stay in the `cli/` module |
 
 Shared modules: `timestamps/` (`sources.py` reads and ranks a file's timestamps,
 `file_times.py` the file system's birth and modification times, `provenance.py` the
 recovery record written with a correction), `exiftool.py` (the one metadata
 client), `countries.py` (country → timezone), `command_line.py` (timezone flags and
-their resolution, interrupt handling), `profiles.py`, `filesystem.py`, `footage.py`.
+their resolution, interrupt handling), `profiles.py`, `filesystem.py`, `footage.py`, `data_portion.py` (the data portion
+verify-card compares: QuickTime/HEIF footage, a JPEG from start-of-scan).
 `cli/results.py` prints a single-file command's result as `@@key=value` lines.
 
 A `cli/` module holds argument parsing, validation messages and output; anything

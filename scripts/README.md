@@ -44,6 +44,7 @@ directory, e.g. `~/jetlag/scripts/media-pipeline.sh …`.
 | `generate-gyroflow.sh` | Write a Gyroflow stabilization project for a video with gyro data | `--preset`, `--apply` |
 | `probe-camera.sh` | Report which camera shot the media in a folder | `--extensions`, `--sample` |
 | `scan-source.sh` | Report how many media files a folder holds, or whether their names carry dates | `--extensions`, `--count` or `--timestamped-names` |
+| `verify-card.sh` | Check that every file on a card is on each backup location before it is wiped; read-only, prints a verdict per file and location | `--location NAME=ROOT` (repeat), `--media-extensions`, `--include-companions` |
 | `report-file-dates.sh` | Report where each file's date would come from: metadata, filename or file times | `--file-extensions` |
 
 ### Examples
@@ -78,6 +79,7 @@ Other examples:
 ./probe-camera.sh /Volumes/Untitled/DCIM --extensions .mp4 .mov
 ./scan-source.sh /Volumes/Untitled/DCIM --extensions .mp4 --count
 ./report-file-dates.sh /Volumes/Untitled/DCIM --file-extensions .mp4
+./verify-card.sh /Volumes/Untitled --location T9="/Volumes/T9/Videos/Source Video" --media-extensions .mp4 .insv --ignore-paths MISC
 ```
 
 `--timezone` takes a zone name (`Pacific/Auckland`, resolved per file so a trip

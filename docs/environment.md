@@ -42,6 +42,7 @@ Scripts and the web site only. Sessions usually run as root.
     -k "test_summary_shows_failed_files or test_apply_mentions_working_dir_only_when_preserved_for_inspection or test_archive_skipped_when_a_file_failed"
   ```
 - **ffmpeg:** the tests generate their media with `ffmpeg`. If a container lacks it, `apt-get install -y ffmpeg` (as CI does).
+- **rsync:** the verify-card tests list a stand-in remote location with `rsync`; `apt-get install -y rsync` if it is missing.
 - **macOS-only script tests** (Finder tags, birth time) carry `skipif` markers and are skipped on Linux.
 - **No Swift or Xcode:** `macos/` cannot be built or tested. For any change under `macos/` (or a `scripts/` change the app depends on), put a reviewer test plan in the PR: a checklist of steps to run in the live app and what each should show.
 - **Web:** Node and npm are available, so `web/` builds (`cd web && npm install && npm run build`) and Playwright with Chromium is preinstalled, so `npm run screenshot --prefix web` works.

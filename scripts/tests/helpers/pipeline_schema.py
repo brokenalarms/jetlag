@@ -12,6 +12,7 @@ Not a test module itself — imported by the tests that capture pipeline output.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -34,14 +35,14 @@ _TYPE_CHECKS = {
 }
 
 
-def _load() -> dict[str, Any]:
-    with open(SCHEMA_PATH) as f:
+def _load(path: Path = SCHEMA_PATH) -> dict[str, Any]:
+    with open(path) as f:
         return yaml.safe_load(f)
 
 
-def load_schema() -> dict[str, Any]:
-    """The event declarations."""
-    return _load()["events"]
+def load_schema(path: Path = SCHEMA_PATH) -> dict[str, Any]:
+    """The event declarations, of the pipeline or of another command's schema file."""
+    return _load(path)["events"]
 
 
 def load_cli() -> dict[str, Any]:

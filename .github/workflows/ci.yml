@@ -32,7 +32,7 @@ jobs:
           # times out; drop it so apt goes straight to archive.ubuntu.com
           sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
           sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15
-          sudo apt-get install -y ffmpeg libimage-exiftool-perl
+          sudo apt-get install -y ffmpeg libimage-exiftool-perl rsync
 
       # make builds scripts/.venv from both requirements files and runs the
       # suite in parallel, the same way it runs locally

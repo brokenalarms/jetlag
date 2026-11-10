@@ -12,7 +12,7 @@ The folders mirror `lib/`, so a module's tests sit where its code does:
 | `fix_media_timestamp/` | `lib/fix_media_timestamp/` — the correction, end to end and by step |
 | `timestamps/` | `lib/timestamps/` — reading and ranking timestamps, file times, provenance |
 | `commands/` | the single-module commands: tag, organize, ingest, archive, gyroflow, probe-camera, scan-source, report-file-dates |
-| `shared/` | the shared `lib/` modules: exiftool client, command-line helpers, filesystem, footage, profiles |
+| `shared/` | the shared `lib/` modules: exiftool client, command-line helpers, filesystem, footage, data portion, profiles |
 | top level | the scripts as a whole: every wrapper runs, dependencies, the Python version macOS ships |
 
 `conftest.py` holds the fixtures and the session checks; everything else the tests
