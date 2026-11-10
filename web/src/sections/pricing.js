@@ -1,5 +1,5 @@
 import { renderSectionHeader } from '../components/section-header.js'
-import { BUY_URL, FREE_FILE_LIMIT, MIN_MACOS, PRICE } from '../content.js'
+import { BUY_URL, FREE_FILE_LIMIT, PRICE } from '../content.js'
 
 const freeFeatures = [
   'Full pipeline: import, tag, fix timestamps, organize',
@@ -113,7 +113,7 @@ export function render() {
           ${[
             [`What is the ${FREE_FILE_LIMIT}-file limit?`, `The free version processes up to ${FREE_FILE_LIMIT} files per pipeline run. For most day trips with one or two cameras, that's plenty. Pro removes the limit entirely.`],
             ['Is it really a one-time purchase?', 'Yes. Pay once, use Jetlag Pro forever. No monthly fee, no annual renewal.'],
-            ['What macOS version do I need?', `${MIN_MACOS} or later. Jetlag is a native SwiftUI app — no Electron, no web runtime.`],
+            ['Does it run natively on Apple Silicon?', 'Yes, no Rosetta. Jetlag is a native SwiftUI app — no Electron, no web runtime.'],
             ['Can I try it before buying?', `Yes. Download the free version and run it on your footage. The full pipeline works — you're only limited to ${FREE_FILE_LIMIT} files per run.`],
           ].map(([q, a]) => /* html */`
             <div class="card">

@@ -1,4 +1,4 @@
-import { BUY_URL, DOWNLOAD_URL, MIN_MACOS, PRICE } from '../content.js'
+import { BUY_URL, DOWNLOAD_URL, PRICE } from '../content.js'
 
 export const id = 'download'
 
@@ -40,7 +40,7 @@ export function render() {
         </div>
 
         <p class="mt-6 text-xs text-white/25">
-          ${MIN_MACOS} or later &nbsp;·&nbsp; Apple Silicon & Intel &nbsp;·&nbsp; ~8 MB download
+          Native on Apple Silicon &nbsp;·&nbsp; ~8 MB download
         </p>
       </div>
     </section>

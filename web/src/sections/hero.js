@@ -1,4 +1,4 @@
-import { MIN_MACOS, PRICE } from '../content.js'
+import { PRICE } from '../content.js'
 
 export const id = 'hero'
 
@@ -47,7 +47,7 @@ export function render() {
 
       <!-- Trust line -->
       <p class="animate-fade-up opacity-0 mt-6 text-sm text-white/30" style="animation-delay: 0.6s">
-        ${MIN_MACOS} or later &nbsp;·&nbsp; No subscription &nbsp;·&nbsp; Free tier included
+        Native on Apple Silicon &nbsp;·&nbsp; No subscription &nbsp;·&nbsp; Free tier included
       </p>
 
       <!-- App preview / diagram -->
