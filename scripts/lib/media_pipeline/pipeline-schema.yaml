@@ -334,7 +334,7 @@ cli:
   steps:
     - { stage: ingest }
     - { stage: tag, task: tag }
-    - { stage: fix-timestamp, task: fix-timestamp }
+    - { stage: fix-timestamp }
     - { stage: output }
     - { stage: gyroflow, task: gyroflow }
     - { stage: archive-source, task: archive-source }

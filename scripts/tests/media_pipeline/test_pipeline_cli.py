@@ -15,6 +15,7 @@ import yaml
 from helpers.media import create_test_video as _create_video_raw
 from helpers.pipeline import create_test_video, get_exif_field, run_in_process, run_pipeline
 from helpers.pipeline_schema import validate_event
+from lib.exiftool import MetadataWriteRefused, exiftool
 
 
 class TestDryRunMode:
@@ -201,7 +202,7 @@ class TestSourceAndTargetMustNotOverlap:
 
         result = run_in_process([
             "--profile", test_profile, "--source", str(source), "--target", str(target),
-            "--timezone", "+0900", "--tasks", "fix-timestamp", "archive-source",
+            "--timezone", "+0900", "--tasks", "archive-source",
             "--update-filename-dates", "--apply",
             "--working-dir", str(target / "working"),
         ])
@@ -466,7 +467,7 @@ class TestPipelineMachineOutput:
             "--source", str(source),
             "--timezone", "+0900",
             "--group", "Test",
-            "--tasks", "tag", "fix-timestamp", "gyroflow",
+            "--tasks", "tag", "gyroflow",
         ])
 
         files = self._parse_events(result.stdout)
@@ -565,7 +566,7 @@ class TestPipelineMachineOutput:
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0200",
-            "--tasks", "fix-timestamp",
+            "--tasks",
         ])
 
         assert result.returncode == 0, \
@@ -604,7 +605,7 @@ class TestPipelineMachineOutput:
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+1300",
-            "--tasks", "fix-timestamp",
+            "--tasks",
         ])
 
         assert result.returncode == 0
@@ -636,7 +637,7 @@ class TestPipelineMachineOutput:
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0800",
-            "--tasks", "fix-timestamp",
+            "--tasks",
         ])
 
         files = self._parse_events(result.stdout)
@@ -663,7 +664,7 @@ class TestPipelineMachineOutput:
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0200",
-            "--tasks", "fix-timestamp",
+            "--tasks",
             "--apply",
         ])
 
@@ -696,7 +697,7 @@ class TestPipelineMachineOutput:
             "--source", str(source),
             "--timezone", "+0200",
             "--force-timezone",
-            "--tasks", "fix-timestamp",
+            "--tasks",
         ])
 
         files = self._parse_events(result.stdout)
@@ -731,7 +732,7 @@ class TestPipelineMachineOutput:
             "--source", str(source),
             "--timezone", "+0900",
             "--force-timezone",
-            "--tasks", "fix-timestamp",
+            "--tasks",
         ])
 
         assert result.returncode != 0, \
@@ -761,7 +762,7 @@ class TestPipelineMachineOutput:
             "--profile", test_profile,
             "--source", str(source),
             "--timezone", "+0800",
-            "--tasks", "fix-timestamp",
+            "--tasks",
         ])
 
         events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
@@ -800,7 +801,7 @@ class TestPipelineMachineOutput:
             "--timezone", "+0900",
             "--allow-mixed-timezones",
             "--force-timezone",
-            "--tasks", "fix-timestamp",
+            "--tasks",
         ])
 
         events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
@@ -826,7 +827,7 @@ class TestPipelineMachineOutput:
             "--source", str(source),
             "--timezone", "+0900",
             "--infer-from-filename",
-            "--tasks", "fix-timestamp",
+            "--tasks",
         ])
 
         assert result.returncode != 0, "Pipeline should exit non-zero for unparseable filenames"
@@ -835,38 +836,36 @@ class TestPipelineMachineOutput:
         assert len(parse_errors) == 1, f"Expected 1 filename_parse_error event, got {len(parse_errors)}"
         assert "C0009.MP4" in parse_errors[0]["unparseable_files"]
 
-    def test_error_field_on_timestamp_result_exception(self, temp_workspace, test_profile):
-        """Exception path includes error message in timestamp_result event.
+    @staticmethod
+    def _refuse_writes(monkeypatch):
+        """exiftool refusing every write, as it does the Insta360 X6's .insv."""
+        def refuse(*_args, **_kwargs):
+            raise MetadataWriteRefused("Corrupted Insta360 trailer")
+        monkeypatch.setattr(exiftool, "write_tags", refuse)
 
-        When fix_media_timestamps() raises (e.g. --infer-from-filename on a
-        file with no parseable date that slips past the pre-flight), the
-        timestamp_result event should include the error string so the app
-        can display it in the diff table instead of a generic "Error" label.
+    def test_error_field_on_timestamp_result_exception(self, temp_workspace, test_profile, monkeypatch):
+        """A file the timestamp step cannot correct carries the reason in its
+        timestamp_result, so the app shows it in the diff table instead of a
+        generic "Error" label.
+
+        Actual: the timestamp_result of a file exiftool refuses to write
+        Expected: action=error, error naming exiftool's reason
         """
         source = temp_workspace["source"]
-        # VID_ prefix with valid date passes pre-flight; create a second file
-        # with unparseable name that we'll swap in after pre-flight by creating
-        # the batch with one good file and checking error on the good one won't
-        # work. Instead, directly verify the JSONL event format by triggering
-        # the infer-from-filename exception path:
-        # The pre-flight check catches this, so we test the exception handler
-        # by verifying the error= kwarg is passed to emit_event in the code.
-        # For the integration test, we verify the simpler no-timezone error
-        # path where the error is captured in the result dict.
         create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
+        self._refuse_writes(monkeypatch)
 
-        result = run_pipeline([
-            "--profile", test_profile,
-            "--source", str(source),
-            "--tasks", "fix-timestamp",
+        result = run_in_process([
+            "--profile", test_profile, "--source", str(source), "--timezone", "+0900",
+            "--tasks", "--apply",
         ])
 
-        # Verify events include timestamp_result with action=error
         events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
-        ts_events = [e for e in events if e.get("event") == "timestamp_result" and e.get("action") == "error"]
-        assert len(ts_events) == 1, f"Expected 1 error timestamp_result, got {len(ts_events)}"
+        errors = [(e.get("action"), e.get("error")) for e in events if e.get("event") == "timestamp_result"]
+        assert errors == [("error", "Corrupted Insta360 trailer")], \
+            f"Actual: {errors}, Expected: one error carrying exiftool's reason"
 
-    def test_error_path_emits_original_time(self, temp_workspace, test_profile):
+    def test_error_path_emits_original_time(self, temp_workspace, test_profile, monkeypatch):
         """Error path emits original_time when the file has a known timestamp.
 
         Actual: original_time present alongside action=error in timestamp_result
@@ -874,11 +873,11 @@ class TestPipelineMachineOutput:
         """
         source = temp_workspace["source"]
         create_test_video(source / "test.mp4", media_create_date="2025:10:05 01:00:00")
+        self._refuse_writes(monkeypatch)
 
-        result = run_pipeline([
-            "--profile", test_profile,
-            "--source", str(source),
-            "--tasks", "fix-timestamp",
+        result = run_in_process([
+            "--profile", test_profile, "--source", str(source), "--timezone", "+0900",
+            "--tasks", "--apply",
         ])
 
         files = self._parse_events(result.stdout)
@@ -886,10 +885,8 @@ class TestPipelineMachineOutput:
         f = files[0]
         assert f.get("timestamp_action") == "error", \
             f"Expected timestamp_action=error, got: {f.get('timestamp_action')}"
-        assert "original_time" in f, \
-            f"Error path should include original_time, got keys: {list(f.keys())}"
-        assert f["original_time"], \
-            f"original_time should be non-empty, got: {f.get('original_time')}"
+        assert f.get("original_time"), \
+            f"Error path should include original_time, got: {f.get('original_time')}"
 
     def test_pipeline_emits_stage_complete(self, temp_workspace, test_profile):
         """Pipeline emits stage_complete events for each step that runs.

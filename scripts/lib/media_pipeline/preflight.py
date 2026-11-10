@@ -15,7 +15,7 @@ from typing import Optional
 from lib import ingest_media, tag_media
 from lib.media_pipeline.consent import require_consent
 from lib.media_pipeline.events import emit_event
-from lib.media_pipeline.options import FIX_TIMESTAMP, RunOptions
+from lib.media_pipeline.options import RunOptions
 from lib.timestamps.sources import normalize_timezone_input, read_file
 
 
@@ -207,7 +207,7 @@ def check_timezones(files: list[Path], opts: RunOptions) -> None:
     A dry run previews a provided mismatch per file (each timestamp_result
     carries requires_force_timezone); only applying is refused.
     """
-    if not opts.runs(FIX_TIMESTAMP) or opts.infer_from_filename:
+    if opts.infer_from_filename:
         return
     zones = read_file_zones(files, opts.timezone_spec)
     compared = {zone.name for zone in zones}

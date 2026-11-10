@@ -58,7 +58,7 @@ final class PipelineArgsTests: XCTestCase {
             .prefix(while: { !$0.hasPrefix("--") })
         let tasks = Array(tasksSlice)
         XCTAssertTrue(tasks.contains("tag"))
-        XCTAssertTrue(tasks.contains("fix-timestamp"))
+        XCTAssertFalse(tasks.contains("fix-timestamp"), "Set Timestamps is in the fixed frame, never a task")
         XCTAssertTrue(tasks.contains("gyroflow"))
         XCTAssertFalse(tasks.contains("archive-source"))
         XCTAssertFalse(tasks.contains("ingest"))
@@ -70,8 +70,11 @@ final class PipelineArgsTests: XCTestCase {
         session.enabledSteps = Set(session.availableSteps.filter { $0.isAlwaysOn })
         let (script, args) = session.buildPipelineArgs()
 
+        // --tasks with no names: left out, the pipeline would run its default
+        // optional steps, giving back the ones the user turned off.
         XCTAssertEqual(script, "media-pipeline.sh")
-        XCTAssertFalse(args.contains("--tasks"))
+        let tasksIndex = args.firstIndex(of: "--tasks")!
+        XCTAssertTrue(tasksIndex + 1 == args.count || args[tasksIndex + 1].hasPrefix("--"))
         XCTAssertTrue(args.contains("--source"))
     }
 
@@ -191,21 +194,15 @@ final class PipelineArgsTests: XCTestCase {
         XCTAssertFalse(session.isStepReady(.ingest))
     }
 
-    func testAllStepsReadyWhenFixTimestampsDisabledAndTimezoneEmpty() {
+    /// Set Timestamps is always on, so no run is ready without a timezone, and
+    /// toggling the step does nothing.
+    func testAllStepsNotReadyWithoutATimezoneWhateverTheToggle() {
         let session = makeSession()
         session.sourceDir.value = makeTempDir()
         session.readyDir.value = makeTempDir()
         session.timezone.value = ""
-        session.enabledSteps.remove(.fixTimestamps)
-        XCTAssertTrue(session.allStepsReady)
-    }
-
-    func testAllStepsNotReadyWhenFixTimestampsEnabledAndTimezoneEmpty() {
-        let session = makeSession()
-        session.sourceDir.value = makeTempDir()
-        session.readyDir.value = makeTempDir()
-        session.timezone.value = ""
-        session.enabledSteps.insert(.fixTimestamps)
+        session.toggle(.fixTimestamps)
+        XCTAssertTrue(PipelineStep.fixTimestamps.isAlwaysOn)
         XCTAssertFalse(session.allStepsReady)
     }
 
@@ -221,16 +218,6 @@ final class PipelineArgsTests: XCTestCase {
     func testInferFromFilenamesNotIncludedByDefault() {
         let session = makeSession()
         session.timezone.value = "Asia/Tokyo"
-        let (_, args) = session.buildPipelineArgs()
-
-        XCTAssertFalse(args.contains("--infer-from-filename"))
-    }
-
-    func testInferFromFilenamesNotIncludedWhenStepDisabled() {
-        let session = makeSession()
-        session.timezone.value = "Asia/Tokyo"
-        session.inferFromFilenames = true
-        session.enabledSteps.remove(.fixTimestamps)
         let (_, args) = session.buildPipelineArgs()
 
         XCTAssertFalse(args.contains("--infer-from-filename"))

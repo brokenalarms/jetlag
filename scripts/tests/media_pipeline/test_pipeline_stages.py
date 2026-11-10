@@ -22,11 +22,11 @@ import pytest
 
 from lib.media_pipeline import RunOptions, WorkingDir, process_file
 from lib.media_pipeline import stages
-from lib.media_pipeline.stages import Stage, StageOutcome, enabled_stages, fix_writes_fields
+from lib.media_pipeline.stages import Stage, StageOutcome, enabled_stages
 from helpers import SCRIPT_DIR
 from helpers.pipeline import create_test_video, get_exif_field, has_tag_cmd, run_in_process, run_pipeline
 
-DEFAULT_TASKS = frozenset({"tag", "fix-timestamp", "gyroflow"})
+DEFAULT_TASKS = frozenset({"tag", "gyroflow"})
 CAMERA_PROFILE = {"tags": ["test-camera"], "exif": {"make": "Test", "model": "Camera"}}
 
 
@@ -43,10 +43,11 @@ def _names(opts: RunOptions) -> list[str]:
 
 class TestStageRouting:
 
-    def test_ingest_and_output_always_run(self):
-        """Actual: with no optional task, only ingest and output
-        Expected: the fixed frame of every run"""
-        assert _names(_opts(tasks=frozenset())) == ["ingest", "output"]
+    def test_ingest_fix_timestamp_and_output_always_run(self):
+        """Actual: with no optional task, ingest, fix-timestamp and output
+        Expected: the fixed frame of every run. Set Timestamps is always on: a run
+        that skipped it organized the Comedy night C0199 uncorrected."""
+        assert _names(_opts(tasks=frozenset())) == ["ingest", "fix-timestamp", "output"]
 
     def test_default_tasks_with_a_camera_profile(self):
         assert _names(_opts(profile=CAMERA_PROFILE)) == ["ingest", "tag", "fix-timestamp", "output"]
@@ -68,11 +69,10 @@ class TestStageRouting:
     def test_any_of_tags_make_or_model_enables_tag(self, profile):
         assert "tag" in _names(_opts(profile=profile))
 
-    def test_rename_follows_fix_timestamp_only_with_update_filename_dates(self):
+    def test_rename_follows_fix_timestamp_with_update_filename_dates(self):
         assert "rename" not in _names(_opts())
         assert _names(_opts(update_filename_dates=True)) == \
             ["ingest", "fix-timestamp", "rename", "output"]
-        assert "rename" not in _names(_opts(tasks=frozenset({"tag"}), update_filename_dates=True))
 
     @pytest.mark.parametrize("profile,config,enabled", [
         ({"gyroflow_enabled": True}, {"binary": "gyroflow"}, True),
@@ -87,27 +87,15 @@ class TestStageRouting:
         opts = _opts(profile={**CAMERA_PROFILE, "gyroflow_enabled": True}, gyroflow_config={"a": 1})
         assert _names(opts)[-2:] == ["output", "gyroflow"]
 
-    @pytest.mark.parametrize("apply,tasks,expected", [
-        (True, DEFAULT_TASKS, True),
-        (False, DEFAULT_TASKS, False),
-        (True, frozenset({"tag"}), False),
-    ], ids=["apply", "dry-run", "no-fix-timestamp"])
-    def test_tag_writes_ride_in_fix_timestamps_call_only_when_it_writes(self, apply, tasks, expected):
-        """Tag's camera fields go out in fix-timestamp's exiftool write, so the file
-        is rewritten once; without that write, the provenance stage writes them."""
-        assert fix_writes_fields(_opts(apply=apply, tasks=tasks)) is expected
-
-    @pytest.mark.parametrize("apply,tasks,expected", [
-        (True, frozenset({"tag"}), ["ingest", "tag", "provenance", "output"]),
-        (True, frozenset({"gyroflow"}), ["ingest", "provenance", "output"]),
-        (True, DEFAULT_TASKS, ["ingest", "tag", "fix-timestamp", "output"]),
-        (False, frozenset({"tag"}), ["ingest", "tag", "output"]),
-    ], ids=["tag-only", "no-metadata-step", "fix-timestamp-writes", "dry-run"])
-    def test_provenance_stage_writes_only_when_fix_timestamp_does_not(self, apply, tasks, expected):
-        """Every file an apply moves gets one metadata write carrying its provenance:
-        fix-timestamp's when it runs, the provenance stage's, right after tag, otherwise.
-        A dry run writes nothing."""
-        assert _names(_opts(apply=apply, tasks=tasks, profile=CAMERA_PROFILE)) == expected
+    @pytest.mark.parametrize("apply,tasks", [
+        (True, frozenset({"tag"})), (True, frozenset({"gyroflow"})), (False, frozenset({"tag"})),
+    ], ids=["tag-apply", "no-tag-apply", "dry-run"])
+    def test_every_run_sets_timestamps(self, apply, tasks):
+        """Actual: the stages whatever optional steps are asked for
+        Expected: fix-timestamp always, and no separate provenance stage: the
+        provenance record and tag's camera fields ride in its one write"""
+        names = _names(_opts(apply=apply, tasks=tasks, profile=CAMERA_PROFILE))
+        assert "fix-timestamp" in names and "provenance" not in names
 
 
 class _Recorder:
@@ -269,7 +257,7 @@ class TestEveryMovedFileRecordsItsCardName:
 
         result = run_in_process([
             "--profile", test_profile, "--source", str(source), "--timezone", "+0900",
-            "--tasks", "fix-timestamp", "--apply",
+            "--tasks", "--apply",
         ])
 
         # The clock fields, not the action: on macOS the staged copy never keeps the

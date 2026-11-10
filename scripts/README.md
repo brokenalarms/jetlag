@@ -35,7 +35,7 @@ directory, e.g. `~/jetlag/scripts/media-pipeline.sh …`.
 
 | Command | What it does | Main options |
 |---|---|---|
-| `media-pipeline.sh` | The whole workflow for a card or folder: copy, tag, fix timestamps, file by date, then optionally make Gyroflow projects and archive the source | `--profile`, or `--source` and `--target`; `--timezone` or `--location`; `--group`; `--tasks`; `--apply` |
+| `media-pipeline.sh` | The whole workflow for a card or folder: copy, tag, fix timestamps, file by date, then optionally make Gyroflow projects and archive the source | `--profile`, or `--source` and `--target`; `--timezone` or `--location` (required); `--group`; `--tasks` (tag, gyroflow, archive-source); `--apply` |
 | `fix-media-timestamp.sh` | Correct one file's timestamps | `--timezone` or `--country`; `--infer-from-filename`; `--time-offset`; `--force-timezone`; `--apply` |
 | `tag-media.sh` | Add Finder tags and camera make/model to files | `--tags`, `--make`, `--model`, `--apply` |
 | `organize-by-date.sh` | Move (or copy) one file into a dated folder, by its date where it was shot | `--target`, `--template`, `--timezone`, `--copy`, `--overwrite`, `--apply` |

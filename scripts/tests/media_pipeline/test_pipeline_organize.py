@@ -287,7 +287,7 @@ class TestOutputAlwaysOn:
 
         run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900",
-             "--group", "Test", "--tasks", "fix-timestamp", "--apply"],
+             "--group", "Test", "--tasks", "--apply"],
         )
 
         output_files = list(target.rglob("*.mp4"))
