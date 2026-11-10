@@ -1,3 +1,12 @@
+import { renderMobileNavMenu, renderMobileNavToggle } from '../components/mobile-nav.js'
+
+/** In-page links shown in both the desktop bar and the mobile menu. */
+export const NAV_LINKS = [
+  { href: '#features', label: 'Features' },
+  { href: '#how-it-works', label: 'How it works' },
+  { href: '#pricing', label: 'Pricing' },
+]
+
 export function renderNav() {
   return /* html */`
     <nav class="fixed top-0 z-50 w-full border-b border-white/6 bg-neutral-950/80 backdrop-blur-xl">
@@ -8,9 +17,9 @@ export function renderNav() {
         </a>
 
         <div class="hidden items-center gap-8 text-sm text-white/60 sm:flex">
-          <a href="#features" class="transition-colors hover:text-white">Features</a>
-          <a href="#how-it-works" class="transition-colors hover:text-white">How it works</a>
-          <a href="#pricing" class="transition-colors hover:text-white">Pricing</a>
+          ${NAV_LINKS.map(({ href, label }) => /* html */`
+            <a href="${href}" class="transition-colors hover:text-white">${label}</a>
+          `).join('')}
         </div>
 
         <div class="flex items-center gap-3">
@@ -21,29 +30,11 @@ export function renderNav() {
             </svg>
             Download
           </a>
-          <!-- Mobile hamburger -->
-          <button class="sm:hidden flex items-center justify-center w-9 h-9 rounded-lg border border-white/10 text-white/60 hover:text-white hover:border-white/20 transition-colors" id="nav-toggle" aria-label="Toggle menu">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" class="nav-icon-open">
-              <path d="M3 5h12M3 9h12M3 13h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" class="nav-icon-close hidden">
-              <path d="M5 5l8 8M13 5l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-          </button>
+          ${renderMobileNavToggle()}
         </div>
       </div>
 
-      <!-- Mobile menu -->
-      <div id="nav-mobile-menu" class="hidden sm:hidden border-t border-white/6 bg-neutral-950/95 backdrop-blur-xl">
-        <div class="flex flex-col gap-1 px-6 py-4">
-          <a href="#features" class="nav-mobile-link rounded-lg px-4 py-3 text-sm text-white/60 hover:text-white hover:bg-white/5 transition-all">Features</a>
-          <a href="#how-it-works" class="nav-mobile-link rounded-lg px-4 py-3 text-sm text-white/60 hover:text-white hover:bg-white/5 transition-all">How it works</a>
-          <a href="#pricing" class="nav-mobile-link rounded-lg px-4 py-3 text-sm text-white/60 hover:text-white hover:bg-white/5 transition-all">Pricing</a>
-          <div class="mt-2 pt-3 border-t border-white/6">
-            <a href="#pricing" class="btn-secondary w-full justify-center text-sm">Buy License</a>
-          </div>
-        </div>
-      </div>
+      ${renderMobileNavMenu(NAV_LINKS)}
     </nav>
   `
 }

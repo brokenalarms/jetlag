@@ -14,6 +14,7 @@ Outputs:
     macos/Sources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -31,12 +32,24 @@ except ImportError:
     raise SystemExit(subprocess.call([venv_python] + sys.argv))
 
 
-# ── Design tokens ──────────────────────────────────────────────────────────────
+# ── Colours ───────────────────────────────────────────────────────────────────
+#
+# The background comes from design/tokens.json. The clip colours are the
+# Tailwind blue/green/red/white shades the web timeline component uses, which
+# are not design tokens.
+
+TOKENS_PATH = Path(__file__).parent / "tokens.json"
+
+
+def token_rgb(name):
+    hex_color = json.loads(TOKENS_PATH.read_text())["colors"][name].lstrip("#")
+    return tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
+
 
 SIZE = 1024
-BG_COLOR = (10, 10, 11)                # #0a0a0b
+BG_COLOR = token_rgb("bg-primary")
 
-BLUE_FILL    = (59,  130, 246,  90)    # blue-500  ~35 %
+BLUE_FILL   = (59,  130, 246,  90)    # blue-500  ~35 %
 BLUE_BORDER  = (96,  165, 250,  70)    # blue-400  ~27 %
 BLUE_TEXT    = (147, 197, 253, 180)    # blue-300  ~70 %
 
