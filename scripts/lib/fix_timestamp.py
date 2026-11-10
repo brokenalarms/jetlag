@@ -14,7 +14,7 @@ import sys
 import time
 from dataclasses import dataclass, field as dataclass_field
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from lib.exiftool import MetadataWriteRefused, exiftool
 from lib.provenance import provenance_field_args
@@ -256,7 +256,7 @@ def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, 
     - Uses filename timestamp with provided timezone as source of truth
     - Ignores existing EXIF timestamps
     """
-    data = {
+    data: Dict[str, Any] = {
         "file_path": file_path,
         "exif": read_exif_data(file_path),
         "file_system": get_file_system_timestamps(file_path) if sys.platform == "darwin" else {"birth": "", "modify": ""},
@@ -293,7 +293,7 @@ def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, 
     data["timezone_offset"] = timezone_offset
 
     if best_timestamp:
-        if source.zoned:
+        if source.zoned and source.field:
             raw_value = data["exif"].get(source.field, "")
             data["timezone_source"] = f"{_FIELD_LABELS[source.field]} metadata"
             data["datetime_original_str"] = raw_value
@@ -308,7 +308,7 @@ def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, 
                     utc_str = embedded.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
                     declared_offset = resolve_timezone_offset(timezone_spec, utc_str, timestamp_is_utc=True)
                     declared_tz = _timezone_from_offset(declared_offset) if declared_offset else None
-                    if declared_tz is not None:
+                    if declared_offset and declared_tz is not None:
                         converted = embedded.astimezone(declared_tz)
                         data["timezone_offset"] = declared_offset
                         data["datetime_original"] = converted
@@ -322,7 +322,7 @@ def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, 
         elif source.is_utc:
             # UTC digits are expressed in the declared zone: same instant, new label.
             local_tz = _timezone_from_offset(timezone_offset) if timezone_offset else None
-            if local_tz is not None:
+            if timezone_offset and local_tz is not None:
                 utc_dt = datetime.strptime(best_timestamp, "%Y:%m:%d %H:%M:%S").replace(tzinfo=timezone.utc)
                 local_dt = utc_dt.astimezone(local_tz)
                 datetime_with_tz = local_dt.strftime("%Y:%m:%d %H:%M:%S") + timezone_offset
@@ -731,7 +731,7 @@ def fix_media_timestamps(file_path: str, apply: bool = True, timezone_spec: Opti
     print(f"🌐 UTC      : {utc_display}", file=sys.stderr)
 
     # Gather timestamp data for display (separating data from presentation)
-    timestamp_data = None
+    timestamp_data: Optional[Dict[str, Any]] = None
     if changes.get("file_timestamps"):
         current_fs = current_data["file_system"]
         expected_file_time = get_expected_file_system_time(datetime_original, preserve_wallclock=preserve_wallclock)

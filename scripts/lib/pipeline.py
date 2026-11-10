@@ -15,7 +15,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from lib import archive, fix_timestamp, gyroflow, ingest, organize, profiles, tagging
 from lib.cli import UnknownLocation, UnknownTimezone, interrupt_handler, resolve_timezone
@@ -240,7 +240,7 @@ def process_file(
     Returns:
         dict with keys: changed, failed, error, source_files, organize_conflict
     """
-    result = {"changed": False, "failed": False, "error": None,
+    result: Dict[str, Any] = {"changed": False, "failed": False, "error": None,
               "organize_conflict": None, "source_files": [str(file_path)]}
     file_changed = False
     # A dry run's --update-filename-dates rename that has not happened: the
