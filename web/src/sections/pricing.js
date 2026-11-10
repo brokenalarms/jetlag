@@ -1,3 +1,4 @@
+import { renderSectionHeader } from '../components/section-header.js'
 import { BUY_URL, FREE_FILE_LIMIT, MIN_MACOS, PRICE } from '../content.js'
 
 const freeFeatures = [
@@ -33,15 +34,12 @@ export function render() {
   return /* html */`
     <section id="${id}" class="py-24 px-6 bg-white/[0.02]">
       <div class="mx-auto max-w-5xl">
-        <div class="text-center mb-14">
-          <span class="section-label">Pricing</span>
-          <h2 class="vhs-scanlines mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
-            Simple, honest pricing
-          </h2>
-          <p class="mt-4 mx-auto max-w-md text-base text-white/50">
-            One-time purchase. No subscription. Use Jetlag forever.
-          </p>
-        </div>
+        ${renderSectionHeader({
+          label: 'Pricing',
+          title: 'Simple, honest pricing',
+          intro: 'One-time purchase. No subscription. Use Jetlag forever.',
+          introClass: 'max-w-md text-base text-white/50',
+        })}
 
         <div class="grid gap-6 lg:grid-cols-2 max-w-3xl mx-auto">
           <!-- Free tier -->

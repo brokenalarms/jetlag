@@ -1,3 +1,5 @@
+import { renderSectionHeader } from '../components/section-header.js'
+
 const audiences = [
   {
     cardClasses: 'border-neon-pink/15 bg-neon-pink/5 hover:border-neon-pink/25 hover:bg-neon-pink/8',
@@ -64,16 +66,11 @@ export function render() {
     <section id="${id}" class="py-24 px-6">
       <div class="mx-auto max-w-6xl">
 
-        <div class="text-center mb-14">
-          <span class="section-label">Who it's for</span>
-          <h2 class="vhs-scanlines mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
-            Made for people who don't stop moving
-          </h2>
-          <p class="mt-4 mx-auto max-w-2xl text-base leading-relaxed text-white/55">
-            Whether it's a dream gap year, a cross-continent bikepacking route, or life as a full-time
-            digital nomad — if you film your journey and cross timezones doing it, Jetlag was built for you.
-          </p>
-        </div>
+        ${renderSectionHeader({
+          label: "Who it's for",
+          title: "Made for people who don't stop moving",
+          intro: "Whether it's a dream gap year, a cross-continent bikepacking route, or life as a full-time digital nomad — if you film your journey and cross timezones doing it, Jetlag was built for you.",
+        })}
 
         <div class="grid gap-6 sm:grid-cols-2">
           ${audiences.map(a => /* html */`

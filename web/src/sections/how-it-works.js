@@ -1,3 +1,5 @@
+import { renderSectionHeader } from '../components/section-header.js'
+
 const steps = [
   {
     number: '01',
@@ -27,12 +29,10 @@ export function render() {
   return /* html */`
     <section id="${id}" class="py-24 px-6">
       <div class="mx-auto max-w-5xl">
-        <div class="text-center mb-14">
-          <span class="section-label">How it works</span>
-          <h2 class="vhs-scanlines mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
-            From card to cut in four steps
-          </h2>
-        </div>
+        ${renderSectionHeader({
+          label: 'How it works',
+          title: 'From card to cut in four steps',
+        })}
 
         <div class="relative">
           <!-- Connecting line -->

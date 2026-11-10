@@ -1,3 +1,5 @@
+import { renderSectionHeader } from '../components/section-header.js'
+
 const features = [
   {
     icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 2v4M10 14v4M2 10h4M14 10h4M4.93 4.93l2.83 2.83M12.24 12.24l2.83 2.83M4.93 15.07l2.83-2.83M12.24 7.76l2.83-2.83" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
@@ -37,16 +39,12 @@ export function render() {
   return /* html */`
     <section id="${id}" class="py-24 px-6 bg-white/[0.02]">
       <div class="mx-auto max-w-6xl">
-        <div class="text-center mb-14">
-          <span class="section-label">Features</span>
-          <h2 class="vhs-scanlines mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
-            Everything your pipeline needs
-          </h2>
-          <p class="mt-4 mx-auto max-w-xl text-base text-white/50">
-            Built for working filmmakers who shoot with multiple cameras and need footage
-            to cut together without the manual timestamp headache.
-          </p>
-        </div>
+        ${renderSectionHeader({
+          label: 'Features',
+          title: 'Everything your pipeline needs',
+          intro: 'Built for working filmmakers who shoot with multiple cameras and need footage to cut together without the manual timestamp headache.',
+          introClass: 'max-w-xl text-base text-white/50',
+        })}
 
         <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           ${features.map(f => /* html */`
