@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The pipeline's steps, declared in the order the pipeline runs them — the
-/// order of `cli.steps` in scripts/pipeline-schema.yaml, which
+/// order of `cli.steps` in scripts/lib/media_pipeline/pipeline-schema.yaml, which
 /// PipelineSchemaContractTests holds these cases and tokens to.
 enum PipelineStep: String, CaseIterable, Identifiable {
     case ingest = "Ingest"

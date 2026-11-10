@@ -7,7 +7,7 @@ import Foundation
 /// The script decides an outcome and names it; the app renders that name. Which
 /// other fields an event happens to carry is not an outcome — a skipped file still
 /// reports the destination it would have gone to — so nothing here consults `dest`.
-/// The token sets are enumerated in scripts/pipeline-schema.yaml and pinned to
+/// The token sets are enumerated in scripts/lib/media_pipeline/pipeline-schema.yaml and pinned to
 /// these cases by PipelineSchemaContractTests.
 struct RowOutcome {
     let correction: Correction?

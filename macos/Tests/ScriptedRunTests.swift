@@ -29,7 +29,7 @@ final class ReplayingLauncher: ScriptLaunching {
 /// checked against the free tier, the pipeline launch, every JSONL line folded
 /// into the table and the summary, and the popup or alert raised at the end.
 /// The pipeline's output is the schema's own example events
-/// (scripts/pipeline-schema.yaml), so the run is fed exactly what the contract
+/// (scripts/lib/media_pipeline/pipeline-schema.yaml), so the run is fed exactly what the contract
 /// says the pipeline emits.
 final class ScriptedRunTests: XCTestCase {
 

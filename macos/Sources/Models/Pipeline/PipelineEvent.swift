@@ -1,6 +1,6 @@
 import Foundation
 
-/// JSONL event types emitted by media-pipeline.py on stdout.
+/// JSONL event types emitted by media-pipeline.sh on stdout.
 enum PipelineEvent: Decodable {
     case pipelineFile(file: String, sourcePath: String?)
     case stageComplete(stage: String)

@@ -2,7 +2,7 @@ import XCTest
 import Yams
 @testable import Jetlag
 
-/// Holds the app to scripts/pipeline-schema.yaml, the one place a pipeline token is
+/// Holds the app to scripts/lib/media_pipeline/pipeline-schema.yaml, the one place a pipeline token is
 /// defined.
 ///
 /// Two directions are covered. Decoding: every event type's declared example — the

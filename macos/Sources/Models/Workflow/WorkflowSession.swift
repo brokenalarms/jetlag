@@ -558,7 +558,7 @@ final class WorkflowSession {
     }
 
     /// Where organized files land, laid out as the pipeline lays them out
-    /// (`expand_path_template` in scripts/lib/organize.py): the profile's
+    /// (`expand_path_template` in scripts/lib/organize_by_date.py): the profile's
     /// `folder_template` when it has one, otherwise year / [group /] date. The
     /// group is an optional folder, so without one that folder is left out.
     /// Date parts show as their placeholders (YYYY, MM, …).

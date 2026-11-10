@@ -70,7 +70,7 @@ enum Strings {
         static let copyCompanionToggle = String(localized: "workflow.copyCompanion.toggle", defaultValue: "Copy companion files")
         static let renameSourceDirToggle = String(localized: "workflow.renameSourceDir.toggle", defaultValue: "Rename source dir")
 
-        /// The name archive-source.py gives a folder it archives with no name of
+        /// The name archive-source.sh gives a folder it archives with no name of
         /// its own; the app prefills the field with it so the default is editable.
         static func archivedNameDefault(source: String, date: String) -> String {
             String(localized: "workflow.archivedName.default",
