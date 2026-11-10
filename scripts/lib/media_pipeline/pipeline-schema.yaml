@@ -186,79 +186,56 @@ events:
       action: would_generate
       gyroflow_path: /Volumes/Media/Ready/2025/2025-08-15/DJI_20250815_101112_0001.gyroflow
 
-  organize_conflict:
+  batch_check:
     description: >-
-      Emitted once after the batch when the organize step left files in place
-      because a different file already occupies their destination. Every listed
-      file also has its own organize_result with reason=exists_differs; this is
-      the batch-level summary the app prompts on before re-running with --overwrite.
+      One finding of a batch-level check (lib/media_pipeline/preflight.py CHECKS),
+      emitted before the first file is processed, except destination_occupied,
+      which is emitted after the batch. Every check reports before the run stops,
+      so a run that meets several asks about all of them at once. The app renders
+      the token and the files, and reads refused rather than working out itself
+      whether this run stopped.
     fields:
-      count: { type: integer }
-      files:
-        type: "list[string]"
-        description: "Basenames of the files whose destination is already occupied"
-    example:
-      event: organize_conflict
-      count: 1
-      files: [DJI_20250815_101112_0001.MP4]
-
-  timezone_conflict:
-    description: "Emitted when the declared timezone cannot be reconciled with the files"
-    fields:
-      conflict_type:
+      check:
         type: string
-        enum: [mixed_timezones, provided_mismatch]
-      provided_tz: { type: string, optional: true }
-      file_timezones:
+        enum: [protected_sources, camera_mismatch, mixed_timezones, zone_relabel,
+               filename_unparseable, destination_occupied]
+        description: >-
+          protected_sources: source files carry the user-immutable flag; their
+          imported copies come out unlocked. camera_mismatch: files whose
+          Make/Model differ (ignoring case) from the profile's, grouped by the
+          camera found; their camera fields are never overwritten.
+          mixed_timezones: the batch grouped by each file's zone, with files
+          that hold no zone evidence under none. zone_relabel: files whose zoned
+          tag differs from --timezone, grouped by the tag's zone.
+          filename_unparseable: under --infer-from-filename, files with no date
+          in their name. destination_occupied: files left in place because a
+          different file holds their destination; each also has its own
+          organize_result with reason=exists_differs.
+      files:
+        type: "list[string]"
+        description: "Basenames of the files the finding is about"
+      groups:
         type: "map[string, list[string]]"
-        description: "Embedded timezone offset → the filenames carrying it"
+        optional: true
+        description: "For a check that splits the batch: each label (a zone, a camera) → its files"
+      assent_flag:
+        type: string
+        optional: true
+        description: "The flag that lets a refused run go on; absent for a check that always refuses"
+      refused:
+        type: boolean
+        description: >-
+          Whether this run stopped on the finding: the check refuses this mode
+          (an apply, or every run) and its assent flag was not given.
     example:
-      event: timezone_conflict
-      conflict_type: provided_mismatch
-      provided_tz: "+09:00"
-      file_timezones:
-        "+08:00": [DJI_20250815_101112_0001.MP4]
-
-  camera_mismatch:
-    description: >-
-      Emitted once before any file is processed when source files carry a
-      camera Make/Model (ignoring case) different from the profile's: the
-      profile was likely picked for the wrong camera. A dry run reports this
-      and previews anyway; an apply refuses without --allow-camera-mismatch.
-      The files' camera fields are never overwritten either way.
-    fields:
-      files:
-        type: "list[string]"
-        description: "Basenames of the files shot on another camera"
-      expected_make: { type: string, optional: true }
-      expected_model: { type: string, optional: true }
-      found_makes:
-        type: "list[string]"
-        description: "Distinct differing Makes those files carry; empty when only the Model differs"
-      found_models:
-        type: "list[string]"
-        description: "Distinct differing Models those files carry; empty when only the Make differs"
-    example:
-      event: camera_mismatch
-      files: [A7V00113.ARW]
-      expected_make: Sony
-      expected_model: ILCE-7M4
-      found_makes: []
-      found_models: [ILCE-7M5]
-
-  protected_sources:
-    description: >-
-      Emitted once before any file is processed when source files carry the
-      user-immutable flag (a camera's "Protect"). Their imported copies come out
-      unprotected, so an apply refuses without --unlock-protected; a dry run
-      reports this and previews anyway.
-    fields:
-      files:
-        type: "list[string]"
-        description: "Basenames of the protected source files"
-    example:
-      event: protected_sources
-      files: [A7V01670.ARW]
+      event: batch_check
+      check: mixed_timezones
+      files: [VID_20261006_002802_00_001.insv, VID_20261006_203505_00_005.insv]
+      groups:
+        "-0700": [VID_20261006_002802_00_001.insv]
+        "+0800": [VID_20261006_203505_00_005.insv]
+      assent_flag: --allow-mixed-timezones
+      refused: true
 
   no_media_files:
     description: >-

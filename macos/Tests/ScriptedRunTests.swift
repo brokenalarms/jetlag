@@ -148,10 +148,10 @@ final class ScriptedRunTests: XCTestCase {
 
     /// An apply the pipeline refuses for a zone mismatch asks the user, and
     /// answering re-runs it as the apply it was.
-    func testAnApplyRefusedForAZoneMismatchAsks() async throws {
+    func testAnApplyRefusedOnABatchCheckAsks() async throws {
         let launcher = ReplayingLauncher([
             "scan-source.sh": [countLine(1)],
-            "media-pipeline.sh": [try example("timezone_conflict")],
+            "media-pipeline.sh": [try example("batch_check")],
         ])
         let state = makeState(launcher: launcher)
         state.workflowSession.applyMode = true
@@ -159,13 +159,12 @@ final class ScriptedRunTests: XCTestCase {
 
         await runToCompletion(state)
 
-        XCTAssertTrue(state.workflowSession.showTimezoneConflict)
-        XCTAssertEqual(state.workflowSession.timezoneConflictProvidedTz, "+09:00")
+        XCTAssertEqual(state.workflowSession.pendingChecks.map(\.kind), [.mixedTimezones])
         XCTAssertNil(state.runSummary, "a refused run reports no summary")
         XCTAssertFalse(state.showRunSummary)
 
-        state.workflowSession.grantTimezoneAssent()
+        state.workflowSession.grantPendingAssent()
         XCTAssertTrue(state.workflowSession.applyMode)
-        XCTAssertTrue(state.workflowSession.buildPipelineArgs().args.contains(WorkflowSession.forceTimezoneFlag))
+        XCTAssertTrue(state.workflowSession.buildPipelineArgs().args.contains("--allow-mixed-timezones"))
     }
 }

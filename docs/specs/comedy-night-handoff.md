@@ -1,7 +1,7 @@
 # Handoff: Comedy night follow-ups, for a local macOS session
 
 Read `timestamp-handoff.md` (the principles), `comedy-night-timestamps.md` (the items)
-and `preflight-checks.md` (the batch-check design) first. This file holds the state of
+and `completed/preflight-checks.md` (the batch-check design) first. This file holds the state of
 the branch and what is left.
 
 ## Branch
@@ -35,7 +35,7 @@ Fix whatever fails before anything else; Swift compile errors are possible.
    "Set Timestamps" ("Set TS"), and `--tasks` and `--timezone` are always passed. The
    Swift tests in `PipelineArgsTests` and `FixTimestampPreviewTests` were edited blind.
    Check them first.
-3. **Specs:** `preflight-checks.md` is new. `comedy-night-timestamps.md` items 3 and 4
+3. **Specs:** `completed/preflight-checks.md` is new. `comedy-night-timestamps.md` items 3 and 4
    record the user's decisions.
 
 ## Reviewer checks in the app
@@ -50,7 +50,7 @@ Fix whatever fails before anything else; Swift compile errors are possible.
 ## Left to do, in order
 
 1. **Merge #285** once `make test-scripts` and `make test-macos` pass.
-2. **The batch-check sequence** (`preflight-checks.md`): one new PR from main covering
+2. **The batch-check sequence** (`completed/preflight-checks.md`): one new PR from main covering
    the script, the schema and Swift together. The Swift side is about 190 references
    across 18 files: `PipelineEvent`, `RunTranscript`, `AppState`, `WorkflowSession`
    (the per-check state triples and `clearRunAssent`), `WorkflowView` (four alerts),

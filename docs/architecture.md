@@ -66,7 +66,9 @@ A profile's identity is its `exif` camera (Make + Model) and its `type` (photo o
 
 Nothing reads a source on its own: `probe-camera` runs only on the folder chosen for a new profile. The workflow's profile is picked by hand, as ever. The workflow reads its source once it is chosen (a profile picked, a folder browsed to, a typed path entered), never per keystroke or redraw, to learn whether its filenames carry timestamps. Every such read is a single walk that skips hidden entries and packages, so a Photos library inside a source is never opened.
 
-`media-pipeline` checks every file against the profile's camera before processing (case-insensitively: cameras write `SONY`, profiles may say `Sony`). A dry run reports files from another camera as `camera_mismatch` and previews them; an apply refuses without `--allow-camera-mismatch`. `tag-media` only fills a Make/Model a file lacks — a camera-written value is never overwritten.
+`media-pipeline` checks every file against the profile's camera before processing (case-insensitively: cameras write `SONY`, profiles may say `Sony`). A dry run reports files from another camera as a `camera_mismatch` batch check and previews them; an apply refuses without `--allow-camera-mismatch`. `tag-media` only fills a Make/Model a file lacks — a camera-written value is never overwritten.
+
+Every batch-level check is declared once in `CHECKS` (`scripts/lib/media_pipeline/preflight.py`): its token, its finder over the files' cached reads, its assent flag and which runs it refuses. One runner reports each finding as a `batch_check` event carrying `refused`, and stops the run once after every check has reported. The app keeps the last run's findings, asks about the refused ones in one alert, asks before an apply about every finding its preview reported, and passes the flags the user grants for that click; the token only picks the alert's text.
 
 ### Where the file lives
 

@@ -129,7 +129,7 @@ The user expects the timestamp step to always run, but only Ingest and Organize 
 always on (`PipelineStep.isAlwaysOn`); the workflow lets Fix Timestamps be tapped off.
 C0199 was organized without a correction on 10 Oct, most likely through this. The
 user's decision: the step becomes **Set Timestamps** and is always on. All the batch
-checks move into one sequence with one output: `preflight-checks.md`.
+checks move into one sequence with one output: `completed/preflight-checks.md`.
 
 ## 5. Writes that rewrite a file without its birth time
 

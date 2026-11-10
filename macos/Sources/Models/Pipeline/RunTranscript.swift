@@ -24,11 +24,7 @@ struct RunTranscript {
 
     /// An event about the run as a whole, for the app to act on.
     enum Notice {
-        case timezoneConflict(kind: TimezoneConflictKind, providedTz: String?,
-                              fileTimezones: [String: [String]])
-        case organizeConflict(count: Int, files: [String])
-        case protectedSources(files: [String])
-        case cameraMismatch(CameraMismatch)
+        case batchCheck(BatchCheck)
         case error(message: String)
     }
 
@@ -102,17 +98,8 @@ struct RunTranscript {
         case .noMediaFiles(let empty):
             emptySource = empty
 
-        case .timezoneConflict(let kind, let providedTz, let fileTimezones):
-            return .timezoneConflict(kind: kind, providedTz: providedTz, fileTimezones: fileTimezones)
-
-        case .organizeConflict(let count, let files):
-            return .organizeConflict(count: count, files: files)
-
-        case .protectedSources(let files):
-            return .protectedSources(files: files)
-
-        case .cameraMismatch(let mismatch):
-            return .cameraMismatch(mismatch)
+        case .batchCheck(let check):
+            return .batchCheck(check)
 
         case .pipelineError(let message):
             return .error(message: message)

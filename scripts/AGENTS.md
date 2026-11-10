@@ -75,7 +75,7 @@ another command or the pipeline could call belongs in its `lib/` module.
 | Module | Holds |
 |---|---|
 | `options.py` | `RunOptions`, the frozen command line resolved against the profile, and its validation |
-| `preflight.py` | batch checks before the first file: stale exiftool_tmp, protected files, camera, timezones (`preflight_timezones` is pure), filename timestamps |
+| `preflight.py` | stale exiftool_tmp, then `CHECKS`: each batch check declared once (token, finder, assent flag, which runs it refuses) and run by `run_checks`, one `batch_check` event per finding |
 | `consent.py` | `require_consent`, the one terminal-only y/n prompt |
 | `stages.py` | one file's trip: a `Stage` per step (`name`, `enabled(opts)`, `run(ctx) -> StageOutcome`) run by `process_file`, which owns `stage_complete` and the single failure exit |
 | `batch.py` | `run()`: options → pre-flight → every file → organize conflicts → archive → summary |

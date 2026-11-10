@@ -549,8 +549,8 @@ class TestPipelineMachineOutput:
         """A dry run previews a timezone-mismatched file instead of aborting.
 
         The user asks "what would happen?" — the answer is the full preview,
-        with the conflict reported as data: an informational timezone_conflict
-        event plus a per-file requires_force_timezone flag the app can flag in
+        with the conflict reported as data: a zone_relabel batch_check the run
+        did not stop on, plus a per-file requires_force_timezone flag the app can flag in
         its diff table. Exit status stays 0 so the preview is usable.
         """
         source = temp_workspace["source"]
@@ -573,12 +573,10 @@ class TestPipelineMachineOutput:
             f"Dry run should continue past a timezone conflict, got {result.returncode}"
 
         events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
-        conflict_events = [e for e in events if e.get("event") == "timezone_conflict"]
-        assert len(conflict_events) == 1, f"Expected 1 timezone_conflict event, got {len(conflict_events)}"
-        conflict = conflict_events[0]
-        assert conflict["conflict_type"] == "provided_mismatch"
-        assert conflict["provided_tz"] == "+0200"
-        assert "+0900" in conflict["file_timezones"]
+        checks = [e for e in events if e.get("event") == "batch_check"]
+        assert [(c["check"], c["groups"], c["refused"]) for c in checks] == \
+            [("zone_relabel", {"+0900": ["test.mp4"]}, False)], \
+            f"Actual: {checks}, Expected: one zone_relabel the dry run went on past"
 
         files = self._parse_events(result.stdout)
         assert len(files) == 1, f"Dry run should still preview the file, got: {files}"
@@ -671,9 +669,9 @@ class TestPipelineMachineOutput:
         assert result.returncode != 0, "Apply should exit non-zero on timezone conflict"
 
         events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
-        conflict_events = [e for e in events if e.get("event") == "timezone_conflict"]
-        assert len(conflict_events) == 1, f"Expected 1 timezone_conflict event, got {len(conflict_events)}"
-        assert conflict_events[0]["conflict_type"] == "provided_mismatch"
+        checks = [e for e in events if e.get("event") == "batch_check"]
+        assert [(c["check"], c["refused"]) for c in checks] == [("zone_relabel", True)], \
+            f"Actual: {checks}, Expected: one refused zone_relabel"
         assert not [e for e in events if e.get("event") == "timestamp_result"], \
             "Apply should refuse before touching any file"
 
@@ -710,8 +708,8 @@ class TestPipelineMachineOutput:
         """--force-timezone does not bypass the mixed timezones check.
 
         When files have different embedded timezones, --force-timezone should
-        not suppress the mixed_timezones conflict — only --allow-mixed-timezones
-        should. This ensures the app can present each conflict dialog independently.
+        not suppress the mixed_timezones finding — only --allow-mixed-timezones
+        should: each check has its own assent.
         """
         source = temp_workspace["source"]
         _create_video_raw(
@@ -738,16 +736,16 @@ class TestPipelineMachineOutput:
         assert result.returncode != 0, \
             "Pipeline should still block on mixed timezones even with --force-timezone"
         events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
-        conflict_events = [e for e in events if e.get("event") == "timezone_conflict"]
-        assert len(conflict_events) == 1
-        assert conflict_events[0]["conflict_type"] == "mixed_timezones"
+        refused = [e["check"] for e in events if e.get("event") == "batch_check" and e["refused"]]
+        assert refused == ["mixed_timezones"], \
+            f"Actual: {refused}, Expected: only mixed_timezones refused"
 
     def test_a_camera_whose_zone_changed_mid_batch_stops_as_mixed(self, temp_workspace, test_profile):
         """The Comedy night Insta360 X6 batch, shaped down to two clips: no zoned
         tag on either, a correct UTC clock on both, and the camera naming one clip
         in UTC-7 and the next in Perth time.
 
-        Actual: the run's timezone_conflict event
+        Actual: the run's batch_check events
         Expected: mixed_timezones, -0700 for the first clip and +0800 for the
         second — the zones the clock and filename show, which the guard used to
         miss because it looked only at zoned tags
@@ -766,11 +764,12 @@ class TestPipelineMachineOutput:
         ])
 
         events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
-        conflicts = [e for e in events if e.get("event") == "timezone_conflict"]
-        assert [(c["conflict_type"], c["file_timezones"]) for c in conflicts] == [(
+        checks = [e for e in events if e.get("event") == "batch_check"]
+        assert [(c["check"], c["groups"], c["refused"]) for c in checks] == [(
             "mixed_timezones",
             {"-0700": ["VID_20261006_002802_00_001.mp4"], "+0800": ["VID_20261006_203505_00_005.mp4"]},
-        )], f"Actual: {conflicts}, Expected: one mixed_timezones conflict, -0700 and +0800"
+            True,
+        )], f"Actual: {checks}, Expected: one refused mixed_timezones, -0700 and +0800"
         assert not [e for e in events if e.get("event") == "timestamp_result"], \
             "Actual: a file was processed, Expected: the batch stops before the first file"
 
@@ -805,9 +804,9 @@ class TestPipelineMachineOutput:
         ])
 
         events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
-        conflict_events = [e for e in events if e.get("event") == "timezone_conflict"]
-        assert len(conflict_events) == 0, \
-            f"No timezone_conflict expected with --allow-mixed-timezones, got: {conflict_events}"
+        refused = [e for e in events if e.get("event") == "batch_check" and e["refused"]]
+        assert refused == [], \
+            f"Actual: {refused}, Expected: nothing refused with --allow-mixed-timezones"
 
         files = self._parse_events(result.stdout)
         assert len(files) == 2, f"Both files should be processed, got {len(files)}"
@@ -816,7 +815,7 @@ class TestPipelineMachineOutput:
         """--infer-from-filename with unparseable filenames blocks before processing.
 
         Files like C0009.MP4 have no timestamp in their name. The pipeline
-        should emit a filename_parse_error event and exit before processing,
+        should report a filename_unparseable finding and exit before processing,
         rather than failing mid-batch.
         """
         source = temp_workspace["source"]
@@ -832,9 +831,10 @@ class TestPipelineMachineOutput:
 
         assert result.returncode != 0, "Pipeline should exit non-zero for unparseable filenames"
         events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
-        parse_errors = [e for e in events if e.get("event") == "filename_parse_error"]
-        assert len(parse_errors) == 1, f"Expected 1 filename_parse_error event, got {len(parse_errors)}"
-        assert "C0009.MP4" in parse_errors[0]["unparseable_files"]
+        checks = [e for e in events if e.get("event") == "batch_check"]
+        assert [(c["check"], c["files"], c["refused"]) for c in checks] == \
+            [("filename_unparseable", ["C0009.MP4"], True)], \
+            f"Actual: {checks}, Expected: one refused filename_unparseable naming C0009.MP4"
 
     @staticmethod
     def _refuse_writes(monkeypatch):

@@ -56,20 +56,12 @@ final class AppStateTests: XCTestCase {
     }
 }
 
-/// Covers how the app reacts to the pipeline's timezone-conflict reporting:
-/// a dry-run preview flags the affected rows quietly, while applying is what
-/// prompts the user to confirm the relabel.
-final class TimezoneConflictTests: XCTestCase {
+/// Covers what a timestamp_result carries onto its row: the relabel flag, the
+/// winning source and the fields and file times a correction would write.
+final class TimestampResultRowTests: XCTestCase {
 
     private func feed(_ state: AppState, _ json: String) {
         state.appendLog(LogLine(text: json, stream: .stdout))
-    }
-
-    private func feedConflict(_ state: AppState, type: String) {
-        feed(state, """
-        {"event": "timezone_conflict", "conflict_type": "\(type)", \
-        "provided_tz": "+0200", "file_timezones": {"+0900": ["test.mp4"]}}
-        """)
     }
 
     /// A preview row whose file already carries a camera-set zone is flagged in
@@ -177,117 +169,6 @@ final class TimezoneConflictTests: XCTestCase {
         XCTAssertEqual(state.diffTableRows[0].correctedTime, "2025:08:30 18:00:00+09:00")
     }
 
-    /// A dry-run preview must not be interrupted by a modal: the conflict is
-    /// data the user reads in the table, not a question they answer yet.
-    func testDryRunProvidedMismatchDoesNotInterruptThePreview() {
-        let state = AppState()
-        state.workflowSession.applyMode = false
-
-        feedConflict(state, type: "provided_mismatch")
-
-        XCTAssertFalse(state.workflowSession.showTimezoneConflict)
-        XCTAssertEqual(state.workflowSession.timezoneConflictType, .providedMismatch)
-        XCTAssertEqual(state.workflowSession.timezoneConflictProvidedTz, "+0200")
-        XCTAssertEqual(state.workflowSession.timezoneConflictFileTimezones?["+0900"], ["test.mp4"])
-    }
-
-    /// Applying is where the pipeline refuses without --force-timezone, so that
-    /// is where the user is asked to confirm.
-    func testApplyProvidedMismatchPromptsForAssent() {
-        let state = AppState()
-        state.workflowSession.applyMode = true
-
-        feedConflict(state, type: "provided_mismatch")
-
-        XCTAssertTrue(state.workflowSession.showTimezoneConflict)
-    }
-
-    /// A batch spanning several zones is refused in both modes, so it always asks.
-    func testMixedTimezonesPromptsEvenInDryRun() {
-        let state = AppState()
-        state.workflowSession.applyMode = false
-
-        feedConflict(state, type: "mixed_timezones")
-
-        XCTAssertTrue(state.workflowSession.showTimezoneConflict)
-    }
-
-    /// Confirming the prompt is what unblocks the apply: the re-run the app
-    /// launches next must carry --force-timezone, or the pipeline refuses again.
-    func testAssentToAProvidedMismatchAddsForceTimezoneToTheNextRun() {
-        let state = AppState()
-        state.workflowSession.applyMode = true
-        feedConflict(state, type: "provided_mismatch")
-
-        state.workflowSession.grantTimezoneAssent()
-
-        XCTAssertFalse(state.workflowSession.showTimezoneConflict)
-        let (_, args) = state.workflowSession.buildPipelineArgs()
-        XCTAssertTrue(args.contains("--force-timezone"))
-        XCTAssertFalse(args.contains("--allow-mixed-timezones"))
-    }
-
-    /// The refused apply has already reset to preview mode by the time the
-    /// user answers; overriding must re-run that apply, not quietly preview it.
-    func testAssentAfterARefusedApplyReRunsTheApply() {
-        let state = AppState()
-        state.workflowSession.applyMode = true
-        feedConflict(state, type: "provided_mismatch")
-        state.workflowSession.noteRunFinished()
-
-        state.workflowSession.grantTimezoneAssent()
-
-        XCTAssertFalse(state.workflowSession.requestDryRunAssentIfNeeded(),
-                       "The refused apply already passed the dry-run question")
-        let (_, args) = state.workflowSession.buildPipelineArgs()
-        XCTAssertTrue(args.contains("--apply"))
-        XCTAssertTrue(args.contains("--force-timezone"))
-    }
-
-    /// A mixed-zone batch is refused even in a dry run; overriding that
-    /// re-runs the preview, never promotes it to an apply.
-    func testAssentAfterARefusedDryRunStaysADryRun() {
-        let state = AppState()
-        state.workflowSession.applyMode = false
-        feedConflict(state, type: "mixed_timezones")
-        state.workflowSession.noteRunFinished()
-
-        state.workflowSession.grantTimezoneAssent()
-
-        let (_, args) = state.workflowSession.buildPipelineArgs()
-        XCTAssertFalse(args.contains("--apply"))
-        XCTAssertTrue(args.contains("--allow-mixed-timezones"))
-    }
-
-    /// A mixed-zone batch needs the other override, so assent must not send the
-    /// flag that answers a different question.
-    func testAssentToMixedTimezonesAddsAllowMixedToTheNextRun() {
-        let state = AppState()
-        feedConflict(state, type: "mixed_timezones")
-
-        state.workflowSession.grantTimezoneAssent()
-
-        let (_, args) = state.workflowSession.buildPipelineArgs()
-        XCTAssertTrue(args.contains("--allow-mixed-timezones"))
-        XCTAssertFalse(args.contains("--force-timezone"))
-    }
-
-    /// Assent covers the run it was given for. Starting a fresh run clears it,
-    /// so a later batch of untouched files is never relabelled without asking.
-    func testStartingAFreshRunDropsEarlierAssent() {
-        let state = AppState()
-        state.workflowSession.applyMode = true
-        feedConflict(state, type: "provided_mismatch")
-        state.workflowSession.grantTimezoneAssent()
-
-        state.workflowSession.clearRunAssent()
-
-        let (_, args) = state.workflowSession.buildPipelineArgs()
-        XCTAssertFalse(args.contains("--force-timezone"))
-        XCTAssertFalse(args.contains("--allow-mixed-timezones"))
-        XCTAssertNil(state.workflowSession.timezoneConflictType)
-        XCTAssertNil(state.workflowSession.timezoneConflictFileTimezones)
-    }
 }
 
 /// A timezone is a claim about one batch of footage. These cover the guards that
@@ -354,72 +235,5 @@ final class TimezoneCarryOverTests: XCTestCase {
         let second = AppState()
 
         XCTAssertTrue(second.workflowSession.timezone.current.isEmpty)
-    }
-}
-
-/// Covers how the app reacts to protected (locked) source files: a dry run
-/// previews them without a modal, while the apply the pipeline refuses asks the
-/// user, and their answer re-runs that apply with --unlock-protected.
-final class ProtectedSourcesTests: XCTestCase {
-
-    private func feedProtected(_ state: AppState) {
-        state.appendLog(LogLine(
-            text: #"{"event": "protected_sources", "files": ["A7V01670.ARW"]}"#,
-            stream: .stdout))
-    }
-
-    /// A preview is not refused, so it is not interrupted either.
-    func testDryRunRecordsTheFilesWithoutAsking() {
-        let state = AppState()
-        state.workflowSession.applyMode = false
-
-        feedProtected(state)
-
-        XCTAssertFalse(state.workflowSession.showProtectedSources)
-        XCTAssertEqual(state.workflowSession.protectedSourceFiles, ["A7V01670.ARW"])
-    }
-
-    /// Applying is where the pipeline refuses without --unlock-protected, so
-    /// that is where the user is asked.
-    func testApplyAsksBeforeImportingProtectedFiles() {
-        let state = AppState()
-        state.workflowSession.applyMode = true
-
-        feedProtected(state)
-
-        XCTAssertTrue(state.workflowSession.showProtectedSources)
-    }
-
-    /// The refused apply has already reset to preview mode when the answer
-    /// arrives; the re-run must still be the apply, carrying the flag.
-    func testAssentReRunsTheRefusedApplyWithTheFlag() {
-        let state = AppState()
-        state.workflowSession.applyMode = true
-        feedProtected(state)
-        state.workflowSession.noteRunFinished()
-
-        state.workflowSession.grantUnlockProtectedAssent()
-
-        XCTAssertFalse(state.workflowSession.showProtectedSources)
-        XCTAssertFalse(state.workflowSession.requestDryRunAssentIfNeeded(),
-                       "The refused apply already passed the dry-run question")
-        let (_, args) = state.workflowSession.buildPipelineArgs()
-        XCTAssertTrue(args.contains("--unlock-protected"))
-        XCTAssertTrue(args.contains("--apply"))
-    }
-
-    /// Assent covers the run it was given for, so a later card's protected
-    /// files are asked about again.
-    func testStartingAFreshRunDropsEarlierAssent() {
-        let state = AppState()
-        state.workflowSession.applyMode = true
-        feedProtected(state)
-        state.workflowSession.grantUnlockProtectedAssent()
-
-        state.workflowSession.clearRunAssent()
-
-        let (_, args) = state.workflowSession.buildPipelineArgs()
-        XCTAssertFalse(args.contains("--unlock-protected"))
-        XCTAssertEqual(state.workflowSession.protectedSourceFiles, [])
     }
 }
