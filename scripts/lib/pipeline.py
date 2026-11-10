@@ -12,24 +12,17 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shutil
-import signal
 import sys
 from pathlib import Path
 from typing import Optional
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-import yaml
-
-from lib import archive, fix_timestamp, gyroflow, ingest, organize, tagging
-from lib.countries import get_timezone_for_country
-from lib.exiftool import MetadataWriteRefused, exiftool
+from lib import archive, fix_timestamp, gyroflow, ingest, organize, profiles, tagging
+from lib.cli import UnknownLocation, UnknownTimezone, interrupt_handler, resolve_timezone
+from lib.exiftool import MetadataWriteRefused
 from lib.filesystem import find_media_files
-from lib.profiles import resolve_profiles_file
 from lib.timestamp_source import (
-    build_filename, carry_exif_cache, extract_metadata_timezone, is_zone_name,
-    normalize_timezone_input, parse_datetime_original, parse_filename_timestamp,
+    build_filename, carry_exif_cache, extract_metadata_timezone, normalize_timezone_input, parse_datetime_original, parse_filename_timestamp,
     read_exif_data, resolve_file_timezone_offset,
 )
 
@@ -53,11 +46,6 @@ def emit_event(event_type: str, **fields) -> None:
         payload[key] = value
     print(json.dumps(payload), flush=True)
 
-
-SIGNAL_MESSAGES = {
-    signal.SIGINT: "\n\nInterrupted by user",
-    signal.SIGTERM: "\n\nCancelled",
-}
 
 EXIFTOOL_TMP_GLOB = "*_exiftool_tmp"
 
@@ -118,43 +106,23 @@ def clean_working_dir_on_cancel() -> None:
         pass
 
 
-def signal_handler(sig, frame):
-    """Shut exiftool down, clean the working dir, then exit.
-
-    The pipeline owns a persistent ``exiftool -stay_open`` process. Under the
-    default SIGTERM disposition the interpreter dies without unwinding, so it
-    is re-parented to launchd and keeps running; closing it here stops it
-    instead. Only once it has returned is the working directory quiet enough
-    to clear.
-    """
-    print(SIGNAL_MESSAGES[sig], file=sys.stderr)
-    exiftool.close()
-    clean_working_dir_on_cancel()
-    sys.exit(128 + sig)
+# Cancel shuts exiftool down first; only then is the working directory quiet
+# enough to clear.
+signal_handler = interrupt_handler(clean_working_dir_on_cancel)
 
 
 def load_config(profile_name: str) -> tuple[dict, dict]:
-    """Load profile and top-level config from media-profiles.yaml.
-
-    Returns:
-        tuple of (profile_dict, full_config_dict)
-    """
-    profiles_file = resolve_profiles_file()
-    if not profiles_file.exists():
-        print(f"ERROR: Profile file not found: {profiles_file}", file=sys.stderr)
+    """The named profile and the whole profiles file, or exit naming what is wrong."""
+    try:
+        config = profiles.load_config()
+        return profiles.load_profile(profile_name, config), config
+    except profiles.ProfilesFileMissing as missing:
+        print(f"ERROR: Profile file not found: {missing.path}", file=sys.stderr)
         sys.exit(1)
-
-    with open(profiles_file) as f:
-        data = yaml.safe_load(f)
-
-    profiles = data.get("profiles", {})
-    if profile_name not in profiles:
-        available = ", ".join(profiles.keys())
+    except profiles.ProfileNotFound as not_found:
         print(f"ERROR: Profile '{profile_name}' not found", file=sys.stderr)
-        print(f"Available profiles: {available}", file=sys.stderr)
+        print(f"Available profiles: {', '.join(not_found.available)}", file=sys.stderr)
         sys.exit(1)
-
-    return profiles[profile_name], data
 
 
 def check_exiftool_tmp(source_dir: str) -> list[Path]:
@@ -333,18 +301,17 @@ def process_file(
     camera_fields: dict = {}
     # Tag media (if in tasks and profile has tags/make/model)
     if tasks and "tag" in tasks and profile:
-        tags = ",".join(profile.get("tags", []))
+        finder_tags = tagging.parse_tag_list(",".join(profile.get("tags", [])))
         exif = profile.get("exif", {})
         make = exif.get("make", "")
         model = exif.get("model", "")
 
-        if tags or make or model:
+        if finder_tags or make or model:
             print("🏷️  Tagging...", file=sys.stderr)
             try:
-                finder_tags = [t.strip() for t in tags.split(",")] if tags else []
                 tag_result = tagging.tag_media_file(
                     str(active_file), finder_tags, make or None, model or None,
-                    dry_run=not apply, write_exif=not fix_writes_fields)
+                    apply=apply, write_exif=not fix_writes_fields)
             except MetadataWriteRefused as refusal:
                 print(f"   ❌ exiftool could not write {active_file.name}: {refusal}", file=sys.stderr)
                 result["failed"] = True
@@ -374,7 +341,7 @@ def process_file(
         try:
             ts_result = fix_timestamp.fix_media_timestamps(
                 str(active_file),
-                dry_run=not apply,
+                apply=apply,
                 timezone_spec=timezone_spec,
                 infer_from_filename=infer_from_filename,
                 time_offset_seconds=time_offset,
@@ -466,14 +433,8 @@ def process_file(
     print("📁 Organizing by date...", file=sys.stderr)
 
     folder_template = profile.get("folder_template") if profile else None
-    if folder_template:
-        template = folder_template.replace("{{GROUP}}", group) if group else folder_template
-    elif group:
-        template = f"{{{{YYYY}}}}/{group}/{{{{YYYY}}}}-{{{{MM}}}}-{{{{DD}}}}"
-    else:
-        template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
     org_result = organize.process_file(
-        str(active_file), target_dir, template,
+        str(active_file), target_dir, folder_template or None, group=group,
         copy_mode=False, overwrite=overwrite, apply=apply, verbose=verbose,
         dest_name=pending_rename_name, datetime_original=organize_datetime_original,
     )
@@ -602,7 +563,7 @@ def run(args) -> None:
     # Apply CLI overrides to profile (workflow tab ad-hoc edits)
     if profile:
         if args.tags is not None:
-            profile["tags"] = [t.strip() for t in args.tags.split(",") if t.strip()]
+            profile["tags"] = tagging.parse_tag_list(args.tags)
         if args.make is not None:
             profile.setdefault("exif", {})["make"] = args.make
         if args.model is not None:
@@ -637,17 +598,14 @@ def run(args) -> None:
         print(f"ERROR: Source directory not found: {source_dir}", file=sys.stderr)
         sys.exit(1)
 
-    # Validate timezone if provided
-    if args.timezone:
-        if is_zone_name(args.timezone):
-            try:
-                ZoneInfo(args.timezone)
-            except (ZoneInfoNotFoundError, ValueError):
-                print(f"ERROR: unknown timezone '{args.timezone}' — use an IANA zone name (e.g., Pacific/Auckland) or a +HHMM offset", file=sys.stderr)
-                sys.exit(1)
-        elif not re.match(r'^[+-]\d{4}$', args.timezone):
-            print("ERROR: --timezone must be an IANA zone name (e.g., Pacific/Auckland) or in +HHMM format (e.g., +0800, -0500)", file=sys.stderr)
-            sys.exit(1)
+    try:
+        timezone_spec = resolve_timezone(args.timezone, args.location)
+    except UnknownTimezone:
+        print(f"ERROR: unknown timezone '{args.timezone}' — use an IANA zone name (e.g., Pacific/Auckland) or a +HHMM offset", file=sys.stderr)
+        sys.exit(1)
+    except UnknownLocation:
+        print(f"ERROR: Could not determine timezone for location '{args.location}'", file=sys.stderr)
+        sys.exit(1)
 
     group = args.group
 
@@ -658,14 +616,6 @@ def run(args) -> None:
     if args.time_offset is not None and not args.timezone:
         print("ERROR: --time-offset requires --timezone", file=sys.stderr)
         sys.exit(1)
-
-    # Resolve timezone upfront (direct module calls need the offset, not CLI args)
-    timezone_spec = args.timezone
-    if args.location and not timezone_spec:
-        timezone_spec = get_timezone_for_country(args.location)
-        if not timezone_spec:
-            print(f"ERROR: Could not determine timezone for location '{args.location}'", file=sys.stderr)
-            sys.exit(1)
 
     # Check for stale exiftool_tmp directories
     tmp_dirs = check_exiftool_tmp(source_dir)

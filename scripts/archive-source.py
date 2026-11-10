@@ -13,22 +13,16 @@ Modes:
 
 import argparse
 import os
-import signal
 import sys
 
 from lib.archive import archive_source, delete_files
+from lib.cli import install_interrupt_handlers
 from lib.results import emit_result
-
-
-def signal_handler(sig, frame):
-    """Handle Ctrl-C gracefully."""
-    print("\n\nInterrupted by user", file=sys.stderr)
-    sys.exit(130)
 
 
 def main():
     """Main entry point."""
-    signal.signal(signal.SIGINT, signal_handler)
+    install_interrupt_handlers()
 
     parser = argparse.ArgumentParser(
         description="Act on source directory after pipeline processing."

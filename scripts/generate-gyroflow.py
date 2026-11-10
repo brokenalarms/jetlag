@@ -10,21 +10,32 @@ Command line for lib/gyroflow.py; prints the result as @@key=value lines.
 
 import argparse
 import json
-import signal
 import sys
 from pathlib import Path
 
-from lib.gyroflow import generate_gyroflow_project, load_gyroflow_config
+from lib.cli import install_interrupt_handlers
+from lib.gyroflow import generate_gyroflow_project
+from lib.profiles import ProfilesFileMissing, load_config
 from lib.results import emit_result
 
 
-def signal_handler(sig, frame):
-    print("\n\nInterrupted by user", file=sys.stderr)
-    sys.exit(130)
+def load_gyroflow_config() -> dict:
+    """The profiles file's gyroflow section, or exit saying where to add it."""
+    try:
+        config = load_config().get("gyroflow")
+    except ProfilesFileMissing as missing:
+        print(f"ERROR: Config file not found: {missing.path}", file=sys.stderr)
+        print("Add a 'gyroflow' section to media-profiles.yaml", file=sys.stderr)
+        sys.exit(1)
+    if not config:
+        print("ERROR: No 'gyroflow' section found in media-profiles.yaml", file=sys.stderr)
+        print("Add a 'gyroflow' section to media-profiles.yaml", file=sys.stderr)
+        sys.exit(1)
+    return config
 
 
 def main():
-    signal.signal(signal.SIGINT, signal_handler)
+    install_interrupt_handlers()
 
     parser = argparse.ArgumentParser(
         description="Generate a .gyroflow project file for a video with gyroscope data."

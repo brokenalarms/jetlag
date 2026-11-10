@@ -7,22 +7,16 @@ Command line for lib/tagging.py; prints each file's result as @@key=value lines.
 
 import argparse
 import os
-import signal
 import sys
 
+from lib.cli import install_interrupt_handlers
 from lib.exiftool import MetadataWriteRefused
 from lib.results import emit_result
-from lib.tagging import tag_media_file
-
-
-# Handle Ctrl-C gracefully
-def signal_handler(sig, frame):  # noqa: ARG001
-    print("\n\nInterrupted by user", file=sys.stderr)
-    sys.exit(130)
+from lib.tagging import parse_tag_list, tag_media_file
 
 
 def main():
-    signal.signal(signal.SIGINT, signal_handler)
+    install_interrupt_handlers()
     parser = argparse.ArgumentParser(description='Tag media files with Finder tags and camera EXIF')
     parser.add_argument('files', nargs='+', help='Media files to tag')
     parser.add_argument('--make', help='Camera make/manufacturer to add to EXIF')
@@ -31,18 +25,16 @@ def main():
     parser.add_argument('--apply', action='store_true', help='Apply changes (default: dry run)')
 
     args = parser.parse_args()
-    dry_run = not args.apply
 
     # Convert file paths to absolute paths to ensure exiftool can find them
     file_paths = [os.path.abspath(f) for f in args.files]
 
-    # Parse tags
-    finder_tags = args.tags.split(',') if args.tags else []
+    finder_tags = parse_tag_list(args.tags)
 
     success_count = 0
     for file_path in file_paths:
         try:
-            result = tag_media_file(file_path, finder_tags, args.make, args.model, dry_run)
+            result = tag_media_file(file_path, finder_tags, args.make, args.model, apply=args.apply)
         except MetadataWriteRefused as refusal:
             print(f"❌ exiftool could not write {os.path.basename(file_path)}: {refusal}", file=sys.stderr)
             continue
@@ -56,6 +48,7 @@ def main():
     if success_count < len(file_paths):
         return 1
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

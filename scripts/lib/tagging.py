@@ -28,6 +28,15 @@ class TagResult:
     file_make: Optional[str] = None
     file_model: Optional[str] = None
 
+def parse_tag_list(text: Optional[str]) -> List[str]:
+    """Comma-separated Finder tags as a list, each stripped, empty ones dropped.
+
+    The one parser for every place tags arrive as text (--tags on tag-media and
+    on the pipeline), so "a, b" tags a file "b" from either.
+    """
+    return [tag.strip() for tag in (text or "").split(",") if tag.strip()]
+
+
 def get_existing_finder_tags(file_path: str) -> List[str]:
     """Get existing Finder tags from a file"""
     try:
@@ -40,7 +49,7 @@ def get_existing_finder_tags(file_path: str) -> List[str]:
     except (subprocess.CalledProcessError, OSError):
         return []
 
-def apply_finder_tags(file_path: str, tags: List[str], dry_run: bool = False) -> Tuple[bool, List[str]]:
+def apply_finder_tags(file_path: str, tags: List[str], apply: bool = True) -> Tuple[bool, List[str]]:
     """Apply Finder tags to a file using macOS tag command
 
     Returns:
@@ -56,7 +65,7 @@ def apply_finder_tags(file_path: str, tags: List[str], dry_run: bool = False) ->
         if not tags_to_add:
             return True, []
 
-        if not dry_run:
+        if apply:
             subprocess.run(["tag", '--add', ','.join(tags_to_add), file_path],
                           capture_output=True, check=True)
         return True, tags_to_add
@@ -111,18 +120,18 @@ def camera_exif_fields(file_path: str, make: Optional[str], model: Optional[str]
         if wanted and not str(existing.get(field) or '').strip()
     }
 
-def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Optional[str] = None, dry_run: bool = False) -> List[str]:
+def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Optional[str] = None, apply: bool = True) -> List[str]:
     """Add camera info to EXIF Make and Model fields; return the fields written.
 
     Raises MetadataWriteRefused, with exiftool's reason, when the file cannot be
     written.
     """
     fields = camera_exif_fields(file_path, make, model)
-    if fields and not dry_run:
+    if fields and apply:
         exiftool.write_tags(file_path, [f'-{field}={value}' for field, value in fields.items()])
     return list(fields)
 
-def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], model: Optional[str], dry_run: bool, write_exif: bool = True) -> Optional[TagResult]:
+def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], model: Optional[str], apply: bool, write_exif: bool = True) -> Optional[TagResult]:
     """Process a single file: apply tags and EXIF, return structured result.
 
     write_exif=False leaves the camera fields for the caller to write in its own
@@ -151,7 +160,7 @@ def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], 
     # Apply camera EXIF (Make and Model)
     if make or model:
         fields_updated = add_camera_to_exif(
-            file_path, make=make, model=model, dry_run=dry_run or not write_exif)
+            file_path, make=make, model=model, apply=apply and write_exif)
 
         if fields_updated:
             exif_parts = []
@@ -165,17 +174,17 @@ def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], 
 
     # Apply Finder tags (macOS only — skipped on other platforms)
     if finder_tags:
-        success, tags_added = apply_finder_tags(file_path, finder_tags, dry_run=dry_run)
+        success, tags_added = apply_finder_tags(file_path, finder_tags, apply=apply)
 
         if success and tags_added:
             all_tags_added = tags_added
             actions.append(f"Tags: {', '.join(tags_added)}")
 
-    dry_run_suffix = " (DRY RUN)" if dry_run else ""
+    dry_run_suffix = "" if apply else " (DRY RUN)"
     tag_action = "tagged" if actions else "already_correct"
 
     if actions:
-        verb = "would tag" if dry_run else "tagged"
+        verb = "tagged" if apply else "would tag"
         print(f"📌 {verb}: {filename} ({'; '.join(actions)}){dry_run_suffix}", file=sys.stderr)
     else:
         print(f"✓ already tagged: {filename}{dry_run_suffix}", file=sys.stderr)

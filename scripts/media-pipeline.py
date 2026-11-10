@@ -13,10 +13,10 @@ INGEST (always) → [tag] → [fix-timestamp] → OUTPUT (always) → [gyroflow]
 from __future__ import annotations
 
 import argparse
-import signal
 import sys
 
-from lib.pipeline import SIGNAL_MESSAGES, WORKING_DIR_NAME, emit_event, run, signal_handler
+from lib.cli import add_timezone_args, attach_negative_option_values, install_interrupt_handlers
+from lib.pipeline import WORKING_DIR_NAME, emit_event, run, signal_handler
 
 
 def build_parser():
@@ -28,8 +28,7 @@ def build_parser():
     parser.add_argument("--source", help="Directory containing media files (default: current directory)")
     parser.add_argument("--target", help="Target directory for organized files")
     parser.add_argument("--extensions", nargs="+", help="File extensions to process (e.g. .mp4 .mov); overrides the profile's file_extensions")
-    parser.add_argument("--location", help="Location name/code for timezone lookup")
-    parser.add_argument("--timezone", help="IANA zone name (e.g., Pacific/Auckland), resolved per file so a run spanning a DST changeover gets the right offset either side, or a fixed offset in +HHMM format (e.g., +0800)")
+    add_timezone_args(parser, "--location")
     parser.add_argument("--group", help="Optional group folder name substituted for {{GROUP}} in the profile's folder_template, or inserted between year and date by default (e.g., 'Japan' → YYYY/Japan/YYYY-MM-DD)")
     parser.add_argument("--apply", action="store_true", help="Apply changes (default: dry run)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed processing info")
@@ -106,10 +105,9 @@ def build_parser():
 
 def main():
     """Main entry point."""
-    for sig in SIGNAL_MESSAGES:
-        signal.signal(sig, signal_handler)
+    install_interrupt_handlers(signal_handler)
 
-    run(build_parser().parse_args())
+    run(build_parser().parse_args(attach_negative_option_values(sys.argv[1:])))
 
 
 if __name__ == "__main__":

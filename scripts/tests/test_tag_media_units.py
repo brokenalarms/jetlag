@@ -79,7 +79,7 @@ class TestApplyFinderTags:
         success, tags_added = tagging.apply_finder_tags(
             self.test_video,
             ["tag1", "tag2"],
-            dry_run=False
+            apply=True
         )
 
         assert success is True
@@ -99,7 +99,7 @@ class TestApplyFinderTags:
         success, tags_added = tagging.apply_finder_tags(
             self.test_video,
             ["existing-tag", "new-tag"],
-            dry_run=False
+            apply=True
         )
 
         assert success is True
@@ -113,7 +113,7 @@ class TestApplyFinderTags:
         success, tags_added = tagging.apply_finder_tags(
             self.test_video,
             ["tag1", "tag2"],
-            dry_run=True
+            apply=False
         )
 
         assert success is True
@@ -129,7 +129,7 @@ class TestApplyFinderTags:
         success, tags_added = tagging.apply_finder_tags(
             self.test_video,
             [],
-            dry_run=False
+            apply=True
         )
 
         assert success is True
@@ -146,7 +146,7 @@ class TestApplyFinderTags:
         success, tags_added = tagging.apply_finder_tags(
             self.test_video,
             ["tag1"],
-            dry_run=False
+            apply=True
         )
 
         assert success is True
@@ -246,7 +246,7 @@ class TestAddCameraToExif:
             self.test_video,
             make="GoPro",
             model="HERO12 Black",
-            dry_run=False
+            apply=True
         )
 
         assert isinstance(fields_updated, list)
@@ -268,7 +268,7 @@ class TestAddCameraToExif:
             self.test_video,
             make="GoPro",
             model="HERO12 Black",
-            dry_run=False
+            apply=True
         )
 
         # Should only update Model
@@ -293,7 +293,7 @@ class TestAddCameraToExif:
             self.test_video,
             make="Sony",
             model="ILCE-7M4",
-            dry_run=False
+            apply=True
         )
 
         clear_exif_cache(self.test_video)
@@ -309,7 +309,7 @@ class TestAddCameraToExif:
             self.test_video,
             make="GoPro",
             model="HERO12 Black",
-            dry_run=True
+            apply=False
         )
 
         # Should return what WOULD be updated
@@ -325,7 +325,7 @@ class TestAddCameraToExif:
             self.test_video,
             make="GoPro",
             model=None,
-            dry_run=False
+            apply=True
         )
 
         assert len(fields_updated) == 1
@@ -337,7 +337,7 @@ class TestAddCameraToExif:
             self.test_video,
             make=None,
             model="HERO12 Black",
-            dry_run=False
+            apply=True
         )
 
         assert len(fields_updated) == 1
@@ -358,7 +358,7 @@ class TestAddCameraToExif:
             self.test_video,
             make="GoPro",
             model="HERO12 Black",
-            dry_run=False
+            apply=True
         )
 
         assert len(fields_updated) == 0
@@ -369,7 +369,7 @@ class TestAddCameraToExif:
             self.test_video,
             make=None,
             model=None,
-            dry_run=False
+            apply=True
         )
 
         assert len(fields_updated) == 0
@@ -379,7 +379,7 @@ class TestAddCameraToExif:
         renamed = os.path.join(self.temp_dir, "test.lrv")
         shutil.copy(self.test_video, renamed)
 
-        fields_updated = tagging.add_camera_to_exif(renamed, make="GoPro", model="HERO12", dry_run=False)
+        fields_updated = tagging.add_camera_to_exif(renamed, make="GoPro", model="HERO12", apply=True)
 
         clear_exif_cache(renamed)
         assert fields_updated == ["Make", "Model"]
@@ -392,7 +392,7 @@ class TestAddCameraToExif:
             f.write("not a video")
 
         with pytest.raises(MetadataWriteRefused, match="Not a valid MP4"):
-            tagging.add_camera_to_exif(unwritable, make="GoPro", model="HERO12", dry_run=False)
+            tagging.add_camera_to_exif(unwritable, make="GoPro", model="HERO12", apply=True)
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — Finder tags don't exist on Linux")
@@ -413,7 +413,7 @@ class TestIdempotency:
         success1, added1 = tagging.apply_finder_tags(
             self.test_video,
             ["tag1", "tag2"],
-            dry_run=False
+            apply=True
         )
 
         assert success1 is True
@@ -423,7 +423,7 @@ class TestIdempotency:
         success2, added2 = tagging.apply_finder_tags(
             self.test_video,
             ["tag1", "tag2"],
-            dry_run=False
+            apply=True
         )
 
         assert success2 is True
@@ -436,7 +436,7 @@ class TestIdempotency:
             self.test_video,
             make="GoPro",
             model="HERO12",
-            dry_run=False
+            apply=True
         )
 
         assert len(updated1) == 2
@@ -449,7 +449,7 @@ class TestIdempotency:
             self.test_video,
             make="GoPro",
             model="HERO12",
-            dry_run=False
+            apply=True
         )
 
         assert len(updated2) == 0  # Nothing to update
@@ -477,7 +477,7 @@ class TestDataPresentation:
         success, tags_added = tagging.apply_finder_tags(
             self.test_video,
             ["tag1"],
-            dry_run=True
+            apply=False
         )
 
         assert isinstance(success, bool)
@@ -489,7 +489,7 @@ class TestDataPresentation:
         fields_updated = tagging.add_camera_to_exif(
             self.test_video,
             make="GoPro",
-            dry_run=True
+            apply=False
         )
 
         assert isinstance(fields_updated, list)
@@ -524,7 +524,7 @@ class TestTagMediaFileResult:
         Expected: TagResult dataclass instance
         """
         result = tagging.tag_media_file(
-            self.test_video, [], None, None, dry_run=True
+            self.test_video, [], None, None, apply=False
         )
         assert isinstance(result, tagging.TagResult)
         assert result.file == "test.mp4"
@@ -540,7 +540,7 @@ class TestTagMediaFileResult:
         Expected: action reflects that tagging occurred
         """
         result = tagging.tag_media_file(
-            self.test_video, [], "GoPro", "HERO12", dry_run=False
+            self.test_video, [], "GoPro", "HERO12", apply=True
         )
         assert result is not None
         assert result.action == "tagged"
@@ -554,10 +554,10 @@ class TestTagMediaFileResult:
         Expected: no changes reported
         """
         tagging.tag_media_file(
-            self.test_video, [], "GoPro", "HERO12", dry_run=False
+            self.test_video, [], "GoPro", "HERO12", apply=True
         )
         result = tagging.tag_media_file(
-            self.test_video, [], "GoPro", "HERO12", dry_run=False
+            self.test_video, [], "GoPro", "HERO12", apply=True
         )
         assert result is not None
         assert result.action == "already_correct"
@@ -571,7 +571,7 @@ class TestTagMediaFileResult:
         Expected: None (failure sentinel)
         """
         result = tagging.tag_media_file(
-            "/nonexistent/file.mp4", [], None, None, dry_run=True
+            "/nonexistent/file.mp4", [], None, None, apply=False
         )
         assert result is None
 
@@ -579,3 +579,15 @@ class TestTagMediaFileResult:
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__, "-v"])
+
+
+class TestParseTagList:
+    """tag-media's --tags and the pipeline's --tags parse through one function, so
+    "a, b" tags a file "b" from either; tag-media alone once kept the space."""
+
+    def test_whitespace_and_empty_entries_are_dropped(self):
+        assert tagging.parse_tag_list(" trip , gopro,, ") == ["trip", "gopro"]
+
+    def test_no_text_is_no_tags(self):
+        assert tagging.parse_tag_list(None) == []
+        assert tagging.parse_tag_list("") == []

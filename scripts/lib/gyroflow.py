@@ -14,10 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-import yaml
-
 from lib.exiftool import exiftool
-from lib.profiles import resolve_profiles_file
 
 
 @dataclass
@@ -102,26 +99,6 @@ def resolve_gyroflow_binary(configured_path: Optional[str] = None) -> Optional[s
         return configured_path
 
     return None
-
-
-def load_gyroflow_config() -> dict:
-    """Load gyroflow config from media-profiles.yaml."""
-    profiles_file = resolve_profiles_file()
-    if not profiles_file.exists():
-        print(f"ERROR: Config file not found: {profiles_file}", file=sys.stderr)
-        print("Add a 'gyroflow' section to media-profiles.yaml", file=sys.stderr)
-        sys.exit(1)
-
-    with open(profiles_file) as f:
-        data = yaml.safe_load(f)
-
-    config = data.get("gyroflow")
-    if not config:
-        print("ERROR: No 'gyroflow' section found in media-profiles.yaml", file=sys.stderr)
-        print("Add a 'gyroflow' section to media-profiles.yaml", file=sys.stderr)
-        sys.exit(1)
-
-    return config
 
 
 def generate_gyroflow_project(

@@ -19,6 +19,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+from lib.cli import install_interrupt_handlers
 from lib.filesystem import _is_walked
 from lib.tagging import file_camera
 
@@ -73,6 +74,7 @@ def probe(path: Path, extensions: list[str], sample: int) -> list[dict]:
 
 
 def main() -> int:
+    install_interrupt_handlers()
     parser = argparse.ArgumentParser(description="Report the camera that shot a folder's media")
     parser.add_argument("path", help="Folder (searched recursively) or a single media file")
     parser.add_argument("--extensions", nargs="+", default=DEFAULT_EXTENSIONS,

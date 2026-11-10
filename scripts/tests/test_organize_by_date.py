@@ -767,3 +767,23 @@ class TestSourceDirectoryPreservedAfterMove:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestFolderTemplateDefault:
+    """The default folder layout is defined once, in lib/organize, for both the
+    pipeline and organize-by-date; these pin how it and a group combine."""
+
+    def test_default_without_group(self):
+        assert organize.expand_path_template(None, "2025-08-15") == "2025/2025-08-15"
+
+    def test_default_with_group_puts_it_after_the_year(self):
+        assert organize.expand_path_template(None, "2025-08-15", "Japan") == "2025/Japan/2025-08-15"
+
+    def test_own_template_takes_the_group(self):
+        template = "{{YYYY}}/{{GROUP}}/{{MMM}}-{{DD}}"
+        assert organize.expand_path_template(template, "2025-08-15", "Japan") == "2025/Japan/Aug-15"
+
+    def test_own_template_keeps_group_token_without_a_group(self):
+        """As the pipeline always has: a profile's template is used as written."""
+        template = "{{YYYY}}/{{GROUP}}/{{DD}}"
+        assert organize.expand_path_template(template, "2025-08-15") == "2025/{{GROUP}}/15"

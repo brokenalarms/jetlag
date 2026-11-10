@@ -26,6 +26,7 @@ import yaml
 
 from conftest import create_test_video as _create_video_raw
 from lib import organize, pipeline
+from lib.exiftool import exiftool
 from pipeline_schema import validate_event
 
 SCRIPT_DIR = Path(__file__).parent.parent
@@ -2898,7 +2899,7 @@ class TestCancelClearsTheWorkingDir:
         (working_dir / "VID_20251005_100000_00_001.mp4_exiftool_tmp").write_bytes(b"scratch")
 
         monkeypatch.setattr(pipeline, "_working_dir", str(working_dir))
-        monkeypatch.setattr(pipeline.exiftool, "close", lambda: None)
+        monkeypatch.setattr(exiftool, "close", lambda: None)
         pipeline.register_staged_paths([staged, companion])
         yield working_dir
         pipeline._staged_paths.clear()

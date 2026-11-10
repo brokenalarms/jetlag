@@ -15,10 +15,12 @@ import argparse
 import os
 import sys
 
+from lib.cli import install_interrupt_handlers
 from lib.ingest import ingest_file
 
 
 def main():
+    install_interrupt_handlers()
     parser = argparse.ArgumentParser(
         description="Copy a single source file into a flat working directory."
     )

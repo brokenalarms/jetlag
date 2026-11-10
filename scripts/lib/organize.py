@@ -76,12 +76,27 @@ def get_file_date_for_organization(file_path: str, datetime_original: Optional[s
         return None
 
 
-def expand_path_template(template: str, file_date: str) -> str:
+# The folder a file goes to when its caller names no template: a group folder
+# after the year when there is a group, none when there is not.
+DEFAULT_FOLDER_TEMPLATE = "{{YYYY}}/{{GROUP}}/{{YYYY}}-{{MM}}-{{DD}}"
+
+
+def expand_path_template(template: Optional[str], file_date: str,
+                         group: Optional[str] = None) -> str:
     """Expand path template with date components.
 
-    Template variables: {{YYYY}}, {{MM}}, {{MMM}}, {{DD}}, {{YYYY-MM-DD}}
+    Template variables: {{YYYY}}, {{MM}}, {{MMM}}, {{DD}}, {{YYYY-MM-DD}}, {{GROUP}}
     file_date: YYYY-MM-DD format
+
+    template None means DEFAULT_FOLDER_TEMPLATE. A group fills {{GROUP}}; without
+    one, the default drops its group folder while a caller's own template keeps
+    {{GROUP}} as written.
     """
+    if template is None:
+        template = DEFAULT_FOLDER_TEMPLATE if group else DEFAULT_FOLDER_TEMPLATE.replace("{{GROUP}}/", "")
+    if group:
+        template = template.replace("{{GROUP}}", group)
+
     year = file_date[:4]
     month = file_date[5:7]
     day = file_date[8:10]
@@ -171,10 +186,11 @@ def _handle_existing_target(file_path, target_file, target_path, abs_target,
     return OrganizeResult(dest=abs_target, action="skipped", reason=skip_reason)
 
 
-def process_file(file_path: str, target_dir: str, template: str,
+def process_file(file_path: str, target_dir: str, template: Optional[str],
                  copy_mode: bool, overwrite: bool, apply: bool,
                  verbose: bool, dest_name: Optional[str] = None,
-                 datetime_original: Optional[str] = None) -> OrganizeResult:
+                 datetime_original: Optional[str] = None,
+                 group: Optional[str] = None) -> OrganizeResult:
     """Process a single file for organization.
 
     Printed messages name file_path: they report the operation this function
@@ -187,6 +203,8 @@ def process_file(file_path: str, target_dir: str, template: str,
 
     datetime_original, when given, is the date the destination is built from in
     place of reading the file.
+
+    template and group are as expand_path_template() takes them.
 
     Returns:
         OrganizeResult with dest path and action taken
@@ -204,7 +222,7 @@ def process_file(file_path: str, target_dir: str, template: str,
     if verbose:
         print(f"  Date: {file_date}", file=sys.stderr)
 
-    organized_path = expand_path_template(template, file_date)
+    organized_path = expand_path_template(template, file_date, group)
 
     target_path = os.path.join(target_dir.rstrip('/'), organized_path.lstrip('/'))
     target_file = os.path.join(target_path, base)

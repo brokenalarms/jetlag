@@ -610,7 +610,7 @@ def format_offset_display(seconds: int) -> str:
     return f"{sign}{days}d {hours}h {minutes}m {secs}s"
 
 
-def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None, force_timezone: bool = False, extra_write_fields: Optional[Dict[str, str]] = None) -> TimestampFixResult:
+def fix_media_timestamps(file_path: str, apply: bool = True, timezone_spec: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None, force_timezone: bool = False, extra_write_fields: Optional[Dict[str, str]] = None) -> TimestampFixResult:
     """Fix media (photo/video) timestamps.
 
     extra_write_fields are other steps' field writes, sent in this step's exiftool
@@ -646,7 +646,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
             requires_force_timezone = not force_timezone
             if requires_force_timezone:
                 print(f"⚠️  File already carries timezone {detected_tz}; declared {declared_offset} relabels it", file=sys.stderr)
-                if dry_run:
+                if not apply:
                     print("   Applying requires --force-timezone.", file=sys.stderr)
                 else:
                     print("❌ Refusing to apply without --force-timezone.", file=sys.stderr)
@@ -782,7 +782,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
         camera_zone_offset=current_data.get("camera_zone_offset"),
     )
 
-    if dry_run and has_changes:
+    if not apply and has_changes:
         print(f"📊 Change   : {change_desc} (DRY RUN)", file=sys.stderr)
         return TimestampFixResult(**result_base,
                                   timestamp_action="would_add" if only_adds_fields else "would_fix")
@@ -790,7 +790,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
         print(f"📊 Change   : {change_desc}", file=sys.stderr)
 
     extra_write_fields = extra_write_fields or {}
-    if dry_run or not (has_changes or extra_write_fields):
+    if not apply or not (has_changes or extra_write_fields):
         return TimestampFixResult(**result_base, timestamp_action="no_change")
 
     # Apply changes

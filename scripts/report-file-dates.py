@@ -13,11 +13,13 @@ import argparse
 import os
 import sys
 
+from lib.cli import install_interrupt_handlers
 from lib.filesystem import find_media_files
 from lib.timestamp_source import read_timestamp_sources
 
 
 def main():
+    install_interrupt_handlers()
     parser = argparse.ArgumentParser(description="Report timestamp sources for media files")
     parser.add_argument("source_dir", help="Directory to scan")
     parser.add_argument(
