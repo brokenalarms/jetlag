@@ -21,9 +21,11 @@ const steps = [
   },
 ]
 
-export function renderHowItWorks() {
+export const id = 'how-it-works'
+
+export function render() {
   return /* html */`
-    <section id="how-it-works" class="py-24 px-6">
+    <section id="${id}" class="py-24 px-6">
       <div class="mx-auto max-w-5xl">
         <div class="text-center mb-14">
           <span class="section-label">How it works</span>

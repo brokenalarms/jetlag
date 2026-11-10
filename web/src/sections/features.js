@@ -31,9 +31,11 @@ const features = [
   },
 ]
 
-export function renderFeatures() {
+export const id = 'features'
+
+export function render() {
   return /* html */`
-    <section id="features" class="py-24 px-6 bg-white/[0.02]">
+    <section id="${id}" class="py-24 px-6 bg-white/[0.02]">
       <div class="mx-auto max-w-6xl">
         <div class="text-center mb-14">
           <span class="section-label">Features</span>

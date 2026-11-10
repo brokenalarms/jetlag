@@ -1,6 +1,8 @@
-export function renderHero() {
+export const id = 'hero'
+
+export function render() {
   return /* html */`
-    <section class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pt-24 pb-16">
+    <section id="${id}" class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pt-24 pb-16">
       <!-- Background glows: pink centre, green lower-left, pink upper-right -->
       <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
         <div class="h-[600px] w-[600px] rounded-full bg-neon-pink/10 blur-3xl"></div>

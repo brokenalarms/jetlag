@@ -25,9 +25,11 @@ function checkIcon(color = 'pink') {
   `
 }
 
-export function renderPricing() {
+export const id = 'pricing'
+
+export function render() {
   return /* html */`
-    <section id="pricing" class="py-24 px-6 bg-white/[0.02]">
+    <section id="${id}" class="py-24 px-6 bg-white/[0.02]">
       <div class="mx-auto max-w-5xl">
         <div class="text-center mb-14">
           <span class="section-label">Pricing</span>

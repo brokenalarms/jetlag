@@ -57,9 +57,11 @@ const audiences = [
   },
 ]
 
-export function renderAudience() {
+export const id = 'audience'
+
+export function render() {
   return /* html */`
-    <section id="audience" class="py-24 px-6">
+    <section id="${id}" class="py-24 px-6">
       <div class="mx-auto max-w-6xl">
 
         <div class="text-center mb-14">

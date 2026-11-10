@@ -1,6 +1,8 @@
 import { renderInteractiveTimeline } from '../components/timeline.js'
 
-export function renderProblem() {
+export const id = 'problem'
+
+export function render() {
   // Clip fields: time (HH:MM), day (0-based, 0=same day as first clip),
   // tz (display string), correct (bool), file (label), color (blue|green|purple).
   // Bar positions are derived automatically by the timeline component.
@@ -67,7 +69,7 @@ export function renderProblem() {
   ]
 
   return /* html */`
-    <section class="py-24 px-6">
+    <section id="${id}" class="py-24 px-6">
       <div class="mx-auto max-w-5xl">
 
         <!-- Section header -->
