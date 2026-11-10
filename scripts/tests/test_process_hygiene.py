@@ -9,6 +9,7 @@ nested pytest run.
 
 import stat
 import subprocess
+import time
 from pathlib import Path
 
 from conftest import _leaked_metadata_pids
@@ -23,12 +24,28 @@ def _executable(path: Path, body: str) -> Path:
     return path
 
 
+def _wait_until_execed(pid: int, name: str, timeout: float = 5.0) -> None:
+    """Popen returns once the child is forked, which can be before it execs:
+    until then ps shows the parent's (pytest's) command line. Wait for the
+    child's own command so the leak check sees what a real leak would show."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        cmd = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True
+        ).stdout
+        if name in cmd:
+            return
+        time.sleep(0.02)
+    raise AssertionError(f"pid {pid} never showed {name!r} in ps")
+
+
 def test_a_live_registered_process_is_reported_as_leaked(tmp_path):
     fake = _executable(tmp_path / "exiftool", '''#!/usr/bin/env python3
 import time
 time.sleep(30)
 ''')
     proc = subprocess.Popen([str(fake)])
+    _wait_until_execed(proc.pid, "exiftool")
     exiftool_module._spawned_pids.append(proc.pid)
     try:
         leaked = _leaked_metadata_pids()
