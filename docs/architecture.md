@@ -13,7 +13,12 @@
 │   ├── Sources/          ← Swift source files
 │   └── project.yml       ← XcodeGen project spec
 ├── web/                  ← Vite + Tailwind marketing site
-│   └── src/sections/     ← each section is a standalone render function
+│   ├── src/page.js       ← SECTIONS list; renders and initialises the page
+│   ├── src/content.js    ← product facts (price, URLs, free-file limit)
+│   ├── src/sections/     ← each section is a standalone render function
+│   ├── src/components/   ← shared pieces (section header, nav, timeline)
+│   ├── tokens.js         ← Tailwind plugin: design/tokens.json → CSS variables
+│   └── tests/            ← Vitest suite (`npm test`)
 ├── design/               ← shared design tokens, app icon generation, screenshots
 └── docs/                 ← documentation
 ```
