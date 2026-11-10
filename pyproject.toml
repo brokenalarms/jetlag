@@ -21,7 +21,3 @@ extend-exclude = ["scripts/site-packages", "scripts/tools"]
 # Syntax errors, unused or undefined names, imports below code, bare except.
 select = ["E4", "E7", "E9", "F", "E722"]
 
-[tool.ruff.lint.per-file-ignores]
-# Fixtures imported from test_media_pipeline so pytest can resolve them here read
-# as redefinitions wherever a test takes them as parameters.
-"scripts/tests/test_pipeline_schema.py" = ["F811"]
