@@ -81,6 +81,19 @@ def get_file_date_for_organization(file_path: str, datetime_original: Optional[s
 DEFAULT_FOLDER_TEMPLATE = "{{YYYY}}/{{GROUP}}/{{YYYY}}-{{MM}}-{{DD}}"
 
 
+# {{GROUP}} with the separators that join it to the rest of a folder name,
+# as in "{{YYYY-MM-DD}} {{GROUP}}".
+_GROUP_WITH_JOINER = re.compile(r"[ _.-]*\{\{GROUP\}\}")
+
+
+def _drop_group(template: str) -> str:
+    """Remove {{GROUP}} from each folder of the template, with the separator
+    that joined it, and drop folders left empty."""
+    folders = (_GROUP_WITH_JOINER.sub("", folder).strip(" _.-") if "{{GROUP}}" in folder else folder
+               for folder in template.split("/"))
+    return "/".join(folder for folder in folders if folder)
+
+
 def expand_path_template(template: Optional[str], file_date: str,
                          group: Optional[str] = None) -> str:
     """Expand path template with date components.
@@ -88,14 +101,13 @@ def expand_path_template(template: Optional[str], file_date: str,
     Template variables: {{YYYY}}, {{MM}}, {{MMM}}, {{DD}}, {{YYYY-MM-DD}}, {{GROUP}}
     file_date: YYYY-MM-DD format
 
-    template None means DEFAULT_FOLDER_TEMPLATE. A group fills {{GROUP}}; without
-    one, the default drops its group folder while a caller's own template keeps
-    {{GROUP}} as written.
+    template None means DEFAULT_FOLDER_TEMPLATE. A group fills {{GROUP}}; the
+    group is an optional grouping folder, so without one {{GROUP}} is removed
+    along with any folder it leaves empty.
     """
     if template is None:
-        template = DEFAULT_FOLDER_TEMPLATE if group else DEFAULT_FOLDER_TEMPLATE.replace("{{GROUP}}/", "")
-    if group:
-        template = template.replace("{{GROUP}}", group)
+        template = DEFAULT_FOLDER_TEMPLATE
+    template = template.replace("{{GROUP}}", group) if group else _drop_group(template)
 
     year = file_date[:4]
     month = file_date[5:7]

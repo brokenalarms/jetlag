@@ -557,20 +557,19 @@ final class WorkflowSession {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    /// Where organized files land, laid out as the pipeline lays them out: the
-    /// profile's `folder_template` when it has one, otherwise year / [group /]
-    /// date. Date parts show as their placeholders (YYYY, MM, …).
+    /// Where organized files land, laid out as the pipeline lays them out
+    /// (`expand_path_template` in scripts/lib/organize.py): the profile's
+    /// `folder_template` when it has one, otherwise year / [group /] date. The
+    /// group is an optional folder, so without one `{{GROUP}}` is left out.
+    /// Date parts show as their placeholders (YYYY, MM, …).
     var destinationPreview: String {
-        let template: String
+        var template = "{{YYYY}}/{{GROUP}}/{{YYYY}}-{{MM}}-{{DD}}"
         if let folderTemplate = workingProfile.folderTemplate, !folderTemplate.isEmpty {
-            template = group.isEmpty
-                ? folderTemplate
-                : folderTemplate.replacingOccurrences(of: "{{GROUP}}", with: group)
-        } else if !group.isEmpty {
-            template = "{{YYYY}}/\(group)/{{YYYY}}-{{MM}}-{{DD}}"
-        } else {
-            template = "{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}"
+            template = folderTemplate
         }
+        template = group.isEmpty
+            ? Self.droppingGroup(from: template)
+            : template.replacingOccurrences(of: "{{GROUP}}", with: group)
         var relative = template
         for token in ["YYYY-MM-DD", "YYYY", "MMM", "MM", "DD"] {
             relative = relative.replacingOccurrences(of: "{{\(token)}}", with: token)
@@ -580,5 +579,21 @@ final class WorkflowSession {
             relative.removeLast()
         }
         return readyDir.current + "/" + relative
+    }
+
+    /// `{{GROUP}}` removed from each folder of a template, with the separator
+    /// that joined it to the rest of the folder name; folders left empty go.
+    static func droppingGroup(from template: String) -> String {
+        let joiners = CharacterSet(charactersIn: " _.-")
+        return template
+            .components(separatedBy: "/")
+            .compactMap { folder -> String? in
+                guard folder.contains("{{GROUP}}") else { return folder }
+                let remaining = folder
+                    .replacingOccurrences(of: #"[ _.-]*\{\{GROUP\}\}"#, with: "", options: .regularExpression)
+                    .trimmingCharacters(in: joiners)
+                return remaining.isEmpty ? nil : remaining
+            }
+            .joined(separator: "/")
     }
 }

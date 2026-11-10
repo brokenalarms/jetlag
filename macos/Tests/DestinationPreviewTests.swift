@@ -29,11 +29,18 @@ final class DestinationPreviewTests: XCTestCase {
         XCTAssertEqual(preview, "/Volumes/Media/Ready/YYYY/MMM/Japan")
     }
 
-    /// The pipeline substitutes the group only when one is given, so the preview
-    /// does too.
-    func testAFolderTemplateWithoutAGroupKeepsItsPlaceholder() {
-        let preview = session(folderTemplate: "{{YYYY-MM-DD}}/{{GROUP}}").destinationPreview
+    /// The group is an optional grouping folder: without one the pipeline leaves
+    /// that folder out, so the preview does too.
+    func testAFolderTemplateWithoutAGroupLeavesTheGroupFolderOut() {
+        let preview = session(folderTemplate: "{{YYYY}}/{{GROUP}}/{{YYYY-MM-DD}}").destinationPreview
 
-        XCTAssertEqual(preview, "/Volumes/Media/Ready/YYYY-MM-DD/{{GROUP}}")
+        XCTAssertEqual(preview, "/Volumes/Media/Ready/YYYY/YYYY-MM-DD")
+    }
+
+    /// A group sharing a folder name with the date drops with its separator.
+    func testAGroupInsideAFolderNameDropsWithItsSeparator() {
+        let preview = session(folderTemplate: "{{YYYY}}/{{YYYY-MM-DD}} {{GROUP}}").destinationPreview
+
+        XCTAssertEqual(preview, "/Volumes/Media/Ready/YYYY/YYYY-MM-DD")
     }
 }

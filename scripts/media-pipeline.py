@@ -29,7 +29,7 @@ def build_parser():
     parser.add_argument("--target", help="Target directory for organized files")
     parser.add_argument("--extensions", nargs="+", help="File extensions to process (e.g. .mp4 .mov); overrides the profile's file_extensions")
     add_timezone_args(parser, "--location")
-    parser.add_argument("--group", help="Optional group folder name substituted for {{GROUP}} in the profile's folder_template, or inserted between year and date by default (e.g., 'Japan' → YYYY/Japan/YYYY-MM-DD)")
+    parser.add_argument("--group", help="Optional group folder name substituted for {{GROUP}} in the profile's folder_template, or inserted between year and date by default (e.g., 'Japan' → YYYY/Japan/YYYY-MM-DD). Without it, the {{GROUP}} folder is left out")
     parser.add_argument("--apply", action="store_true", help="Apply changes (default: dry run)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed processing info")
     parser.add_argument(

@@ -783,7 +783,15 @@ class TestFolderTemplateDefault:
         template = "{{YYYY}}/{{GROUP}}/{{MMM}}-{{DD}}"
         assert organize.expand_path_template(template, "2025-08-15", "Japan") == "2025/Japan/Aug-15"
 
-    def test_own_template_keeps_group_token_without_a_group(self):
-        """As the pipeline always has: a profile's template is used as written."""
+    def test_own_template_drops_the_group_folder_without_a_group(self):
+        """The group is an optional grouping folder: with no group there is no
+        such folder, never one literally named {{GROUP}}."""
         template = "{{YYYY}}/{{GROUP}}/{{DD}}"
-        assert organize.expand_path_template(template, "2025-08-15") == "2025/{{GROUP}}/15"
+        assert organize.expand_path_template(template, "2025-08-15") == "2025/15"
+
+    def test_group_sharing_a_folder_name_drops_with_its_separator(self):
+        """A group written into a folder name alongside the date leaves the
+        date alone, without a dangling separator."""
+        template = "{{YYYY}}/{{YYYY-MM-DD}} {{GROUP}}"
+        assert organize.expand_path_template(template, "2025-08-15") == "2025/2025-08-15"
+        assert organize.expand_path_template(template, "2025-08-15", "Japan") == "2025/2025-08-15 Japan"

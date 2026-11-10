@@ -79,7 +79,8 @@ struct MediaProfile: Codable, Equatable {
     var companionExtensions: [String]?
     /// Where organize puts files under the ready folder, e.g.
     /// `{{YYYY}}/{{GROUP}}/{{YYYY-MM-DD}}`. Set by hand in the file; absent means
-    /// the pipeline's default of year / [group /] date.
+    /// the pipeline's default of year / [group /] date. Without a group the
+    /// `{{GROUP}}` folder is left out.
     var folderTemplate: String?
     /// The profile's block as it was read from the profiles file. A save is
     /// written over it, so keys the app does not model — or anything a newer

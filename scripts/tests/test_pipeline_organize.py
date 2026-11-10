@@ -206,7 +206,7 @@ class TestGroupTemplate:
         assert expected.exists(), f"Expected: {expected}\nActual files: {actual_files}\nStdout: {result.stdout[-500:]}\nStderr: {result.stderr}"
 
     def test_folder_template_without_group(self, temp_workspace, test_profile):
-        """Profile folder_template used as-is when no --group given."""
+        """Without --group, a profile folder_template's {{GROUP}} folder is left out."""
         profiles_path = Path(os.environ["JETLAG_PROFILES_FILE"])
         with open(profiles_path) as f:
             profiles = yaml.safe_load(f)
@@ -224,7 +224,7 @@ class TestGroupTemplate:
         )
 
         actual_files = list(target.rglob("*.mp4"))
-        expected = target / "2025" / "08" / "{{GROUP}}" / "2025-08-15" / "test.mp4"
+        expected = target / "2025" / "08" / "2025-08-15" / "test.mp4"
         assert expected.exists(), f"Expected: {expected}\nActual files: {actual_files}\nStdout: {result.stdout[-500:]}\nStderr: {result.stderr}"
 
 
