@@ -6,6 +6,17 @@ The site uses an 80s neon/retro aesthetic — spray-paint headline effects, VHS 
 
 Vanilla JS with template literals (no framework) — each section is a self-contained render function. This is deliberate; don't introduce React/Vue/etc.
 
+## Structure
+
+- `src/page.js` — `SECTIONS` (content sections in page order), `renderPage()`, `initPage()`. `main.js` only mounts.
+- `src/sections/` — one module per section, exporting its anchor `id` and `render()`. `nav.js` and `footer.js` are the page chrome; `nav.js` owns `NAV_LINKS`.
+- `src/components/` — shared pieces, each exporting `render…()` and, if interactive, `init…()` (section header, timeline, mobile nav, back-to-top).
+- `src/content.js` — price, buy URL, free file limit and other product facts used in more than one place.
+
+## Tests
+
+`npm test` (Vitest) runs `web/tests/`: timeline maths, token wiring, component behaviour in jsdom, and a page smoke test (unique ids, every `#anchor` has a target, content constants used everywhere).
+
 ## Color pipeline
 
 `design/tokens.json` is the single source of truth for colors, shared between web and the macOS app. Don't define colors in CSS or Tailwind config directly — always go through tokens. The pipeline:
