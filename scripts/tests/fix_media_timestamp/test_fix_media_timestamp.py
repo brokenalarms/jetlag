@@ -394,10 +394,14 @@ class TestIdempotenceAcrossRanking:
         pristine = os.path.join(temp_dir, filename)
         create_test_video(pristine, **exif_tags)
 
-        reprocessed = os.path.join(temp_dir, f"reprocessed_{filename}")
-        processed_once = os.path.join(temp_dir, f"once_{filename}")
-        shutil.copy2(pristine, reprocessed)
-        shutil.copy2(pristine, processed_once)
+        # Each copy keeps the pristine name in a folder of its own: a prefixed name
+        # no longer matches the camera filename pattern, so the "filename" case
+        # would rank the file's birth time instead.
+        reprocessed = os.path.join(temp_dir, "reprocessed", filename)
+        processed_once = os.path.join(temp_dir, "once", filename)
+        for copy in (reprocessed, processed_once):
+            os.makedirs(os.path.dirname(copy))
+            shutil.copy2(pristine, copy)
 
         cmd = [sys.executable, str(SCRIPT_DIR / "cli" / "fix_media_timestamp.py")]
 
