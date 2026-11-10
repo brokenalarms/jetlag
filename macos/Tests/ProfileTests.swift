@@ -601,6 +601,35 @@ final class ProfileTests: XCTestCase {
         XCTAssertEqual(state.workflowSession.readyDir.current, "/tmp/new-ready")
     }
 
+    /// Closing Settings reloads the profiles file. A profile the app itself saved
+    /// is read back as it was saved, so the workflow keeps every choice made since
+    /// — the save is not mistaken for a change made to the file outside the app.
+    func testReloadingAfterTheAppsOwnSaveKeepsTheWorkflow() throws {
+        let state = try stateLoaded(from: fixtureYAML)
+        state.selectProfile("gopro")
+        var edited = try XCTUnwrap(state.profile(named: "gopro"))
+        edited.readyDir = "/tmp/new-ready"
+        try state.saveProfile(edited, as: "gopro", replacing: "gopro")
+        state.workflowSession.timezone.value = "Asia/Seoul"
+
+        state.loadProfiles()
+
+        XCTAssertEqual(state.workflowSession.timezone.current, "Asia/Seoul")
+    }
+
+    /// A profile changed in the file outside the app is what the workflow runs
+    /// after a reload.
+    func testReloadingAProfileChangedInTheFileRebuildsTheWorkflow() throws {
+        let state = try stateLoaded(from: fixtureYAML)
+        state.selectProfile("gopro")
+        try fixtureYAML.replacingOccurrences(of: "ready_dir: /tmp/ready", with: "ready_dir: /tmp/elsewhere")
+            .write(toFile: state.profilesLocation.path, atomically: true, encoding: .utf8)
+
+        state.loadProfiles()
+
+        XCTAssertEqual(state.workflowSession.readyDir.current, "/tmp/elsewhere")
+    }
+
     // MARK: - Save and Cancel visibility
 
     /// Save and Cancel used to show on every profile, edited or not, so clicking Save

@@ -122,12 +122,12 @@ final class AppState {
         }
         do {
             let selected = workflowSession.profileName
-            let previous = profile(named: selected)
+            let previous = settings(ofProfile: selected)
             profilesConfig = try ProfileService.load(from: profilesLocation.path)
             profileLoadError = nil
             // A workflow whose profile was changed or removed in the file follows
             // it; one whose profile is as it was keeps every choice made for it.
-            if !selected.isEmpty, profile(named: selected) != previous {
+            if !selected.isEmpty, settings(ofProfile: selected) != previous {
                 startSession(with: profile(named: selected) == nil ? "" : selected)
             }
         } catch {
@@ -144,6 +144,15 @@ final class AppState {
     /// the global preset filled in.
     func profile(named name: String) -> MediaProfile? {
         profilesConfig?.profile(named: name)
+    }
+
+    /// The profile without the file block it was read from. A save from the app
+    /// keeps the block it loaded, while a reload reads the block as saved, so
+    /// the block alone says nothing about whether the profile changed.
+    private func settings(ofProfile name: String) -> MediaProfile? {
+        guard var stored = profile(named: name) else { return nil }
+        stored.fileNode = nil
+        return stored
     }
 
     /// Create the profile for a camera found in the source chosen for it. Its
