@@ -572,6 +572,26 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
             xcode-select --install
             """)
 
+        static func yamlTypeMismatch(path: String, expected: String) -> String {
+            String(localized: "error.yaml.typeMismatch",
+                   defaultValue: "Type mismatch at \(path): expected \(expected)")
+        }
+
+        static func yamlKeyMissing(key: String, path: String) -> String {
+            String(localized: "error.yaml.keyMissing",
+                   defaultValue: "Missing key '\(key)' at \(path)")
+        }
+
+        static func yamlValueMissing(type: String, path: String) -> String {
+            String(localized: "error.yaml.valueMissing",
+                   defaultValue: "Missing value of type \(type) at \(path)")
+        }
+
+        static func yamlInvalidAt(path: String, description: String) -> String {
+            String(localized: "error.yaml.invalidAt",
+                   defaultValue: "At \(path): \(description)")
+        }
+
         static func scriptStartFailed(_ description: String) -> String {
             String(localized: "error.scriptStartFailed",
                    defaultValue: "Failed to start: \(description)")

@@ -47,16 +47,18 @@ struct ProfileService {
             switch error {
             case .typeMismatch(let type, let context):
                 let path = context.codingPath.map(\.stringValue).joined(separator: " → ")
-                detail = "Type mismatch at \(path): expected \(type)"
+                detail = Strings.Errors.yamlTypeMismatch(path: path, expected: "\(type)")
             case .keyNotFound(let key, let context):
                 let path = context.codingPath.map(\.stringValue).joined(separator: " → ")
-                detail = "Missing key '\(key.stringValue)' at \(path)"
+                detail = Strings.Errors.yamlKeyMissing(key: key.stringValue, path: path)
             case .valueNotFound(let type, let context):
                 let path = context.codingPath.map(\.stringValue).joined(separator: " → ")
-                detail = "Missing value of type \(type) at \(path)"
+                detail = Strings.Errors.yamlValueMissing(type: "\(type)", path: path)
             case .dataCorrupted(let context):
                 let path = context.codingPath.map(\.stringValue).joined(separator: " → ")
-                detail = path.isEmpty ? context.debugDescription : "At \(path): \(context.debugDescription)"
+                detail = path.isEmpty
+                    ? context.debugDescription
+                    : Strings.Errors.yamlInvalidAt(path: path, description: context.debugDescription)
             @unknown default:
                 detail = error.localizedDescription
             }
