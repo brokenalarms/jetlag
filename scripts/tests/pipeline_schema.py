@@ -4,7 +4,8 @@ The schema is the one place a token is defined. This module lets the test suite
 hold the emitting side to it: any event media-pipeline.py writes to stdout must
 declare every field it carries and stay inside the enumerations. A token added to
 the script without being declared here fails, and so does a declared-but-unemitted
-required field.
+required field. `load_cli` reads the schema's command-line section, which the tests
+hold media-pipeline's parser to.
 
 Not a test module itself — imported by the tests that capture pipeline output.
 """
@@ -32,9 +33,19 @@ _TYPE_CHECKS = {
 }
 
 
-def load_schema() -> dict[str, Any]:
+def _load() -> dict[str, Any]:
     with open(SCHEMA_PATH) as f:
-        return yaml.safe_load(f)["events"]
+        return yaml.safe_load(f)
+
+
+def load_schema() -> dict[str, Any]:
+    """The event declarations."""
+    return _load()["events"]
+
+
+def load_cli() -> dict[str, Any]:
+    """The command-line section: the pipeline's steps and the flags the app passes."""
+    return _load()["cli"]
 
 
 def enum_tokens(event_type: str, field: str) -> list[str]:

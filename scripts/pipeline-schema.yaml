@@ -1,4 +1,4 @@
-# Pipeline JSONL event schema
+# Pipeline JSONL event and command-line schema
 #
 # Each stdout line from media-pipeline.py is a single JSON object (JSONL).
 # The "event" field discriminates event types. All other fields depend on event type.
@@ -18,6 +18,8 @@
 #
 # Each event carries an `example`: a complete, valid instance used verbatim as a
 # decoding fixture on the Swift side.
+#
+# The `cli` section at the end declares the step tokens and the flags the app passes.
 
 events:
   pipeline_file:
@@ -312,3 +314,30 @@ events:
       failed: 1
       failed_files: [DJI_20250815_101112_0001.MP4]
       mode: applied
+
+# The command line the app builds for media-pipeline. The app's PipelineStep tokens
+# and flag constants, and media-pipeline.py's build_parser(), are both held to this
+# section by the same contract tests as the events above.
+cli:
+  # Every step in pipeline order. `stage` is the token stage_complete carries; `task`
+  # is the token --tasks accepts. A step without a task is the fixed frame: it always
+  # runs and cannot be named in --tasks.
+  steps:
+    - { stage: ingest }
+    - { stage: tag, task: tag }
+    - { stage: fix-timestamp, task: fix-timestamp }
+    - { stage: output }
+    - { stage: gyroflow, task: gyroflow }
+    - { stage: archive-source, task: archive-source }
+
+  # Every flag the app passes.
+  flags: [--profile, --source, --target, --tags, --make, --model, --group, --tasks,
+          --archive-destination, --archived-name, --copy-companion-files, --timezone,
+          --infer-from-filename, --time-offset, --update-filename-dates, --gyroflow-preset,
+          --force-timezone, --allow-mixed-timezones, --overwrite, --unlock-protected,
+          --allow-camera-mismatch, --apply]
+
+  # The flags that carry an answer the user gave for one run rather than a setting:
+  # a run started fresh drops them, and they never make a dry run's preview stale.
+  assent_flags: [--force-timezone, --allow-mixed-timezones, --overwrite, --unlock-protected,
+                 --allow-camera-mismatch, --apply]

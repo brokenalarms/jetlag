@@ -94,6 +94,11 @@ def _pipeline_command_line():
     return module
 
 
+def pipeline_parser():
+    """media-pipeline.py's own argument parser."""
+    return _pipeline_command_line().build_parser()
+
+
 def run_in_process(args: list[str]) -> PipelineResult:
     """run_pipeline's run, made in this process.
 
@@ -111,7 +116,7 @@ def run_in_process(args: list[str]) -> PipelineResult:
     events._machine_output = True
     try:
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            parsed = _pipeline_command_line().build_parser().parse_args(
+            parsed = pipeline_parser().parse_args(
                 attach_negative_option_values(args))
             pipeline.run(parsed, pipeline.WorkingDir())
     except SystemExit as exit_info:
