@@ -4,7 +4,6 @@ Unit tests for fix-media-timestamp.py
 Tests individual functions without relying on output strings
 """
 
-import json
 import os
 import sys
 import tempfile
@@ -27,7 +26,7 @@ spec = importlib.util.spec_from_file_location(
 )
 fmt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fmt)
-from lib.timestamp_source import SOURCE_UTC_BY_SPEC, SOURCE_UTC_CORROBORATED
+from lib.timestamp_source import SOURCE_UTC_BY_SPEC, SOURCE_UTC_CORROBORATED, clear_exif_cache
 if sys.platform == "darwin":
     from lib.file_timestamps import get_file_system_timestamps, set_file_system_timestamps
 
@@ -310,52 +309,6 @@ class TestChangeDetection:
         assert targets["QuickTime:MediaCreateDate"] == "2025:06:17 23:25:21"
         assert targets["QuickTime:TrackCreateDate"] == "2025:06:17 23:25:21"
         assert targets["Keys:CreationDate"] == "2025:06:18 07:25:21+08:00"
-
-
-class TestWriteOperations:
-    """Test write operations and idempotency"""
-
-    def setup_method(self):
-        self.temp_dir = tempfile.mkdtemp()
-        self.test_video = os.path.join(self.temp_dir, "test.mp4")
-        create_test_video(self.test_video)
-
-    def teardown_method(self):
-        shutil.rmtree(self.temp_dir)
-        fmt._exif_cache.clear()
-
-    def test_write_quicktime_createdate_reaches_track_atom(self):
-        """Healing a QuickTime clock writes the corrected UTC instant into the
-        per-track tkhd atom as well as the movie header, so no application reads
-        the pre-correction time back out of the track."""
-        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
-
-        subprocess.run([
-            "exiftool", "-P", "-overwrite_original",
-            "-QuickTime:TrackCreateDate=2020:01:01 00:00:00",
-            self.test_video
-        ], capture_output=True, check=True)
-        fmt._exif_cache.clear()
-
-        assert fmt.write_quicktime_createdate(self.test_video, dt) is True
-
-        fmt._exif_cache.clear()
-        data = fmt.read_exif_data(self.test_video)
-        assert data["TrackCreateDate"] == "2025:06:17 23:25:21"
-        assert data["MediaCreateDate"] == "2025:06:17 23:25:21"
-
-    def test_write_keys_creationdate(self):
-        """Test writing Keys:CreationDate"""
-        dt = datetime(2025, 6, 18, 7, 25, 21, tzinfo=timezone(timedelta(hours=8)))
-
-        success = fmt.write_keys_creationdate(self.test_video, dt)
-
-        assert success is True
-
-        # Verify it was written
-        fmt._exif_cache.clear()
-        data = fmt.read_exif_data(self.test_video)
-        assert "CreationDate" in data
 
 
 class TestTimezoneHandling:
@@ -998,7 +951,7 @@ class TestTimestampFixResult:
         )
 
     def teardown_method(self):
-        fmt.clear_exif_cache()
+        clear_exif_cache()
         shutil.rmtree(self.temp_dir)
 
     def test_returns_timestamp_fix_result(self):
@@ -1063,7 +1016,7 @@ class TestProvenanceRecord:
         )
 
     def teardown_method(self):
-        fmt.clear_exif_cache()
+        clear_exif_cache()
         shutil.rmtree(self.temp_dir)
 
     def test_provenance_written_on_first_correction(self):
@@ -1085,7 +1038,7 @@ class TestProvenanceRecord:
         first = fmt.read_provenance_record(self.video)
         assert first
 
-        fmt.clear_exif_cache()
+        clear_exif_cache()
         second_run = fmt.fix_media_timestamps(
             self.video, timezone_spec="+09:00", force_timezone=True
         )

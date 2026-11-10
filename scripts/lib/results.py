@@ -1,11 +1,8 @@
-"""Shared result serialisation for pipeline scripts.
+"""Shared result serialisation for the single-file scripts' command lines.
 
-Each script returns a dataclass from its core function. During the
-subprocess era (before module-call migration), main() serialises the
-result to @@key=value lines so media-pipeline.py can parse them.
-
-emit_result() is the shared helper for that serialisation. It will be
-deleted when the pipeline switches to direct module calls (step 3).
+Each script's core function returns a dataclass. The pipeline calls those
+functions in-process and reads the dataclass directly; a script run on its own
+prints the same result as @@key=value lines through emit_result().
 """
 
 import dataclasses

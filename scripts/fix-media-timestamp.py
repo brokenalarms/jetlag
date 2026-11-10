@@ -11,15 +11,9 @@ import re
 import signal
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field as dataclass_field
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from typing import Dict, Optional
-
-# Handle Ctrl-C gracefully
-def signal_handler(sig, frame):
-    print("\n\nInterrupted by user", file=sys.stderr)
-    sys.exit(130)
 
 from lib.exiftool import MetadataWriteRefused, exiftool
 from lib.results import emit_result
@@ -42,7 +36,6 @@ from lib.timestamp_source import (
     is_zone_name,
     is_utc_timestamp_source,
     resolve_timezone_offset,
-    clear_exif_cache,
     camera_zone_offset_for_file,
 )
 
@@ -60,6 +53,12 @@ else:
     def get_expected_file_system_time(datetime_original: datetime, preserve_wallclock: bool = False) -> str:
         return ""
 
+# Handle Ctrl-C gracefully
+def signal_handler(sig, frame):
+    print("\n\nInterrupted by user", file=sys.stderr)
+    sys.exit(130)
+
+
 @dataclass
 class TimestampFixResult:
     file: str
@@ -75,13 +74,16 @@ class TimestampFixResult:
     corrected_epoch: Optional[float] = None
     requires_force_timezone: Optional[bool] = None
     camera_zone_offset: Optional[str] = None
-    stale_fields: list = field(default_factory=list)
-    stale_file_times: list = field(default_factory=list)
+    stale_fields: list = dataclass_field(default_factory=list)
+    stale_file_times: list = dataclass_field(default_factory=list)
     error: Optional[str] = None
 
 
 def get_timezone_for_country(input_country: str) -> Optional[str]:
-    """Get timezone for country using CSV lookup (lines 536-604 from bash)"""
+    """The +HH:MM offset for a country code or name, from lib/timezones/*.csv.
+
+    Returns None when the country or its zone cannot be found.
+    """
     script_dir = os.path.dirname(os.path.abspath(__file__))
     timezone_dir = os.path.join(script_dir, "lib", "timezones")
     country_csv = os.path.join(timezone_dir, "country.csv")
@@ -104,7 +106,7 @@ def get_timezone_for_country(input_country: str) -> Optional[str]:
                     if line.strip() and input_country.lower() in line.lower():
                         country_code = line.split(',')[0].strip()
                         break
-        except:
+        except OSError:
             return None
 
     if not country_code:
@@ -131,7 +133,7 @@ def get_timezone_for_country(input_country: str) -> Optional[str]:
                 minutes = (abs_seconds % 3600) // 60
                 sign = "-" if offset_seconds < 0 else "+"
                 return f"{sign}{hours:02d}:{minutes:02d}"
-    except:
+    except (OSError, ValueError):
         pass
 
     return None
@@ -147,7 +149,7 @@ def get_country_name(input_country: str) -> str:
                 for line in f:
                     if line.startswith(input_country.upper() + ","):
                         return line.split(',', 1)[1].strip().strip('"')
-        except:
+        except OSError:
             pass
 
     return input_country
@@ -213,30 +215,6 @@ def provenance_field_args(file_path: str, exif: Dict[str, str]) -> list:
     return [f"-{PRESERVED_FILENAME_TAG}={os.path.basename(file_path)}"] + clock_args
 
 
-def write_keys_creationdate(file_path: str, datetime_original: datetime) -> bool:
-    """Write Keys:CreationDate with original timezone
-
-    Always writes DateTimeOriginal with its original timezone to maintain correct absolute time.
-
-    Args:
-        file_path: Path to the media file
-        datetime_original: datetime object with timezone info
-
-    Returns:
-        True if successful, False otherwise
-    """
-    try:
-        keys_value = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
-        keys_value = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', keys_value)
-
-        result = exiftool.write_tags(file_path, [f"-Keys:CreationDate={keys_value}"])
-        if file_path in _exif_cache:
-            del _exif_cache[file_path]
-        return result
-    except Exception as e:
-        print(f"Error writing Keys:CreationDate: {e}", file=sys.stderr)
-        return False
-
 @dataclass(frozen=True)
 class ClockField:
     """A metadata clock field a correction owns.
@@ -282,10 +260,6 @@ CLOCK_FIELDS = [
     ClockField("QuickTime:TrackCreateDate", "TrackCreateDate", quicktime=True,
                container_only=True, proves_container=True),
 ]
-
-QUICKTIME_CLOCK_TAGS = [field.write_tag.removeprefix("QuickTime:")
-                        for field in CLOCK_FIELDS if field.quicktime]
-
 
 def is_quicktime_container(exif: Dict[str, str]) -> bool:
     """Whether a file's clock fields come from a QuickTime container."""
@@ -396,44 +370,6 @@ def missing_clock_fields(exif: Dict[str, str], stale: list) -> list:
     return [tag for tag in stale if not stored.get(tag)]
 
 
-def quicktime_createdate_args(utc_time: str) -> list:
-    """Write args setting every QuickTime clock atom to the same UTC instant.
-
-    CreateDate reaches the movie header (mvhd), MediaCreateDate the per-track mdhd
-    atoms and TrackCreateDate the per-track tkhd atoms. All three are written so a
-    correction is what any application reads, whichever atom it happens to consult.
-    """
-    return [f"-QuickTime:{tag}={utc_time}" for tag in QUICKTIME_CLOCK_TAGS]
-
-
-def write_quicktime_createdate(file_path: str, datetime_original: datetime) -> bool:
-    """Write QuickTime CreateDate as UTC
-
-    This heals corrupted QuickTime CreateDate fields (common in iPhone files).
-    Writes UTC directly without QuickTimeUTC flag. The flag is only used for READING
-    (to convert stored UTC to local time for verification).
-
-    Args:
-        file_path: Path to the media file
-        datetime_original: datetime object with timezone info
-        
-
-    Returns:
-        True if successful, False otherwise
-    """
-    try:
-        utc_dt = datetime_original.astimezone(timezone.utc)
-        utc_time = utc_dt.strftime("%Y:%m:%d %H:%M:%S")
-
-        result = exiftool.write_tags(file_path, quicktime_createdate_args(utc_time))
-        if file_path in _exif_cache:
-            del _exif_cache[file_path]
-        return result
-    except Exception as e:
-        print(f"Error writing QuickTime CreateDate: {e}", file=sys.stderr)
-        return False
-
-
 def _timezone_from_offset(offset_str: str) -> Optional[timezone]:
     """Build a tzinfo from a +HH:MM / +HHMM offset string."""
     match = re.match(r'([+-])(\d{2}):?(\d{2})$', offset_str)
@@ -475,7 +411,7 @@ def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, 
             raise ValueError("--infer-from-filename requires --timezone to be specified")
         report = read_timestamp_sources(file_path, timezone_spec)
         if not report.filename_parseable:
-            raise ValueError(f"--infer-from-filename specified but filename has no parseable date")
+            raise ValueError("--infer-from-filename specified but filename has no parseable date")
         fn_ts, _ = parse_filename_timestamp(file_path)
         timezone_offset = resolve_timezone_offset(timezone_spec, fn_ts)
         data["timezone_offset"] = timezone_offset
@@ -697,7 +633,7 @@ def format_original_timestamps(current_data: dict) -> str:
         if filename_ts:
             parts.append(f"{format_exif_timestamp_display(filename_ts)} (from filename)")
         else:
-            parts.append(f"(from filename)")
+            parts.append("(from filename)")
     elif source == "file birthtime":
         birth_ts = current_data["file_system"].get("birth", "")
         if birth_ts:
@@ -1029,7 +965,7 @@ def fix_media_timestamps(file_path: str, dry_run: bool = False, timezone_spec: O
             if current_fs.get("birth"):
                 current_birth = datetime.strptime(current_fs["birth"], '%Y:%m:%d %H:%M:%S')
                 timestamp_data["birth_delta_seconds"] = (expected_dt - current_birth).total_seconds()
-        except:
+        except ValueError:
             pass
 
     # Display changes
