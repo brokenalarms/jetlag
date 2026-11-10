@@ -21,10 +21,13 @@ size to compare. Only headers are read: a few small reads per file.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import struct
 
-from lib.footage import footage_ranges
+from lib.footage import footage_ranges_of
+
+_HASH_CHUNK = 1 << 20
 
 _JPEG_SOI = b"\xff\xd8"
 _JPEG_SOS = 0xDA
@@ -221,15 +224,15 @@ def _heif_ranges(f, meta_start: int, meta_end: int, file_size: int) -> list[tupl
     return ranges
 
 
-def _iso_still_ranges(path: str | os.PathLike) -> list[tuple[int, int]] | None:
-    """A HEIF or AVIF still's ranges, or None when the file is not one (no top-level
-    meta with an item table, or a movie with a moov)."""
-    with open(path, "rb") as f:
-        file_size = os.fstat(f.fileno()).st_size
-        top = {t: (s, e) for t, s, e in _boxes(f, 0, file_size)}
-        if b"ftyp" not in top or b"meta" not in top or b"moov" in top:
-            return None
-        return _heif_ranges(f, *top[b"meta"], file_size)
+def _is_iso_still(f, file_size: int) -> bool:
+    """A HEIF or AVIF still: a top-level meta with no movie (moov) beside it."""
+    top = {t for t, _, _ in _boxes(f, 0, file_size)}
+    return b"ftyp" in top and b"meta" in top and b"moov" not in top
+
+
+def _iso_still_ranges(f, file_size: int) -> list[tuple[int, int]] | None:
+    meta = next((s, e) for t, s, e in _boxes(f, 0, file_size) if t == b"meta")
+    return _heif_ranges(f, *meta, file_size)
 
 
 _RAF_MAGIC = b"FUJIFILMCCD-RAW "
@@ -253,22 +256,48 @@ def data_ranges(path: str | os.PathLike) -> list[tuple[int, int]] | None:
     None when the format has no reader, or the file is truncated or malformed.
     """
     with open(path, "rb") as f:
-        file_size = os.fstat(f.fileno()).st_size
-        start = f.read(16)
-        if start[:2] == _JPEG_SOI:
-            return _jpeg_ranges(f, file_size)
-        if start == _RAF_MAGIC:
-            return _raf_ranges(f, file_size)
-        if start[:2] in (b"II", b"MM"):
-            return _tiff_ranges(f, file_size)
-        if start[4:8] == b"ftyp":
-            still = _iso_still_ranges(path)
-            if still is not None:
-                return still
-    return footage_ranges(path)
+        return data_ranges_of(f, os.fstat(f.fileno()).st_size)
+
+
+def data_ranges_of(f, file_size: int) -> list[tuple[int, int]] | None:
+    """data_ranges for an open file of the given size: any object with seek and read,
+    such as a file on another host read in small pieces."""
+    f.seek(0)
+    start = f.read(16)
+    if start[:2] == _JPEG_SOI:
+        return _jpeg_ranges(f, file_size)
+    if start == _RAF_MAGIC:
+        return _raf_ranges(f, file_size)
+    if start[:2] in (b"II", b"MM"):
+        return _tiff_ranges(f, file_size)
+    if start[4:8] == b"ftyp" and _is_iso_still(f, file_size):
+        return _iso_still_ranges(f, file_size)
+    return footage_ranges_of(f, file_size)
 
 
 def data_bytes(path: str | os.PathLike) -> int | None:
     """Total size of the data portion; None as for data_ranges."""
     ranges = data_ranges(path)
     return None if ranges is None else sum(length for _, length in ranges)
+
+
+def data_sha256(path: str | os.PathLike) -> str | None:
+    """sha256 of the data portion, its ranges in order; None as for data_ranges.
+
+    Reads the whole data portion, so it is for checking a copy, not for listing one.
+    """
+    ranges = data_ranges(path)
+    if ranges is None:
+        return None
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for offset, length in ranges:
+            f.seek(offset)
+            remaining = length
+            while remaining:
+                chunk = f.read(min(_HASH_CHUNK, remaining))
+                if not chunk:
+                    return None
+                digest.update(chunk)
+                remaining -= len(chunk)
+    return digest.hexdigest()

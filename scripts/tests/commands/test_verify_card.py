@@ -304,3 +304,157 @@ class TestRemoteLocation:
         report = run_verify(card, {"NAS": f"nas:{remote}"}, env=rsync_env)
 
         assert outcome(report, f"DCIM/{CLIP}", "NAS") == ("unverifiable", None, [CLIP])
+
+
+def recorded_hash(path: Path) -> str:
+    return subprocess.run([str(SCRIPT_DIR / "tools" / "exiftool"), "-s3", "-XMP-jetlag:ContentSHA256", str(path)],
+                          capture_output=True, text=True).stdout.strip()
+
+
+def flip_a_data_byte(path: Path) -> None:
+    """Damage a copy without changing its size: the default check cannot see it."""
+    from lib.data_portion import data_ranges
+    offset, length = data_ranges(path)[0]
+    content = bytearray(path.read_bytes())
+    content[offset + length // 2] ^= 0xFF
+    path.write_bytes(bytes(content))
+
+
+class TestVerifyHashes:
+    """--verify-hashes hashes each matched copy's data portion and compares it with the
+    card file's: it catches a copy damaged since import, or cut short with its size
+    intact, which the size check passes. A local copy that hashes equal to the card
+    records the hash, so a later run need not read the card again."""
+
+    def test_matching_copy_records_the_hash(self, card, tmp_path):
+        library = tmp_path / "T9"
+        copy = copy_to(card / "DCIM" / CLIP, library / CLIP)
+        from lib.data_portion import data_sha256
+        expected = data_sha256(card / "DCIM" / CLIP)
+
+        report = run_verify(card, {"T9": str(library)}, "--verify-hashes")
+
+        result = report["results"][(f"DCIM/{CLIP}", "T9")]
+        assert (result["verdict"], result["hash"]) == ("matched", "match")
+        assert recorded_hash(copy) == expected
+        assert report["summary"]["hash_cache_written"] == 1
+
+    def test_damaged_copy_with_its_size_intact_is_a_hash_mismatch(self, card, tmp_path):
+        library = tmp_path / "T9"
+        copy = copy_to(card / "DCIM" / CLIP, library / CLIP)
+        flip_a_data_byte(copy)
+        assert outcome(run_verify(card, {"T9": str(library)}), f"DCIM/{CLIP}", "T9")[0] == "matched"
+
+        report = run_verify(card, {"T9": str(library)}, "--verify-hashes")
+
+        result = report["results"][(f"DCIM/{CLIP}", "T9")]
+        assert (result["verdict"], result["hash"]) == ("hash_mismatch", "mismatch")
+        assert recorded_hash(copy) == "", "A mismatching copy must not record a hash"
+
+    def test_later_run_takes_its_reference_from_the_recorded_hash(self, card, tmp_path):
+        """With a hash recorded, the card is not read: proven by changing the card's
+        data after the first run, which the second run does not notice."""
+        library = tmp_path / "T9"
+        copy_to(card / "DCIM" / CLIP, library / CLIP)
+        run_verify(card, {"T9": str(library)}, "--verify-hashes")
+        flip_a_data_byte(card / "DCIM" / CLIP)
+
+        report = run_verify(card, {"T9": str(library)}, "--verify-hashes")
+
+        assert report["results"][(f"DCIM/{CLIP}", "T9")]["hash"] == "match"
+        assert report["summary"]["hash_cache_written"] == 0
+
+    def test_without_the_flag_nothing_is_hashed_or_written(self, card, tmp_path):
+        library = tmp_path / "T9"
+        copy = copy_to(card / "DCIM" / CLIP, library / CLIP)
+
+        report = run_verify(card, {"T9": str(library)})
+
+        assert "hash" not in report["results"][(f"DCIM/{CLIP}", "T9")]
+        assert recorded_hash(copy) == ""
+
+
+class TestVerifyHashesOnARemoteLocation:
+    """A host:/path copy is hashed on its host, so only the digest crosses the network,
+    and only with --include-network. Stand-ins for rsync and ssh drop the host and run
+    locally, so the commands run are the real ones."""
+
+    @pytest.fixture
+    def remote_env(self, tmp_path):
+        rsync = tmp_path / "fake-rsync"
+        rsync.write_text('#!/bin/bash\nargs=()\nfor a in "$@"; do args+=("${a#nas:}"); done\nexec rsync "${args[@]}"\n')
+        ssh = tmp_path / "fake-ssh"
+        ssh.write_text('#!/bin/bash\nshift\nexec bash -c "$1"\n')
+        for stub in (rsync, ssh):
+            stub.chmod(0o755)
+        return {"JETLAG_RSYNC": str(rsync), "JETLAG_SSH": str(ssh)}
+
+    def test_remote_location_is_labelled_network_and_skipped_without_include_network(self, card, tmp_path, remote_env):
+        remote = tmp_path / "nas"
+        copy_to(card / "DCIM" / CLIP, remote / CLIP)
+
+        report = run_verify(card, {"NAS": f"nas:{remote}"}, "--verify-hashes", env=remote_env)
+
+        assert report["locations"]["NAS"]["network"] is True
+        assert "hash" not in report["results"][(f"DCIM/{CLIP}", "NAS")]
+
+    def test_remote_copy_without_a_twin_is_hashed_from_headers_read_on_the_host(self, card, tmp_path, remote_env):
+        remote = tmp_path / "nas"
+        copy = copy_to(card / "DCIM" / CLIP, remote / CLIP)
+
+        report = run_verify(card, {"NAS": f"nas:{remote}"}, "--verify-hashes", "--include-network", env=remote_env)
+
+        assert report["results"][(f"DCIM/{CLIP}", "NAS")]["hash"] == "match"
+        assert recorded_hash(copy) == "", "A network copy is never written"
+
+    def test_damaged_remote_copy_with_a_local_twin_is_a_hash_mismatch(self, card, tmp_path, remote_env):
+        local, remote = tmp_path / "T9", tmp_path / "nas"
+        copy_to(card / "DCIM" / CLIP, local / CLIP)
+        damaged = copy_to(card / "DCIM" / CLIP, remote / CLIP)
+        flip_a_data_byte(damaged)
+        os.utime(damaged, ns=((local / CLIP).stat().st_atime_ns, (local / CLIP).stat().st_mtime_ns))
+
+        report = run_verify(card, {"T9": str(local), "NAS": f"nas:{remote}"},
+                            "--verify-hashes", "--include-network", env=remote_env)
+
+        verdicts = {loc: report["results"][(f"DCIM/{CLIP}", loc)]["verdict"] for loc in ("T9", "NAS")}
+        assert verdicts == {"T9": "matched", "NAS": "hash_mismatch"}
+
+    def test_intact_remote_copy_with_a_local_twin_matches_while_the_twin_records_its_hash(
+            self, card, tmp_path, remote_env):
+        """The local twin gets the hash written into it in the same run, which moves
+        its metadata; the remote copy's ranges must come from the twin as listed."""
+        local, remote = tmp_path / "T9", tmp_path / "nas"
+        written = copy_to(card / "DCIM" / CLIP, local / CLIP)
+        write_tags(written, f"-XMP-xmpMM:PreservedFileName={CLIP}", "-Make=Insta360")
+        mirror = copy_to(written, remote / CLIP)
+        os.utime(mirror, ns=(written.stat().st_atime_ns, written.stat().st_mtime_ns))
+
+        report = run_verify(card, {"T9": str(local), "NAS": f"nas:{remote}"},
+                            "--verify-hashes", "--include-network", env=remote_env)
+
+        hashes = {loc: report["results"][(f"DCIM/{CLIP}", loc)].get("hash") for loc in ("T9", "NAS")}
+        assert hashes == {"T9": "match", "NAS": "match"}
+        assert recorded_hash(written) != ""
+
+
+class TestRecordedHashesDisagree:
+    def test_card_settles_it_and_nothing_is_recorded(self, card, tmp_path):
+        """Two copies recording different hashes for one file: the card is hashed to
+        settle which is right, the copy whose record is wrong is not overwritten, and
+        no new hash is recorded."""
+        from lib.data_portion import data_bytes
+        t9, ssd = tmp_path / "T9", tmp_path / "SSD"
+        size = data_bytes(card / "DCIM" / CLIP)
+        good = copy_to(card / "DCIM" / CLIP, t9 / CLIP)
+        stale = copy_to(card / "DCIM" / CLIP, ssd / CLIP)
+        write_tags(good, f"-XMP-jetlag:ContentSHA256={'a' * 64}", f"-XMP-jetlag:ContentBytes={size}")
+        write_tags(stale, f"-XMP-jetlag:ContentSHA256={'b' * 64}", f"-XMP-jetlag:ContentBytes={size}")
+
+        report = run_verify(card, {"T9": str(t9), "SSD": str(ssd)}, "--verify-hashes")
+
+        assert report["files"][f"DCIM/{CLIP}"]["recorded_hashes_disagree"] is True
+        hashes = {loc: report["results"][(f"DCIM/{CLIP}", loc)]["hash"] for loc in ("T9", "SSD")}
+        assert hashes == {"T9": "match", "SSD": "match"}
+        assert (recorded_hash(good), recorded_hash(stale)) == ("a" * 64, "b" * 64)
+        assert report["summary"]["hash_cache_written"] == 0

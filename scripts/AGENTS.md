@@ -60,7 +60,8 @@ recovery record written with a correction), `exiftool.py` (the one metadata
 client), `countries.py` (country → timezone), `command_line.py` (timezone flags and
 their resolution, interrupt handling), `profiles.py`, `filesystem.py`, `footage.py`, `data_portion.py` (the data portion
 verify-card compares, per format: QuickTime footage, HEIF/AVIF image items, JPEG from
-start-of-scan, TIFF raw strips, RAF raw block).
+start-of-scan, TIFF raw strips, RAF raw block), `volumes.py` (whether a folder is
+on a local disk or across a network, from the mount table).
 `cli/results.py` prints a single-file command's result as `@@key=value` lines.
 
 A `cli/` module holds argument parsing, validation messages and output; anything

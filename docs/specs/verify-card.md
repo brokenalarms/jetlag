@@ -119,8 +119,9 @@ stored: the same root can be a USB drive one day and an SMB mount the next.
   never changes the default verdict.
 
 Each location on the Verify screen carries a small "Local" or "Network" label (a
-`host:/path` root is "Network"), so it is clear which locations each deep-check
-checkbox covers. The label is information only: no location gets a warning or note
+`host:/path` root is "Network"; `verify_location` carries it as `network`), so it is
+clear which locations each deep-check checkbox covers. `scripts/lib/volumes.py` makes
+the call from the mount table (`mount` on macOS, `/proc/self/mounts` on Linux). The label is information only: no location gets a warning or note
 of its own.
 
 ## The check
@@ -202,7 +203,10 @@ refuses. The pipeline's `--source-action delete` verifies the same way against i
 
 ## Deep check
 
-Two checkboxes on the Verify screen, both off by default:
+Two checkboxes on the Verify screen, both off by default (`verify-card --verify-hashes`
+and `--include-network`; each result then carries `hash`: `match`, `mismatch` or
+`not_hashable`, and a mismatch makes the verdict `hash_mismatch`, so the file is not
+cleared for deletion):
 
 - ☐ **Verify hashes** — every matched copy on a "Local" location has its content
   hashed and compared with the card file's.
@@ -225,7 +229,8 @@ For each card file the reference is, in order:
    so a read-only card works.
 
 Two copies recording different hashes for one card file are listed as "Recorded
-hashes disagree", and the card is hashed to settle which is right.
+hashes disagree" (`recorded_hashes_disagree` on its `verify_file`), and the card is
+hashed to settle which is right.
 
 ### Hashing a copy
 
@@ -256,8 +261,10 @@ against a local disk's GB/s).
 - A copy that mismatches, or whose card file had disagreeing recorded hashes, is not
   written.
 - The write is metadata only and leaves the content, and so the hash, unchanged (the
-  phase 2 regression test). It does change the file's size and mtime, so a sync tool
-  mirroring that location copies the file again on its next run.
+  phase 2 regression test). It keeps the file's mtime but changes its size, so a sync
+  tool mirroring that location copies the file again on its next run.
+- Writes happen after every copy has been hashed: a remote copy's ranges are read
+  from its local twin, whose layout the write changes.
 - The card is never written.
 
 ### What is hashed

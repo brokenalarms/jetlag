@@ -16,6 +16,12 @@ events:
       remote:
         type: boolean
         description: "A host:/path root, listed by its host over ssh and never read"
+      network:
+        type: boolean
+        description: >-
+          Reading it crosses a network: a host:/path root, a share mounted from another
+          machine, or a mount that cannot say where its data lives. Shown as the
+          location's Local or Network label; decides which hash checkbox covers it
       reachable: { type: boolean }
       files:
         type: integer
@@ -26,6 +32,7 @@ events:
       location: T9
       root: /Volumes/T9/Videos/Source Video
       remote: false
+      network: false
       reachable: true
       files: 5120
 
@@ -41,6 +48,12 @@ events:
         type: integer
         optional: true
         description: "Size of its data portion; absent for companions and formats with no reader"
+      recorded_hashes_disagree:
+        type: boolean
+        optional: true
+        description: >-
+          With --verify-hashes: two of its copies recorded different hashes, so the card
+          was hashed to settle which is right and no hash was recorded for it this run
     example:
       event: verify_file
       file: DCIM/Camera01/VID_20250619_042028_00_004.insv
@@ -55,7 +68,8 @@ events:
       location: { type: string }
       verdict:
         type: string
-        enum: [matched, missing, duplicate, data_differs, size_differs, unverifiable, unreachable]
+        enum: [matched, missing, duplicate, data_differs, size_differs, unverifiable, unreachable,
+               hash_mismatch]
         description: >-
           matched: one copy, equal in total size or data portion. missing: no copy.
           duplicate: more than one copy, for the user to resolve. data_differs: the
@@ -63,7 +77,8 @@ events:
           size_differs: a companion whose copy differs in size. unverifiable: a copy
           whose size differs and whose data portion cannot be compared without reading
           it over the network, or whose format has no reader. unreachable: the
-          location could not be listed.
+          location could not be listed. hash_mismatch: with --verify-hashes, a copy
+          matched on size whose data hashes differently from the card file's.
       basis:
         type: string
         enum: [size, data]
@@ -72,6 +87,14 @@ events:
       copies:
         type: "list[string]"
         description: "The copies found, relative to the location's root"
+      hash:
+        type: string
+        enum: [match, mismatch, not_hashable]
+        optional: true
+        description: >-
+          With --verify-hashes, for a matched media copy on a location in scope (local,
+          or network with --include-network). not_hashable: the format has no data
+          portion reader, so the default verdict stands
     example:
       event: verify_result
       file: DCIM/Camera01/VID_20250619_042028_00_004.insv
@@ -90,6 +113,14 @@ events:
       not_checked_kinds:
         type: "list[string]"
         description: "Extensions and ignored folders (MISC/) of the files not checked"
+      hashes_checked:
+        type: integer
+        optional: true
+        description: "With --verify-hashes: copies hashed"
+      hash_cache_written:
+        type: integer
+        optional: true
+        description: "With --verify-hashes: local copies the matching hash was recorded in"
     example:
       event: verify_summary
       checked: 203
