@@ -3,7 +3,7 @@
 jetlag's writes, and other tools', rewrite metadata and can move it around the file,
 so a copy jetlag has written rarely matches its card file in total size. The data
 portion is what stays the same, and is what verify-card compares and hashes. See
-docs/specs/verify-card.md, "What is hashed".
+docs/specs/completed/verify-card.md, "What is hashed".
 
 - QuickTime family (video): each `mdat` payload plus any trailer, from lib.footage.
 - HEIF and AVIF stills: the extents of every image item in the file's item table

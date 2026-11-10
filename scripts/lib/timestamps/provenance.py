@@ -1,7 +1,7 @@
 """The provenance record: what a file held before jetlag first wrote to it.
 
 Written in the same exiftool call as the timestamp correction (see
-docs/specs/verify-card.md, "Provenance"), and read back by verification.
+docs/specs/completed/verify-card.md, "Provenance"), and read back by verification.
 """
 
 from __future__ import annotations

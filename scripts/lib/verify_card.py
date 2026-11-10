@@ -6,7 +6,7 @@ reached over ssh. A card file's copy is looked for anywhere under the root, by i
 name or by the card name recorded in the copy's provenance
 (XMP-xmpMM:PreservedFileName), since an import can rename a file. A copy passes when
 its total size equals the card file's (an untouched copy) or its data portion does (a
-copy jetlag has written); nothing is passed on a guess. See docs/specs/verify-card.md.
+copy jetlag has written); nothing is passed on a guess. See docs/specs/completed/verify-card.md.
 
 The check is read-only. A local location is walked; a remote one is listed by its host
 with `rsync --list-only --recursive` and never read over the network: a remote copy is
