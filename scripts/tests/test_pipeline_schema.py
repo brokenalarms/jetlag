@@ -18,9 +18,7 @@ import pytest
 
 from conftest import create_test_video
 from pipeline_schema import enum_tokens, load_schema, validate_event, validate_events
-# The pipeline harness and its profile isolation live with the pipeline tests;
-# re-exporting the fixtures here is what makes them resolvable in this module.
-from test_media_pipeline import run_pipeline, temp_workspace, test_profile  # noqa: F401
+from pipeline_helpers import run_pipeline
 
 
 def _events(stdout: str) -> list[dict]:

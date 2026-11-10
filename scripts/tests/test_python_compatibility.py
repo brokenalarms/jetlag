@@ -21,7 +21,7 @@ MIN_VERSION = (3, 9)
 
 SOURCES = sorted(
     list(SCRIPT_DIR.glob("*.py"))
-    + list((SCRIPT_DIR / "lib").glob("*.py"))
+    + list((SCRIPT_DIR / "lib").rglob("*.py"))
     + list((SCRIPT_DIR / "tests").glob("*.py"))
 )
 

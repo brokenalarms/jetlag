@@ -11,7 +11,13 @@ Call functions directly and assert on returned data, not output strings.
 
 - `test_fix_media_timestamp_units.py` — timezone parsing and normalisation, birth-time operations, change detection, the priority order for picking the best timestamp
 - `test_tag_media_units.py` — reading and adding Finder tags and EXIF camera fields, only adding what is missing, dry run vs apply
+- `test_fix_timestamp_plan.py` — `plan_correction` and `apply_correction`: source ranking, declared-zone relabelling, the `--force-timezone` gate, `--time-offset` and the one-write rule
+- `test_pipeline_stages.py`, `test_pipeline_preflight.py`, `test_pipeline_consent.py` — which stages a run's options route a file through, the stage loop's completion and failure exit, the timezone pre-flight decision, and the consent prompts (each file also holds the end-to-end tests of its area)
 - `test_filesystem.py`, `test_timestamp_source.py`, `test_footage.py` — `lib/` modules
+
+Unit tests that would otherwise call exiftool take the `fake_metadata` fixture
+(`conftest.py`): reads return the tags a test gives each path and writes are
+recorded, with no exiftool process behind them.
 
 ### Scenario tests
 Real timezone combinations users hit.
@@ -21,7 +27,8 @@ Real timezone combinations users hit.
 ### Integration and regression tests
 Run a script end to end against temporary media and compare file state before and after.
 
-- `test_media_pipeline.py`, `test_timestamp_regression.py`, `test_fix_media_timestamp.py`, `test_tag_media.py`, `test_organize_by_date.py`, `test_ingest_media.py`, `test_archive_source.py`, `test_generate_gyroflow.py`, `test_probe_camera.py`, `test_scan_source.py`, `test_report_file_dates.py`, `test_pipeline_cancel.py`, `test_insta360_camera.py`
+- media-pipeline, split by area: `test_pipeline_cli.py` (arguments, modes, summary, JSONL events), `test_pipeline_discovery.py`, `test_pipeline_timezones.py`, `test_pipeline_organize.py`, `test_pipeline_companions.py`, `test_pipeline_archive.py`, `test_pipeline_working_dir.py`, `test_pipeline_cancel.py`; `pipeline_helpers.py` runs the pipeline as the app does, and the `temp_workspace` / `test_profile` fixtures are in `conftest.py`
+- `test_timestamp_regression.py`, `test_fix_media_timestamp.py`, `test_tag_media.py`, `test_organize_by_date.py`, `test_ingest_media.py`, `test_archive_source.py`, `test_generate_gyroflow.py`, `test_probe_camera.py`, `test_scan_source.py`, `test_report_file_dates.py`, `test_insta360_camera.py`
 
 ### Contract tests
 Hold an interface or a cost fixed.

@@ -18,9 +18,12 @@ import tempfile
 from pathlib import Path
 
 import pytest
+import yaml
 
 import lib.exiftool as _exiftool_module
 from lib.exiftool import exiftool
+
+SCRIPT_DIR = Path(__file__).parent.parent
 
 _template_video: Path | None = None
 
@@ -138,6 +141,84 @@ def metadata_client():
     via the context-manager protocol, even if the test body raises."""
     with contextlib.ExitStack() as stack:
         yield stack.enter_context
+
+
+@pytest.fixture
+def temp_workspace():
+    """Create a temporary workspace with source and target directories."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        workspace = Path(tmpdir)
+        source = workspace / "source"
+        target = workspace / "target"
+        source.mkdir()
+        target.mkdir()
+        yield {"root": workspace, "source": source, "target": target}
+
+
+@pytest.fixture
+def test_profile(temp_workspace, monkeypatch):
+    """Create a test profile in an isolated copy of media-profiles.yaml.
+
+    The copy plus the JETLAG_PROFILES_FILE override keeps every test (and its
+    spawned scripts) off the shared repo file, which is what allows the suite
+    to run in parallel workers. Tests that need to tweak the profile edit the
+    copy via os.environ["JETLAG_PROFILES_FILE"].
+    """
+    profiles_path = temp_workspace["root"] / "media-profiles.yaml"
+
+    with open(SCRIPT_DIR / "media-profiles.yaml") as f:
+        profiles = yaml.safe_load(f)
+
+    profiles["profiles"]["_test"] = {
+        "source_dir": str(temp_workspace["source"]),
+        "ready_dir": str(temp_workspace["target"]),
+        "file_extensions": [".mp4"],
+        "tags": ["test-camera"],
+        "exif": {"make": "Test", "model": "Camera"},
+        "companion_extensions": [".thm", ".lrv"],
+    }
+
+    with open(profiles_path, "w") as f:
+        yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
+
+    monkeypatch.setenv("JETLAG_PROFILES_FILE", str(profiles_path))
+    yield "_test"
+
+
+class FakeMetadata:
+    """Stands in for exiftool behind the shared metadata client.
+
+    files maps a path to the tags a read returns for it, keyed as exiftool's
+    short output names them (DateTimeOriginal, MediaCreateDate, …); a file it
+    does not know reads as having no tags. Every write is recorded in writes as
+    (path, tag_args) and reported as made.
+    """
+
+    def __init__(self):
+        self.files: dict[str, dict[str, str]] = {}
+        self.writes: list[tuple[str, list[str]]] = []
+
+    def read_tags(self, file_path, tags, extra_args=None):
+        return dict(self.files.get(str(file_path), {}))
+
+    def write_tags(self, file_path, tag_args):
+        self.writes.append((str(file_path), list(tag_args)))
+        exiftool.cache.pop(str(file_path), None)
+        return True
+
+    def execute(self, *args):
+        raise AssertionError(f"exiftool run with a fake metadata client: {args}")
+
+
+@pytest.fixture
+def fake_metadata(monkeypatch):
+    """Route the metadata client's reads and writes to a FakeMetadata, so a test
+    runs the real lib code with no exiftool process behind it."""
+    fake = FakeMetadata()
+    monkeypatch.setattr(exiftool, "read_tags", fake.read_tags)
+    monkeypatch.setattr(exiftool, "write_tags", fake.write_tags)
+    monkeypatch.setattr(exiftool, "execute", fake.execute)
+    return fake
 
 
 def _leaked_metadata_pids():

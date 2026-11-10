@@ -34,19 +34,16 @@ from lib.timestamp_source import (
     resolve_timezone_offset,
 )
 
-if sys.platform == "darwin":
-    from lib.file_timestamps import (
-        get_file_system_timestamps,
-        check_file_system_timestamps_need_update,
-        get_expected_file_system_time,
-    )
-else:
-    def get_file_system_timestamps(file_path: str) -> Dict[str, str]:
-        return {"birth": "", "modify": ""}
-    def check_file_system_timestamps_need_update(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False) -> bool:
-        return False
-    def get_expected_file_system_time(datetime_original: datetime, preserve_wallclock: bool = False) -> str:
-        return ""
+from lib.file_timestamps import (
+    birth_time_needs_update,
+    check_file_system_timestamps_need_update,
+    get_expected_file_system_time,
+    get_file_system_timestamps,
+)
+
+# Birth time is read, compared and written only on macOS, where it is what Final Cut
+# Pro shows before import; elsewhere a correction leaves file times alone.
+BIRTH_TIME_TRACKED = sys.platform == "darwin"
 
 
 @dataclass
@@ -259,7 +256,7 @@ def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, 
     data: Dict[str, Any] = {
         "file_path": file_path,
         "exif": read_exif_data(file_path),
-        "file_system": get_file_system_timestamps(file_path) if sys.platform == "darwin" else {"birth": "", "modify": ""},
+        "file_system": get_file_system_timestamps(file_path) if BIRTH_TIME_TRACKED else {"birth": "", "modify": ""},
         "datetime_original_str": "",
         "datetime_original": None,
         "timestamp_source": TimestampSource.NONE,
@@ -338,10 +335,28 @@ def get_all_timestamp_data(file_path: str, timezone_spec: Optional[str] = None, 
 
     return data
 
+def needed_changes(exif: Dict[str, str], datetime_original: datetime, birth_time_stale: bool,
+                   write_datetime_original: bool = False, write_zone: bool = False) -> dict:
+    """What a correction to datetime_original must change, from the fields already read.
+
+    Returns the correction's target value per clock field, the write tags whose
+    stored value does not already match, those of them the file holds no value
+    for, and whether the birth time is stale.
+    """
+    targets = clock_field_targets(exif, datetime_original, write_datetime_original, write_zone)
+    stale = stale_clock_fields(exif, targets)
+    return {
+        "clock_targets": targets,
+        "stale_clock_fields": stale,
+        "missing_clock_fields": missing_clock_fields(exif, stale),
+        "file_timestamps": birth_time_stale,
+    }
+
+
 def determine_needed_changes(file_path: str, datetime_original: datetime, preserve_wallclock: bool = False,
                              write_datetime_original: bool = False,
                              write_zone: bool = False) -> dict:
-    """Determine what changes are needed
+    """needed_changes() for a file, reading its fields and birth time.
 
     Args:
         file_path: Path to the media file
@@ -349,24 +364,14 @@ def determine_needed_changes(file_path: str, datetime_original: datetime, preser
         preserve_wallclock: If True, preserve wall-clock shooting time for birth time
         write_datetime_original: If True, DateTimeOriginal is a field this correction owns
         write_zone: If True, OffsetTimeOriginal is owned even where DateTimeOriginal is not
-
-    Returns:
-        Dict with the correction's target value per clock field, the write tags
-        whose stored value does not already match, and the file system flag.
     """
     exif = read_exif_data(file_path)
-    targets = clock_field_targets(exif, datetime_original, write_datetime_original, write_zone)
-    stale = stale_clock_fields(exif, targets)
-
-    return {
-        "clock_targets": targets,
-        "stale_clock_fields": stale,
-        "missing_clock_fields": missing_clock_fields(exif, stale),
-        "file_timestamps": (
-            check_file_system_timestamps_need_update(file_path, datetime_original, preserve_wallclock)
-            if sys.platform == "darwin" else False
-        ),
-    }
+    birth_time_stale = (
+        check_file_system_timestamps_need_update(file_path, datetime_original, preserve_wallclock)
+        if BIRTH_TIME_TRACKED else False
+    )
+    return needed_changes(exif, datetime_original, birth_time_stale,
+                          write_datetime_original, write_zone)
 
 
 def _machine_original_time(current_data: dict) -> str:
@@ -610,8 +615,337 @@ def format_offset_display(seconds: int) -> str:
     return f"{sign}{days}d {hours}h {minutes}m {secs}s"
 
 
-def fix_media_timestamps(file_path: str, apply: bool = True, timezone_spec: Optional[str] = None, infer_from_filename: bool = False, preserve_wallclock: bool = False, time_offset_seconds: Optional[int] = None, force_timezone: bool = False, extra_write_fields: Optional[Dict[str, str]] = None) -> TimestampFixResult:
-    """Fix media (photo/video) timestamps.
+# ---------------------------------------------------------------------------
+# A correction: read the file, plan the change, describe it, apply it
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class CorrectionOptions:
+    """How a correction was asked for.
+
+    extra_write_fields are other steps' field writes, sent in this correction's
+    exiftool call so the file is rewritten once. They are written even when the
+    timestamps need no change.
+    """
+    apply: bool = True
+    timezone_spec: Optional[str] = None
+    infer_from_filename: bool = False
+    preserve_wallclock: bool = False
+    time_offset_seconds: Optional[int] = None
+    force_timezone: bool = False
+    extra_write_fields: Dict[str, str] = dataclass_field(default_factory=dict)
+
+    @property
+    def moves_time(self) -> bool:
+        """Whether --time-offset moves the actual time, rather than only relabelling it."""
+        return self.time_offset_seconds is not None and self.time_offset_seconds != 0
+
+
+@dataclass(frozen=True)
+class CurrentTimestamps:
+    """What a file holds now, as far as a correction is concerned.
+
+    data is get_all_timestamp_data()'s reading: the fields, the winning source and
+    the time it gives. detected_tz is the zone the file's metadata carries.
+    """
+    file_path: str
+    data: Dict[str, Any]
+    detected_tz: Optional[str] = None
+    birth_time_tracked: bool = BIRTH_TIME_TRACKED
+
+
+def read_current(file_path: str, opts: CorrectionOptions) -> CurrentTimestamps:
+    """Read everything plan_correction() needs from the file (one metadata read)."""
+    detected_tz = extract_metadata_timezone(file_path) or None
+    data = get_all_timestamp_data(file_path, opts.timezone_spec, opts.infer_from_filename)
+    return CurrentTimestamps(file_path=file_path, data=data, detected_tz=detected_tz)
+
+
+# Why a correction cannot be made at all.
+REFUSED_WITHOUT_FORCE = "refused_without_force"  # applying would relabel a zoned file unconfirmed
+ZONE_NEEDED = "zone_needed"                      # a CreateDate, no DateTimeOriginal, no --timezone
+NO_TIMESTAMP = "no_timestamp"                    # nothing to correct from
+
+
+@dataclass(frozen=True)
+class CorrectionPlan:
+    """Everything a correction will say and write, worked out before either happens.
+
+    problem names why there is nothing to correct (None when there is). original
+    is the time the winning source gives; corrected is it after --time-offset.
+    """
+    current: CurrentTimestamps
+    opts: CorrectionOptions
+    requires_force_timezone: bool = False
+    problem: Optional[str] = None
+    original: Optional[datetime] = None
+    corrected: Optional[datetime] = None
+    corrected_str: str = ""
+    write_datetime_original: bool = False
+    changes: Dict[str, Any] = dataclass_field(default_factory=dict)
+    birth_time: Optional[Dict[str, Any]] = None
+    provenance_args: list = dataclass_field(default_factory=list)
+    correction_args: list = dataclass_field(default_factory=list)
+    extra_args: list = dataclass_field(default_factory=list)
+    file_time_args: list = dataclass_field(default_factory=list)
+
+    @property
+    def filename(self) -> str:
+        return os.path.basename(self.current.file_path)
+
+    @property
+    def has_changes(self) -> bool:
+        return bool(self.changes.get("stale_clock_fields")) or bool(self.changes.get("file_timestamps"))
+
+    @property
+    def correction_mode(self) -> str:
+        return "time" if self.opts.moves_time else "timezone"
+
+    @property
+    def only_adds_fields(self) -> bool:
+        """Writing only into fields the file left empty fills in what it never had;
+        any stored value or file time that disagrees, or a moved time, is a fix."""
+        return (
+            self.correction_mode == "timezone"
+            and not self.changes["file_timestamps"]
+            and len(self.changes["missing_clock_fields"]) == len(self.changes["stale_clock_fields"])
+        )
+
+    @property
+    def writes(self) -> bool:
+        """Whether applying this plan sends a write to exiftool's process."""
+        return (self.problem is None and self.opts.apply
+                and (self.has_changes or bool(self.opts.extra_write_fields)))
+
+    def result(self, action: str, error: Optional[str] = None) -> TimestampFixResult:
+        """The machine-readable result of this plan ending in action."""
+        data = self.current.data
+        offset = self.opts.time_offset_seconds if self.opts.moves_time else None
+        return TimestampFixResult(
+            file=self.filename,
+            timestamp_action=action,
+            original_time=_machine_original_time(data),
+            corrected_time=self.corrected_str,
+            stale_fields=self.changes["stale_clock_fields"],
+            stale_file_times=["FileCreateDate"] if self.changes["file_timestamps"] else [],
+            timestamp_source=data["timestamp_source"].token,
+            correction_mode=self.correction_mode,
+            timezone=self.current.detected_tz,
+            time_offset_seconds=offset,
+            time_offset_display=format_offset_display(offset) if offset is not None else None,
+            original_epoch=self.original.timestamp() if self.original else None,
+            corrected_epoch=self.corrected.timestamp() if self.corrected else None,
+            requires_force_timezone=self.requires_force_timezone or None,
+            camera_zone_offset=data.get("camera_zone_offset"),
+            error=error,
+        )
+
+
+def plan_correction(current: CurrentTimestamps, opts: CorrectionOptions) -> CorrectionPlan:
+    """Work out what correcting a file means, from what it holds now. Pure."""
+    data = current.data
+    exif = data["exif"]
+
+    # --force-timezone is a confirmation gate, not arithmetic: relabelling a file whose
+    # winning source already carries a zone must be explicitly confirmed. The corrected
+    # value is the same instant either way — get_all_timestamp_data() already expressed
+    # it in the declared zone. A dry run always previews the relabel; applying is what
+    # the flag confirms.
+    requires_force_timezone = False
+    if opts.timezone_spec and not opts.infer_from_filename:
+        source = data["timestamp_source"]
+        declared_offset = data.get("timezone_offset")
+        if (source.zoned and current.detected_tz and declared_offset
+                and normalize_timezone_format(current.detected_tz) != normalize_timezone_format(declared_offset)):
+            requires_force_timezone = not opts.force_timezone
+    if requires_force_timezone and opts.apply:
+        return CorrectionPlan(current, opts, requires_force_timezone=True,
+                              problem=REFUSED_WITHOUT_FORCE)
+
+    if not data["datetime_original"]:
+        zone_needed = exif.get("CreateDate", "") and not opts.timezone_spec
+        return CorrectionPlan(current, opts, requires_force_timezone=requires_force_timezone,
+                              problem=ZONE_NEEDED if zone_needed else NO_TIMESTAMP)
+
+    original = data["datetime_original"]
+    corrected, corrected_str = original, data["datetime_original_str"]
+    if opts.moves_time:
+        corrected = original + timedelta(seconds=opts.time_offset_seconds or 0)
+        corrected_str = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', corrected.strftime('%Y:%m:%d %H:%M:%S%z'))
+
+    # DateTimeOriginal is a field this correction owns when:
+    # 1. It's missing and we have timezone info, OR
+    # 2. infer_from_filename is set (filename is the source of truth, DTO may be wrong/missing)
+    # 3. force_timezone is set (the confirmed relabel must reach the stored tag)
+    write_datetime_original = bool(
+        (not exif.get("DateTimeOriginal") and corrected_str) or
+        (opts.infer_from_filename and corrected_str) or
+        (opts.force_timezone and corrected_str)
+    )
+
+    # A still's bare DateTimeOriginal labelled by --timezone keeps its digits but
+    # needs the declared zone stored beside it; a video carries its zone elsewhere.
+    write_zone = bool(
+        exif.get("DateTimeOriginal")
+        and not is_quicktime_container(exif)
+        and not stored_zone(exif)
+        and data.get("timezone_source", "").startswith("--timezone flag")
+    )
+
+    current_birth = data["file_system"].get("birth", "")
+    birth_time_stale = current.birth_time_tracked and birth_time_needs_update(
+        current_birth, corrected, opts.preserve_wallclock)
+    changes = needed_changes(exif, corrected, birth_time_stale, write_datetime_original, write_zone)
+
+    expected_birth = get_expected_file_system_time(corrected, preserve_wallclock=opts.preserve_wallclock)
+    birth_time: Optional[Dict[str, Any]] = None
+    if changes["file_timestamps"]:
+        birth_time = {"expected_time": expected_birth, "current_birth": current_birth,
+                      "birth_delta_seconds": None}
+        try:
+            expected_dt = datetime.strptime(expected_birth, '%Y:%m:%d %H:%M:%S')
+            if current_birth:
+                birth = datetime.strptime(current_birth, '%Y:%m:%d %H:%M:%S')
+                birth_time["birth_delta_seconds"] = (expected_dt - birth).total_seconds()
+        except ValueError:
+            pass
+
+    # Capture what the file held before jetlag touches it, in the same write as the
+    # correction.
+    provenance_args = provenance_field_args(current.file_path, exif)
+    # A correction owns the whole clock-field table, so one stale field rewrites
+    # them all: a subset write is what let a stale movie header outlive a run that
+    # found the track atoms correct.
+    correction_args = [
+        f"-{tag}={value}" for tag, value in changes["clock_targets"].items()
+    ] if changes["stale_clock_fields"] else []
+    extra_args = [f"-{tag}={value}" for tag, value in opts.extra_write_fields.items()]
+    # Rewriting the file for any field resets its birth time, so the birth time rides
+    # in the same exiftool call, which applies file system tags after the rewrite —
+    # whether or not the correction found it stale.
+    file_time_args = [f"-FileCreateDate={expected_birth}"] if current.birth_time_tracked and (
+        changes["file_timestamps"] or provenance_args or correction_args or extra_args) else []
+
+    return CorrectionPlan(
+        current, opts,
+        requires_force_timezone=requires_force_timezone,
+        original=original,
+        corrected=corrected,
+        corrected_str=corrected_str,
+        write_datetime_original=write_datetime_original,
+        changes=changes,
+        birth_time=birth_time,
+        provenance_args=provenance_args,
+        correction_args=correction_args,
+        extra_args=extra_args,
+        file_time_args=file_time_args,
+    )
+
+
+def describe_correction(plan: CorrectionPlan) -> str:
+    """The correction as the user reads it on stderr."""
+    data = plan.current.data
+    lines = [f"\033[36m🔍 {plan.filename}\033[0m"]
+
+    if plan.requires_force_timezone:
+        lines.append(f"⚠️  File already carries timezone {plan.current.detected_tz}; "
+                     f"declared {data.get('timezone_offset')} relabels it")
+        if plan.problem == REFUSED_WITHOUT_FORCE:
+            lines.append("❌ Refusing to apply without --force-timezone.")
+            return "\n".join(lines)
+        lines.append("   Applying requires --force-timezone.")
+
+    if plan.problem == ZONE_NEEDED:
+        lines += [
+            "❌ File has CreateDate but no DateTimeOriginal",
+            f"   CreateDate: {data['exif'].get('CreateDate', '')}",
+            "   Use --timezone to specify timezone (e.g., --timezone +09:00)",
+        ]
+        return "\n".join(lines)
+    if plan.problem == NO_TIMESTAMP:
+        lines.append("❌ No valid DateTimeOriginal found")
+        return "\n".join(lines)
+
+    corrected = plan.corrected
+    assert corrected is not None
+    lines.append(f"📅 Original : {format_original_timestamps(data)}")
+    lines.append(f"⏱️ Corrected: {format_corrected_timestamp(corrected, data['timestamp_source'], data.get('timezone_source', ''))}")
+    lines.append(f"🌐 UTC      : {corrected.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+
+    change_desc = format_change_description(plan.changes, plan.birth_time, data,
+                                            plan.opts.preserve_wallclock, corrected)
+    dry_run = " (DRY RUN)" if not plan.opts.apply and plan.has_changes else ""
+    lines.append(f"📊 Change   : {change_desc}{dry_run}")
+
+    if plan.writes and plan.write_datetime_original and data["exif"].get("DateTimeOriginal"):
+        if plan.opts.infer_from_filename:
+            lines.append("   ⚠️  Overwriting existing DateTimeOriginal (--infer-from-filename flag)")
+        elif plan.opts.force_timezone:
+            lines.append("   ⚠️  Overwriting existing DateTimeOriginal timezone (--force-timezone flag)")
+    return "\n".join(lines)
+
+
+def apply_correction(plan: CorrectionPlan) -> TimestampFixResult:
+    """Carry the plan out — at most one exiftool write — and report the result."""
+    data = plan.current.data
+    if plan.problem == REFUSED_WITHOUT_FORCE:
+        return TimestampFixResult(
+            file=plan.filename,
+            timestamp_action="error",
+            original_time=_machine_original_time(data),
+            timezone=plan.current.detected_tz,
+            requires_force_timezone=True,
+        )
+    if plan.problem == ZONE_NEEDED:
+        return TimestampFixResult(
+            file=plan.filename,
+            timestamp_action="error",
+            original_time=data["exif"].get("CreateDate", ""),
+            timezone=plan.current.detected_tz,
+        )
+    if plan.problem == NO_TIMESTAMP:
+        return TimestampFixResult(file=plan.filename, timestamp_action="error",
+                                  timezone=plan.current.detected_tz)
+
+    if not plan.opts.apply:
+        if plan.has_changes:
+            return plan.result("would_add" if plan.only_adds_fields else "would_fix")
+        return plan.result("no_change")
+    if not plan.writes:
+        return plan.result("no_change")
+
+    write_args = plan.provenance_args + plan.correction_args + plan.extra_args + plan.file_time_args
+    succeeded = True
+    write_error = None
+    if write_args:
+        try:
+            written = exiftool.write_tags(plan.current.file_path, write_args)
+        except MetadataWriteRefused as refusal:
+            written, write_error = False, str(refusal)
+            print(f"   ❌ exiftool could not write this file: {write_error}", file=sys.stderr)
+        if not written:
+            if plan.provenance_args:
+                print("   ⚠️  Failed to record original timestamps for recovery", file=sys.stderr)
+            if plan.correction_args:
+                print(f"   ❌ Failed to write clock fields: {', '.join(plan.changes['clock_targets'])}", file=sys.stderr)
+            if plan.extra_args:
+                print(f"   ❌ Failed to write {', '.join(plan.opts.extra_write_fields)}", file=sys.stderr)
+            if plan.file_time_args:
+                print("   ❌ Failed to apply file timestamps", file=sys.stderr)
+            succeeded = not (plan.correction_args or plan.extra_args or plan.file_time_args)
+
+    if not succeeded:
+        return plan.result("error", error=write_error)
+    if not plan.has_changes:
+        return plan.result("no_change")
+    return plan.result("added" if plan.only_adds_fields else "fixed")
+
+
+def fix_media_timestamps(file_path: str, apply: bool = True, timezone_spec: Optional[str] = None,
+                         infer_from_filename: bool = False, preserve_wallclock: bool = False,
+                         time_offset_seconds: Optional[int] = None, force_timezone: bool = False,
+                         extra_write_fields: Optional[Dict[str, str]] = None) -> TimestampFixResult:
+    """Fix media (photo/video) timestamps: read, plan, describe on stderr, apply.
 
     extra_write_fields are other steps' field writes, sent in this step's exiftool
     call so the file is rewritten once. They are written even when the timestamps
@@ -621,227 +955,15 @@ def fix_media_timestamps(file_path: str, apply: bool = True, timezone_spec: Opti
         TimestampFixResult with all machine-readable fields populated.
         The caller (main) serialises this to @@key=value via emit_result().
     """
-
-    filename = os.path.basename(file_path)
-
-    detected_tz = extract_metadata_timezone(file_path) or None
-
-    # Get all data
-    current_data = get_all_timestamp_data(file_path, timezone_spec, infer_from_filename)
-
-    # Display header
-    print(f"\033[36m🔍 {filename}\033[0m", file=sys.stderr)
-
-    # --force-timezone is a confirmation gate, not arithmetic: relabelling a file whose
-    # winning source already carries a zone must be explicitly confirmed. The corrected
-    # value is the same instant either way — get_all_timestamp_data() already expressed
-    # it in the declared zone. A dry run always previews the relabel; applying is what
-    # the flag confirms.
-    requires_force_timezone = False
-    if timezone_spec and not infer_from_filename:
-        source = current_data["timestamp_source"]
-        declared_offset = current_data.get("timezone_offset")
-        if (source.zoned and detected_tz and declared_offset
-                and normalize_timezone_format(detected_tz) != normalize_timezone_format(declared_offset)):
-            requires_force_timezone = not force_timezone
-            if requires_force_timezone:
-                print(f"⚠️  File already carries timezone {detected_tz}; declared {declared_offset} relabels it", file=sys.stderr)
-                if not apply:
-                    print("   Applying requires --force-timezone.", file=sys.stderr)
-                else:
-                    print("❌ Refusing to apply without --force-timezone.", file=sys.stderr)
-                    return TimestampFixResult(
-                        file=filename,
-                        timestamp_action="error",
-                        original_time=_machine_original_time(current_data),
-                        timezone=detected_tz,
-                        requires_force_timezone=True,
-                    )
-
-    if not current_data["datetime_original"]:
-        # Check if we have CreateDate but missing timezone
-        create_date = current_data["exif"].get("CreateDate", "")
-        if create_date and not timezone_spec:
-            print("❌ File has CreateDate but no DateTimeOriginal", file=sys.stderr)
-            print(f"   CreateDate: {create_date}", file=sys.stderr)
-            print("   Use --timezone to specify timezone (e.g., --timezone +09:00)", file=sys.stderr)
-            return TimestampFixResult(
-                file=filename,
-                timestamp_action="error",
-                original_time=create_date,
-                timezone=detected_tz,
-            )
-        print("❌ No valid DateTimeOriginal found", file=sys.stderr)
-        return TimestampFixResult(
-            file=filename,
-            timestamp_action="error",
-            timezone=detected_tz,
-        )
-
-    datetime_original = current_data["datetime_original"]
-    datetime_original_str = current_data["datetime_original_str"]
-    datetime_before_offset = datetime_original
-
-    # Apply time offset if specified
-    if time_offset_seconds is not None and time_offset_seconds != 0:
-        datetime_original = datetime_original + timedelta(seconds=time_offset_seconds)
-        datetime_original_str = datetime_original.strftime('%Y:%m:%d %H:%M:%S%z')
-        datetime_original_str = re.sub(r'([+-]\d{2})(\d{2})$', r'\1:\2', datetime_original_str)
-        current_data["datetime_original"] = datetime_original
-        current_data["datetime_original_str"] = datetime_original_str
-
-    # DateTimeOriginal is a field this correction owns when:
-    # 1. It's missing and we have timezone info, OR
-    # 2. infer_from_filename is set (filename is the source of truth, DTO may be wrong/missing)
-    # 3. force_timezone is set (the confirmed relabel must reach the stored tag)
-    should_write_datetime_original = bool(
-        (not current_data["exif"].get("DateTimeOriginal") and current_data["datetime_original_str"]) or
-        (infer_from_filename and current_data["datetime_original_str"]) or
-        (force_timezone and current_data["datetime_original_str"])
-    )
-
-    # A still's bare DateTimeOriginal labelled by --timezone keeps its digits but
-    # needs the declared zone stored beside it; a video carries its zone elsewhere.
-    should_write_zone = bool(
-        current_data["exif"].get("DateTimeOriginal")
-        and not is_quicktime_container(current_data["exif"])
-        and not stored_zone(current_data["exif"])
-        and current_data.get("timezone_source", "").startswith("--timezone flag")
-    )
-
-    # Determine needed changes
-    changes = determine_needed_changes(
-        file_path, datetime_original,
+    opts = CorrectionOptions(
+        apply=apply,
+        timezone_spec=timezone_spec,
+        infer_from_filename=infer_from_filename,
         preserve_wallclock=preserve_wallclock,
-        write_datetime_original=should_write_datetime_original,
-        write_zone=should_write_zone,
+        time_offset_seconds=time_offset_seconds,
+        force_timezone=force_timezone,
+        extra_write_fields=dict(extra_write_fields or {}),
     )
-
-    # Format and display timestamps
-    original_display = format_original_timestamps(current_data)
-    print(f"📅 Original : {original_display}", file=sys.stderr)
-
-    timestamp_source = current_data["timestamp_source"]
-    timezone_source = current_data.get("timezone_source", "")
-    corrected_display = format_corrected_timestamp(datetime_original, timestamp_source, timezone_source)
-    print(f"⏱️ Corrected: {corrected_display}", file=sys.stderr)
-
-    utc_dt = datetime_original.astimezone(timezone.utc)
-    utc_display = utc_dt.strftime('%Y-%m-%d %H:%M:%S UTC')
-    print(f"🌐 UTC      : {utc_display}", file=sys.stderr)
-
-    # Gather timestamp data for display (separating data from presentation)
-    timestamp_data: Optional[Dict[str, Any]] = None
-    if changes.get("file_timestamps"):
-        current_fs = current_data["file_system"]
-        expected_file_time = get_expected_file_system_time(datetime_original, preserve_wallclock=preserve_wallclock)
-
-        timestamp_data = {
-            "expected_time": expected_file_time,
-            "current_birth": current_fs.get("birth"),
-            "birth_delta_seconds": None
-        }
-
-        try:
-            expected_dt = datetime.strptime(expected_file_time, '%Y:%m:%d %H:%M:%S')
-
-            # Calculate birth time delta
-            if current_fs.get("birth"):
-                current_birth = datetime.strptime(current_fs["birth"], '%Y:%m:%d %H:%M:%S')
-                timestamp_data["birth_delta_seconds"] = (expected_dt - current_birth).total_seconds()
-        except ValueError:
-            pass
-
-    # Display changes
-    change_desc = format_change_description(changes, timestamp_data, current_data, preserve_wallclock, datetime_original)
-    has_changes = bool(changes["stale_clock_fields"]) or changes["file_timestamps"]
-
-    # Build common result fields
-    correction_mode = "time" if (time_offset_seconds is not None and time_offset_seconds != 0) else "timezone"
-    # Writing only into fields the file left empty fills in what it never had; any
-    # stored value or file time that disagrees, or a moved time, is a fix.
-    only_adds_fields = (
-        correction_mode == "timezone"
-        and not changes["file_timestamps"]
-        and len(changes["missing_clock_fields"]) == len(changes["stale_clock_fields"])
-    )
-    result_base = dict(
-        file=filename,
-        original_time=_machine_original_time(current_data),
-        corrected_time=datetime_original_str,
-        stale_fields=changes["stale_clock_fields"],
-        stale_file_times=["FileCreateDate"] if changes["file_timestamps"] else [],
-        timestamp_source=timestamp_source.token,
-        correction_mode=correction_mode,
-        timezone=detected_tz,
-        time_offset_seconds=time_offset_seconds if (time_offset_seconds is not None and time_offset_seconds != 0) else None,
-        time_offset_display=format_offset_display(time_offset_seconds) if (time_offset_seconds is not None and time_offset_seconds != 0) else None,
-        original_epoch=datetime_before_offset.timestamp() if datetime_before_offset else None,
-        corrected_epoch=datetime_original.timestamp() if datetime_original else None,
-        requires_force_timezone=requires_force_timezone or None,
-        camera_zone_offset=current_data.get("camera_zone_offset"),
-    )
-
-    if not apply and has_changes:
-        print(f"📊 Change   : {change_desc} (DRY RUN)", file=sys.stderr)
-        return TimestampFixResult(**result_base,
-                                  timestamp_action="would_add" if only_adds_fields else "would_fix")
-    else:
-        print(f"📊 Change   : {change_desc}", file=sys.stderr)
-
-    extra_write_fields = extra_write_fields or {}
-    if not apply or not (has_changes or extra_write_fields):
-        return TimestampFixResult(**result_base, timestamp_action="no_change")
-
-    # Apply changes
-    success = True
-
-    # Capture what the file held before jetlag touches it, in the same write as the
-    # correction below.
-    provenance_args = provenance_field_args(file_path, current_data["exif"])
-
-    if should_write_datetime_original and infer_from_filename and current_data["exif"].get("DateTimeOriginal"):
-        print("   ⚠️  Overwriting existing DateTimeOriginal (--infer-from-filename flag)", file=sys.stderr)
-    elif should_write_datetime_original and force_timezone and current_data["exif"].get("DateTimeOriginal"):
-        print("   ⚠️  Overwriting existing DateTimeOriginal timezone (--force-timezone flag)", file=sys.stderr)
-
-    # A correction owns the whole clock-field table, so one stale field rewrites
-    # them all: a subset write is what let a stale movie header outlive a run that
-    # found the track atoms correct.
-    correction_args = [
-        f"-{tag}={value}" for tag, value in changes["clock_targets"].items()
-    ] if changes["stale_clock_fields"] else []
-
-    extra_args = [f"-{tag}={value}" for tag, value in extra_write_fields.items()]
-    field_args = provenance_args + correction_args + extra_args
-
-    # Rewriting the file for any field resets its birth time, so the birth time rides
-    # in the same exiftool call, which applies file system tags after the rewrite —
-    # whether or not the correction found it stale.
-    file_time_args = [
-        f"-FileCreateDate={get_expected_file_system_time(datetime_original, preserve_wallclock=preserve_wallclock)}"
-    ] if sys.platform == "darwin" and (changes["file_timestamps"] or field_args) else []
-
-    write_error = None
-    if field_args or file_time_args:
-        try:
-            written = exiftool.write_tags(file_path, field_args + file_time_args)
-        except MetadataWriteRefused as refusal:
-            written, write_error = False, str(refusal)
-            print(f"   ❌ exiftool could not write this file: {write_error}", file=sys.stderr)
-        if not written:
-            if provenance_args:
-                print("   ⚠️  Failed to record original timestamps for recovery", file=sys.stderr)
-            if correction_args:
-                print(f"   ❌ Failed to write clock fields: {', '.join(changes['clock_targets'])}", file=sys.stderr)
-            if extra_args:
-                print(f"   ❌ Failed to write {', '.join(extra_write_fields)}", file=sys.stderr)
-            if file_time_args:
-                print("   ❌ Failed to apply file timestamps", file=sys.stderr)
-            success = not (correction_args or extra_args or file_time_args)
-
-    if not success:
-        return TimestampFixResult(**result_base, timestamp_action="error", error=write_error)
-    if not has_changes:
-        return TimestampFixResult(**result_base, timestamp_action="no_change")
-    return TimestampFixResult(**result_base, timestamp_action="added" if only_adds_fields else "fixed")
+    plan = plan_correction(read_current(file_path, opts), opts)
+    print(describe_correction(plan), file=sys.stderr)
+    return apply_correction(plan)

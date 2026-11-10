@@ -26,8 +26,8 @@ modules, so the pipeline and the tests import exactly the code the CLI runs.
 
 | Command line (`.py` + `.sh`) | Logic in `lib/` |
 |---|---|
-| `media-pipeline` | `pipeline.py` — runs every step in-process |
-| `fix-media-timestamp` | `fix_timestamp.py`; `provenance.py` (the recovery record written with it) |
+| `media-pipeline` | `pipeline/` — runs every step in-process (see below) |
+| `fix-media-timestamp` | `fix_timestamp.py` — `read_current` → pure `plan_correction` → `describe_correction` (stderr) → `apply_correction` (one write); `provenance.py` (the recovery record written with it) |
 | `tag-media` | `tagging.py` |
 | `organize-by-date` | `organize.py` |
 | `ingest-media` | `ingest.py` |
@@ -42,6 +42,22 @@ Shared modules: `timestamp_source.py` (reading and ranking a file's timestamps),
 
 A script holds argument parsing, validation messages and output; anything another
 script or the pipeline could call belongs in its `lib/` module.
+
+`lib/pipeline/` is split by what each part decides:
+
+| Module | Holds |
+|---|---|
+| `options.py` | `RunOptions`, the frozen command line resolved against the profile, and its validation |
+| `preflight.py` | batch checks before the first file: stale exiftool_tmp, protected files, camera, timezones (`preflight_timezones` is pure), filename timestamps |
+| `consent.py` | `require_consent`, the one terminal-only y/n prompt |
+| `stages.py` | one file's trip: a `Stage` per step (`name`, `enabled(opts)`, `run(ctx) -> StageOutcome`) run by `process_file`, which owns `stage_complete` and the single failure exit |
+| `batch.py` | `run()`: options → pre-flight → every file → organize conflicts → archive → summary |
+| `working_dir.py` | `WorkingDir`, the staging directory and the copies a cancel clears |
+| `events.py` | `emit_event`, the JSONL on stdout |
+
+Adding a pipeline step means one `Stage` subclass in `STAGES` plus its entry in
+`pipeline-schema.yaml`. `media-pipeline.py` keeps `build_parser()` and builds the
+`WorkingDir` its cancel handler closes over.
 
 ## External tool behavior
 

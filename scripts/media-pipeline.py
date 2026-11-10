@@ -16,7 +16,7 @@ import argparse
 import sys
 
 from lib.cli import add_timezone_args, attach_negative_option_values, install_interrupt_handlers
-from lib.pipeline import WORKING_DIR_NAME, emit_event, run, signal_handler
+from lib.pipeline import WORKING_DIR_NAME, WorkingDir, cancel_handler, emit_event, run
 
 
 def build_parser():
@@ -105,9 +105,10 @@ def build_parser():
 
 def main():
     """Main entry point."""
-    install_interrupt_handlers(signal_handler)
+    working_dir = WorkingDir()
+    install_interrupt_handlers(cancel_handler(working_dir))
 
-    run(build_parser().parse_args(attach_negative_option_values(sys.argv[1:])))
+    run(build_parser().parse_args(attach_negative_option_values(sys.argv[1:])), working_dir)
 
 
 if __name__ == "__main__":
