@@ -54,61 +54,78 @@ EXIFTOOL_TMP_GLOB = "*_exiftool_tmp"
 # volumes. The destination's free space is then the only limit on a batch.
 WORKING_DIR_NAME = ".jetlag-working"
 
-# The working directory is an implementation detail: nothing survives in it past
-# the iteration of the file it was staged for. These hold what the run currently
-# owns there, so a cancel can take it with it.
-_staged_paths: list[Path] = []
-_working_dir: Optional[str] = None
+class WorkingDir:
+    """The staging directory and the copies in it the run currently owns.
 
-
-def register_staged_paths(paths: list[Path]) -> None:
-    """Record the working-dir copies this file's iteration owns."""
-    _staged_paths.clear()
-    _staged_paths.extend(paths)
-
-
-def discard_staged_paths() -> None:
-    """Delete the staged copies of the file being processed, if they still exist.
-
-    The source is never touched — a staged copy organize declined to place is a
-    duplicate with no further use.
+    The working directory is an implementation detail: nothing survives in it past
+    the iteration of the file it was staged for. The cancel handler closes over
+    this object, so a cancel can take what the run owns with it.
     """
-    for path in _staged_paths:
+
+    def __init__(self, path: str = "", created: bool = False):
+        self.path = path
+        self.created = created
+        self.staged: list[Path] = []
+
+    def create(self) -> None:
+        """Create the directory an apply stages into; a cancel now clears it."""
+        os.makedirs(self.path, exist_ok=True)
+        self.created = True
+
+    def stage(self, paths: list[Path]) -> None:
+        """Record the working-dir copies this file's iteration owns."""
+        self.staged = list(paths)
+
+    def release(self) -> None:
+        """Stop owning the staged copies without touching them: they have been
+        moved out, or are kept for inspection after a failure."""
+        self.staged = []
+
+    def discard(self) -> None:
+        """Delete the staged copies of the file being processed, if they still exist.
+
+        The source is never touched — a staged copy organize declined to place is a
+        duplicate with no further use.
+        """
+        for path in self.staged:
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError as e:
+                print(f"   ⚠️  Could not discard staged copy {path.name}: {e}", file=sys.stderr)
+        self.staged = []
+
+    def clean_on_cancel(self) -> None:
+        """Leave nothing behind: the in-flight copies, exiftool's scratch files, the dir.
+
+        Only safe once the metadata service has been closed, because until then
+        exiftool may still be writing the very files this removes.
+        """
+        self.discard()
+        if not self.created:
+            return
+        working = Path(self.path)
+        if not working.is_dir():
+            return
+        for leftover in working.glob(EXIFTOOL_TMP_GLOB):
+            try:
+                leftover.unlink()
+            except OSError:
+                pass
         try:
-            path.unlink()
-        except FileNotFoundError:
-            pass
-        except OSError as e:
-            print(f"   ⚠️  Could not discard staged copy {path.name}: {e}", file=sys.stderr)
-    _staged_paths.clear()
-
-
-def clean_working_dir_on_cancel() -> None:
-    """Leave nothing behind: the in-flight copies, exiftool's scratch files, the dir.
-
-    Only safe once the metadata service has been closed, because until then
-    exiftool may still be writing the very files this removes.
-    """
-    discard_staged_paths()
-    if _working_dir is None:
-        return
-    working = Path(_working_dir)
-    if not working.is_dir():
-        return
-    for leftover in working.glob(EXIFTOOL_TMP_GLOB):
-        try:
-            leftover.unlink()
+            os.rmdir(working)
         except OSError:
             pass
-    try:
-        os.rmdir(working)
-    except OSError:
-        pass
 
 
-# Cancel shuts exiftool down first; only then is the working directory quiet
-# enough to clear.
-signal_handler = interrupt_handler(clean_working_dir_on_cancel)
+def cancel_handler(working_dir: WorkingDir):
+    """The SIGINT/SIGTERM handler for a run staging into working_dir.
+
+    Cancel shuts exiftool down first; only then is the working directory quiet
+    enough to clear.
+    """
+    return interrupt_handler(working_dir.clean_on_cancel)
 
 
 def load_config(profile_name: str) -> tuple[dict, dict]:
@@ -218,7 +235,7 @@ def process_file(
     file_path: Path,
     profile: Optional[dict],
     target_dir: str,
-    working_dir: str,
+    working_dir: WorkingDir,
     group: Optional[str],
     timezone_spec: Optional[str],
     apply: bool,
@@ -254,10 +271,10 @@ def process_file(
     ingest_companions = companion_extensions if copy_companion_files else None
     # Registered before the copy starts, so a cancel mid-ingest still knows
     # which partial copy to take with it.
-    register_staged_paths([Path(working_dir) / file_path.name] if apply else [])
+    working_dir.stage([Path(working_dir.path) / file_path.name] if apply else [])
     try:
         dest, action, companion_dests = ingest.ingest_file(
-            str(file_path), working_dir, apply, companion_extensions=ingest_companions,
+            str(file_path), working_dir.path, apply, companion_extensions=ingest_companions,
         )
         ingest_error = None
     except Exception as e:
@@ -271,14 +288,14 @@ def process_file(
         print(f"   ❌ Ingest failed for {file_path.name}", file=sys.stderr)
         result["failed"] = True
         result["error"] = "Ingest failed"
-        _staged_paths.clear()
+        working_dir.release()
         emit_event("pipeline_result", file=file_path.name, result="failed")
         return result
 
     active_file = Path(dest) if action == "copied" else file_path
     if action == "copied":
         file_changed = True
-        register_staged_paths([Path(dest)] + [Path(c) for c in companion_dests])
+        working_dir.stage([Path(dest)] + [Path(c) for c in companion_dests])
         carry_exif_cache(str(file_path), dest)
     emit_event("stage_complete", stage="ingest")
 
@@ -316,7 +333,7 @@ def process_file(
                 print(f"   ❌ exiftool could not write {active_file.name}: {refusal}", file=sys.stderr)
                 result["failed"] = True
                 result["error"] = str(refusal)
-                _staged_paths.clear()
+                working_dir.release()
                 emit_event("pipeline_result", file=file_path.name, result="failed")
                 return result
             if fix_writes_fields:
@@ -358,7 +375,7 @@ def process_file(
             )
             result["failed"] = True
             result["error"] = error_msg
-            _staged_paths.clear()
+            working_dir.release()
             emit_event("pipeline_result", file=file_path.name, result="failed")
             return result
 
@@ -385,7 +402,7 @@ def process_file(
             print(f"   ❌ Timestamp fix failed for {file_path.name}", file=sys.stderr)
             result["failed"] = True
             result["error"] = ts_result.error or "Timestamp fix failed"
-            _staged_paths.clear()
+            working_dir.release()
             emit_event("pipeline_result", file=file_path.name, result="failed")
             return result
 
@@ -414,7 +431,7 @@ def process_file(
                                 updated_companion_dests.append(str(new_companion))
                         if updated_companion_dests:
                             companion_dests = updated_companion_dests
-                        register_staged_paths(
+                        working_dir.stage(
                             [new_path] + [Path(c) for c in companion_dests])
                     else:
                         # The rename has not happened: active_file must keep
@@ -460,17 +477,17 @@ def process_file(
         print(f"   ❌ Organization failed for {file_path.name}", file=sys.stderr)
         result["failed"] = True
         result["error"] = "Organization failed"
-        _staged_paths.clear()
+        working_dir.release()
         emit_event("pipeline_result", file=file_path.name, result="failed")
         return result
 
     # A staged copy organize declined to place is a duplicate of a file already
     # at the destination, so it has no further use. Without this an idempotent
     # re-run stages the whole library into the working dir and leaves it there.
-    if org_result.action == "skipped" and _staged_paths:
+    if org_result.action == "skipped" and working_dir.staged:
         print(f"   Discarded staged copy of {file_path.name} "
               f"(skipped: {org_result.reason})", file=sys.stderr)
-        discard_staged_paths()
+        working_dir.discard()
 
     if org_result.action in ("copied", "moved", "overwrote", "would_copy", "would_move", "would_overwrite"):
         file_changed = True
@@ -489,7 +506,7 @@ def process_file(
                 print(f"  Companion: {companion_file.name} → {companion_target}", file=sys.stderr)
             elif not apply:
                 print(f"  [DRY RUN] Would move companion: {companion_file.name} → {companion_target}", file=sys.stderr)
-    _staged_paths.clear()
+    working_dir.release()
     emit_event("stage_complete", stage="output")
 
     # Generate gyroflow project (if in tasks, enabled, and applying)
@@ -552,8 +569,11 @@ def print_summary(stats: dict, apply: bool):
         print("   Use --apply to execute timestamp fixes and file organization.", file=sys.stderr)
 
 
-def run(args) -> None:
-    """Run the pipeline for parsed command-line arguments; always exits."""
+def run(args, working: WorkingDir) -> None:
+    """Run the pipeline for parsed command-line arguments; always exits.
+
+    working is the WorkingDir the cancel handler closes over; an apply opens it.
+    """
     # Load profile if specified
     profile = None
     full_config = {}
@@ -646,11 +666,10 @@ def run(args) -> None:
             sys.exit(1)
 
     # Set up working directory
-    global _working_dir
     working_dir = args.working_dir or os.path.join(target_dir, WORKING_DIR_NAME)
+    working.path = working_dir
     if args.apply:
-        os.makedirs(working_dir, exist_ok=True)
-        _working_dir = working_dir
+        working.create()
 
     # Display configuration
     print(f"→ Source:  {source_dir}", file=sys.stderr)
@@ -800,7 +819,7 @@ def run(args) -> None:
             file_path,
             profile,
             target_dir,
-            working_dir,
+            working,
             group,
             timezone_spec,
             args.apply,

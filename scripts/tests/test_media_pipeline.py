@@ -2830,10 +2830,11 @@ class TestWorkingDirIsTransient:
         errored = organize.OrganizeResult(dest="", action="error")
         original = organize.process_file
         organize.process_file = lambda *a, **k: errored
+        working = pipeline.WorkingDir(str(working_dir), created=True)
         try:
             result = pipeline.process_file(
                 temp_workspace["source"] / name, None, str(temp_workspace["target"]),
-                str(working_dir), None, None, True, False, tasks=set(),
+                working, None, None, True, False, tasks=set(),
             )
         finally:
             organize.process_file = original
@@ -2841,7 +2842,7 @@ class TestWorkingDirIsTransient:
         assert result["failed"], "Actual: the run succeeded, Expected: organize's error to fail it"
         assert self._leftovers(working_dir) == [name], \
             f"Actual: working dir holds {self._leftovers(working_dir)}, Expected: the staged copy"
-        assert pipeline._staged_paths == [], \
+        assert working.staged == [], \
             "Actual: the preserved copy is still owned, Expected: a cancel must not remove it"
 
     def test_leftover_entries_on_a_clean_run_are_reported(self, temp_workspace, test_profile):
@@ -2898,11 +2899,10 @@ class TestCancelClearsTheWorkingDir:
         companion.write_bytes(b"thumb")
         (working_dir / "VID_20251005_100000_00_001.mp4_exiftool_tmp").write_bytes(b"scratch")
 
-        monkeypatch.setattr(pipeline, "_working_dir", str(working_dir))
         monkeypatch.setattr(exiftool, "close", lambda: None)
-        pipeline.register_staged_paths([staged, companion])
-        yield working_dir
-        pipeline._staged_paths.clear()
+        working = pipeline.WorkingDir(str(working_dir), created=True)
+        working.stage([staged, companion])
+        yield working_dir, pipeline.cancel_handler(working)
 
     @pytest.mark.parametrize("sig", [signal.SIGINT, signal.SIGTERM],
                              ids=["sigint", "sigterm"])
@@ -2914,14 +2914,15 @@ class TestCancelClearsTheWorkingDir:
         *_exiftool_tmp entry and no working dir remain
         Expected: a cancelled run leaves the disk as it found it
         """
+        working_dir, handler = staged_working_dir
         with pytest.raises(SystemExit) as exit_info:
-            pipeline.signal_handler(sig, None)
+            handler(sig, None)
 
         assert exit_info.value.code == 128 + sig, \
             f"Actual: exit {exit_info.value.code}, Expected: {128 + sig}"
-        assert not staged_working_dir.exists(), \
+        assert not working_dir.exists(), \
             ("Actual: working dir survives holding "
-             f"{sorted(p.name for p in staged_working_dir.iterdir())}, Expected: removed")
+             f"{sorted(p.name for p in working_dir.iterdir())}, Expected: removed")
 
     def test_handler_keeps_a_working_dir_holding_someone_elses_files(
             self, staged_working_dir):
@@ -2931,14 +2932,15 @@ class TestCancelClearsTheWorkingDir:
         directory holding it remain
         Expected: the pipeline never deletes a working dir it does not recognise
         """
-        stray = staged_working_dir / "not-ours.txt"
+        working_dir, handler = staged_working_dir
+        stray = working_dir / "not-ours.txt"
         stray.write_bytes(b"someone else's")
 
         with pytest.raises(SystemExit):
-            pipeline.signal_handler(signal.SIGTERM, None)
+            handler(signal.SIGTERM, None)
 
-        assert sorted(p.name for p in staged_working_dir.iterdir()) == ["not-ours.txt"], \
-            f"Actual: {sorted(p.name for p in staged_working_dir.iterdir())}, Expected: only the stray"
+        assert sorted(p.name for p in working_dir.iterdir()) == ["not-ours.txt"], \
+            f"Actual: {sorted(p.name for p in working_dir.iterdir())}, Expected: only the stray"
 
 
 if __name__ == "__main__":
