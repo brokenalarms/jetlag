@@ -26,6 +26,8 @@ from pathlib import Path
 import pytest
 
 from conftest import create_test_video
+from lib import pipeline
+from lib.exiftool import exiftool
 
 SCRIPT_DIR = Path(__file__).parent.parent
 MEDIA_PIPELINE_PY = SCRIPT_DIR / "media-pipeline.py"
@@ -215,3 +217,68 @@ def test_cancel_empties_and_removes_the_working_dir(running_pipeline, sig):
 
     assert not working_dir.exists(), \
         f"Actual: working dir survives holding {_entries(working_dir)}, Expected: removed"
+
+
+
+class TestCancelClearsTheWorkingDir:
+    """Cancel is not a failure, so it leaves nothing in the working directory.
+
+    The handler runs after the metadata service has been closed — exiftool has
+    finished or died and is no longer writing — so it is safe to remove the
+    copies the interrupted file's iteration owns, the scratch files an
+    interrupted exiftool write left behind, and the directory itself.
+    """
+
+    @pytest.fixture
+    def staged_working_dir(self, tmp_path, monkeypatch):
+        """A working dir mid-file: a staged copy, its companion, exiftool scratch."""
+        working_dir = tmp_path / "working"
+        working_dir.mkdir()
+        staged = working_dir / "VID_20251005_100000_00_001.mp4"
+        companion = working_dir / "VID_20251005_100000_00_001.thm"
+        staged.write_bytes(b"half a video")
+        companion.write_bytes(b"thumb")
+        (working_dir / "VID_20251005_100000_00_001.mp4_exiftool_tmp").write_bytes(b"scratch")
+
+        monkeypatch.setattr(exiftool, "close", lambda: None)
+        working = pipeline.WorkingDir(str(working_dir), created=True)
+        working.stage([staged, companion])
+        yield working_dir, pipeline.cancel_handler(working)
+
+    @pytest.mark.parametrize("sig", [signal.SIGINT, signal.SIGTERM],
+                             ids=["sigint", "sigterm"])
+    def test_handler_removes_staged_copies_scratch_files_and_the_dir(
+            self, staged_working_dir, sig):
+        """Both signals mean the same thing: Cancel in the app is Ctrl+C.
+
+        Actual: after the handler exits, no staged copy, no companion copy, no
+        *_exiftool_tmp entry and no working dir remain
+        Expected: a cancelled run leaves the disk as it found it
+        """
+        working_dir, handler = staged_working_dir
+        with pytest.raises(SystemExit) as exit_info:
+            handler(sig, None)
+
+        assert exit_info.value.code == 128 + sig, \
+            f"Actual: exit {exit_info.value.code}, Expected: {128 + sig}"
+        assert not working_dir.exists(), \
+            ("Actual: working dir survives holding "
+             f"{sorted(p.name for p in working_dir.iterdir())}, Expected: removed")
+
+    def test_handler_keeps_a_working_dir_holding_someone_elses_files(
+            self, staged_working_dir):
+        """Cleanup only removes what the run owns — an unexpected file stays put.
+
+        Actual: the staged copies and scratch file go, the stray file and the
+        directory holding it remain
+        Expected: the pipeline never deletes a working dir it does not recognise
+        """
+        working_dir, handler = staged_working_dir
+        stray = working_dir / "not-ours.txt"
+        stray.write_bytes(b"someone else's")
+
+        with pytest.raises(SystemExit):
+            handler(signal.SIGTERM, None)
+
+        assert sorted(p.name for p in working_dir.iterdir()) == ["not-ours.txt"], \
+            f"Actual: {sorted(p.name for p in working_dir.iterdir())}, Expected: only the stray"

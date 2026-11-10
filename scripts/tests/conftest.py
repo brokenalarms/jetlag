@@ -18,9 +18,12 @@ import tempfile
 from pathlib import Path
 
 import pytest
+import yaml
 
 import lib.exiftool as _exiftool_module
 from lib.exiftool import exiftool
+
+SCRIPT_DIR = Path(__file__).parent.parent
 
 _template_video: Path | None = None
 
@@ -138,6 +141,48 @@ def metadata_client():
     via the context-manager protocol, even if the test body raises."""
     with contextlib.ExitStack() as stack:
         yield stack.enter_context
+
+
+@pytest.fixture
+def temp_workspace():
+    """Create a temporary workspace with source and target directories."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        workspace = Path(tmpdir)
+        source = workspace / "source"
+        target = workspace / "target"
+        source.mkdir()
+        target.mkdir()
+        yield {"root": workspace, "source": source, "target": target}
+
+
+@pytest.fixture
+def test_profile(temp_workspace, monkeypatch):
+    """Create a test profile in an isolated copy of media-profiles.yaml.
+
+    The copy plus the JETLAG_PROFILES_FILE override keeps every test (and its
+    spawned scripts) off the shared repo file, which is what allows the suite
+    to run in parallel workers. Tests that need to tweak the profile edit the
+    copy via os.environ["JETLAG_PROFILES_FILE"].
+    """
+    profiles_path = temp_workspace["root"] / "media-profiles.yaml"
+
+    with open(SCRIPT_DIR / "media-profiles.yaml") as f:
+        profiles = yaml.safe_load(f)
+
+    profiles["profiles"]["_test"] = {
+        "source_dir": str(temp_workspace["source"]),
+        "ready_dir": str(temp_workspace["target"]),
+        "file_extensions": [".mp4"],
+        "tags": ["test-camera"],
+        "exif": {"make": "Test", "model": "Camera"},
+        "companion_extensions": [".thm", ".lrv"],
+    }
+
+    with open(profiles_path, "w") as f:
+        yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
+
+    monkeypatch.setenv("JETLAG_PROFILES_FILE", str(profiles_path))
+    yield "_test"
 
 
 class FakeMetadata:

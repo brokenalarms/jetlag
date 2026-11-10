@@ -5,10 +5,15 @@ exiftool: which stages a set of options routes a file through, and what the
 loop does around them — one stage_complete per reporting stage, and a single
 failure exit that stops the trip, releases the staged copy without deleting it
 and reports the file failed.
+
+The end-to-end tests below them run whole pipelines through stages with real
+effects: tagging, and a file exiftool refuses to write.
 """
 
 from __future__ import annotations
 
+import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -16,6 +21,7 @@ import pytest
 from lib.pipeline import RunOptions, WorkingDir, process_file
 from lib.pipeline import stages
 from lib.pipeline.stages import Stage, StageOutcome, enabled_stages, fix_writes_fields
+from pipeline_helpers import create_test_video, get_exif_field, has_tag_cmd, run_pipeline
 
 DEFAULT_TASKS = frozenset({"tag", "fix-timestamp", "gyroflow"})
 CAMERA_PROFILE = {"tags": ["test-camera"], "exif": {"make": "Test", "model": "Camera"}}
@@ -176,3 +182,100 @@ class TestStageLoop:
         ]
         assert (result.failed, result.error, result.changed) == (True, "exiftool refused", False)
         assert working.staged == [] and staged.exists()
+
+
+
+@pytest.mark.skipif(
+    sys.platform != "darwin" or not has_tag_cmd(),
+    reason="requires macOS and the 'tag' command (brew install tag)"
+)
+class TestTagging:
+    """Tests for file tagging from profile."""
+
+    def test_applies_tags_from_profile(self, temp_workspace, test_profile):
+        """Tags from profile are applied to files."""
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        create_test_video(video)
+
+        result = run_pipeline(
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
+        )
+
+        event_types = [json.loads(line)["event"] for line in result.stdout.strip().split("\n") if line.strip()]
+        assert "tag_result" in event_types, \
+            f"Actual: event types {event_types}, Expected: tag_result present"
+
+    def test_applies_exif_make_model_from_profile(self, temp_workspace, test_profile):
+        """EXIF Make/Model from profile are applied."""
+        source = temp_workspace["source"]
+        target = temp_workspace["target"]
+        video = source / "test.mp4"
+        create_test_video(video)
+
+        run_pipeline(
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0900", "--group", "Test", "--apply"],
+        )
+
+        moved = list(target.rglob("*.mp4"))[0]
+        make = get_exif_field(moved, "Make")
+        model = get_exif_field(moved, "Model")
+        assert make == "Test"
+        assert model == "Camera"
+
+
+class TestFileExiftoolCannotWrite:
+    """exiftool reads some files it refuses to rewrite, saying why on stderr and
+    "0 image files updated" on stdout. A camera's malformed atoms are one source;
+    trailing bytes past the last atom are the same refusal on any MP4. Such a file
+    must fail with exiftool's reason and stay out of the library: it carries none
+    of the metadata the run says it applied.
+    """
+
+    @staticmethod
+    def _create_unwritable_video(path: Path):
+        create_test_video(path)
+        with open(path, "ab") as f:
+            f.write(b"\0\x0f\x42\x40free" + b"\0" * 16)
+
+    @staticmethod
+    def _events(stdout: str) -> list[dict]:
+        return [json.loads(line) for line in stdout.splitlines() if line.startswith("{")]
+
+    def test_timestamp_write_refused_fails_the_file_with_exiftools_reason(self, temp_workspace, test_profile):
+        source, target = temp_workspace["source"], temp_workspace["target"]
+        self._create_unwritable_video(source / "VID_20251005_100000.mp4")
+
+        result = run_pipeline([
+            "--profile", test_profile, "--source", str(source),
+            "--timezone", "+0900", "--infer-from-filename", "--apply",
+        ])
+
+        events = self._events(result.stdout)
+        timestamp = next(e for e in events if e["event"] == "timestamp_result")
+        outcome = next(e for e in events if e["event"] == "pipeline_result")
+        organized = [p for p in target.rglob("*.mp4")]
+        assert timestamp["action"] == "error", f"Actual: {timestamp}, Expected: action=error"
+        assert "garbage at end of file" in timestamp.get("error", ""), \
+            f"Actual: error={timestamp.get('error')!r}, Expected: exiftool's own reason"
+        assert outcome["result"] == "failed", f"Actual: {outcome}, Expected: failed"
+        assert organized == [], f"Actual: {organized} organized, Expected: nothing in the library"
+        assert "changes applied" not in result.stderr, \
+            "Actual: summary says changes applied, Expected: it names the failure"
+
+    def test_camera_write_refused_fails_the_file_when_tagging_writes_alone(self, temp_workspace, test_profile):
+        source, target = temp_workspace["source"], temp_workspace["target"]
+        self._create_unwritable_video(source / "VID_20251005_100000.mp4")
+
+        result = run_pipeline([
+            "--profile", test_profile, "--source", str(source),
+            "--timezone", "+0900", "--tasks", "tag", "--apply",
+        ])
+
+        events = self._events(result.stdout)
+        outcome = next(e for e in events if e["event"] == "pipeline_result")
+        organized = [p for p in target.rglob("*.mp4")]
+        assert outcome["result"] == "failed", f"Actual: {outcome}, Expected: failed"
+        assert organized == [], f"Actual: {organized} organized, Expected: nothing in the library"
+        assert "garbage at end of file" in result.stderr, \
+            f"Actual: {result.stderr[-800:]}, Expected: exiftool's own reason"
