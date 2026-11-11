@@ -259,20 +259,33 @@ def data_ranges(path: str | os.PathLike) -> list[tuple[int, int]] | None:
         return data_ranges_of(f, os.fstat(f.fileno()).st_size)
 
 
-def data_ranges_of(f, file_size: int) -> list[tuple[int, int]] | None:
-    """data_ranges for an open file of the given size: any object with seek and read,
-    such as a file on another host read in small pieces."""
+def _still_reader(f, file_size: int):
+    """The ranges reader for a still image's format; None for anything else."""
     f.seek(0)
     start = f.read(16)
     if start[:2] == _JPEG_SOI:
-        return _jpeg_ranges(f, file_size)
+        return _jpeg_ranges
     if start == _RAF_MAGIC:
-        return _raf_ranges(f, file_size)
+        return _raf_ranges
     if start[:2] in (b"II", b"MM"):
-        return _tiff_ranges(f, file_size)
+        return _tiff_ranges
     if start[4:8] == b"ftyp" and _is_iso_still(f, file_size):
-        return _iso_still_ranges(f, file_size)
-    return footage_ranges_of(f, file_size)
+        return _iso_still_ranges
+    return None
+
+
+def data_ranges_of(f, file_size: int) -> list[tuple[int, int]] | None:
+    """data_ranges for an open file of the given size: any object with seek and read,
+    such as a file on another host read in small pieces."""
+    reader = _still_reader(f, file_size) or footage_ranges_of
+    return reader(f, file_size)
+
+
+def is_still(path: str | os.PathLike) -> bool:
+    """A photo in one of the formats above (JPEG, RAF, TIFF-based RAW, HEIF/AVIF),
+    which has no length the way a recording does."""
+    with open(path, "rb") as f:
+        return _still_reader(f, os.fstat(f.fileno()).st_size) is not None
 
 
 def data_bytes(path: str | os.PathLike) -> int | None:

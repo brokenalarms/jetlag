@@ -30,7 +30,8 @@ from pathlib import Path
 import pytest
 
 from helpers import SCRIPT_DIR
-from helpers.media import create_test_photo, create_test_tiff_raw, create_test_video
+from helpers.media import (create_test_heif, create_test_photo, create_test_raf, create_test_tiff_raw,
+                           create_test_video)
 from helpers.pipeline_schema import load_schema, validate_event
 from lib.exiftool import exiftool
 from lib.verify_card import SCHEMA_PATH
@@ -44,7 +45,7 @@ RENAMED_CLIP = "VID_20250619_072028_00_004.mp4"
 
 def run_verify(source: Path, locations: dict[str, str], *extra: str, env: dict | None = None) -> dict:
     args = [sys.executable, str(VERIFY_CARD), str(source),
-            "--media-extensions", ".mp4", ".jpg", ".arw",
+            "--media-extensions", ".mp4", ".jpg", ".arw", ".raf", ".hif",
             "--companion-extensions", ".lrv", ".thm",
             "--ignore-paths", "MISC"]
     for name, root in locations.items():
@@ -500,3 +501,19 @@ class TestUnmatchedClipDetails:
         details = report["files"]["DCIM/VID_20250619_042028_00_006.mp4"]
         assert details["opens"] is False and "duration_seconds" not in details
         assert "neighbours_backed_up" not in details, "the clip numbered beside it is missing too"
+
+    def test_missing_photo_is_not_judged_as_a_recording(self, card, tmp_path):
+        """A photo has no length, so ffprobe finding none says nothing about it: a
+        missing photo must not read as a broken recording."""
+        photos = {"DSC00001.jpg": create_test_photo, "DSC00002.arw": create_test_tiff_raw,
+                  "DSCF0003.raf": create_test_raf, "DSC00004.hif": create_test_heif}
+        for name, create in photos.items():
+            create(card / "DCIM" / name)
+        library = tmp_path / "T9"
+        library.mkdir()
+
+        report = run_verify(card, {"T9": str(library)})
+
+        for photo in (f"DCIM/{name}" for name in photos):
+            details = report["files"][photo]
+            assert "opens" not in details and "duration_seconds" not in details, photo

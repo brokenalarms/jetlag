@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Optional
 
-from lib.data_portion import data_bytes, data_ranges, data_ranges_of, data_sha256
+from lib.data_portion import data_bytes, data_ranges, data_ranges_of, data_sha256, is_still
 from lib.exiftool import exiftool
 from lib.volumes import is_network
 
@@ -67,9 +67,9 @@ class CardFile:
     data_bytes: Optional[int]
     # With --verify-hashes: two copies recorded different hashes for this file.
     recorded_hashes_disagree: bool = False
-    # For a media file not on every location, what helps the user judge it: its
-    # length and whether it opens (no duration means a broken recording), and
-    # whether a clip numbered next to it was backed up.
+    # For a media file not on every location, what helps the user judge it: for a
+    # recording, its length and whether it opens (no duration means a broken
+    # recording), and whether a clip numbered next to it was backed up.
     duration_seconds: Optional[float] = None
     opens: Optional[bool] = None
     neighbours_backed_up: Optional[bool] = None
@@ -463,8 +463,9 @@ def _have_ffprobe() -> bool:
 
 
 def describe_unmatched(report: Report) -> None:
-    """Gather, for each media file not on every location, its length, whether it
-    opens, and whether a clip numbered next to it is on every location."""
+    """Gather, for each media file not on every location, whether a clip numbered
+    next to it is on every location and, for a recording, its length and whether it
+    opens."""
     unmatched = [c for c in report.scan.checked if c.kind == "media" and not all(
         v.verdict == "matched" for v in report.verdicts[c.rel].values())]
     if not unmatched:
@@ -476,7 +477,7 @@ def describe_unmatched(report: Report) -> None:
             by_number[key] = card_file
     can_probe = _have_ffprobe()
     for card_file in unmatched:
-        if can_probe:
+        if can_probe and not is_still(card_file.path):
             card_file.duration_seconds = probe_duration(card_file.path)
             card_file.opens = card_file.duration_seconds is not None
         key = _clip_number(Path(card_file.rel))
