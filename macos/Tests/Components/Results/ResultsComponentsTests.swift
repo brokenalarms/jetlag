@@ -8,7 +8,7 @@ import AppKit
 /// `DiffTableRow`, with its own columns, and check what the table actually does.
 final class ResultsComponentsTests: XCTestCase {
 
-    private struct BackupRow: Identifiable {
+    private struct BackupRow: Identifiable, Equatable {
         let id: String
         let path: String
         let backups: [String]
@@ -32,7 +32,7 @@ final class ResultsComponentsTests: XCTestCase {
     }
 
     private func resultsTable(rows: [BackupRow], backupCount: Int,
-                              measurements: ColumnMeasurements) -> some View {
+                              measurements: ColumnMeasurements<BackupRow>) -> some View {
         ResultsTable(rows: rows, columns: columns(backupCount: backupCount),
                      measurements: measurements, fileURL: { URL(fileURLWithPath: $0.path) })
             .frame(width: 700, height: 300)
@@ -42,7 +42,7 @@ final class ResultsComponentsTests: XCTestCase {
     /// update in which the lazily created table exists: the last row is appended after the
     /// table has been laid out once.
     private func hostedTable(rows: [BackupRow], backupCount: Int) -> NSTableView? {
-        let measurements = ColumnMeasurements()
+        let measurements = ColumnMeasurements<BackupRow>()
         let host = NSHostingView(rootView: resultsTable(rows: Array(rows.dropLast()), backupCount: backupCount,
                                                         measurements: measurements))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 300),

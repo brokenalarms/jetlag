@@ -51,36 +51,45 @@ struct ColumnWidths: Equatable {
     var contentFit: [CGFloat] = []
 }
 
-/// Per-run cache of the column widths, which depend on every row. Text measurement is
-/// the expensive part, so each row's cells are measured when the row first appears
-/// and again only when their text changes — a run's live row fills in as its events
-/// arrive and is then replaced by the finalised row at the same index — and the
-/// column widths are the running maxima. Comparing a row's cell text to what was
-/// measured is string work only. Without this each update re-measured every row,
-/// and the app fell behind the pipeline on a few hundred files.
-class ColumnMeasurements {
+/// Per-run cache of the column widths, which depend on every row. A row's cell text
+/// is a function of the row and the columns alone, so a row is measured when it first
+/// appears and again only when it changes — a run's live row fills in as its events
+/// arrive and is then replaced by the finalised row at the same index — and the column
+/// widths are the running maxima. Deciding a row is unchanged compares the row, not its
+/// text: building the text (a status is a localized string) for every row on every
+/// update made a long run cost more with each file, and the app fell minutes behind a
+/// pipeline that had already finished.
+class ColumnMeasurements<Row: Identifiable & Equatable> {
     private struct Measured {
-        let texts: [CellText]
+        let row: Row
         let widths: ColumnWidths
     }
 
-    private var measured: [AnyHashable: Measured] = [:]
+    private var titles: [String] = []
+    private var measured: [Row.ID: Measured] = [:]
     private var widths = ColumnWidths()
     /// How many rows have had their text measured, for tests that pin the cache.
     private(set) var measurementCount = 0
 
-    func columnWidths<Row: Identifiable>(for rows: [Row], texts: (Row) -> [CellText]) -> ColumnWidths {
-        var seen = Set<AnyHashable>()
+    /// `titles` names the columns the text is built for: a different set of columns
+    /// (a Verify check against other locations) measures every row afresh.
+    func columnWidths(for rows: [Row], titles: [String], texts: (Row) -> [CellText]) -> ColumnWidths {
+        if titles != self.titles {
+            self.titles = titles
+            measured = [:]
+            widths = ColumnWidths()
+        }
+        var seen = Set<Row.ID>()
         for row in rows {
             seen.insert(row.id)
-            let cells = texts(row)
-            if let cached = measured[row.id], cached.texts == cells {
+            if measured[row.id]?.row == row {
                 continue
             }
+            let cells = texts(row)
             let cellWidths = ColumnWidths(fitted: cells.map(\.idealWidth),
                                           contentFit: cells.map(\.contentFitWidth))
             measurementCount += 1
-            measured[row.id] = Measured(texts: cells, widths: cellWidths)
+            measured[row.id] = Measured(row: row, widths: cellWidths)
             widths = Self.folding(cellWidths, into: widths)
         }
         if seen.count < measured.count {

@@ -26,10 +26,10 @@ struct ResultsMenuItem {
 /// The files table, generic over its row and columns. Every row resolves to the file
 /// the Show in Finder / Quick Look commands act on through `fileURL`; the caller adds
 /// its own context-menu items with `extraMenuItems`, given the selected rows.
-struct ResultsTable<Row: Identifiable>: View {
+struct ResultsTable<Row: Identifiable & Equatable>: View {
     let rows: [Row]
     let columns: [ResultsColumn<Row>]
-    let measurements: ColumnMeasurements
+    let measurements: ColumnMeasurements<Row>
     let fileURL: (Row) -> URL?
     var extraMenuItems: ([Row]) -> [ResultsMenuItem] = { _ in [] }
 
@@ -45,7 +45,7 @@ struct ResultsTable<Row: Identifiable>: View {
     }
 
     private var columnWidths: ColumnWidths {
-        measurements.columnWidths(for: rows) { row in columns.map { $0.measure(row) } }
+        measurements.columnWidths(for: rows, titles: columns.map(\.title)) { row in columns.map { $0.measure(row) } }
     }
 
     private func selectedFileURLs(_ ids: Set<Row.ID>) -> [URL] {

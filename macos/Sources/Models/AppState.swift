@@ -384,11 +384,13 @@ final class AppState {
         // Cancel is pressed there: cancellation is checked again once on the main
         // actor, or that line would land after the cancelled line.
         currentRunTask = Task {
-            for await line in stream {
+            for await lines in ArrivalBatches(stream) {
                 if Task.isCancelled { break }
                 await MainActor.run {
-                    guard !Task.isCancelled else { return }
-                    appendLog(line)
+                    for line in lines {
+                        guard !Task.isCancelled else { return }
+                        appendLog(line)
+                    }
                 }
             }
             await MainActor.run {
@@ -483,14 +485,16 @@ final class AppState {
         let (process, stream) = launcher.run(script: "verify-card.sh", args: args)
         verifyProcess = process
         verifyTask = Task {
-            for await line in stream {
+            for await lines in ArrivalBatches(stream) {
                 if Task.isCancelled { break }
                 await MainActor.run {
-                    guard !Task.isCancelled else { return }
-                    if line.stream == .stdout, line.isMachineReadable, let event = VerifyEvent.decode(line.text) {
-                        verifySession.report.apply(event)
-                    } else {
-                        verifySession.log.append(line)
+                    for line in lines {
+                        guard !Task.isCancelled else { return }
+                        if line.stream == .stdout, line.isMachineReadable, let event = VerifyEvent.decode(line.text) {
+                            verifySession.report.apply(event)
+                        } else {
+                            verifySession.log.append(line)
+                        }
                     }
                 }
             }
