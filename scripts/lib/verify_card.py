@@ -190,8 +190,12 @@ def parse_rsync_listing(listing: str, extensions: set[str]) -> list[Entry]:
 
 def list_remote(root: str, extensions: set[str]) -> Optional[list[Entry]]:
     rsync = os.environ.get("JETLAG_RSYNC", "rsync")
-    result = subprocess.run([rsync, "--list-only", "--recursive", root.rstrip("/") + "/"],
-                            capture_output=True, text=True)
+    host, path = _remote_parts(root)
+    # The host's shell splits the path on spaces. The Mac's built-in rsync (openrsync)
+    # sends the path as written, and rsync 3.x protects it itself unless told to send
+    # it as written too, so quoting it once for that shell lists it under either.
+    result = subprocess.run([rsync, "--list-only", "--recursive", f"{host}:{shlex.quote(path + '/')}"],
+                            capture_output=True, text=True, env={**os.environ, "RSYNC_OLD_ARGS": "1"})
     if result.returncode != 0:
         print(f"❌ Could not list {root}: {result.stderr.strip()}", file=sys.stderr)
         return None
