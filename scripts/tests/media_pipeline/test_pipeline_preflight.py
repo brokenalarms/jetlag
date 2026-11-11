@@ -1,12 +1,14 @@
 """
-The timezone pre-flight decides, before any file is touched, whether a batch's
-embedded zones stop the run. preflight_timezones is the pure decision over each
-file's embedded and expected zone; read_file_zones is the read that feeds it.
-These tests pin the decision without starting exiftool: a wrong answer either
-relabels a whole batch to the wrong zone or refuses one that was fine.
+Every batch-level check is declared in CHECKS (lib/media_pipeline/preflight.py)
+and run by one runner, which reports each finding as one batch_check event and
+stops the run once. The finders are pure over the files' cached reads, so the
+first tests pin them without starting exiftool: a wrong answer either relabels a
+whole batch to the wrong zone or refuses one that was fine.
 
-The end-to-end tests below them cover the other batch checks a run meets
-before its first file: protected source files and the profile's camera.
+The end-to-end tests below them run each check through the real pipeline: what
+triggers it, which runs it refuses, and that its assent flag lets the run go on.
+Then the two checks with consequences past the refusal: protected source files
+and the profile's camera.
 """
 
 from __future__ import annotations
@@ -21,152 +23,232 @@ import pytest
 import yaml
 
 from helpers.media import create_test_video as _create_video_raw
+from lib.media_pipeline.options import RunOptions
 from lib.media_pipeline.preflight import (
-    MIXED_TIMEZONES, PROVIDED_MISMATCH, FileZone, TimezoneConflict, preflight_timezones,
-    read_file_zones,
+    ALL_CHECKS, CHECKS, Finding, find_mixed_timezones, find_zone_relabel,
 )
 from helpers.pipeline import create_test_video, run_in_process, run_pipeline
-from helpers.pipeline_schema import validate_event
+from helpers.pipeline_schema import enum_tokens, load_cli, validate_event
 
 
-class TestPreflightTimezones:
-
-    def test_a_batch_without_embedded_zones_has_no_conflict(self):
-        assert preflight_timezones([]) is None
-
-    def test_one_embedded_zone_and_no_timezone_given_has_no_conflict(self):
-        zones = [FileZone("a.mp4", "+0900"), FileZone("b.mp4", "+0900")]
-        assert preflight_timezones(zones) is None
-
-    def test_two_embedded_zones_are_mixed_grouped_in_file_order(self):
-        """Actual: a mixed conflict grouping each file under its zone
-        Expected: the event lists files in the order they were found"""
-        zones = [FileZone("b.mp4", "+0900"), FileZone("a.mp4", "+0800"), FileZone("c.mp4", "+0900")]
-
-        conflict = preflight_timezones(zones)
-
-        assert conflict == TimezoneConflict(
-            MIXED_TIMEZONES, {"+0900": ["b.mp4", "c.mp4"], "+0800": ["a.mp4"]}, {})
-        assert list(conflict.file_timezones) == ["+0900", "+0800"]
-
-    def test_allowing_mixed_zones_still_checks_them_against_the_given_timezone(self):
-        """Actual: with --allow-mixed-timezones, the file --timezone disagrees with is
-        a provided mismatch
-        Expected: allowing a mix is not forcing a relabel"""
-        zones = [FileZone("a.mp4", "+0900", expected="+0900"),
-                 FileZone("b.mp4", "+0800", expected="+0900")]
-
-        conflict = preflight_timezones(zones, allow_mixed=True)
-
-        assert conflict == TimezoneConflict(
-            PROVIDED_MISMATCH, {"+0900": ["a.mp4"], "+0800": ["b.mp4"]}, {"+0800": ["b.mp4"]})
-
-    def test_given_timezone_matching_every_file_has_no_conflict(self):
-        zones = [FileZone("a.mp4", "+0900", expected="+0900")]
-        assert preflight_timezones(zones) is None
-
-    def test_given_timezone_differing_from_the_embedded_one_is_a_provided_mismatch(self):
-        zones = [FileZone("a.mp4", "+0800", expected="+0900")]
-
-        conflict = preflight_timezones(zones)
-
-        assert conflict == TimezoneConflict(
-            PROVIDED_MISMATCH, {"+0800": ["a.mp4"]}, {"+0800": ["a.mp4"]})
-
-    def test_force_timezone_accepts_the_relabel(self):
-        zones = [FileZone("a.mp4", "+0800", expected="+0900")]
-        assert preflight_timezones(zones, force=True) is None
-
-    def test_mixed_zones_win_over_a_provided_mismatch(self):
-        """Actual: the mixed conflict is reported, not the mismatch
-        Expected: the first thing to fix is the mix"""
-        zones = [FileZone("a.mp4", "+0900", expected="+0900"),
-                 FileZone("b.mp4", "+0800", expected="+0900")]
-        assert preflight_timezones(zones).kind == MIXED_TIMEZONES
+def _opts(timezone_spec="+0900", **overrides) -> RunOptions:
+    return RunOptions(source_dir="/cards", target_dir="/ready", working_dir="/work",
+                      extensions=[".mp4"], timezone_spec=timezone_spec, **overrides)
 
 
-class TestCameraZonesInTheGuard:
-    """A file's zone is the hierarchy's: a zoned tag's, else the camera's zone
-    setting from its UTC clock against its filename (FileReading.zone). The
-    Comedy night Insta360 X6 batch carries no zoned tag, so the guard saw no
-    zones at all, while the camera named five clips in UTC-7 and two in Perth
-    time: one batch, two camera zones, which should have stopped as mixed.
-    """
-
-    def test_two_camera_zones_are_mixed(self):
-        zones = [FileZone("001.insv", "-0700", "+0800", tagged=False),
-                 FileZone("005.insv", "+0800", "+0800", tagged=False)]
-
-        conflict = preflight_timezones(zones)
-
-        assert conflict == TimezoneConflict(
-            MIXED_TIMEZONES, {"-0700": ["001.insv"], "+0800": ["005.insv"]}, {})
-
-    def test_a_camera_zone_differing_from_the_timezone_given_is_not_a_mismatch(self):
-        """A camera left on the previous country's zone is the case jetlag exists
-        to correct: only a zoned tag needs --force-timezone to be relabelled."""
-        zones = [FileZone("a.insv", "+0900", "+1300", tagged=False),
-                 FileZone("b.insv", "+0900", "+1300", tagged=False)]
-
-        assert preflight_timezones(zones) is None
-
-    def test_a_camera_zone_and_a_tagged_zone_that_agree_are_not_mixed(self):
-        """Korea: half the batch tagged +09:00 by an earlier run, half naive with
-        the camera on +09:00."""
-        zones = [FileZone("a.insv", "+0900", "+0900", tagged=True),
-                 FileZone("b.insv", "+0900", "+0900", tagged=False)]
-
-        assert preflight_timezones(zones) is None
+def _events(stdout: str) -> list[dict]:
+    events = [json.loads(line) for line in stdout.strip().split("\n") if line.strip()]
+    for event in events:
+        validate_event(event)
+    return events
 
 
-class TestReadFileZones:
+def _checks(events: list[dict], token: str | None = None) -> list[dict]:
+    return [e for e in events if e["event"] == "batch_check" and token in (None, e["check"])]
 
-    def test_the_camera_zone_counts_where_no_tag_gives_one(self, fake_metadata):
-        """Actual: the X6-shaped clips' zones from their UTC clock and filename
-        Expected: -0700 and +0800, not tagged; a clip with neither is left out"""
+
+def _processed(events: list[dict]) -> bool:
+    return any(e["event"] == "pipeline_file" for e in events)
+
+
+class TestFindMixedTimezones:
+    """A file's zone is the hierarchy's (FileReading.zone): a zoned tag's, else
+    the camera's zone setting from its UTC clock against its filename. The
+    Comedy night Insta360 X6 batch carries no zoned tag, while the camera named
+    five clips in UTC-7 and two in Perth time: one batch, two camera zones."""
+
+    def test_two_camera_zones_are_mixed_grouped_in_file_order(self, fake_metadata):
         utc_minus_7 = Path("/cards/VID_20261006_002802_00_001.insv")
         perth = Path("/cards/VID_20261006_203505_00_005.insv")
-        no_evidence = Path("/cards/clip.insv")
+        also_utc_minus_7 = Path("/cards/VID_20261006_061911_00_007.insv")
         fake_metadata.files[str(utc_minus_7)] = {"MovieHeaderCreateDate": "2026:10:06 07:28:02"}
         fake_metadata.files[str(perth)] = {"MovieHeaderCreateDate": "2026:10:06 12:35:05"}
-        fake_metadata.files[str(no_evidence)] = {"MovieHeaderCreateDate": "2026:10:06 12:35:05"}
+        fake_metadata.files[str(also_utc_minus_7)] = {"MovieHeaderCreateDate": "2026:10:06 13:19:11"}
 
-        zones = read_file_zones([utc_minus_7, perth, no_evidence], "+0800")
+        finding = find_mixed_timezones([utc_minus_7, perth, also_utc_minus_7], _opts("+0800"))
 
-        assert zones == [
-            FileZone(utc_minus_7.name, "-0700", "+0800", tagged=False),
-            FileZone(perth.name, "+0800", "+0800", tagged=False),
-        ]
+        assert finding == Finding(
+            [utc_minus_7.name, perth.name, also_utc_minus_7.name],
+            {"-0700": [utc_minus_7.name, also_utc_minus_7.name], "+0800": [perth.name]})
+        assert list(finding.groups) == ["-0700", "+0800"]
+
+    def test_zoned_and_unzoned_files_together_are_mixed(self, fake_metadata):
+        """A file with no zone evidence falls in the none group: the user expects a
+        batch where only some files say where they were shot to stop as mixed."""
+        zoned, bare = Path("/cards/zoned.mp4"), Path("/cards/bare.mp4")
+        fake_metadata.files[str(zoned)] = {"DateTimeOriginal": "2025:10:05 10:00:00+09:00"}
+        fake_metadata.files[str(bare)] = {"MediaCreateDate": "2025:10:05 01:00:00"}
+
+        finding = find_mixed_timezones([zoned, bare], _opts())
+
+        assert finding is not None
+        assert finding.groups == {"+0900": ["zoned.mp4"], "none": ["bare.mp4"]}
+
+    def test_a_batch_with_no_zone_evidence_is_not_mixed(self, fake_metadata):
+        a, b = Path("/cards/a.mp4"), Path("/cards/b.mp4")
+        fake_metadata.files[str(a)] = {"MediaCreateDate": "2025:10:05 01:00:00"}
+        fake_metadata.files[str(b)] = {"MediaCreateDate": "2025:10:05 02:00:00"}
+
+        assert find_mixed_timezones([a, b], _opts()) is None
+
+    def test_a_camera_zone_and_a_tagged_zone_that_agree_are_not_mixed(self, fake_metadata):
+        """Korea: half the batch tagged +09:00 by an earlier run, half naive with
+        the camera on +09:00."""
+        tagged = Path("/cards/VID_20250815_101112_00_001.insv")
+        naive = Path("/cards/VID_20250830_101112_00_002.insv")
+        fake_metadata.files[str(tagged)] = {"DateTimeOriginal": "2025:08:15 10:11:12+09:00",
+                                            "MovieHeaderCreateDate": "2025:08:15 01:11:12"}
+        fake_metadata.files[str(naive)] = {"MovieHeaderCreateDate": "2025:08:30 01:11:12"}
+
+        assert find_mixed_timezones([tagged, naive], _opts()) is None
+
+
+class TestFindZoneRelabel:
+
+    def test_a_tagged_zone_differing_from_the_timezone_given_is_found(self, fake_metadata):
+        clip = Path("/cards/clip.mp4")
+        fake_metadata.files[str(clip)] = {"DateTimeOriginal": "2025:10:05 10:00:00+08:00"}
+
+        assert find_zone_relabel([clip], _opts("+0900")) == \
+            Finding(["clip.mp4"], {"+0800": ["clip.mp4"]})
+
+    def test_a_tagged_zone_matching_the_timezone_given_is_not(self, fake_metadata):
+        clip = Path("/cards/clip.mp4")
+        fake_metadata.files[str(clip)] = {"DateTimeOriginal": "2025:10:05 10:00:00+09:00"}
+
+        assert find_zone_relabel([clip], _opts("+0900")) is None
+
+    def test_a_camera_zone_differing_from_the_timezone_given_is_not(self, fake_metadata):
+        """A camera left on the previous country's zone is the case jetlag exists
+        to correct: only a zoned tag needs --force-timezone to be relabelled."""
+        clip = Path("/cards/VID_20250815_101112_00_001.insv")
+        fake_metadata.files[str(clip)] = {"MovieHeaderCreateDate": "2025:08:15 01:11:12"}
+
+        assert find_zone_relabel([clip], _opts("+1300")) is None
 
     def test_a_zone_name_resolves_per_file_across_a_dst_change(self, fake_metadata):
         """A run spanning a DST changeover compares each file with the offset its
-        zone had when that file was shot.
-
-        Actual: the January file expects +1300 and the July file +1200
-        Expected: Pacific/Auckland is not one fixed offset
-        """
+        zone had when that file was shot: Pacific/Auckland is not one offset."""
         summer, winter = Path("/cards/summer.mp4"), Path("/cards/winter.mp4")
         fake_metadata.files[str(summer)] = {"DateTimeOriginal": "2025:01:10 10:00:00+13:00"}
         fake_metadata.files[str(winter)] = {"DateTimeOriginal": "2025:07:10 10:00:00+12:00"}
 
-        zones = read_file_zones([summer, winter], "Pacific/Auckland")
-
-        assert zones == [FileZone("summer.mp4", "+1300", "+1300"),
-                         FileZone("winter.mp4", "+1200", "+1200")]
+        assert find_zone_relabel([summer, winter], _opts("Pacific/Auckland")) is None
         assert fake_metadata.writes == []
 
-    def test_files_without_an_embedded_zone_are_left_out(self, fake_metadata):
-        bare = Path("/cards/bare.mp4")
-        fake_metadata.files[str(bare)] = {"MediaCreateDate": "2025:10:05 01:00:00"}
 
-        assert read_file_zones([bare], "+0900") == []
+class TestChecksAreDeclaredOnce:
+    """The schema enumerates the check tokens and assent flags the app holds
+    itself to; ALL_CHECKS is what the script emits. A check added on one side
+    only fails here."""
 
-    def test_without_a_timezone_nothing_is_expected(self, fake_metadata):
-        clip = Path("/cards/clip.mp4")
-        fake_metadata.files[str(clip)] = {"CreationDate": "2025:10:05 10:00:00+09:00"}
+    def test_every_check_token_is_in_the_schema(self):
+        assert [c.token for c in ALL_CHECKS] == enum_tokens("batch_check", "check")
 
-        assert read_file_zones([clip], None) == [FileZone("clip.mp4", "+0900", None)]
+    def test_the_schema_assent_flags_are_the_checks_flags_and_apply(self):
+        flags = {c.assent_flag for c in ALL_CHECKS if c.assent_flag} | {"--apply"}
+        assert set(load_cli()["assent_flags"]) == flags
 
+
+def _camera_mismatch(source: Path) -> list[str]:
+    _create_video_raw(source / "clip.mp4", MediaCreateDate="2025:10:05 01:00:00",
+                      CreateDate="2025:10:05 01:00:00", Make="Test", Model="Other Body")
+    return []
+
+
+def _mixed_timezones(source: Path) -> list[str]:
+    _create_video_raw(source / "tokyo.mp4", MediaCreateDate="2025:10:05 01:00:00",
+                      CreateDate="2025:10:05 01:00:00",
+                      DateTimeOriginal="2025:10:05 10:00:00+09:00")
+    create_test_video(source / "bare.mp4")
+    return []
+
+
+def _zone_relabel(source: Path) -> list[str]:
+    _create_video_raw(source / "tokyo.mp4", MediaCreateDate="2025:10:05 01:00:00",
+                      CreateDate="2025:10:05 01:00:00",
+                      DateTimeOriginal="2025:10:05 10:00:00+09:00")
+    return ["--timezone", "+0200"]
+
+
+def _filename_unparseable(source: Path) -> list[str]:
+    create_test_video(source / "C0009.mp4")
+    return ["--infer-from-filename"]
+
+
+# token → (makes a batch that triggers it and returns its extra args,
+#          dry run refused, apply refused)
+SCENARIOS = {
+    "camera_mismatch": (_camera_mismatch, False, True),
+    "mixed_timezones": (_mixed_timezones, True, True),
+    "zone_relabel": (_zone_relabel, False, True),
+    "filename_unparseable": (_filename_unparseable, True, True),
+}
+
+
+class TestEveryCheckRunsTheSameWay:
+    """One test over the checks a plain video batch can trigger (protected
+    sources needs BSD flags and destination_occupied comes after the batch; both
+    have their own tests). For each: one batch_check naming the check and its
+    files; a dry run and an apply each refuse or go on as the check declares;
+    and an apply given the check's assent flag goes on.
+    """
+
+    def _run(self, workspace, profile, extra, *flags):
+        args = ["--profile", profile, "--source", str(workspace["source"]),
+                "--target", str(workspace["target"]), "--extensions", ".mp4", "--tasks"]
+        if "--timezone" not in extra:
+            args += ["--timezone", "+0900"]
+        return run_in_process(args + extra + list(flags))
+
+    @pytest.mark.parametrize("token", sorted(SCENARIOS))
+    def test_each_check_reports_refuses_and_takes_assent(self, token, temp_workspace, test_profile):
+        make_batch, dry_refused, apply_refused = SCENARIOS[token]
+        check = next(c for c in CHECKS if c.token == token)
+        extra = make_batch(temp_workspace["source"])
+
+        for flags, refused in (((), dry_refused), (("--apply",), apply_refused)):
+            result = self._run(temp_workspace, test_profile, extra, *flags)
+            events = _events(result.stdout)
+            reported = _checks(events, token)
+            assert len(reported) == 1, f"Actual: {_checks(events)}, Expected: one {token}"
+            assert reported[0]["refused"] is refused, \
+                f"Actual: {reported[0]}, Expected: refused={refused} for {flags}"
+            assert reported[0].get("assent_flag") == check.assent_flag
+            assert reported[0]["files"], f"Actual: {reported[0]}, Expected: the files it found"
+            assert (result.returncode != 0) is refused, \
+                f"Actual: exit {result.returncode}, {result.output}, Expected: refused={refused}"
+            assert _processed(events) is not refused, \
+                "Actual: a refused run processed files, or a run that went on did not"
+
+        if check.assent_flag:
+            result = self._run(temp_workspace, test_profile, extra, "--apply", check.assent_flag)
+            events = _events(result.stdout)
+            assert [e["refused"] for e in _checks(events, token)] == [False]
+            assert result.returncode == 0, f"Actual: {result.output}, Expected: assent lets it go on"
+            assert _processed(events)
+
+    def test_every_finding_is_reported_before_the_run_stops(self, temp_workspace, test_profile):
+        """A batch from another camera that also spans two zones asks about both at
+        once, rather than one per re-run.
+
+        Actual: the apply's batch_check events
+        Expected: camera_mismatch and mixed_timezones, both refused, no file processed
+        """
+        source = temp_workspace["source"]
+        _create_video_raw(source / "tokyo.mp4", MediaCreateDate="2025:10:05 01:00:00",
+                          CreateDate="2025:10:05 01:00:00",
+                          DateTimeOriginal="2025:10:05 10:00:00+09:00",
+                          Make="Test", Model="Other Body")
+        create_test_video(source / "bare.mp4")
+
+        result = self._run(temp_workspace, test_profile, [], "--apply")
+
+        events = _events(result.stdout)
+        assert [(e["check"], e["refused"]) for e in _checks(events)] == \
+            [("camera_mismatch", True), ("mixed_timezones", True)]
+        assert result.returncode != 0
+        assert not _processed(events)
 
 
 @pytest.mark.skipif(not hasattr(os, "chflags"), reason="BSD file flags only")
@@ -176,8 +258,8 @@ class TestProtectedSources:
     its staged copy, and a lock carried onto that copy fails each of them with
     EPERM. Importing it means its copy in the library comes out unprotected, so
     an apply asks first: the batch reports the protected files as one
-    protected_sources event, and only --unlock-protected lets the apply proceed.
-    The source itself keeps its lock either way.
+    protected_sources finding, and only --unlock-protected lets the apply
+    proceed. The source itself keeps its lock either way.
     """
 
     VIDEO = "VID_20251005_100000_00_001.mp4"
@@ -202,15 +284,6 @@ class TestProtectedSources:
             *extra,
         ])
 
-    def _events(self, stdout: str) -> list[dict]:
-        events = [json.loads(line) for line in stdout.strip().split("\n") if line.strip()]
-        for event in events:
-            validate_event(event)
-        return events
-
-    def _protected_events(self, events):
-        return [e for e in events if e["event"] == "protected_sources"]
-
     def test_apply_without_assent_refuses_before_touching_anything(
             self, temp_workspace, test_profile, locked_source):
         """Actual: the run exits non-zero having reported the protected file,
@@ -219,12 +292,13 @@ class TestProtectedSources:
         """
         result = self._run(temp_workspace, test_profile, "--apply")
 
-        events = self._events(result.stdout)
+        events = _events(result.stdout)
         assert result.returncode != 0, \
             f"Actual: {result.output}, Expected: the apply refused"
-        assert [e["files"] for e in self._protected_events(events)] == [[self.VIDEO]], \
-            f"Actual: {events}, Expected: one protected_sources naming {self.VIDEO}"
-        assert [e for e in events if e["event"] == "pipeline_file"] == [], \
+        assert [(e["files"], e["refused"]) for e in _checks(events, "protected_sources")] == \
+            [([self.VIDEO], True)], \
+            f"Actual: {events}, Expected: one refused protected_sources naming {self.VIDEO}"
+        assert not _processed(events), \
             "Actual: files were processed, Expected: refused before the first file"
         assert sorted(temp_workspace["target"].rglob("*.mp4")) == [], \
             "Actual: a file reached the target, Expected: nothing organized"
@@ -248,20 +322,22 @@ class TestProtectedSources:
 
     def test_dry_run_reports_protected_files_and_previews_anyway(
             self, temp_workspace, test_profile, locked_source):
-        """Actual: protected_sources is reported and every file is still previewed
+        """Actual: protected_sources is reported, not refused, and every file is
+        still previewed
         Expected: the preview tells the user what the apply will ask about
         """
         result = self._run(temp_workspace, test_profile)
 
-        events = self._events(result.stdout)
+        events = _events(result.stdout)
         assert result.returncode == 0, f"Actual: {result.output}, Expected: a full preview"
-        assert [e["files"] for e in self._protected_events(events)] == [[self.VIDEO]], \
+        assert [(e["files"], e["refused"]) for e in _checks(events, "protected_sources")] == \
+            [([self.VIDEO], False)], \
             f"Actual: {events}, Expected: one protected_sources naming {self.VIDEO}"
         previewed = [e for e in events if e["event"] == "pipeline_result"]
         assert len(previewed) == 1, f"Actual: {previewed}, Expected: the file previewed"
 
     def test_unprotected_batch_reports_nothing(self, temp_workspace, test_profile):
-        """Actual: no protected_sources event for a batch with no locked files
+        """Actual: no protected_sources finding for a batch with no locked files
         Expected: the app has nothing to ask about on an ordinary import
         """
         create_test_video(temp_workspace["source"] / self.VIDEO)
@@ -269,7 +345,7 @@ class TestProtectedSources:
         result = self._run(temp_workspace, test_profile, "--apply")
 
         assert result.returncode == 0, f"Actual: {result.output}, Expected: a clean run"
-        assert self._protected_events(self._events(result.stdout)) == []
+        assert _checks(_events(result.stdout), "protected_sources") == []
 
 
 class TestSourceCameraIsCheckedAgainstTheProfile:
@@ -277,10 +353,11 @@ class TestSourceCameraIsCheckedAgainstTheProfile:
 
     A file the camera says was shot on another body means the profile was picked
     for the wrong camera — the sony-a7iv-photo profile once relabelled 143 A7V
-    stills. The batch reports such files as one camera_mismatch event; a dry run
-    previews anyway, an apply refuses without --allow-camera-mismatch, and the
-    file's own camera fields are never overwritten. A profile with no camera —
-    for media that records none — is not checked.
+    stills. The batch reports such files as one camera_mismatch finding grouped
+    by the camera found; a dry run previews anyway, an apply refuses without
+    --allow-camera-mismatch, and the file's own camera fields are never
+    overwritten. A profile with no camera — for media that records none — is
+    not checked.
     """
 
     VIDEO = "VID_20251005_100000_00_001.mp4"
@@ -296,19 +373,10 @@ class TestSourceCameraIsCheckedAgainstTheProfile:
             *extra,
         ])
 
-    def _events(self, stdout: str) -> list[dict]:
-        events = [json.loads(line) for line in stdout.strip().split("\n") if line.strip()]
-        for event in events:
-            validate_event(event)
-        return events
-
     def _video(self, workspace, **camera):
         _create_video_raw(workspace["source"] / self.VIDEO,
                           MediaCreateDate="2025:10:05 01:00:00",
                           CreateDate="2025:10:05 01:00:00", **camera)
-
-    def _of(self, events, kind):
-        return [e for e in events if e["event"] == kind]
 
     def _camera(self, path) -> tuple:
         out = subprocess.run(["exiftool", "-s3", "-Make", "-Model", str(path)],
@@ -324,20 +392,21 @@ class TestSourceCameraIsCheckedAgainstTheProfile:
             yaml.dump(profiles, f, default_flow_style=False, sort_keys=False)
 
     def test_apply_refuses_a_file_from_another_camera(self, temp_workspace, test_profile):
-        """Actual: the apply exits non-zero naming the file, with nothing organized
+        """Actual: the apply exits non-zero naming the file under the Model it
+        carries, with nothing organized
         Expected: the wrong profile never imports a batch unasked
         """
         self._video(temp_workspace, Make="Test", Model="Other Body")
 
         result = self._run(temp_workspace, test_profile, "--apply")
 
-        events = self._events(result.stdout)
-        mismatch = self._of(events, "camera_mismatch")
+        events = _events(result.stdout)
+        mismatch = _checks(events, "camera_mismatch")
         assert result.returncode != 0, f"Actual: {result.output}, Expected: the apply refused"
-        assert [(e["files"], e["found_models"], e["found_makes"]) for e in mismatch] == \
-            [([self.VIDEO], ["Other Body"], [])], \
+        assert [(e["files"], e["groups"], e["refused"]) for e in mismatch] == \
+            [([self.VIDEO], {"Other Body": [self.VIDEO]}, True)], \
             f"Actual: {mismatch}, Expected: one camera_mismatch naming the file and its Model only"
-        assert self._of(events, "pipeline_file") == [], \
+        assert not _processed(events), \
             "Actual: files were processed, Expected: refused before the first file"
         assert sorted(temp_workspace["target"].rglob("*.mp4")) == [], \
             "Actual: a file reached the target, Expected: nothing organized"
@@ -356,20 +425,6 @@ class TestSourceCameraIsCheckedAgainstTheProfile:
         assert self._camera(organized[0]) == ("Test", "Other Body"), \
             f"Actual: {self._camera(organized[0])}, Expected: ('Test', 'Other Body')"
 
-    def test_dry_run_reports_the_mismatch_and_previews_anyway(self, temp_workspace, test_profile):
-        """Actual: camera_mismatch is reported and the file is still previewed
-        Expected: the preview tells the user what the apply will ask about
-        """
-        self._video(temp_workspace, Make="Test", Model="Other Body")
-
-        result = self._run(temp_workspace, test_profile)
-
-        events = self._events(result.stdout)
-        assert result.returncode == 0, f"Actual: {result.output}, Expected: a full preview"
-        assert len(self._of(events, "camera_mismatch")) == 1
-        assert len(self._of(events, "pipeline_file")) == 1, \
-            "Actual: the file was not previewed, Expected: previewed anyway"
-
     def test_matching_camera_differing_only_in_case_is_not_a_mismatch(
             self, temp_workspace, test_profile):
         """Cameras write SONY where profiles say Sony: the same camera."""
@@ -377,9 +432,9 @@ class TestSourceCameraIsCheckedAgainstTheProfile:
 
         result = self._run(temp_workspace, test_profile, "--apply")
 
-        events = self._events(result.stdout)
+        events = _events(result.stdout)
         assert result.returncode == 0, f"Actual: {result.output}, Expected: a clean run"
-        assert self._of(events, "camera_mismatch") == []
+        assert _checks(events, "camera_mismatch") == []
 
     def test_profile_without_a_camera_checks_nothing(self, temp_workspace, test_profile):
         """Media that records no camera gets a hand-named profile with none;
@@ -389,6 +444,6 @@ class TestSourceCameraIsCheckedAgainstTheProfile:
 
         result = self._run(temp_workspace, test_profile, "--apply")
 
-        events = self._events(result.stdout)
+        events = _events(result.stdout)
         assert result.returncode == 0, f"Actual: {result.output}, Expected: a clean run"
-        assert self._of(events, "camera_mismatch") == []
+        assert _checks(events, "camera_mismatch") == []

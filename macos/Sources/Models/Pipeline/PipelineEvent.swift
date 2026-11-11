@@ -26,11 +26,7 @@ enum PipelineEvent: Decodable {
     case gyroflowResult
     case pipelineResult(file: String, result: String)
     case pipelineSummary(PipelineSummary)
-    case timezoneConflict(conflictType: TimezoneConflictKind, providedTz: String?,
-                          fileTimezones: [String: [String]])
-    case organizeConflict(count: Int, files: [String])
-    case protectedSources(files: [String])
-    case cameraMismatch(CameraMismatch)
+    case batchCheck(BatchCheck)
     case noMediaFiles(EmptySource)
     case pipelineError(message: String)
 
@@ -56,14 +52,8 @@ enum PipelineEvent: Decodable {
         case renamedTo = "renamed_to"
         case dest, reason
         case error, result, message
-        case conflictType = "conflict_type"
-        case providedTz = "provided_tz"
-        case fileTimezones = "file_timezones"
-        case count, files, extensions
-        case expectedMake = "expected_make"
-        case expectedModel = "expected_model"
-        case foundMakes = "found_makes"
-        case foundModels = "found_models"
+        case check, files, groups, refused, extensions
+        case assentFlag = "assent_flag"
         case processed, succeeded, changed, failed, mode
         case failedFiles = "failed_files"
     }
@@ -138,32 +128,19 @@ enum PipelineEvent: Decodable {
                 failed: try container.decode(Int.self, forKey: .failed),
                 failedFiles: try container.decode([String].self, forKey: .failedFiles),
                 mode: mode))
-        case "timezone_conflict":
-            let kindToken = try container.decode(String.self, forKey: .conflictType)
-            guard let kind = TimezoneConflictKind(rawValue: kindToken) else {
+        case "batch_check":
+            let kindToken = try container.decode(String.self, forKey: .check)
+            guard let kind = BatchCheck.Kind(rawValue: kindToken) else {
                 throw DecodingError.dataCorruptedError(
-                    forKey: .conflictType, in: container,
-                    debugDescription: "Unknown timezone_conflict conflict_type: \(kindToken)")
+                    forKey: .check, in: container,
+                    debugDescription: "Unknown batch_check check: \(kindToken)")
             }
-            self = .timezoneConflict(
-                conflictType: kind,
-                providedTz: try container.decodeIfPresent(String.self, forKey: .providedTz),
-                fileTimezones: try container.decode([String: [String]].self, forKey: .fileTimezones))
-        case "organize_conflict":
-            self = .organizeConflict(
-                count: try container.decode(Int.self, forKey: .count),
-                files: try container.decode([String].self, forKey: .files))
-        case "protected_sources":
-            self = .protectedSources(
-                files: try container.decode([String].self, forKey: .files))
-        case "camera_mismatch":
-            self = .cameraMismatch(CameraMismatch(
+            self = .batchCheck(BatchCheck(
+                kind: kind,
                 files: try container.decode([String].self, forKey: .files),
-                expected: FileCamera(
-                    make: try container.decodeIfPresent(String.self, forKey: .expectedMake),
-                    model: try container.decodeIfPresent(String.self, forKey: .expectedModel)),
-                foundMakes: try container.decode([String].self, forKey: .foundMakes),
-                foundModels: try container.decode([String].self, forKey: .foundModels)))
+                groups: try container.decodeIfPresent([String: [String]].self, forKey: .groups) ?? [:],
+                assentFlag: try container.decodeIfPresent(String.self, forKey: .assentFlag),
+                refused: try container.decode(Bool.self, forKey: .refused)))
         case "no_media_files":
             self = .noMediaFiles(EmptySource(
                 source: try container.decode(String.self, forKey: .source),
@@ -177,14 +154,4 @@ enum PipelineEvent: Decodable {
                 debugDescription: "Unknown event type: \(event)")
         }
     }
-}
-
-/// The `timezone_conflict.conflict_type` tokens: what the pipeline refused on.
-enum TimezoneConflictKind: String, CaseIterable {
-    /// The batch spans several zones; refused in both modes until
-    /// `--allow-mixed-timezones`.
-    case mixedTimezones = "mixed_timezones"
-    /// The declared zone differs from the one files carry; an apply refuses
-    /// until `--force-timezone`.
-    case providedMismatch = "provided_mismatch"
 }

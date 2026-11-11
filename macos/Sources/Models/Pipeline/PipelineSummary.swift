@@ -22,9 +22,9 @@ struct PipelineSummary: Equatable {
 
     var unchanged: Int { succeeded - changed }
 
-    /// The completion popup's text. A dry run that found files from another
-    /// camera says so, since an apply of the same batch will stop to ask.
-    func message(cameraMismatch: CameraMismatch?) -> String {
+    /// The completion popup's text. A dry run says what its batch checks found,
+    /// since an apply of the same batch will stop to ask about them.
+    func message(checks: [BatchCheck]) -> String {
         var lines = [Strings.Workflow.runSummaryCounts(
             processed: processed, changed: changed, mode: mode)]
         lines.append(mode == .applied
@@ -33,11 +33,8 @@ struct PipelineSummary: Equatable {
         if failed > 0 {
             lines.append(Strings.Workflow.runSummaryFailed(count: failed, files: failedFiles))
         }
-        if mode == .dryRun, let mismatch = cameraMismatch {
-            lines.append(Strings.Workflow.runSummaryCameraMismatch(
-                count: mismatch.files.count,
-                found: mismatch.foundName,
-                expected: mismatch.expected?.name ?? ""))
+        if mode == .dryRun {
+            lines += checks.map(Strings.Workflow.runSummaryCheck)
         }
         return lines.joined(separator: "\n\n")
     }

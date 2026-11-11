@@ -338,10 +338,10 @@ class TestOverwriteDestination:
     """A file already sitting at the organize destination blocks the move.
 
     The pipeline reports that as data — every blocked file skips with
-    reason=exists_differs and the batch ends with one organize_conflict event
-    carrying the count — and only replaces those files when --overwrite says so.
-    The app reads the conflict event to ask the user before re-running with the
-    flag, so the count and the file list have to be right.
+    reason=exists_differs and the batch ends with one destination_occupied
+    batch_check naming them — and only replaces those files when --overwrite says so.
+    The app reads the finding to ask the user before re-running with the flag,
+    so the file list has to be right.
     """
 
     def _run(self, workspace, profile, *extra):
@@ -385,7 +385,7 @@ class TestOverwriteDestination:
     def test_blocked_files_are_reported_as_one_batch_conflict(self, temp_workspace, test_profile):
         """Without --overwrite the file stays put and the batch reports the conflict.
 
-        Actual: destination bytes unchanged, organize_conflict names the file
+        Actual: destination bytes unchanged, destination_occupied names the file
         Expected: the app has one event to prompt on, listing every blocked file
         """
         organized = self._seed_differing_destination(temp_workspace, test_profile)
@@ -400,13 +400,10 @@ class TestOverwriteDestination:
         assert organize_event.get("reason") == "exists_differs", \
             f"Actual: organize_result.reason={organize_event.get('reason')!r}, Expected: 'exists_differs'"
 
-        conflicts = [e for e in events if e["event"] == "organize_conflict"]
-        assert len(conflicts) == 1, \
-            f"Actual: {len(conflicts)} organize_conflict events, Expected: exactly 1 for the batch"
-        assert conflicts[0]["count"] == 1, \
-            f"Actual: organize_conflict.count={conflicts[0]['count']}, Expected: 1"
-        assert conflicts[0]["files"] == ["VID_20251005_100000_00_001.mp4"], \
-            f"Actual: organize_conflict.files={conflicts[0]['files']}, Expected: ['VID_20251005_100000_00_001.mp4']"
+        conflicts = [e for e in events if e["event"] == "batch_check"]
+        assert [(c["check"], c["files"], c["assent_flag"], c["refused"]) for c in conflicts] == \
+            [("destination_occupied", ["VID_20251005_100000_00_001.mp4"], "--overwrite", False)], \
+            f"Actual: {conflicts}, Expected: one destination_occupied for the batch, the run finished"
         assert organized.read_bytes() == before, \
             "Actual: the file at the destination changed, Expected: untouched without --overwrite"
 
@@ -426,7 +423,7 @@ class TestOverwriteDestination:
         organize_event = next(e for e in events if e["event"] == "organize_result")
         assert organize_event["action"] == "overwrote", \
             f"Actual: organize_result.action={organize_event['action']!r}, Expected: 'overwrote'"
-        assert not [e for e in events if e["event"] == "organize_conflict"], \
+        assert not [e for e in events if e["event"] == "batch_check"], \
             "Actual: a conflict was reported, Expected: none — --overwrite resolved them"
 
         after = organized.read_bytes()
@@ -490,8 +487,8 @@ class TestOverwriteDestination:
         result = self._run(temp_workspace, test_profile, "--apply")
 
         events = self._events(result.stdout)
-        assert not [e for e in events if e["event"] == "organize_conflict"], \
-            "Actual: organize_conflict emitted for a clean run, Expected: none"
+        assert not [e for e in events if e["event"] == "batch_check"], \
+            "Actual: destination_occupied emitted for a clean run, Expected: none"
 
     def test_identical_copy_is_not_a_conflict(self, temp_workspace, test_profile):
         """An identical file at the destination is not something to ask about.
@@ -512,8 +509,8 @@ class TestOverwriteDestination:
         organize_event = next(e for e in events if e["event"] == "organize_result")
         assert organize_event.get("reason") == "identical", \
             f"Actual: organize_result.reason={organize_event.get('reason')!r}, Expected: 'identical'"
-        assert not [e for e in events if e["event"] == "organize_conflict"], \
-            "Actual: organize_conflict emitted for an identical copy, Expected: none"
+        assert not [e for e in events if e["event"] == "batch_check"], \
+            "Actual: destination_occupied emitted for an identical copy, Expected: none"
 
 
 class TestOrganizeReportsTheUserFacingOutcome:

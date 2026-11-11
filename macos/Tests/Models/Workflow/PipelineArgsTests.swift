@@ -266,34 +266,17 @@ final class PipelineArgsTests: XCTestCase {
         XCTAssertFalse(args.contains("--update-filename-dates"))
     }
 
-    func testForceTimezone() {
+    /// The answers given for this click reach the run as their flags, and no
+    /// answer is passed until it is given.
+    func testGrantedAssentIsPassedAndNothingByDefault() {
         let session = makeSession()
-        session.forceTimezone = true
+        XCTAssertFalse(session.buildPipelineArgs().args.contains("--force-timezone"))
+
+        session.grantedAssent = ["--force-timezone", "--allow-mixed-timezones"]
         let (_, args) = session.buildPipelineArgs()
 
         XCTAssertTrue(args.contains("--force-timezone"))
-    }
-
-    func testForceTimezoneNotIncludedByDefault() {
-        let session = makeSession()
-        let (_, args) = session.buildPipelineArgs()
-
-        XCTAssertFalse(args.contains("--force-timezone"))
-    }
-
-    func testAllowMixedTimezones() {
-        let session = makeSession()
-        session.allowMixedTimezones = true
-        let (_, args) = session.buildPipelineArgs()
-
         XCTAssertTrue(args.contains("--allow-mixed-timezones"))
-    }
-
-    func testAllowMixedTimezonesNotIncludedByDefault() {
-        let session = makeSession()
-        let (_, args) = session.buildPipelineArgs()
-
-        XCTAssertFalse(args.contains("--allow-mixed-timezones"))
     }
 
     func testAlwaysOnStepsNeverInTasks() {

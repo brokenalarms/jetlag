@@ -32,29 +32,16 @@ final class WorkflowSession {
     var inferFromFilenames: Bool = false
     var timeOffsetSeconds: Int?
     var updateFilenameDates: Bool = false
-    var forceTimezone: Bool = false
-    var allowMixedTimezones: Bool = false
 
-    var timezoneConflictType: TimezoneConflictKind?
-    var timezoneConflictProvidedTz: String?
-    var timezoneConflictFileTimezones: [String: [String]]?
-    var showTimezoneConflict: Bool = false
-
-    /// What the last run reported it could not move: a different file already
-    /// occupies those destinations. The report outlives the run that made it,
-    /// because it is the preview the user reads before deciding to apply.
-    var organizeConflictCount: Int = 0
-    var organizeConflictFiles: [String] = []
-    var showOverwriteConflict: Bool = false
-    var overwriteDestination: Bool = false
-
-    var protectedSourceFiles: [String] = []
-    var showProtectedSources: Bool = false
-    var unlockProtected: Bool = false
-
-    var cameraMismatch: CameraMismatch?
-    var showCameraMismatch: Bool = false
-    var allowCameraMismatch: Bool = false
+    /// What the last run's batch checks found. The findings outlive the run that
+    /// made them, because they are the preview the user reads before deciding to
+    /// apply, and an apply asks about them first.
+    private(set) var reportedChecks: [BatchCheck] = []
+    /// The findings the user is being asked about: the ones a run stopped on, or,
+    /// before an apply, the ones its preview found.
+    var pendingChecks: [BatchCheck] = []
+    /// The assent flags answered for this click, which the next run carries.
+    var grantedAssent: Set<String> = []
 
     /// Whether the run a conflict alert asks about was an apply. A finished
     /// apply has dropped back to preview mode before the user answers, so the
@@ -136,8 +123,13 @@ final class WorkflowSession {
         }
     }
 
-    func noteConflict() {
+    /// A finding the running pipeline reported. One it stopped on is asked about
+    /// at once; every one is kept for the apply that follows a preview.
+    func noteBatchCheck(_ check: BatchCheck) {
+        reportedChecks.append(check)
+        guard check.refused else { return }
         conflictedRunWasApply = applyMode
+        pendingChecks.append(check)
     }
 
     /// The refused apply had already passed the dry-run question, so its
@@ -148,47 +140,31 @@ final class WorkflowSession {
         applyWithoutDryRun = true
     }
 
-    /// Record the user's answer to the conflict the pipeline just refused on,
-    /// so the next run carries the override flag that unblocks it.
-    func grantTimezoneAssent() {
-        if timezoneConflictType == .mixedTimezones {
-            allowMixedTimezones = true
-        } else {
-            forceTimezone = true
+    /// Whether the apply has to stop and ask first: every finding its preview
+    /// reported that has an assent flag is something the apply would do to files
+    /// the user has not agreed to. Returns true when the question was raised and
+    /// the run must not start.
+    func requestCheckAssentIfNeeded() -> Bool {
+        guard applyMode else { return false }
+        let unanswered = reportedChecks.filter { check in
+            check.assentFlag.map { !grantedAssent.contains($0) } ?? false
         }
-        showTimezoneConflict = false
-        resumeConflictedRun()
-    }
-
-    /// Whether the run has to stop and ask first: applying over the files the
-    /// last run reported blocked replaces them for good, so it needs an answer.
-    /// Returns true when the question was raised and the run must not start.
-    func requestOverwriteAssentIfNeeded() -> Bool {
-        guard applyMode, !overwriteDestination, organizeConflictCount > 0 else { return false }
-        showOverwriteConflict = true
+        guard !unanswered.isEmpty else { return false }
+        pendingChecks = unanswered
         return true
     }
 
-    /// Record the user's answer, so the re-run carries the flag that replaces
-    /// the files already at the destination.
-    func grantOverwriteAssent() {
-        overwriteDestination = true
-        showOverwriteConflict = false
+    /// Whether the user can agree to every finding being asked about; one with no
+    /// assent flag can only be fixed at the source.
+    var canGrantPendingChecks: Bool {
+        !pendingChecks.isEmpty && pendingChecks.allSatisfy { $0.assentFlag != nil }
     }
 
-    /// Record the user's answer, so the re-run imports the files shot on
-    /// another camera, their camera fields left as the camera wrote them.
-    func grantCameraMismatchAssent() {
-        allowCameraMismatch = true
-        showCameraMismatch = false
-        resumeConflictedRun()
-    }
-
-    /// Record the user's answer, so the re-run carries the flag that imports
-    /// the protected files as unlocked copies.
-    func grantUnlockProtectedAssent() {
-        unlockProtected = true
-        showProtectedSources = false
+    /// Record the user's answer, so the next run carries the flags that let it go
+    /// on past every finding asked about.
+    func grantPendingAssent() {
+        grantedAssent.formUnion(pendingChecks.compactMap(\.assentFlag))
+        pendingChecks = []
         resumeConflictedRun()
     }
 
@@ -196,7 +172,7 @@ final class WorkflowSession {
     /// taken out: an override the user just granted is not a setting they
     /// changed, so it never makes the preview they read look stale.
     func comparableArgs() -> [String] {
-        buildPipelineArgs().args.filter { !Self.assentFlags.contains($0) }
+        buildPipelineArgs().args.filter { !grantedAssent.contains($0) && $0 != Self.applyFlag }
     }
 
     /// Whether the apply has to stop and ask first: an apply moves and replaces
@@ -278,20 +254,8 @@ final class WorkflowSession {
     /// Assent covers the run it was given for. A run the user starts themselves
     /// begins without it, so a later batch is never relabelled or replaced unasked.
     func clearRunAssent() {
-        forceTimezone = false
-        allowMixedTimezones = false
-        showTimezoneConflict = false
-        timezoneConflictType = nil
-        timezoneConflictProvidedTz = nil
-        timezoneConflictFileTimezones = nil
-        overwriteDestination = false
-        showOverwriteConflict = false
-        protectedSourceFiles = []
-        showProtectedSources = false
-        unlockProtected = false
-        cameraMismatch = nil
-        showCameraMismatch = false
-        allowCameraMismatch = false
+        grantedAssent = []
+        pendingChecks = []
         conflictedRunWasApply = false
         applyWithoutDryRun = false
         showDryRunStale = false
@@ -301,8 +265,7 @@ final class WorkflowSession {
     /// The conflict report describes the rows of the run that produced it, so it
     /// is discarded with them rather than carried into the next run's table.
     func clearConflictReport() {
-        organizeConflictCount = 0
-        organizeConflictFiles = []
+        reportedChecks = []
     }
 
     private static func computeAvailableSteps(
@@ -402,19 +365,7 @@ final class WorkflowSession {
         return active.allSatisfy { isStepReady($0) }
     }
 
-    static let forceTimezoneFlag = "--force-timezone"
-    static let allowMixedTimezonesFlag = "--allow-mixed-timezones"
-    static let overwriteFlag = "--overwrite"
-    static let unlockProtectedFlag = "--unlock-protected"
-    static let allowCameraMismatchFlag = "--allow-camera-mismatch"
     static let applyFlag = "--apply"
-
-    /// What the run carries because of an answer given for one click, rather
-    /// than a setting the user chose — the same state `clearRunAssent()` drops.
-    static let assentFlags = [
-        forceTimezoneFlag, allowMixedTimezonesFlag, overwriteFlag, unlockProtectedFlag,
-        allowCameraMismatchFlag, applyFlag,
-    ]
 
     func buildPipelineArgs() -> (script: String, args: [String]) {
         var args: [String] = []
@@ -464,21 +415,7 @@ final class WorkflowSession {
         if updateFilenameDates {
             args.append("--update-filename-dates")
         }
-        if forceTimezone {
-            args.append(Self.forceTimezoneFlag)
-        }
-        if allowMixedTimezones {
-            args.append(Self.allowMixedTimezonesFlag)
-        }
-        if overwriteDestination {
-            args.append(Self.overwriteFlag)
-        }
-        if unlockProtected {
-            args.append(Self.unlockProtectedFlag)
-        }
-        if allowCameraMismatch {
-            args.append(Self.allowCameraMismatchFlag)
-        }
+        args += grantedAssent.sorted()
         if applyMode {
             args.append(Self.applyFlag)
         }
@@ -508,23 +445,6 @@ final class WorkflowSession {
     }
 
     // MARK: - What the form previews
-
-    /// What the timezone question says about the conflict the pipeline refused on.
-    var timezoneConflictMessage: String {
-        guard let fileTimezones = timezoneConflictFileTimezones else { return "" }
-        switch timezoneConflictType {
-        case .mixedTimezones:
-            let groups = fileTimezones
-                .map { zone, files in Strings.Workflow.mixedTimezoneGroup(zone: zone, count: files.count) }
-                .sorted()
-                .joined(separator: "\n")
-            return Strings.Workflow.mixedTimezonesMessage(groups: groups)
-        case .providedMismatch, nil:
-            let existing = fileTimezones.keys.sorted().joined(separator: ", ")
-            return Strings.Workflow.providedMismatchMessage(
-                provided: timezoneConflictProvidedTz ?? "", existing: existing)
-        }
-    }
 
     /// One line under the Set Timestamps step saying what the run will do to
     /// each file's time, or nil when it changes nothing yet.

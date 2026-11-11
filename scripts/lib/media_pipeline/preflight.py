@@ -1,16 +1,17 @@
 """Checks over the whole batch before the first file is processed.
 
-Each check either lets the run go on or stops it with one batch-level event, so
-the app has a single thing to ask about instead of a failure per file.
+Every check is declared the same way in CHECKS and run by run_checks(), which
+emits one batch_check event per finding and stops the run once, after every
+check has reported, so one answer covers them all.
 """
 
 from __future__ import annotations
 
 import shutil
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from lib import ingest_media, tag_media
 from lib.media_pipeline.consent import require_consent
@@ -41,235 +42,229 @@ def check_stale_exiftool_tmp(source_dir: str) -> None:
     print("✅ Deleted exiftool_tmp directories", file=sys.stderr)
 
 
-def check_protected_sources(files: list[Path], opts: RunOptions) -> None:
-    """Report protected (locked) source files; an apply needs consent to import
-    them unlocked."""
+REFUSES_APPLY = "apply"
+REFUSES_ALWAYS = "always"
+REFUSES_NEVER = "never"
+
+NO_ZONE = "none"
+
+
+@dataclass(frozen=True)
+class Finding:
+    """What a check found: the files, and for a check that splits the batch,
+    the files under each label (a zone, a camera), in file order."""
+    files: list[str]
+    groups: dict[str, list[str]] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class BatchCheck:
+    """One batch-level check, declared as data.
+
+    refuses says which runs stop on a finding: an apply, every run, or none (a
+    finding made after the batch, which only a re-run can act on). assent_flag
+    lets a refused run go on; a check without one always stops. find is pure
+    over the files' cached reads; a check without one is reported by whatever
+    makes its finding. headline, note and prompt are its lines on stderr and
+    its question on a terminal.
+    """
+    token: str
+    assent_flag: Optional[str]
+    refuses: str
+    headline: str
+    note: str = ""
+    prompt: str = ""
+    applies: Callable[[RunOptions], bool] = lambda opts: True
+    find: Optional[Callable[[list[Path], RunOptions], Optional[Finding]]] = None
+
+    def granted(self, opts: RunOptions) -> bool:
+        """Whether the assent flag was given: its RunOptions field is argparse's dest."""
+        if self.assent_flag is None:
+            return False
+        return bool(getattr(opts, self.assent_flag.removeprefix("--").replace("-", "_")))
+
+    def refused(self, opts: RunOptions) -> bool:
+        if self.refuses == REFUSES_NEVER:
+            return False
+        if self.refuses == REFUSES_APPLY and not opts.apply:
+            return False
+        return not self.granted(opts)
+
+
+def _grouped(pairs) -> dict[str, list[str]]:
+    groups: dict[str, list[str]] = {}
+    for label, name in pairs:
+        groups.setdefault(label, []).append(name)
+    return groups
+
+
+def find_protected_sources(files: list[Path], opts: RunOptions) -> Optional[Finding]:
     protected = [fp.name for fp in files if ingest_media.is_protected(str(fp))]
-    if not protected:
-        return
-    print(f"🔒 {len(protected)} source file(s) are protected (locked):", file=sys.stderr)
-    for name in protected:
-        print(f"   {name}", file=sys.stderr)
-    print("Their imported copies will be unlocked; the source files stay locked.", file=sys.stderr)
-    print(file=sys.stderr)
-    emit_event("protected_sources", files=protected)
-    if opts.apply:
-        require_consent(opts.unlock_protected, "Import them unlocked?", [
-            "ERROR: Cannot proceed without consent to import protected files unlocked.",
-            "Re-run with --unlock-protected, or from a terminal to be prompted.",
-        ])
-    else:
-        print("Previewing anyway; applying asks first (or pass --unlock-protected).", file=sys.stderr)
-        print(file=sys.stderr)
+    return Finding(protected) if protected else None
 
 
-def check_source_camera(files: list[Path], opts: RunOptions) -> None:
-    """Hold every file to the profile's camera before anything is processed.
-
-    A file shot on another camera means the profile was picked for the wrong
-    body: a dry run reports it and previews anyway, an apply stops without
-    --allow-camera-mismatch. A profile with no camera (for media that records
-    none) is not checked.
-    """
+def _profile_camera(opts: RunOptions) -> tuple[Optional[str], Optional[str]]:
     expected = (opts.profile or {}).get("exif") or {}
-    make, model = expected.get("make"), expected.get("model")
-
-    if not make and not model:
-        return
-
-    mismatched = {fp.name: tag_media.camera_mismatch(str(fp), make, model) for fp in files}
-    mismatched = {name: found for name, found in mismatched.items() if found}
-    if not mismatched:
-        return
-
-    found_makes = sorted({f["Make"] for f in mismatched.values() if "Make" in f})
-    found_models = sorted({f["Model"] for f in mismatched.values() if "Model" in f})
-    expected_name = " ".join(v for v in (make, model) if v)
-    print(f"📷 {len(mismatched)} file(s) were not shot on this profile's camera ({expected_name}):",
-          file=sys.stderr)
-    for name, found in mismatched.items():
-        print(f"   {name}: {' '.join(found.values())}", file=sys.stderr)
-    print("Their camera fields are left as the camera wrote them.", file=sys.stderr)
-    print(file=sys.stderr)
-    emit_event("camera_mismatch",
-        files=list(mismatched),
-        expected_make=make or None,
-        expected_model=model or None,
-        found_makes=found_makes,
-        found_models=found_models,
-    )
-    if opts.apply:
-        require_consent(opts.allow_camera_mismatch, "Import them anyway?", [
-            "ERROR: Cannot proceed without consent to import files from another camera.",
-            "Re-run with --allow-camera-mismatch, or pick the profile for this camera.",
-        ])
-    else:
-        print("Previewing anyway; applying asks first (or pass --allow-camera-mismatch).", file=sys.stderr)
-        print(file=sys.stderr)
+    return expected.get("make"), expected.get("model")
 
 
-# ---------------------------------------------------------------------------
-# Timezones
-# ---------------------------------------------------------------------------
-
-MIXED_TIMEZONES = "mixed_timezones"
-PROVIDED_MISMATCH = "provided_mismatch"
-
-
-@dataclass(frozen=True)
-class FileZone:
-    """A file's zone (FileReading.zone) and the zone --timezone gives it, both as ±HHMM.
-
-    tagged says the zone is a zoned tag's, which a correction to another zone
-    would relabel; otherwise it is the camera's zone setting, which the UTC clock
-    and the filename show and which correcting it is what the run is for.
-    expected is None without --timezone. A zone name resolves per file, so each
-    file is compared against the offset that zone had when that file was shot.
-    """
-    name: str
-    embedded: str
-    expected: Optional[str] = None
-    tagged: bool = True
+def find_camera_mismatch(files: list[Path], opts: RunOptions) -> Optional[Finding]:
+    """Files whose Make/Model differ from the profile's, grouped by the camera
+    they name: the profile was likely picked for the wrong body."""
+    make, model = _profile_camera(opts)
+    pairs = []
+    for fp in files:
+        found = tag_media.camera_mismatch(str(fp), make, model)
+        if found:
+            pairs.append((" ".join(found.values()), fp.name))
+    if not pairs:
+        return None
+    return Finding([name for _, name in pairs], _grouped(pairs))
 
 
-@dataclass(frozen=True)
-class TimezoneConflict:
-    """Why a batch's timezones stop the run.
-
-    file_timezones groups files by zone, in file order: every file with a zone
-    for mixed zones, the files with a zoned tag for a provided mismatch;
-    mismatched holds, per tagged zone, the files --timezone disagrees with.
-    """
-    kind: str
-    file_timezones: dict
-    mismatched: dict
+def _zone_label(zone: Optional[str]) -> str:
+    return normalize_timezone_input(zone).replace(":", "") if zone else NO_ZONE
 
 
-def read_file_zones(files: list[Path], timezone_spec: Optional[str]) -> list[FileZone]:
-    """The zone and expected zone of every file with zone evidence; a file with
-    none adds nothing to the comparison."""
-    zones = []
+def find_mixed_timezones(files: list[Path], opts: RunOptions) -> Optional[Finding]:
+    """The batch split by FileReading.zone. A file with no zone evidence falls in
+    the none group, so zoned and unzoned files together are mixed."""
+    groups = _grouped((_zone_label(read_file(str(fp)).zone), fp.name) for fp in files)
+    if len(groups) < 2:
+        return None
+    return Finding([fp.name for fp in files], groups)
+
+
+def find_zone_relabel(files: list[Path], opts: RunOptions) -> Optional[Finding]:
+    """Files whose zoned tag differs from the zone --timezone gives them, grouped
+    by the tag's zone. A zone name resolves per file, so each file is compared
+    with the offset that zone had when it was shot. A camera zone setting that
+    differs is not one: relabelling it is what the correction is for."""
+    pairs = []
     for fp in files:
         reading = read_file(str(fp))
-        tz = reading.zone
-        if not tz:
-            continue
-        expected = reading.declared_offset(timezone_spec)
-        zones.append(FileZone(
-            name=fp.name,
-            embedded=normalize_timezone_input(tz).replace(":", ""),
-            expected=expected.replace(":", "") if expected else None,
-            tagged=reading.tagged_zone is not None,
-        ))
-    return zones
+        tagged = reading.tagged_zone
+        expected = reading.declared_offset(opts.timezone_spec)
+        if tagged and expected and _zone_label(tagged) != _zone_label(expected):
+            pairs.append((_zone_label(tagged), fp.name))
+    if not pairs:
+        return None
+    return Finding([name for _, name in pairs], _grouped(pairs))
 
 
-def preflight_timezones(zones: list[FileZone], allow_mixed: bool = False,
-                        force: bool = False) -> Optional[TimezoneConflict]:
-    """The batch's timezone conflict, or None when the run may go on.
-
-    Files in different zones are mixed unless allow_mixed: a camera whose zone
-    setting changed partway through a batch is as mixed as two zoned tags.
-    Otherwise files whose zoned tag differs from the --timezone they were given
-    are a provided mismatch unless force. A camera zone setting that differs is
-    not: relabelling it is what the correction is for.
-    """
-    file_timezones: dict[str, list[str]] = {}
-    for zone in zones:
-        file_timezones.setdefault(zone.embedded, []).append(zone.name)
-
-    if len(file_timezones) > 1 and not allow_mixed:
-        return TimezoneConflict(MIXED_TIMEZONES, file_timezones, {})
-
-    tagged_timezones: dict[str, list[str]] = {}
-    expected_by_file = {}
-    for zone in zones:
-        if not zone.tagged:
-            continue
-        tagged_timezones.setdefault(zone.embedded, []).append(zone.name)
-        if zone.expected:
-            expected_by_file[zone.name] = zone.expected
-
-    if expected_by_file and not force:
-        mismatched = {
-            tz: [name for name in names if expected_by_file.get(name, tz) != tz]
-            for tz, names in tagged_timezones.items()
-        }
-        mismatched = {tz: names for tz, names in mismatched.items() if names}
-        if mismatched:
-            return TimezoneConflict(PROVIDED_MISMATCH, tagged_timezones, mismatched)
-    return None
-
-
-def check_timezones(files: list[Path], opts: RunOptions) -> None:
-    """Stop before any file is processed when the batch's timezones conflict.
-
-    A dry run previews a provided mismatch per file (each timestamp_result
-    carries requires_force_timezone); only applying is refused.
-    """
-    if opts.infer_from_filename:
-        return
-    zones = read_file_zones(files, opts.timezone_spec)
-    compared = {zone.name for zone in zones}
-    without_zone = [fp.name for fp in files if fp.name not in compared]
-    if zones and without_zone:
-        print(f"ℹ️  {len(without_zone)} file(s) hold no zone evidence and were not compared:",
-              file=sys.stderr)
-        for name in without_zone:
-            print(f"   {name}", file=sys.stderr)
-        print(file=sys.stderr)
-    conflict = preflight_timezones(zones,
-                                   allow_mixed=opts.allow_mixed_timezones,
-                                   force=opts.force_timezone)
-    if conflict is None:
-        return
-
-    if conflict.kind == MIXED_TIMEZONES:
-        print("⚠️  Files have mixed timezones:", file=sys.stderr)
-        for tz, names in sorted(conflict.file_timezones.items()):
-            print(f"   {tz}: {', '.join(names)}", file=sys.stderr)
-        print(file=sys.stderr)
-        print("Consider processing timezone groups separately, or re-run with --force-timezone to proceed.", file=sys.stderr)
-        emit_event("timezone_conflict",
-            conflict_type=MIXED_TIMEZONES,
-            file_timezones=dict(conflict.file_timezones),
-        )
-        sys.exit(1)
-
-    print(f"⚠️  Timezone conflict: you provided {opts.timezone_spec} but files have different timezones:", file=sys.stderr)
-    for tz, names in sorted(conflict.mismatched.items()):
-        print(f"   {tz}: {', '.join(names)}", file=sys.stderr)
-    print(file=sys.stderr)
-    print("The embedded timezone is usually correct (set by the camera).", file=sys.stderr)
-    if opts.apply:
-        print("Re-run with --force-timezone to override.", file=sys.stderr)
-    else:
-        print("Previewing anyway; applying requires --force-timezone.", file=sys.stderr)
-    emit_event("timezone_conflict",
-        conflict_type=PROVIDED_MISMATCH,
-        provided_tz=opts.timezone_spec,
-        file_timezones=dict(conflict.file_timezones),
-    )
-    if opts.apply:
-        sys.exit(1)
-
-
-def check_filename_timestamps(files: list[Path], opts: RunOptions) -> None:
-    """With --infer-from-filename, stop if any filename has no parseable timestamp."""
-    if not opts.infer_from_filename:
-        return
+def find_filename_unparseable(files: list[Path], opts: RunOptions) -> Optional[Finding]:
     unparseable = [fp.name for fp in files if read_file(str(fp)).filename_timestamp is None]
-    if unparseable:
-        print("⚠️  --infer-from-filename specified but these files have no parseable timestamp in their filename:", file=sys.stderr)
-        for name in unparseable:
+    return Finding(unparseable) if unparseable else None
+
+
+CHECKS: list[BatchCheck] = [
+    BatchCheck(
+        token="protected_sources",
+        find=find_protected_sources,
+        assent_flag="--unlock-protected",
+        refuses=REFUSES_APPLY,
+        headline="source file(s) are protected (locked)",
+        note="Their imported copies will be unlocked; the source files stay locked.",
+        prompt="Import them unlocked?",
+    ),
+    BatchCheck(
+        token="camera_mismatch",
+        applies=lambda opts: any(_profile_camera(opts)),
+        find=find_camera_mismatch,
+        assent_flag="--allow-camera-mismatch",
+        refuses=REFUSES_APPLY,
+        headline="file(s) were not shot on this profile's camera",
+        note="Their camera fields are left as the camera wrote them.",
+        prompt="Import them anyway?",
+    ),
+    BatchCheck(
+        token="mixed_timezones",
+        applies=lambda opts: not opts.infer_from_filename,
+        find=find_mixed_timezones,
+        assent_flag="--allow-mixed-timezones",
+        refuses=REFUSES_ALWAYS,
+        headline="file(s) span more than one timezone",
+        note="Consider processing each timezone group separately.",
+        prompt="Process them together anyway?",
+    ),
+    BatchCheck(
+        token="zone_relabel",
+        applies=lambda opts: not opts.infer_from_filename,
+        find=find_zone_relabel,
+        assent_flag="--force-timezone",
+        refuses=REFUSES_APPLY,
+        headline="file(s) carry a timezone that differs from --timezone",
+        note="The embedded timezone is usually correct (set by the camera).",
+        prompt="Relabel them to the timezone given?",
+    ),
+    BatchCheck(
+        token="filename_unparseable",
+        applies=lambda opts: opts.infer_from_filename,
+        find=find_filename_unparseable,
+        assent_flag=None,
+        refuses=REFUSES_ALWAYS,
+        headline="file(s) have no timestamp in their name for --infer-from-filename",
+    ),
+]
+
+DESTINATION_OCCUPIED = BatchCheck(
+    token="destination_occupied",
+    assent_flag="--overwrite",
+    refuses=REFUSES_NEVER,
+    headline="file(s) already at the destination with different contents",
+    note="They were left in place.",
+)
+
+ALL_CHECKS: list[BatchCheck] = [*CHECKS, DESTINATION_OCCUPIED]
+
+
+def report_finding(check: BatchCheck, finding: Finding, opts: RunOptions) -> None:
+    """The finding as one batch_check event, and as lines on stderr."""
+    refused = check.refused(opts)
+    print(f"⚠️  {len(finding.files)} {check.headline}:", file=sys.stderr)
+    if finding.groups:
+        for label, names in finding.groups.items():
+            print(f"   {label}: {', '.join(names)}", file=sys.stderr)
+    else:
+        for name in finding.files:
             print(f"   {name}", file=sys.stderr)
-        emit_event("filename_parse_error", unparseable_files=unparseable)
+    if check.note:
+        print(check.note, file=sys.stderr)
+    if check.assent_flag and not check.granted(opts):
+        if check.refuses == REFUSES_APPLY and not opts.apply:
+            print(f"Previewing anyway; applying asks first (or pass {check.assent_flag}).",
+                  file=sys.stderr)
+        else:
+            print(f"Re-run with {check.assent_flag} to go on with them.", file=sys.stderr)
+    print(file=sys.stderr)
+    emit_event("batch_check",
+        check=check.token,
+        files=finding.files,
+        groups=finding.groups or None,
+        assent_flag=check.assent_flag,
+        refused=refused,
+    )
+
+
+def run_checks(files: list[Path], opts: RunOptions) -> None:
+    """Every check over the batch, in the order the user meets them. Every
+    finding is reported before the run stops, so one re-run answers them all."""
+    findings = []
+    for check in CHECKS:
+        if check.find is None or not check.applies(opts):
+            continue
+        finding = check.find(files, opts)
+        if finding:
+            findings.append((check, finding))
+    for check, finding in findings:
+        report_finding(check, finding, opts)
+
+    refused = [check for check, _ in findings if check.refused(opts)]
+    if any(check.assent_flag is None for check in refused):
+        print("ERROR: Cannot proceed with the files listed above.", file=sys.stderr)
         sys.exit(1)
-
-
-def run_preflight(files: list[Path], opts: RunOptions) -> None:
-    """Every batch-level check, in the order the user meets them."""
-    check_protected_sources(files, opts)
-    check_source_camera(files, opts)
-    check_timezones(files, opts)
-    check_filename_timestamps(files, opts)
+    for check in refused:
+        require_consent(False, check.prompt, [
+            f"ERROR: Cannot proceed: {check.headline}.",
+            f"Re-run with {check.assent_flag}, or from a terminal to be prompted.",
+        ])
