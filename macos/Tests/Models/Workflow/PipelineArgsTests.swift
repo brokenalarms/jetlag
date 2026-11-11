@@ -41,6 +41,7 @@ final class PipelineArgsTests: XCTestCase {
             sourceDir: "/Volumes/TestCard/DCIM",
             readyDir: "/tmp/ready",
             gyroflowEnabled: true,
+            tags: ["sony-a7v"],
             fileExtensions: [".mp4"]
         )
         let session = WorkflowSession(
@@ -60,7 +61,7 @@ final class PipelineArgsTests: XCTestCase {
         XCTAssertTrue(tasks.contains("tag"))
         XCTAssertFalse(tasks.contains("fix-timestamp"), "Set Timestamps is in the fixed frame, never a task")
         XCTAssertTrue(tasks.contains("gyroflow"))
-        XCTAssertFalse(tasks.contains("archive-source"))
+        XCTAssertTrue(tasks.contains("archive-source"))
         XCTAssertFalse(tasks.contains("ingest"))
         XCTAssertFalse(tasks.contains("organize"))
     }
@@ -78,7 +79,9 @@ final class PipelineArgsTests: XCTestCase {
         XCTAssertTrue(args.contains("--source"))
     }
 
-    func testArchiveSourceNotEnabledByDefault() {
+    /// Every step starts on, archiving included: a run that copies everything off
+    /// the card and leaves it unmarked is the one that gets imported twice.
+    func testArchiveSourceIsOnByDefault() {
         let profile = MediaProfile(
             type: .video,
             sourceDir: "/Volumes/TestCard/DCIM",
@@ -86,7 +89,25 @@ final class PipelineArgsTests: XCTestCase {
             fileExtensions: [".mp4"]
         )
         let session = WorkflowSession(profile: profile, profileName: "test-profile")
-        XCTAssertFalse(session.enabledSteps.contains(.archiveSource))
+        XCTAssertTrue(session.enabledSteps.contains(.archiveSource))
+    }
+
+    /// Tag has nothing to write for a profile with no tags, so it starts off there,
+    /// and on for one that has them.
+    func testTagStartsOnOnlyWhenTheProfileHasTags() {
+        func session(tags: [String]?) -> WorkflowSession {
+            WorkflowSession(profile: MediaProfile(type: .video, sourceDir: "/Volumes/TestCard/DCIM",
+                                                  readyDir: "/tmp/ready", tags: tags,
+                                                  fileExtensions: [".mp4"]),
+                            profileName: "test-profile")
+        }
+
+        XCTAssertFalse(session(tags: nil).enabledSteps.contains(.tag))
+        XCTAssertFalse(session(tags: []).enabledSteps.contains(.tag))
+        XCTAssertFalse(session(tags: [""]).enabledSteps.contains(.tag))
+        XCTAssertTrue(session(tags: ["sony-a7v"]).enabledSteps.contains(.tag))
+        XCTAssertTrue(session(tags: ["sony-a7v"]).availableSteps.contains(.tag),
+                      "Tag is still offered, only off")
     }
 
     func testCopyCompanionFiles() {
