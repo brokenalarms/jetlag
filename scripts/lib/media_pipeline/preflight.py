@@ -52,9 +52,12 @@ NO_ZONE = "none"
 @dataclass(frozen=True)
 class Finding:
     """What a check found: the files, and for a check that splits the batch,
-    the files under each label (a zone, a camera), in file order."""
+    the files under each label (a zone, a camera), in file order. chosen is
+    what the files were held against, in the same terms as the labels: the
+    offsets --timezone gives them, so a zone name compares as an offset."""
     files: list[str]
     groups: dict[str, list[str]] = field(default_factory=dict)
+    chosen: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -141,15 +144,18 @@ def find_zone_relabel(files: list[Path], opts: RunOptions) -> Optional[Finding]:
     with the offset that zone had when it was shot. A camera zone setting that
     differs is not one: relabelling it is what the correction is for."""
     pairs = []
+    chosen = []
     for fp in files:
         reading = read_file(str(fp))
         tagged = reading.tagged_zone
         expected = reading.declared_offset(opts.timezone_spec)
         if tagged and expected and _zone_label(tagged) != _zone_label(expected):
             pairs.append((_zone_label(tagged), fp.name))
+            if _zone_label(expected) not in chosen:
+                chosen.append(_zone_label(expected))
     if not pairs:
         return None
-    return Finding([name for _, name in pairs], _grouped(pairs))
+    return Finding([name for _, name in pairs], _grouped(pairs), chosen)
 
 
 def find_filename_unparseable(files: list[Path], opts: RunOptions) -> Optional[Finding]:
@@ -222,6 +228,8 @@ def report_finding(check: BatchCheck, finding: Finding, opts: RunOptions) -> Non
     """The finding as one batch_check event, and as lines on stderr."""
     refused = check.refused(opts)
     print(f"⚠️  {len(finding.files)} {check.headline}:", file=sys.stderr)
+    if finding.chosen:
+        print(f"   chosen: {', '.join(finding.chosen)}", file=sys.stderr)
     if finding.groups:
         for label, names in finding.groups.items():
             print(f"   {label}: {', '.join(names)}", file=sys.stderr)
@@ -241,6 +249,7 @@ def report_finding(check: BatchCheck, finding: Finding, opts: RunOptions) -> Non
         check=check.token,
         files=finding.files,
         groups=finding.groups or None,
+        chosen=finding.chosen or None,
         assent_flag=check.assent_flag,
         refused=refused,
     )

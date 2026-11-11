@@ -311,6 +311,10 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
             return "\(name): \(fileCount(count))"
         }
 
+        static func chosenLine(_ offsets: [String]) -> String {
+            String(localized: "batchCheck.chosen", defaultValue: "Chosen timezone: \(offsets.joined(separator: ", "))")
+        }
+
         static func fileList(_ files: [String]) -> String {
             let maxListed = 5
             var lines = files.prefix(maxListed).map { $0 }
@@ -322,11 +326,12 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         }
 
         static func message(_ check: BatchCheck) -> String {
+            let groupLines = check.groups.keys.sorted()
+                .map { groupLine(label: $0, count: check.groups[$0]?.count ?? 0) }
+            let chosenLines = check.chosen.isEmpty ? [] : [chosenLine(check.chosen)]
             let detail = check.groups.isEmpty
                 ? fileList(check.files)
-                : check.groups.keys.sorted()
-                    .map { groupLine(label: $0, count: check.groups[$0]?.count ?? 0) }
-                    .joined(separator: "\n")
+                : (chosenLines + groupLines).joined(separator: "\n")
             return "\(lead(check.kind, count: check.files.count))\n\n\(detail)"
         }
 
