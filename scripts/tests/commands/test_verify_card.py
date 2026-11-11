@@ -30,7 +30,8 @@ from pathlib import Path
 import pytest
 
 from helpers import SCRIPT_DIR
-from helpers.media import create_test_photo, create_test_tiff_raw, create_test_video
+from helpers.media import (create_test_heif, create_test_photo, create_test_raf, create_test_tiff_raw,
+                           create_test_video)
 from helpers.pipeline_schema import load_schema, validate_event
 from lib.exiftool import exiftool
 from lib.verify_card import SCHEMA_PATH
@@ -44,7 +45,7 @@ RENAMED_CLIP = "VID_20250619_072028_00_004.mp4"
 
 def run_verify(source: Path, locations: dict[str, str], *extra: str, env: dict | None = None) -> dict:
     args = [sys.executable, str(VERIFY_CARD), str(source),
-            "--media-extensions", ".mp4", ".jpg", ".arw",
+            "--media-extensions", ".mp4", ".jpg", ".arw", ".raf", ".hif",
             "--companion-extensions", ".lrv", ".thm",
             "--ignore-paths", "MISC"]
     for name, root in locations.items():
@@ -259,49 +260,70 @@ class TestWhatIsChecked:
         assert (hashlib.sha256(clip.read_bytes()).hexdigest(), clip.stat().st_mtime_ns) == before
 
 
-class TestRemoteLocation:
-    """A host:/path location is listed by rsync and never read over the network.
+def _rsyncs() -> list[str]:
+    """Every distinct rsync here: on a Mac the built-in openrsync and usually a
+    Homebrew rsync 3.x, which treat a remote path differently."""
+    found = {}
+    for candidate in (shutil.which("rsync"), "/usr/bin/rsync"):
+        if candidate and Path(candidate).exists():
+            found.setdefault(os.path.realpath(candidate), candidate)
+    return list(found.values())
 
-    A stand-in rsync drops the host and lists the path locally, so the listing is
-    real rsync output.
-    """
 
-    @pytest.fixture
-    def rsync_env(self, tmp_path):
-        stub = tmp_path / "fake-rsync"
-        stub.write_text(
-            "#!/bin/bash\n"
-            'args=()\nfor a in "$@"; do args+=("${a#nas:}"); done\n'
-            'exec rsync "${args[@]}"\n'
-        )
+@pytest.fixture(params=_rsyncs())
+def remote_env(request, tmp_path):
+    """Stand-ins for ssh and rsync that reach "nas" on this machine. The ssh one hands
+    its command to a shell, as ssh does on the host, so a remote path goes through
+    the same word splitting it would on a real host; the rsync one is the real rsync
+    using that ssh."""
+    ssh = tmp_path / "fake-ssh"
+    ssh.write_text('#!/bin/bash\nshift\nexec bash -c "$*"\n')
+    rsync = tmp_path / "fake-rsync"
+    rsync.write_text(f'#!/bin/bash\nexec {request.param} -e {ssh} "$@"\n')
+    for stub in (ssh, rsync):
         stub.chmod(0o755)
-        return {"JETLAG_RSYNC": str(stub)}
+    return {"JETLAG_RSYNC": str(rsync), "JETLAG_SSH": str(ssh)}
 
-    def test_untouched_remote_copy_matches_on_its_listed_size(self, card, tmp_path, rsync_env):
+
+class TestRemoteLocation:
+    """A host:/path location is listed by rsync and never read over the network."""
+
+    def test_untouched_remote_copy_matches_on_its_listed_size(self, card, tmp_path, remote_env):
         remote = tmp_path / "nas"
         copy_to(card / "DCIM" / CLIP, remote / "2025" / CLIP)
 
-        report = run_verify(card, {"NAS": f"nas:{remote}"}, env=rsync_env)
+        report = run_verify(card, {"NAS": f"nas:{remote}"}, env=remote_env)
 
         assert report["locations"]["NAS"]["remote"] is True
         assert outcome(report, f"DCIM/{CLIP}", "NAS") == ("matched", "size", [f"2025/{CLIP}"])
 
-    def test_written_remote_copy_is_judged_from_its_local_twin(self, card, tmp_path, rsync_env):
+    def test_remote_root_with_a_space_is_listed(self, card, tmp_path, remote_env):
+        """A mirror folder such as "Samsung 990": the host's shell would split an
+        unquoted path in two, and the location would read as unreachable."""
+        remote = tmp_path / "Mirror" / "Samsung 990"
+        copy_to(card / "DCIM" / CLIP, remote / "2025" / CLIP)
+
+        report = run_verify(card, {"NAS": f"nas:{remote}"}, env=remote_env)
+
+        assert report["locations"]["NAS"]["reachable"] is True
+        assert outcome(report, f"DCIM/{CLIP}", "NAS") == ("matched", "size", [f"2025/{CLIP}"])
+
+    def test_written_remote_copy_is_judged_from_its_local_twin(self, card, tmp_path, remote_env):
         local, remote = tmp_path / "T9", tmp_path / "nas"
         copy = copy_to(card / "DCIM" / CLIP, local / "2025" / RENAMED_CLIP)
         write_tags(copy, f"-XMP-xmpMM:PreservedFileName={CLIP}")
         copy_to(copy, remote / "2025" / RENAMED_CLIP)
 
-        report = run_verify(card, {"T9": str(local), "NAS": f"nas:{remote}"}, env=rsync_env)
+        report = run_verify(card, {"T9": str(local), "NAS": f"nas:{remote}"}, env=remote_env)
 
         assert outcome(report, f"DCIM/{CLIP}", "NAS") == ("matched", "data", [f"2025/{RENAMED_CLIP}"])
 
-    def test_written_remote_copy_without_a_twin_is_unverifiable(self, card, tmp_path, rsync_env):
+    def test_written_remote_copy_without_a_twin_is_unverifiable(self, card, tmp_path, remote_env):
         remote = tmp_path / "nas"
         copy = copy_to(card / "DCIM" / CLIP, remote / CLIP)
         write_tags(copy, f"-XMP-xmpMM:PreservedFileName={CLIP}")
 
-        report = run_verify(card, {"NAS": f"nas:{remote}"}, env=rsync_env)
+        report = run_verify(card, {"NAS": f"nas:{remote}"}, env=remote_env)
 
         assert outcome(report, f"DCIM/{CLIP}", "NAS") == ("unverifiable", None, [CLIP])
 
@@ -378,16 +400,6 @@ class TestVerifyHashesOnARemoteLocation:
     """A host:/path copy is hashed on its host, so only the digest crosses the network,
     and only with --include-network. Stand-ins for rsync and ssh drop the host and run
     locally, so the commands run are the real ones."""
-
-    @pytest.fixture
-    def remote_env(self, tmp_path):
-        rsync = tmp_path / "fake-rsync"
-        rsync.write_text('#!/bin/bash\nargs=()\nfor a in "$@"; do args+=("${a#nas:}"); done\nexec rsync "${args[@]}"\n')
-        ssh = tmp_path / "fake-ssh"
-        ssh.write_text('#!/bin/bash\nshift\nexec bash -c "$1"\n')
-        for stub in (rsync, ssh):
-            stub.chmod(0o755)
-        return {"JETLAG_RSYNC": str(rsync), "JETLAG_SSH": str(ssh)}
 
     def test_remote_location_is_labelled_network_and_skipped_without_include_network(self, card, tmp_path, remote_env):
         remote = tmp_path / "nas"
@@ -489,3 +501,19 @@ class TestUnmatchedClipDetails:
         details = report["files"]["DCIM/VID_20250619_042028_00_006.mp4"]
         assert details["opens"] is False and "duration_seconds" not in details
         assert "neighbours_backed_up" not in details, "the clip numbered beside it is missing too"
+
+    def test_missing_photo_is_not_judged_as_a_recording(self, card, tmp_path):
+        """A photo has no length, so ffprobe finding none says nothing about it: a
+        missing photo must not read as a broken recording."""
+        photos = {"DSC00001.jpg": create_test_photo, "DSC00002.arw": create_test_tiff_raw,
+                  "DSCF0003.raf": create_test_raf, "DSC00004.hif": create_test_heif}
+        for name, create in photos.items():
+            create(card / "DCIM" / name)
+        library = tmp_path / "T9"
+        library.mkdir()
+
+        report = run_verify(card, {"T9": str(library)})
+
+        for photo in (f"DCIM/{name}" for name in photos):
+            details = report["files"][photo]
+            assert "opens" not in details and "duration_seconds" not in details, photo

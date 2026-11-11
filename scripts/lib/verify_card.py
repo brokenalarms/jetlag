@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Optional
 
-from lib.data_portion import data_bytes, data_ranges, data_ranges_of, data_sha256
+from lib.data_portion import data_bytes, data_ranges, data_ranges_of, data_sha256, is_still
 from lib.exiftool import exiftool
 from lib.volumes import is_network
 
@@ -67,9 +67,9 @@ class CardFile:
     data_bytes: Optional[int]
     # With --verify-hashes: two copies recorded different hashes for this file.
     recorded_hashes_disagree: bool = False
-    # For a media file not on every location, what helps the user judge it: its
-    # length and whether it opens (no duration means a broken recording), and
-    # whether a clip numbered next to it was backed up.
+    # For a media file not on every location, what helps the user judge it: for a
+    # recording, its length and whether it opens (no duration means a broken
+    # recording), and whether a clip numbered next to it was backed up.
     duration_seconds: Optional[float] = None
     opens: Optional[bool] = None
     neighbours_backed_up: Optional[bool] = None
@@ -190,8 +190,12 @@ def parse_rsync_listing(listing: str, extensions: set[str]) -> list[Entry]:
 
 def list_remote(root: str, extensions: set[str]) -> Optional[list[Entry]]:
     rsync = os.environ.get("JETLAG_RSYNC", "rsync")
-    result = subprocess.run([rsync, "--list-only", "--recursive", root.rstrip("/") + "/"],
-                            capture_output=True, text=True)
+    host, path = _remote_parts(root)
+    # The host's shell splits the path on spaces. The Mac's built-in rsync (openrsync)
+    # sends the path as written, and rsync 3.x protects it itself unless told to send
+    # it as written too, so quoting it once for that shell lists it under either.
+    result = subprocess.run([rsync, "--list-only", "--recursive", f"{host}:{shlex.quote(path + '/')}"],
+                            capture_output=True, text=True, env={**os.environ, "RSYNC_OLD_ARGS": "1"})
     if result.returncode != 0:
         print(f"❌ Could not list {root}: {result.stderr.strip()}", file=sys.stderr)
         return None
@@ -459,8 +463,9 @@ def _have_ffprobe() -> bool:
 
 
 def describe_unmatched(report: Report) -> None:
-    """Gather, for each media file not on every location, its length, whether it
-    opens, and whether a clip numbered next to it is on every location."""
+    """Gather, for each media file not on every location, whether a clip numbered
+    next to it is on every location and, for a recording, its length and whether it
+    opens."""
     unmatched = [c for c in report.scan.checked if c.kind == "media" and not all(
         v.verdict == "matched" for v in report.verdicts[c.rel].values())]
     if not unmatched:
@@ -472,7 +477,7 @@ def describe_unmatched(report: Report) -> None:
             by_number[key] = card_file
     can_probe = _have_ffprobe()
     for card_file in unmatched:
-        if can_probe:
+        if can_probe and not is_still(card_file.path):
             card_file.duration_seconds = probe_duration(card_file.path)
             card_file.opens = card_file.duration_seconds is not None
         key = _clip_number(Path(card_file.rel))

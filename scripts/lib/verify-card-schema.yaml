@@ -57,13 +57,13 @@ events:
       duration_seconds:
         type: number
         optional: true
-        description: "For a media file not on every location: its length from ffprobe, when it has one"
+        description: "For a recording not on every location: its length from ffprobe, when it has one"
       opens:
         type: boolean
         optional: true
         description: >-
-          For a media file not on every location: whether ffprobe finds a duration. false
-          means a broken recording. Absent when ffprobe is not installed
+          For a recording not on every location: whether ffprobe finds a duration. false
+          means a broken recording. Absent for a photo, and when ffprobe is not installed
       neighbours_backed_up:
         type: boolean
         optional: true
