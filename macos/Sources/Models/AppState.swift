@@ -44,6 +44,8 @@ final class AppState {
 
     /// The Verify screen's choices and its last check.
     var verifySession = VerifySession()
+    /// The Verify tab's log view, owned here for the reason `logViewHolder` is.
+    let verifyLogHolder = LogViewHolder()
     private var verifyProcess: ScriptProcess?
     private var verifyTask: Task<Void, Never>?
 
@@ -476,6 +478,7 @@ final class AppState {
         verifySession.report = VerifyReport()
         verifySession.log = []
         verifySession.isRunning = true
+        verifySession.showsResults = true
 
         let (process, stream) = launcher.run(script: "verify-card.sh", args: args)
         verifyProcess = process
@@ -498,6 +501,10 @@ final class AppState {
                 verifyTask = nil
             }
         }
+    }
+
+    func clearVerifyLog() {
+        verifySession.log = []
     }
 
     func cancelVerify() {
