@@ -7,6 +7,7 @@ check has reported, so one answer covers them all.
 
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 from dataclasses import dataclass, field
@@ -16,7 +17,7 @@ from typing import Callable, Optional
 from lib import ingest_media, tag_media
 from lib.media_pipeline.consent import require_consent
 from lib.media_pipeline.events import emit_event
-from lib.media_pipeline.options import RunOptions
+from lib.media_pipeline.options import ARCHIVE_SOURCE, RunOptions
 from lib.timestamps.sources import normalize_timezone_input, read_file
 
 
@@ -163,6 +164,34 @@ def find_filename_unparseable(files: list[Path], opts: RunOptions) -> Optional[F
     return Finding(unparseable) if unparseable else None
 
 
+def is_writable(path: str) -> bool:
+    """Whether entries in the directory can be created, renamed and removed.
+
+    Permissions alone are not enough: a card whose lock switch is on mounts
+    read-only, yet access() still reports its root writable.
+    """
+    try:
+        read_only = bool(os.statvfs(path).f_flag & os.ST_RDONLY)
+    except OSError:
+        return False
+    return not read_only and os.access(path, os.W_OK)
+
+
+def source_action_dirs(opts: RunOptions) -> list[str]:
+    """The directories the source action writes to: delete removes files from
+    the source; archive renames the source out of its parent into the
+    destination."""
+    if opts.source_action == "delete":
+        return [opts.source_dir]
+    parent = os.path.dirname(os.path.abspath(os.path.normpath(opts.source_dir)))
+    return list(dict.fromkeys([parent, opts.archive_destination or parent]))
+
+
+def find_source_read_only(files: list[Path], opts: RunOptions) -> Optional[Finding]:
+    unwritable = [d for d in source_action_dirs(opts) if not is_writable(d)]
+    return Finding(unwritable) if unwritable else None
+
+
 CHECKS: list[BatchCheck] = [
     BatchCheck(
         token="protected_sources",
@@ -211,6 +240,15 @@ CHECKS: list[BatchCheck] = [
         refuses=REFUSES_ALWAYS,
         headline="file(s) have no timestamp in their name for --infer-from-filename",
     ),
+    BatchCheck(
+        token="source_read_only",
+        applies=lambda opts: opts.runs(ARCHIVE_SOURCE),
+        find=find_source_read_only,
+        assent_flag=None,
+        refuses=REFUSES_APPLY,
+        headline="folder(s) the archive-source step writes to are read-only",
+        note="Unlock the card or remount it writable, or leave archive-source out.",
+    ),
 ]
 
 DESTINATION_OCCUPIED = BatchCheck(
@@ -238,7 +276,9 @@ def report_finding(check: BatchCheck, finding: Finding, opts: RunOptions) -> Non
             print(f"   {name}", file=sys.stderr)
     if check.note:
         print(check.note, file=sys.stderr)
-    if check.assent_flag and not check.granted(opts):
+    if check.refuses == REFUSES_APPLY and not opts.apply and check.assent_flag is None:
+        print("Previewing anyway; applying stops here.", file=sys.stderr)
+    elif check.assent_flag and not check.granted(opts):
         if check.refuses == REFUSES_APPLY and not opts.apply:
             print(f"Previewing anyway; applying asks first (or pass {check.assent_flag}).",
                   file=sys.stderr)

@@ -125,7 +125,7 @@ final class ScriptedRunTests: XCTestCase {
 
         XCTAssertEqual(state.runSummary, PipelineSummary(
             processed: 2, succeeded: 1, changed: 1, failed: 1,
-            failedFiles: [Self.file], mode: .applied))
+            failedFiles: [Self.file], sourceActionFailed: false, mode: .applied))
         XCTAssertTrue(state.showRunSummary)
         XCTAssertFalse(state.isRunning)
 

@@ -56,6 +56,7 @@ enum PipelineEvent: Decodable {
         case assentFlag = "assent_flag"
         case processed, succeeded, changed, failed, mode
         case failedFiles = "failed_files"
+        case sourceActionFailed = "source_action_failed"
     }
 
     init(from decoder: Decoder) throws {
@@ -127,6 +128,7 @@ enum PipelineEvent: Decodable {
                 changed: try container.decode(Int.self, forKey: .changed),
                 failed: try container.decode(Int.self, forKey: .failed),
                 failedFiles: try container.decode([String].self, forKey: .failedFiles),
+                sourceActionFailed: try container.decode(Bool.self, forKey: .sourceActionFailed),
                 mode: mode))
         case "batch_check":
             let kindToken = try container.decode(String.self, forKey: .check)

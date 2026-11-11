@@ -83,7 +83,7 @@ final class RunTranscriptTests: XCTestCase {
         """))
         _ = transcript.apply(try event("""
         {"event": "pipeline_summary", "processed": 0, "succeeded": 0, "changed": 0, \
-        "failed": 0, "failed_files": [], "mode": "dry_run"}
+        "failed": 0, "failed_files": [], "source_action_failed": false, "mode": "dry_run"}
         """))
 
         XCTAssertEqual(transcript.emptySource?.source, "/Volumes/Untitled/DCIM")

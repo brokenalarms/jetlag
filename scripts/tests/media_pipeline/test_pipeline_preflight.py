@@ -25,14 +25,14 @@ import yaml
 from helpers.media import create_test_video as _create_video_raw
 from lib.media_pipeline.options import RunOptions
 from lib.media_pipeline.preflight import (
-    ALL_CHECKS, CHECKS, Finding, find_mixed_timezones, find_zone_relabel,
+    ALL_CHECKS, CHECKS, Finding, find_mixed_timezones, find_source_read_only, find_zone_relabel,
 )
 from helpers.pipeline import create_test_video, run_in_process, run_pipeline
 from helpers.pipeline_schema import enum_tokens, load_cli, validate_event
 
 
-def _opts(timezone_spec="+0900", **overrides) -> RunOptions:
-    return RunOptions(source_dir="/cards", target_dir="/ready", working_dir="/work",
+def _opts(timezone_spec="+0900", source_dir="/cards", **overrides) -> RunOptions:
+    return RunOptions(source_dir=source_dir, target_dir="/ready", working_dir="/work",
                       extensions=[".mp4"], timezone_spec=timezone_spec, **overrides)
 
 
@@ -185,6 +185,14 @@ def _filename_unparseable(source: Path) -> list[str]:
     return ["--infer-from-filename"]
 
 
+def _source_read_only(source: Path) -> list[str]:
+    create_test_video(source / "clip.mp4")
+    locked = source.parent / "locked"
+    locked.mkdir()
+    locked.chmod(0o555)
+    return ["--tasks", "archive-source", "--archive-destination", str(locked)]
+
+
 # token → (makes a batch that triggers it and returns its extra args,
 #          dry run refused, apply refused)
 SCENARIOS = {
@@ -192,6 +200,7 @@ SCENARIOS = {
     "mixed_timezones": (_mixed_timezones, True, True),
     "zone_relabel": (_zone_relabel, False, True),
     "filename_unparseable": (_filename_unparseable, True, True),
+    "source_read_only": (_source_read_only, False, True),
 }
 
 
@@ -456,3 +465,111 @@ class TestSourceCameraIsCheckedAgainstTheProfile:
         events = _events(result.stdout)
         assert result.returncode == 0, f"Actual: {result.output}, Expected: a clean run"
         assert _checks(events, "camera_mismatch") == []
+
+
+class TestSourceReadOnly:
+    """With archive-source on, the folders the source action writes to are
+    checked before the first file. A Sony card with its lock switch on mounted
+    read-only: the apply copied all 18 clips, the rename failed, and the run
+    still reported success with PRIVATE left on the card."""
+
+    def _statvfs_read_only(self, monkeypatch, read_only_path: str):
+        real = os.statvfs
+
+        class ReadOnly:
+            f_flag = os.ST_RDONLY
+
+        monkeypatch.setattr(os, "statvfs",
+                            lambda p: ReadOnly() if str(p) == read_only_path else real(p))
+
+    def test_a_read_only_mount_is_found_though_its_permissions_allow_writing(
+            self, tmp_path, monkeypatch):
+        """access() reported the locked card's root writable; the mount flag did not."""
+        source = tmp_path / "PRIVATE"
+        source.mkdir()
+        self._statvfs_read_only(monkeypatch, str(tmp_path))
+
+        finding = find_source_read_only([], _opts(source_dir=str(source)))
+
+        assert finding == Finding([str(tmp_path)])
+
+    def test_archive_checks_the_source_parent_and_the_destination(self, tmp_path):
+        source = tmp_path / "card" / "PRIVATE"
+        source.mkdir(parents=True)
+        destination = tmp_path / "archive"
+        destination.mkdir()
+        destination.chmod(0o555)
+
+        finding = find_source_read_only([], _opts(
+            source_dir=str(source), archive_destination=str(destination)))
+
+        assert finding == Finding([str(destination)])
+
+    def test_delete_checks_the_source_itself(self, tmp_path):
+        source = tmp_path / "PRIVATE"
+        source.mkdir()
+        source.chmod(0o555)
+
+        finding = find_source_read_only([], _opts(
+            source_dir=str(source), source_action="delete"))
+
+        assert finding == Finding([str(source)])
+
+    def test_writable_folders_are_not_a_finding(self, tmp_path):
+        source = tmp_path / "PRIVATE"
+        source.mkdir()
+
+        assert find_source_read_only([], _opts(source_dir=str(source))) is None
+
+    def test_apply_stops_before_any_file_reaches_the_target(self, temp_workspace, test_profile):
+        """Actual: nothing organized and the source still in place
+        Expected: a run that cannot archive does not copy first and fail after
+        """
+        extra = _source_read_only(temp_workspace["source"])
+
+        result = run_in_process([
+            "--profile", test_profile, "--source", str(temp_workspace["source"]),
+            "--target", str(temp_workspace["target"]), "--extensions", ".mp4",
+            "--timezone", "+0900", *extra, "--apply"])
+
+        assert result.returncode != 0, f"Actual: {result.output}, Expected: the apply refused"
+        assert sorted(temp_workspace["target"].rglob("*.mp4")) == []
+        assert temp_workspace["source"].exists()
+
+
+class TestSourceActionFailureIsReported:
+    """An archive that fails after the files are through says so as data, so the
+    app's completion popup can show it rather than leaving it in the log."""
+
+    def test_a_failed_archive_is_in_the_summary_and_the_exit_code(
+            self, temp_workspace, test_profile):
+        source = temp_workspace["source"]
+        create_test_video(source / "clip.mp4")
+        taken = source.parent / "archived"
+        taken.mkdir()
+        (taken / "already-here").write_text("")
+
+        result = run_in_process([
+            "--profile", test_profile, "--source", str(source),
+            "--target", str(temp_workspace["target"]), "--extensions", ".mp4",
+            "--timezone", "+0900", "--tasks", "archive-source",
+            "--archive-destination", str(source.parent), "--archived-name", "archived",
+            "--apply"])
+
+        summary = next(e for e in _events(result.stdout) if e["event"] == "pipeline_summary")
+        assert summary["source_action_failed"] is True, f"Actual: {summary}"
+        assert summary["failed"] == 0
+        assert result.returncode != 0, f"Actual: {result.output}, Expected: a non-zero exit"
+        assert source.exists()
+
+    def test_a_run_without_archive_source_reports_no_failure(self, temp_workspace, test_profile):
+        create_test_video(temp_workspace["source"] / "clip.mp4")
+
+        result = run_in_process([
+            "--profile", test_profile, "--source", str(temp_workspace["source"]),
+            "--target", str(temp_workspace["target"]), "--extensions", ".mp4",
+            "--timezone", "+0900", "--apply"])
+
+        summary = next(e for e in _events(result.stdout) if e["event"] == "pipeline_summary")
+        assert summary["source_action_failed"] is False
+        assert result.returncode == 0
