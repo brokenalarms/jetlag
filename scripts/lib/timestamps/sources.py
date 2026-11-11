@@ -41,6 +41,9 @@ PRESERVED_FILENAME_TAG = "XMP-xmpMM:PreservedFileName"
 # because an unqualified CreateDate in a QuickTime file prefers XMP.
 MOVIE_HEADER_CREATE_DATE_TAG = "MovieHeaderCreateDate"
 
+# The file's birth time, with its zone: macOS keeps one, Linux does not.
+BIRTH_TIME_TAG = "FileCreateDate"
+
 # Files imported before the jetlag XMP namespace carry their provenance as JSON in
 # this tag instead; it is read only to know such a file is already recorded.
 LEGACY_PROVENANCE_TAG = "XMP-xmpDM:LogComment"
@@ -65,7 +68,7 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
         "QuickTime:MediaModifyDate",
         "QuickTime:TrackCreateDate", "Keys:CreationDate",
         PRESERVED_FILENAME_TAG, LEGACY_PROVENANCE_TAG,
-        "Make", "Model",
+        "Make", "Model", BIRTH_TIME_TAG,
     ]
 
     try:
@@ -83,6 +86,14 @@ def read_exif_data(file_path: str) -> Dict[str, str]:
         print(f"❌ EXIF read failed for {os.path.basename(file_path)}: {e}",
               file=__import__('sys').stderr)
         return {}
+
+
+def birth_time_kept(file_path: str) -> list[str]:
+    """The write argument that carries a file's own birth time through a metadata
+    write: on macOS any exiftool write gives the file a new one. Empty where the
+    platform keeps none."""
+    birth = read_exif_data(file_path).get(BIRTH_TIME_TAG)
+    return [f"-{BIRTH_TIME_TAG}={birth}"] if birth else []
 
 
 def _complete_datetime_original(data: Dict[str, str]) -> None:

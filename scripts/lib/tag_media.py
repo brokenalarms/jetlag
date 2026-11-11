@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 from lib.exiftool import exiftool
-from lib.timestamps.sources import read_exif_data
+from lib.timestamps.sources import birth_time_kept, read_exif_data
 
 
 @dataclass
@@ -123,12 +123,14 @@ def camera_exif_fields(file_path: str, make: Optional[str], model: Optional[str]
 def add_camera_to_exif(file_path: str, make: Optional[str] = None, model: Optional[str] = None, apply: bool = True) -> List[str]:
     """Add camera info to EXIF Make and Model fields; return the fields written.
 
+    The write carries the file's own birth time, which it would otherwise reset.
     Raises MetadataWriteRefused, with exiftool's reason, when the file cannot be
     written.
     """
     fields = camera_exif_fields(file_path, make, model)
     if fields and apply:
-        exiftool.write_tags(file_path, [f'-{field}={value}' for field, value in fields.items()])
+        exiftool.write_tags(file_path, [f'-{field}={value}' for field, value in fields.items()]
+                            + birth_time_kept(file_path))
     return list(fields)
 
 def tag_media_file(file_path: str, finder_tags: List[str], make: Optional[str], model: Optional[str], apply: bool, write_exif: bool = True) -> Optional[TagResult]:
