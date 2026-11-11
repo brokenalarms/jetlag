@@ -128,6 +128,37 @@ final class ComponentsTests: XCTestCase {
         XCTAssertEqual(nodes(.checkBox, in: disabled).first?.isAccessibilityEnabled?(), false)
     }
 
+    /// How much of the row's label side is drawn, on a white ground: the sum of each
+    /// pixel's darkness across the left half, where the label sits in a grouped form.
+    private func labelInk<V: View>(_ row: V) throws -> CGFloat {
+        let hosted = host(Form { row }.formStyle(.grouped).environment(\.colorScheme, .light), width: 400)
+        hosted.appearance = NSAppearance(named: .aqua)
+        HostedWindow.settle(hosted)
+        let labelSide = NSRect(x: 0, y: 0, width: hosted.bounds.width / 2, height: hosted.bounds.height)
+        let bitmap = try XCTUnwrap(hosted.bitmapImageRepForCachingDisplay(in: labelSide))
+        hosted.cacheDisplay(in: labelSide, to: bitmap)
+        var ink: CGFloat = 0
+        for x in 0..<bitmap.pixelsWide {
+            for y in 0..<bitmap.pixelsHigh {
+                ink += 1 - (bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceGray)?.whiteComponent ?? 1)
+            }
+        }
+        return ink
+    }
+
+    /// A disabled switch keeps its label at full strength, and in dark mode an off switch
+    /// looks the same either way, so a disabled row must dim its own label: whether it is
+    /// disabled itself, or sits in a form disabled around it, as Workflow's is mid-run.
+    func testDisabledToggleRowDimsItsLabel() throws {
+        let enabled = try labelInk(ToggleRow(title: "Include network locations", isOn: .constant(false)))
+        let disabled = try labelInk(ToggleRow(title: "Include network locations", isOn: .constant(false),
+                                              isEnabled: false))
+        let disabledAround = try labelInk(ToggleRow(title: "Include network locations", isOn: .constant(false))
+            .disabled(true))
+        XCTAssertLessThan(disabled, enabled * 0.8)
+        XCTAssertLessThan(disabledAround, enabled * 0.8)
+    }
+
     private func actionBar(isRunning: Bool, canRun: Bool,
                            onRun: @escaping () -> Void = {}, onCancel: @escaping () -> Void = {}) -> some View {
         ActionBar(modes: [ActionMode(title: "Preview", value: false), ActionMode(title: "Commit", value: true)],
