@@ -88,8 +88,8 @@ final class BatchCheckTests: XCTestCase {
         XCTAssertTrue(args.contains("--allow-camera-mismatch"))
         XCTAssertTrue(args.contains("--allow-mixed-timezones"))
         XCTAssertEqual(Strings.BatchChecks.title([
-            BatchCheck(kind: .cameraMismatch, files: [], groups: [:], assentFlag: nil, refused: true),
-            BatchCheck(kind: .mixedTimezones, files: [], groups: [:], assentFlag: nil, refused: true),
+            BatchCheck(kind: .cameraMismatch, files: [], groups: [:], chosen: [], assentFlag: nil, refused: true),
+            BatchCheck(kind: .mixedTimezones, files: [], groups: [:], chosen: [], assentFlag: nil, refused: true),
         ]), Strings.BatchChecks.severalTitle)
     }
 
@@ -152,9 +152,9 @@ final class BatchCheckTests: XCTestCase {
     /// The dry run's completion popup says what the apply will ask about, one
     /// line per finding; an applied run's does not.
     func testTheDryRunSummaryHasALinePerFinding() {
-        let camera = BatchCheck(kind: .cameraMismatch, files: ["a.mp4", "b.mp4"], groups: [:],
+        let camera = BatchCheck(kind: .cameraMismatch, files: ["a.mp4", "b.mp4"], groups: [:], chosen: [],
                                 assentFlag: "--allow-camera-mismatch", refused: false)
-        let relabel = BatchCheck(kind: .zoneRelabel, files: ["c.mp4"], groups: [:],
+        let relabel = BatchCheck(kind: .zoneRelabel, files: ["c.mp4"], groups: [:], chosen: [],
                                  assentFlag: "--force-timezone", refused: false)
         func summary(_ mode: PipelineSummary.Mode) -> PipelineSummary {
             PipelineSummary(processed: 3, succeeded: 3, changed: 3, failed: 0, failedFiles: [], mode: mode)
@@ -172,7 +172,7 @@ final class BatchCheckTests: XCTestCase {
     /// no zone evidence is named for the user rather than by its token.
     func testTheMessageListsTheGroups() {
         let mixed = BatchCheck(kind: .mixedTimezones, files: ["a.mp4", "b.mp4", "c.mp4"],
-                               groups: ["+0900": ["a.mp4", "b.mp4"], BatchCheck.noZoneGroup: ["c.mp4"]],
+                               groups: ["+0900": ["a.mp4", "b.mp4"], BatchCheck.noZoneGroup: ["c.mp4"]], chosen: [],
                                assentFlag: "--allow-mixed-timezones", refused: true)
 
         let message = Strings.BatchChecks.message(mixed)
@@ -180,5 +180,18 @@ final class BatchCheckTests: XCTestCase {
         XCTAssertTrue(message.contains(Strings.BatchChecks.groupLine(label: "+0900", count: 2)))
         XCTAssertTrue(message.contains(Strings.BatchChecks.noZoneGroup))
         XCTAssertFalse(message.contains("\(BatchCheck.noZoneGroup):"))
+    }
+
+    /// A relabel says what the files were held against in the same form as
+    /// their zones, so a zone name is never compared with an offset.
+    func testTheRelabelMessageGivesTheChosenOffset() {
+        let relabel = BatchCheck(kind: .zoneRelabel, files: ["a.mp4", "b.mp4"],
+                                 groups: ["+0530": ["a.mp4", "b.mp4"]], chosen: ["+0800"],
+                                 assentFlag: "--force-timezone", refused: true)
+
+        let message = Strings.BatchChecks.message(relabel)
+
+        XCTAssertTrue(message.contains(Strings.BatchChecks.chosenLine(["+0800"])))
+        XCTAssertTrue(message.contains(Strings.BatchChecks.groupLine(label: "+0530", count: 2)))
     }
 }

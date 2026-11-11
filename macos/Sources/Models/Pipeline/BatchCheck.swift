@@ -20,6 +20,8 @@ struct BatchCheck: Equatable {
     let kind: Kind
     let files: [String]
     let groups: [String: [String]]
+    /// What the groups were held against, as offsets like the group labels.
+    let chosen: [String]
     let assentFlag: String?
     let refused: Bool
 }

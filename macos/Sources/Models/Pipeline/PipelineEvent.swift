@@ -52,7 +52,7 @@ enum PipelineEvent: Decodable {
         case renamedTo = "renamed_to"
         case dest, reason
         case error, result, message
-        case check, files, groups, refused, extensions
+        case check, files, groups, chosen, refused, extensions
         case assentFlag = "assent_flag"
         case processed, succeeded, changed, failed, mode
         case failedFiles = "failed_files"
@@ -139,6 +139,7 @@ enum PipelineEvent: Decodable {
                 kind: kind,
                 files: try container.decode([String].self, forKey: .files),
                 groups: try container.decodeIfPresent([String: [String]].self, forKey: .groups) ?? [:],
+                chosen: try container.decodeIfPresent([String].self, forKey: .chosen) ?? [],
                 assentFlag: try container.decodeIfPresent(String.self, forKey: .assentFlag),
                 refused: try container.decode(Bool.self, forKey: .refused)))
         case "no_media_files":

@@ -110,7 +110,16 @@ class TestFindZoneRelabel:
         fake_metadata.files[str(clip)] = {"DateTimeOriginal": "2025:10:05 10:00:00+08:00"}
 
         assert find_zone_relabel([clip], _opts("+0900")) == \
-            Finding(["clip.mp4"], {"+0800": ["clip.mp4"]})
+            Finding(["clip.mp4"], {"+0800": ["clip.mp4"]}, ["+0900"])
+
+    def test_a_zone_name_given_is_reported_as_the_offset_it_gives(self, fake_metadata):
+        """The finding compares like with like: the zone name is held against
+        the tag as the offset it had when the file was shot."""
+        clip = Path("/cards/clip.mp4")
+        fake_metadata.files[str(clip)] = {"DateTimeOriginal": "2025:10:05 10:00:00+05:30"}
+
+        assert find_zone_relabel([clip], _opts("Asia/Hong_Kong")) == \
+            Finding(["clip.mp4"], {"+0530": ["clip.mp4"]}, ["+0800"])
 
     def test_a_tagged_zone_matching_the_timezone_given_is_not(self, fake_metadata):
         clip = Path("/cards/clip.mp4")

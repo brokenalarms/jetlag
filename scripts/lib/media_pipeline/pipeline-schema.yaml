@@ -221,6 +221,14 @@ events:
         type: "map[string, list[string]]"
         optional: true
         description: "For a check that splits the batch: each label (a zone, a camera) → its files"
+      chosen:
+        type: "list[string]"
+        optional: true
+        description: >-
+          zone_relabel only: the offsets --timezone gives the flagged files, in
+          the same form as the group labels, so a zone name is compared as the
+          offset it had when each file was shot. More than one when the batch
+          spans a daylight-saving change.
       assent_flag:
         type: string
         optional: true

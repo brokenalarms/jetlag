@@ -574,8 +574,8 @@ class TestPipelineMachineOutput:
 
         events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
         checks = [e for e in events if e.get("event") == "batch_check"]
-        assert [(c["check"], c["groups"], c["refused"]) for c in checks] == \
-            [("zone_relabel", {"+0900": ["test.mp4"]}, False)], \
+        assert [(c["check"], c["groups"], c["chosen"], c["refused"]) for c in checks] == \
+            [("zone_relabel", {"+0900": ["test.mp4"]}, ["+0200"], False)], \
             f"Actual: {checks}, Expected: one zone_relabel the dry run went on past"
 
         files = self._parse_events(result.stdout)
