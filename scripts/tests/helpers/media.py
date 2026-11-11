@@ -64,6 +64,20 @@ def create_insta360_file(path: Path, model: str) -> Path:
     return path
 
 
+def create_insv_with_corrupted_trailer(path: Path, **exif_tags) -> Path:
+    """A clip shaped like the Insta360 X6's: a valid trailer signature, an empty
+    record table, and a stated length reaching back into the last atom, so
+    exiftool refuses every metadata write as a corrupted Insta360 trailer."""
+    create_test_video(path, **exif_tags)
+    records = bytes(64)
+    overlap = 16
+    footer = bytes(38) + struct.pack("<I", len(records) + FOOTER_LENGTH + overlap) + bytes(4) + INSTA360_MAGIC
+    assert len(footer) == FOOTER_LENGTH
+    with open(path, "ab") as f:
+        f.write(records + footer)
+    return path
+
+
 def create_motion_video(path):
     """A video with a second track whose handler names it gyro data, as a camera's
     motion track is named. ExifTool reads it from the header exactly as it reads a

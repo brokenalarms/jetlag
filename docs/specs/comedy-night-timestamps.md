@@ -111,8 +111,9 @@ to the Perth time under `--update-filename-dates`, and never rewrite the UTC fie
 
 ## 3. `.insv` from the X6 cannot be written
 
-ExifTool 13.50 and 13.55 refuse every X6 clip: `Corrupted Insta360 trailer`, with or
-without `-m`. The trailer's size and signature are valid, but the record table before them
+ExifTool 13.50 and 13.55 refuse every X6 clip. Without `-m` the refusal is a minor
+error, `Terminator found in Meta with 41 bytes remaining`; with `-m` it is
+`Corrupted Insta360 trailer`. The trailer's size and signature are valid, but the record table before them
 is all zeros; X4 clips (NZ, firmware v1.9.21) write normally. The camera produced the
 table, not jetlag: no write ever succeeded on these files, and exiftool writes to a
 temporary file. The user is reporting it to ExifTool's author.

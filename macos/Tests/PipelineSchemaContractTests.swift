@@ -379,6 +379,17 @@ final class RowOutcomeTests: XCTestCase {
             Strings.DiffTable.wouldFixStatus, Strings.DiffTable.wouldMoveStatusAfterFix))
     }
 
+    /// An Insta360 clip whose metadata exiftool cannot write still has its file
+    /// times set and is filed: the row says so, rather than "Fixed" or "Error".
+    func testAClipWithItsMetadataSkippedReadsAsFileTimesSet() {
+        let skipped = row(timestamp: "metadata_skipped", organize: "copied",
+                          dest: "/Volumes/T9/Ready/2026/2026-10-06/VID_20261006_152802_00_001.insv",
+                          result: "changed")
+
+        XCTAssertEqual(skipped.outcome.statusLabel, Strings.DiffTable.combinedStatus(
+            Strings.DiffTable.metadataSkippedStatus, Strings.DiffTable.copiedStatusAfterFix))
+    }
+
     /// A row that only gains missing fields keeps its own wording when combined with
     /// its organize outcome, rather than reading as "Would fix + copy".
     func testPlannedAdditionReadsAsAddingMetadataNotAFix() {

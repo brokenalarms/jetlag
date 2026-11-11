@@ -838,9 +838,9 @@ class TestPipelineMachineOutput:
 
     @staticmethod
     def _refuse_writes(monkeypatch):
-        """exiftool refusing every write, as it does the Insta360 X6's .insv."""
+        """exiftool refusing every write for a reason no fallback answers."""
         def refuse(*_args, **_kwargs):
-            raise MetadataWriteRefused("Corrupted Insta360 trailer")
+            raise MetadataWriteRefused("Not a valid MP4")
         monkeypatch.setattr(exiftool, "write_tags", refuse)
 
     def test_error_field_on_timestamp_result_exception(self, temp_workspace, test_profile, monkeypatch):
@@ -862,7 +862,7 @@ class TestPipelineMachineOutput:
 
         events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
         errors = [(e.get("action"), e.get("error")) for e in events if e.get("event") == "timestamp_result"]
-        assert errors == [("error", "Corrupted Insta360 trailer")], \
+        assert errors == [("error", "Not a valid MP4")], \
             f"Actual: {errors}, Expected: one error carrying exiftool's reason"
 
     def test_error_path_emits_original_time(self, temp_workspace, test_profile, monkeypatch):

@@ -21,7 +21,7 @@ from lib.timestamps.sources import (
 @dataclass
 class TimestampFixResult:
     file: str
-    timestamp_action: str  # "fixed" | "would_fix" | "added" | "would_add" | "no_change" | "error"
+    timestamp_action: str  # "fixed" | "would_fix" | "added" | "would_add" | "metadata_skipped" | "no_change" | "error"
     original_time: Optional[str] = None
     corrected_time: Optional[str] = None
     timestamp_source: Optional[str] = None
@@ -100,6 +100,10 @@ REFUSED_WITHOUT_FORCE = "refused_without_force"  # applying would relabel a zone
 ZONE_NEEDED = "zone_needed"                      # a CreateDate, no DateTimeOriginal, no --timezone
 NO_TIMESTAMP = "no_timestamp"                    # nothing to correct from
 BIRTH_TIME_IN_FUTURE = "birth_time_in_future"    # the corrected birth time is later than now
+
+# A result action: the camera's file refused every metadata write, so only its
+# file times were set.
+METADATA_SKIPPED = "metadata_skipped"
 
 
 @dataclass(frozen=True)
