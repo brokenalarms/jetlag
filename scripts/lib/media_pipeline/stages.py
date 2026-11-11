@@ -229,7 +229,7 @@ class FixTimestampStage(Stage):
         if corrected_dt:
             ctx.organize_date = corrected_dt.strftime("%Y-%m-%d")
         return StageOutcome(
-            changed=ts_result.timestamp_action in ("would_fix", "fixed", "would_add", "added"))
+            changed=ts_result.timestamp_action in ("would_fix", "fixed", "would_add", "added", "metadata_skipped"))
 
 
 class RenameStage(Stage):

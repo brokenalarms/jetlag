@@ -82,7 +82,10 @@ events:
         type: string
         # added / would_add: every field written was empty and the file times
         # already agree — the stored time is not wrong, only incomplete.
-        enum: [fixed, would_fix, added, would_add, no_change, error]
+        # metadata_skipped: exiftool refused every metadata write as a corrupted
+        # Insta360 trailer (the camera's own), so only the file times were set;
+        # the rename and the date folder still follow the corrected time.
+        enum: [fixed, would_fix, added, would_add, metadata_skipped, no_change, error]
       original_time: { type: string, optional: true }
       corrected_time: { type: string, optional: true }
       source: { type: string, optional: true }

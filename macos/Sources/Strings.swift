@@ -591,6 +591,8 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let fixedStatus = String(localized: "diffTable.fixed.status", defaultValue: "Fixed")
         static let wouldAddStatus = String(localized: "diffTable.wouldAdd.status", defaultValue: "Would add metadata")
         static let addedStatus = String(localized: "diffTable.added.status", defaultValue: "Added metadata")
+        static let metadataSkippedStatus = String(localized: "diffTable.metadataSkipped.status",
+            defaultValue: "File times set")
         static let copiedStatus = String(localized: "diffTable.copied.status", defaultValue: "Copied")
         static let movedStatus = String(localized: "diffTable.moved.status", defaultValue: "Moved")
         static let moveSkippedStatus = String(localized: "diffTable.moveSkipped.status", defaultValue: "Move skipped")
@@ -668,6 +670,10 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let fixedChange = String(localized: "diffTable.fixed.change", defaultValue: "Fixed")
         static let wouldAddChange = String(localized: "diffTable.wouldAdd.change", defaultValue: "Would add metadata")
         static let addedChange = String(localized: "diffTable.added.change", defaultValue: "Added metadata")
+        static let metadataSkippedChange = String(localized: "diffTable.metadataSkipped.change",
+            defaultValue: "File times only")
+        static let metadataSkippedHelp = String(localized: "diffTable.metadataSkipped.help",
+            defaultValue: "The camera wrote this file in a form its metadata cannot be rewritten in (a corrupted Insta360 trailer), so the metadata is left as the camera wrote it. Its birth time, name and date folder were still corrected.")
         static let noChangeChange = String(localized: "diffTable.noChange.change", defaultValue: "No change")
         static let errorChange = String(localized: "diffTable.error.change", defaultValue: "Error")
         static let birthTimeInFutureChange = String(

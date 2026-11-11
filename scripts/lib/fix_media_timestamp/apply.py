@@ -1,12 +1,12 @@
-"""Applying a correction: at most one exiftool write, and the result."""
+"""Applying a correction: one exiftool write (a second when the metadata is refused and the file times go alone), and the result."""
 
 from __future__ import annotations
 
 import sys
 
-from lib.exiftool import MetadataWriteRefused, exiftool
+from lib.exiftool import Insta360TrailerCorrupted, MetadataWriteRefused, exiftool
 from lib.fix_media_timestamp.plan import (
-    BIRTH_TIME_IN_FUTURE, NO_TIMESTAMP, REFUSED_WITHOUT_FORCE, ZONE_NEEDED, CorrectionPlan, TimestampFixResult,
+    BIRTH_TIME_IN_FUTURE, METADATA_SKIPPED, NO_TIMESTAMP, REFUSED_WITHOUT_FORCE, ZONE_NEEDED, CorrectionPlan, TimestampFixResult,
     machine_original_time,
 )
 
@@ -48,6 +48,8 @@ def apply_correction(plan: CorrectionPlan) -> TimestampFixResult:
     if write_args:
         try:
             written = exiftool.write_tags(plan.current.file_path, write_args)
+        except Insta360TrailerCorrupted as refusal:
+            return set_file_times_only(plan, str(refusal))
         except MetadataWriteRefused as refusal:
             written, write_error = False, str(refusal)
             print(f"   ❌ exiftool could not write this file: {write_error}", file=sys.stderr)
@@ -67,3 +69,18 @@ def apply_correction(plan: CorrectionPlan) -> TimestampFixResult:
     if not plan.has_changes:
         return plan.result("no_change")
     return plan.result("added" if plan.only_adds_fields else "fixed")
+
+
+def set_file_times_only(plan: CorrectionPlan, reason: str) -> TimestampFixResult:
+    """The metadata cannot be written, so the file times alone are corrected: the
+    birth time, and from it the filename and the date folder. Such a file reaches
+    an editor only through its camera maker's own export, which carries the time
+    from the file's own clock."""
+    print(f"   ⚠️  Metadata left as the camera wrote it: {reason}", file=sys.stderr)
+    if plan.file_time_args:
+        try:
+            exiftool.write_tags(plan.current.file_path, plan.file_time_args)
+        except MetadataWriteRefused as refusal:
+            print(f"   ❌ Failed to apply file timestamps: {refusal}", file=sys.stderr)
+            return plan.result("error", error=str(refusal))
+    return plan.result(METADATA_SKIPPED)

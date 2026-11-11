@@ -64,6 +64,38 @@ def create_insta360_file(path: Path, model: str) -> Path:
     return path
 
 
+def create_insv_with_corrupted_trailer(path: Path, **exif_tags) -> Path:
+    """A clip shaped like the Insta360 X6's: a valid trailer signature, an empty
+    record table, and a stated length reaching back into the last atom, so
+    exiftool refuses every metadata write as a corrupted Insta360 trailer."""
+    create_test_video(path, **exif_tags)
+    records = bytes(64)
+    overlap = 16
+    footer = bytes(38) + struct.pack("<I", len(records) + FOOTER_LENGTH + overlap) + bytes(4) + INSTA360_MAGIC
+    assert len(footer) == FOOTER_LENGTH
+    with open(path, "ab") as f:
+        f.write(records + footer)
+    return path
+
+
+_refuses_corrupted_trailer: bool | None = None
+
+
+def exiftool_refuses_corrupted_insta360_trailer() -> bool:
+    """Whether the exiftool in use checks an Insta360 trailer before writing. The
+    app ships 13.50, which does; Ubuntu's packaged 12.76, which CI installs, writes
+    such a clip without a word, so the tests that need the real refusal skip there."""
+    global _refuses_corrupted_trailer
+    if _refuses_corrupted_trailer is None:
+        d = tempfile.mkdtemp(prefix="pytest_insta360_probe_")
+        clip = create_insv_with_corrupted_trailer(Path(d) / "probe.insv")
+        result = subprocess.run(["exiftool", "-overwrite_original", "-Make=Probe", str(clip)],
+                                capture_output=True, text=True)
+        _refuses_corrupted_trailer = "Corrupted Insta360 trailer" in result.stderr
+        shutil.rmtree(d, ignore_errors=True)
+    return _refuses_corrupted_trailer
+
+
 def create_motion_video(path):
     """A video with a second track whose handler names it gyro data, as a camera's
     motion track is named. ExifTool reads it from the header exactly as it reads a
