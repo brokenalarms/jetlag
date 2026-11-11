@@ -4,6 +4,7 @@ Regression tests for fix-media-timestamp
 Tests critical behaviors documented in AGENTS.md
 """
 
+import json
 import os
 import sys
 import tempfile
@@ -13,6 +14,7 @@ import pytest
 
 from helpers.media import create_test_video
 from helpers import SCRIPT_DIR
+from helpers.pipeline import run_in_process
 from lib.timestamps.sources import clear_exif_cache, read_exif_data, read_file
 
 
@@ -395,3 +397,48 @@ class TestExtractMetadataTimezone:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestInsta360X6ClockIsCorroboratedUTC:
+    """The Comedy night Insta360 X6 (Perth, UTC+8): the camera named clip 001 in
+    UTC-7 (VID_20261006_002802…) while its movie header and tracks hold the
+    correct instant in UTC (07:28:02). The 10 Oct code took the filename over that
+    clock and planned to overwrite the UTC fields with a time 15 hours early. The
+    filename minus the clock is a legal zone offset (-07:00), which makes the
+    clock corroborated UTC: the correction is that instant in the declared zone,
+    the rename is to the Perth time, and no UTC field is rewritten. Pinned with
+    the header and tracks agreeing, as a stale header would be healed to them.
+    """
+
+    CLIP = "VID_20261006_002802_00_001.mp4"
+    UTC = "2026:10:06 07:28:02"
+    UTC_FIELDS = ("QuickTime:CreateDate", "QuickTime:MediaCreateDate", "QuickTime:TrackCreateDate")
+
+    def _utc_fields(self, path):
+        out = subprocess.run(["exiftool", "-s3", *(f"-{f}" for f in self.UTC_FIELDS), str(path)],
+                             capture_output=True, text=True, check=True).stdout
+        return out.split()
+
+    def test_the_utc_clock_wins_the_name_follows_and_the_utc_fields_stay(self, temp_workspace, test_profile):
+        """Actual: the correction, the new name, and the UTC fields after the apply
+        Expected: 15:28:02+08:00, VID_20261006_152802_00_001.mp4, each still 07:28:02"""
+        create_test_video(temp_workspace["source"] / self.CLIP,
+                          **{field: self.UTC for field in self.UTC_FIELDS})
+
+        result = run_in_process([
+            "--profile", test_profile, "--source", str(temp_workspace["source"]),
+            "--target", str(temp_workspace["target"]), "--extensions", ".mp4",
+            "--timezone", "+0800", "--update-filename-dates", "--tasks", "--apply",
+        ])
+
+        events = [json.loads(line) for line in result.stdout.splitlines() if line.startswith("{")]
+        timestamp = next(e for e in events if e["event"] == "timestamp_result")
+        assert (timestamp["source"], timestamp["corrected_time"]) == \
+            ("moviecreatedate", "2026:10:06 15:28:02+08:00"), f"Actual: {timestamp}"
+        assert not [f for f in timestamp.get("stale_fields", []) if f in self.UTC_FIELDS], \
+            f"Actual: {timestamp.get('stale_fields')}, Expected: no UTC field planned"
+        organized = list(temp_workspace["target"].rglob("*.mp4"))
+        assert [p.name for p in organized] == ["VID_20261006_152802_00_001.mp4"], \
+            f"Actual: {organized}, Expected: renamed to the Perth time"
+        assert self._utc_fields(organized[0]) == [self.UTC.split()[0], self.UTC.split()[1]] * 3, \
+            f"Actual: {self._utc_fields(organized[0])}, Expected: every UTC field still {self.UTC}"
