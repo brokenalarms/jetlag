@@ -11,6 +11,7 @@ struct BatchCheck: Equatable {
         case mixedTimezones = "mixed_timezones"
         case zoneRelabel = "zone_relabel"
         case filenameUnparseable = "filename_unparseable"
+        case sourceReadOnly = "source_read_only"
         case destinationOccupied = "destination_occupied"
     }
 

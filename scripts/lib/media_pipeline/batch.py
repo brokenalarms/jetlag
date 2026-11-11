@@ -91,17 +91,18 @@ def report_organize_conflicts(stats: BatchStats, opts: RunOptions) -> None:
         report_finding(DESTINATION_OCCUPIED, Finding(stats.organize_conflicts), opts)
 
 
-def act_on_source(opts: RunOptions, stats: BatchStats) -> None:
-    """Archive or delete the source once every file is through.
+def act_on_source(opts: RunOptions, stats: BatchStats) -> bool:
+    """Archive or delete the source once every file is through; True when that
+    was attempted and failed.
 
     A failed file's only copy may still be in the source directory, so archiving
     it away after failures would strand it.
     """
     if not opts.runs(ARCHIVE_SOURCE):
-        return
+        return False
     if stats.failed > 0:
         print(f"📦 Skipping archive source: {stats.failed} file(s) failed.", file=sys.stderr)
-        return
+        return False
     print("📦 Archive source...", file=sys.stderr)
     if opts.source_action == "delete":
         arc_result = archive_source.delete_files(opts.source_dir, stats.source_files, opts.apply,
@@ -114,6 +115,7 @@ def act_on_source(opts: RunOptions, stats: BatchStats) -> None:
         )
     if arc_result.failed:
         print("   ⚠️  Archive-source failed", file=sys.stderr)
+    return arc_result.failed
 
 
 def verified_on_backups(opts: RunOptions) -> set[Path]:
@@ -147,7 +149,7 @@ def finish_working_dir(opts: RunOptions, stats: BatchStats) -> None:
                   "with no failures", file=sys.stderr)
 
 
-def print_summary(stats: BatchStats, apply: bool) -> None:
+def print_summary(stats: BatchStats, apply: bool, source_action_failed: bool) -> None:
     """Print pipeline summary to stderr."""
     print(file=sys.stderr)
     print("===========================================", file=sys.stderr)
@@ -165,6 +167,9 @@ def print_summary(stats: BatchStats, apply: bool) -> None:
         for f in stats.failed_files:
             print(f"  - {f}", file=sys.stderr)
 
+    if source_action_failed:
+        print("❌ Archive source failed: see the archive-source lines above.", file=sys.stderr)
+
     if apply and stats.failed > 0:
         print(f"❌ Media pipeline complete - {stats.failed} file(s) failed and were left in the working directory.", file=sys.stderr)
     elif apply:
@@ -174,7 +179,7 @@ def print_summary(stats: BatchStats, apply: bool) -> None:
         print("   Use --apply to execute timestamp fixes and file organization.", file=sys.stderr)
 
 
-def report_summary(stats: BatchStats, apply: bool) -> None:
+def report_summary(stats: BatchStats, apply: bool, source_action_failed: bool) -> None:
     """The run's outcome as data, for the app's completion popup, and as text for
     the log. Neither side reads the other."""
     emit_event("pipeline_summary",
@@ -183,9 +188,10 @@ def report_summary(stats: BatchStats, apply: bool) -> None:
         changed=stats.changed,
         failed=stats.failed,
         failed_files=stats.failed_files,
+        source_action_failed=source_action_failed,
         mode="applied" if apply else "dry_run",
     )
-    print_summary(stats, apply)
+    print_summary(stats, apply, source_action_failed)
 
 
 def run(args, working_dir: WorkingDir) -> NoReturn:
@@ -207,7 +213,7 @@ def run(args, working_dir: WorkingDir) -> NoReturn:
 
     stats = process_files(files, with_gyroflow_preset(opts), working_dir)
     report_organize_conflicts(stats, opts)
-    act_on_source(opts, stats)
+    source_action_failed = act_on_source(opts, stats)
     finish_working_dir(opts, stats)
-    report_summary(stats, opts.apply)
-    sys.exit(1 if stats.failed > 0 else 0)
+    report_summary(stats, opts.apply, source_action_failed)
+    sys.exit(1 if stats.failed > 0 or source_action_failed else 0)

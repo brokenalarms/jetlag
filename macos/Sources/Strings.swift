@@ -188,6 +188,10 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
 
         static func runSummaryCheck(_ check: BatchCheck) -> String {
             let title = BatchChecks.title(check.kind)
+            if check.kind == .sourceReadOnly {
+                return String(localized: "workflow.runSummary.check.sourceReadOnly",
+                              defaultValue: "\(title): \(check.files.joined(separator: ", ")). Applying stops before any file is copied.")
+            }
             let count = BatchChecks.fileCount(check.files.count)
             return check.assentFlag == nil
                 ? String(localized: "workflow.runSummary.check",
@@ -206,6 +210,9 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
             return String(localized: "workflow.runSummary.failed",
                           defaultValue: "\(count) failed:\n\(listed)")
         }
+
+        static let runSummarySourceActionFailed = String(localized: "workflow.runSummary.sourceActionFailed",
+            defaultValue: "Archive Source failed: the source was left where it was. Show Output says why.")
 
         static let showOutputButton = String(localized: "workflow.runSummary.showOutput",
             defaultValue: "Show Output")
@@ -240,6 +247,8 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
                 String(localized: "batchCheck.zoneRelabel.title", defaultValue: "Timezone Conflict")
             case .filenameUnparseable:
                 String(localized: "batchCheck.filenameUnparseable.title", defaultValue: "No Time in Filenames")
+            case .sourceReadOnly:
+                String(localized: "batchCheck.sourceReadOnly.title", defaultValue: "Source Is Read-Only")
             case .destinationOccupied:
                 String(localized: "batchCheck.destinationOccupied.title", defaultValue: "Files Already at Destination")
             }
@@ -255,7 +264,7 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
                 String(localized: "batchCheck.mixedTimezones.button", defaultValue: "Process Together")
             case .zoneRelabel:
                 String(localized: "batchCheck.zoneRelabel.button", defaultValue: "Override Timezone")
-            case .filenameUnparseable:
+            case .filenameUnparseable, .sourceReadOnly:
                 ""
             case .destinationOccupied:
                 String(localized: "batchCheck.destinationOccupied.button", defaultValue: "Overwrite")
@@ -288,6 +297,9 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
                              defaultValue: "1 file has no date and time in its name, so filenames cannot be the time source for this batch.")
                     : String(localized: "batchCheck.filenameUnparseable.message.many",
                              defaultValue: "\(count) files have no date and time in their names, so filenames cannot be the time source for this batch.")
+            case .sourceReadOnly:
+                String(localized: "batchCheck.sourceReadOnly.message",
+                       defaultValue: "Archive Source can't rename or move the source: the folders below are read-only. Unlock the card (its lock switch) or turn off Archive Source. Applying stops before any file is copied.")
             case .destinationOccupied:
                 one ? String(localized: "batchCheck.destinationOccupied.message.one",
                              defaultValue: "1 file already exists at the destination with different contents. Overwrite it?")

@@ -125,7 +125,7 @@ final class ScriptedRunTests: XCTestCase {
 
         XCTAssertEqual(state.runSummary, PipelineSummary(
             processed: 2, succeeded: 1, changed: 1, failed: 1,
-            failedFiles: [Self.file], mode: .applied))
+            failedFiles: [Self.file], sourceActionFailed: false, mode: .applied))
         XCTAssertTrue(state.showRunSummary)
         XCTAssertFalse(state.isRunning)
 
@@ -166,5 +166,30 @@ final class ScriptedRunTests: XCTestCase {
         state.workflowSession.grantPendingAssent()
         XCTAssertTrue(state.workflowSession.applyMode)
         XCTAssertTrue(state.workflowSession.buildPipelineArgs().args.contains("--allow-mixed-timezones"))
+    }
+
+    /// Dry run, Done on its popup, Apply, Run: the preview just read is the run
+    /// about to happen, so Apply goes straight through.
+    @MainActor
+    func testApplyAfterAFinishedDryRunDoesNotAskForADryRun() async throws {
+        let launcher = ReplayingLauncher([
+            "scan-source.sh": [countLine(1)],
+            "media-pipeline.sh": [try example("pipeline_summary")],
+        ])
+        let state = makeState(launcher: launcher)
+        state.workflowSession.timezone.value = "Asia/Kolkata"
+        state.workflowSession.toggle(.archiveSource)
+
+        state.workflowSession.clearRunAssent()
+        await runToCompletion(state)
+        XCTAssertFalse(state.isRunning)
+        state.showRunSummary = false
+
+        state.workflowSession.applyMode = true
+        state.workflowSession.clearRunAssent()
+        state.runWorkflow(check: pythonReady)
+
+        XCTAssertFalse(state.workflowSession.showDryRunStale,
+                       "asked: \(String(describing: state.workflowSession.dryRunStaleReason))")
     }
 }

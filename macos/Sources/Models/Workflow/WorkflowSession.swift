@@ -434,7 +434,10 @@ final class WorkflowSession {
 
             if !stabilization.isEmpty {
                 let preset: [String: Any] = ["stabilization": stabilization]
-                if let data = try? JSONSerialization.data(withJSONObject: preset),
+                // Sorted, so the same settings are always the same argument: a
+                // dictionary's key order is not stable, and the dry-run check
+                // compares arguments as text.
+                if let data = try? JSONSerialization.data(withJSONObject: preset, options: .sortedKeys),
                    let json = String(data: data, encoding: .utf8) {
                     args += ["--gyroflow-preset", json]
                 }

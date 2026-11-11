@@ -311,6 +311,24 @@ final class PipelineArgsTests: XCTestCase {
         XCTAssertTrue(json.contains("adaptive_zoom_method"))
     }
 
+    /// The dry-run check compares arguments as text, and a dictionary's key order
+    /// is not stable between instances: the same settings came out in a different
+    /// order at Apply than at the dry run, which then read as "Settings Changed".
+    /// One set of settings is one exact argument.
+    func testGyroflowPresetIsOneExactArgumentForTheSameSettings() {
+        let session = makeSession()
+        session.workingProfile.gyroflowSettings = StabilizationSettings(
+            maxZoom: 105.0,
+            adaptiveZoomWindow: 15.0,
+            adaptiveZoomMethod: 1
+        )
+        let (_, args) = session.buildPipelineArgs()
+
+        let idx = args.firstIndex(of: "--gyroflow-preset")!
+        XCTAssertEqual(args[idx + 1],
+            #"{"stabilization":{"adaptive_zoom_method":1,"adaptive_zoom_window":15,"max_zoom":105}}"#)
+    }
+
     func testGyroflowPresetNotIncludedWhenStepDisabled() {
         let session = makeSession()
         session.enabledSteps.remove(.gyroflow)

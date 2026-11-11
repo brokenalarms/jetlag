@@ -13,7 +13,7 @@ final class RunSummaryTests: XCTestCase {
     }
 
     private let appliedSummary = #"""
-    {"event": "pipeline_summary", "processed": 3, "succeeded": 2, "changed": 1, "failed": 1, "failed_files": ["broken.mp4"], "mode": "applied"}
+    {"event": "pipeline_summary", "processed": 3, "succeeded": 2, "changed": 1, "failed": 1, "failed_files": ["broken.mp4"], "source_action_failed": false, "mode": "applied"}
     """#
 
     /// Every stat the popup shows arrives decoded, including which files failed —
@@ -38,7 +38,7 @@ final class RunSummaryTests: XCTestCase {
     func testDryRunSummaryCarriesItsMode() {
         let state = AppState()
 
-        feed(state, #"{"event": "pipeline_summary", "processed": 1, "succeeded": 1, "changed": 1, "failed": 0, "failed_files": [], "mode": "dry_run"}"#)
+        feed(state, #"{"event": "pipeline_summary", "processed": 1, "succeeded": 1, "changed": 1, "failed": 0, "failed_files": [], "source_action_failed": false, "mode": "dry_run"}"#)
 
         XCTAssertEqual(state.runSummary?.mode, .dryRun)
     }
@@ -93,6 +93,29 @@ final class RunSummaryTests: XCTestCase {
 
         XCTAssertNil(state.runSummary)
         XCTAssertFalse(state.showRunSummary)
+    }
+
+    /// An archive that failed after every file went through is in the popup, with
+    /// Show Output to say why. A locked card once left the source unarchived
+    /// behind a popup that only said the changes were written.
+    func testAFailedArchiveIsInThePopup() {
+        let state = AppState()
+
+        feed(state, #"{"event": "pipeline_summary", "processed": 18, "succeeded": 18, "changed": 18, "failed": 0, "failed_files": [], "source_action_failed": true, "mode": "applied"}"#)
+
+        XCTAssertEqual(state.runSummary?.hasFailures, true)
+        XCTAssertTrue(state.runSummary?.message(checks: [])
+            .contains(Strings.Workflow.runSummarySourceActionFailed) ?? false)
+    }
+
+    func testARunWhoseArchiveSucceededHasNoArchiveLine() {
+        let state = AppState()
+
+        feed(state, #"{"event": "pipeline_summary", "processed": 1, "succeeded": 1, "changed": 1, "failed": 0, "failed_files": [], "source_action_failed": false, "mode": "applied"}"#)
+
+        XCTAssertEqual(state.runSummary?.hasFailures, false)
+        XCTAssertFalse(state.runSummary?.message(checks: [])
+            .contains(Strings.Workflow.runSummarySourceActionFailed) ?? true)
     }
 
     /// The completion popup's "Show Output" button dismisses the popup and

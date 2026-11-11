@@ -201,7 +201,7 @@ events:
       check:
         type: string
         enum: [protected_sources, camera_mismatch, mixed_timezones, zone_relabel,
-               filename_unparseable, destination_occupied]
+               filename_unparseable, source_read_only, destination_occupied]
         description: >-
           protected_sources: source files carry the user-immutable flag; their
           imported copies come out unlocked. camera_mismatch: files whose
@@ -211,12 +211,15 @@ events:
           that hold no zone evidence under none. zone_relabel: files whose zoned
           tag differs from --timezone, grouped by the tag's zone.
           filename_unparseable: under --infer-from-filename, files with no date
-          in their name. destination_occupied: files left in place because a
+          in their name. source_read_only: with archive-source, the
+          directories the source action writes to that are read-only (a locked
+          card); files holds their paths, and an apply stops before any file.
+          destination_occupied: files left in place because a
           different file holds their destination; each also has its own
           organize_result with reason=exists_differs.
       files:
         type: "list[string]"
-        description: "Basenames of the files the finding is about"
+        description: "Basenames of the files the finding is about; for source_read_only, directory paths"
       groups:
         type: "map[string, list[string]]"
         optional: true
@@ -299,6 +302,11 @@ events:
       failed_files:
         type: "list[string]"
         description: "Basenames of the files that failed, empty when failed is 0"
+      source_action_failed:
+        type: boolean
+        description: >-
+          Whether archive-source ran and could not archive or delete the source.
+          The run exits non-zero; the files themselves were processed.
       mode:
         type: string
         enum: [applied, dry_run]
@@ -310,6 +318,7 @@ events:
       changed: 1
       failed: 1
       failed_files: [DJI_20250815_101112_0001.MP4]
+      source_action_failed: false
       mode: applied
 
 # The command line the app builds for media-pipeline. The app's PipelineStep tokens

@@ -157,7 +157,8 @@ final class BatchCheckTests: XCTestCase {
         let relabel = BatchCheck(kind: .zoneRelabel, files: ["c.mp4"], groups: [:], chosen: [],
                                  assentFlag: "--force-timezone", refused: false)
         func summary(_ mode: PipelineSummary.Mode) -> PipelineSummary {
-            PipelineSummary(processed: 3, succeeded: 3, changed: 3, failed: 0, failedFiles: [], mode: mode)
+            PipelineSummary(processed: 3, succeeded: 3, changed: 3, failed: 0, failedFiles: [],
+                            sourceActionFailed: false, mode: mode)
         }
 
         let dryRun = summary(.dryRun).message(checks: [camera, relabel])
@@ -166,6 +167,18 @@ final class BatchCheckTests: XCTestCase {
         XCTAssertTrue(dryRun.contains(Strings.Workflow.runSummaryCheck(camera)))
         XCTAssertTrue(dryRun.contains(Strings.Workflow.runSummaryCheck(relabel)))
         XCTAssertFalse(applied.contains(Strings.Workflow.runSummaryCheck(camera)))
+    }
+
+    /// A read-only source names folders, not files: the dry run's line lists them
+    /// and says the apply will stop, rather than counting them as files.
+    func testTheReadOnlySourceLineNamesTheFolders() {
+        let readOnly = BatchCheck(kind: .sourceReadOnly, files: ["/Volumes/Untitled"], groups: [:],
+                                  chosen: [], assentFlag: nil, refused: false)
+
+        let line = Strings.Workflow.runSummaryCheck(readOnly)
+
+        XCTAssertTrue(line.contains("/Volumes/Untitled"))
+        XCTAssertFalse(line.contains(Strings.BatchChecks.fileCount(1)))
     }
 
     /// The message lists the groups the event carries, and the group of files with

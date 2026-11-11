@@ -123,7 +123,7 @@ struct WorkflowView: View {
         ) {
             Button(Strings.Common.done) { state.showRunSummary = false }
                 .keyboardShortcut(.defaultAction)
-            if (state.runSummary?.failed ?? 0) > 0 {
+            if state.runSummary?.hasFailures == true {
                 Button(Strings.Workflow.showOutputButton) {
                     state.showOutputForRunSummary()
                 }
