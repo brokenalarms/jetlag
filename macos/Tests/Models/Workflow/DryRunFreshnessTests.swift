@@ -65,12 +65,12 @@ final class DryRunFreshnessTests: XCTestCase {
         XCTAssertEqual(session.dryRunStaleReason, .settingsChanged)
     }
 
-    /// A step toggled off changes what the run does just as much as a path does.
+    /// A step toggled changes what the run does just as much as a path does.
     func testTogglingAStepMakesTheDryRunStale() {
         let session = makeSession()
         completeDryRun(session)
 
-        session.enabledSteps.remove(.tag)
+        session.toggle(.tag)
 
         XCTAssertTrue(session.requestDryRunAssentIfNeeded())
         XCTAssertEqual(session.dryRunStaleReason, .settingsChanged)
