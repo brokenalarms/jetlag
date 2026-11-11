@@ -133,8 +133,7 @@ final class DryRunFreshnessTests: XCTestCase {
         let session = makeSession()
         completeDryRun(session)
 
-        session.overwriteDestination = true
-        session.forceTimezone = true
+        session.grantedAssent = ["--overwrite", "--force-timezone"]
 
         XCTAssertFalse(session.requestDryRunAssentIfNeeded())
     }

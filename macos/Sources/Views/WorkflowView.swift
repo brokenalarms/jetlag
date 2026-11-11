@@ -73,67 +73,24 @@ struct WorkflowView: View {
             )
         }
         .alert(
-            Strings.Workflow.timezoneConflictTitle,
-            isPresented: $state.workflowSession.showTimezoneConflict
+            Strings.BatchChecks.title(state.workflowSession.pendingChecks),
+            isPresented: Binding(
+                get: { !state.workflowSession.pendingChecks.isEmpty },
+                set: { if !$0 { state.workflowSession.pendingChecks = [] } }
+            )
         ) {
-            Button(Strings.Workflow.forceTimezoneButton, role: .destructive) {
-                state.workflowSession.grantTimezoneAssent()
-                state.runWorkflow()
+            if state.workflowSession.canGrantPendingChecks {
+                Button(Strings.BatchChecks.confirmButton(state.workflowSession.pendingChecks),
+                       role: .destructive) {
+                    state.workflowSession.grantPendingAssent()
+                    state.runWorkflow()
+                }
             }
             Button(Strings.Common.cancel, role: .cancel) {
-                state.workflowSession.showTimezoneConflict = false
+                state.workflowSession.pendingChecks = []
             }
         } message: {
-            Text(state.workflowSession.timezoneConflictMessage)
-        }
-        .alert(
-            Strings.Workflow.overwriteConflictTitle,
-            isPresented: $state.workflowSession.showOverwriteConflict
-        ) {
-            Button(Strings.Workflow.overwriteButton, role: .destructive) {
-                state.workflowSession.grantOverwriteAssent()
-                state.runWorkflow()
-            }
-            Button(Strings.Common.cancel, role: .cancel) {
-                state.workflowSession.showOverwriteConflict = false
-            }
-        } message: {
-            Text(Strings.Workflow.overwriteConflictMessage(
-                count: state.workflowSession.organizeConflictCount))
-        }
-        .alert(
-            Strings.Workflow.cameraMismatchTitle,
-            isPresented: $state.workflowSession.showCameraMismatch
-        ) {
-            Button(Strings.Workflow.allowCameraMismatchButton, role: .destructive) {
-                state.workflowSession.grantCameraMismatchAssent()
-                state.runWorkflow()
-            }
-            Button(Strings.Common.cancel, role: .cancel) {
-                state.workflowSession.showCameraMismatch = false
-            }
-        } message: {
-            if let mismatch = state.workflowSession.cameraMismatch {
-                Text(Strings.Workflow.cameraMismatchMessage(
-                    count: mismatch.files.count,
-                    found: mismatch.foundName,
-                    expected: mismatch.expected?.name ?? ""))
-            }
-        }
-        .alert(
-            Strings.Workflow.protectedSourcesTitle,
-            isPresented: $state.workflowSession.showProtectedSources
-        ) {
-            Button(Strings.Workflow.unlockProtectedButton) {
-                state.workflowSession.grantUnlockProtectedAssent()
-                state.runWorkflow()
-            }
-            Button(Strings.Common.cancel, role: .cancel) {
-                state.workflowSession.showProtectedSources = false
-            }
-        } message: {
-            Text(Strings.Workflow.protectedSourcesMessage(
-                files: state.workflowSession.protectedSourceFiles))
+            Text(Strings.BatchChecks.message(state.workflowSession.pendingChecks))
         }
         .alert(
             state.workflowSession.dryRunStaleReason == .settingsChanged
@@ -172,7 +129,7 @@ struct WorkflowView: View {
                 }
             }
         } message: {
-            Text(state.runSummary?.message(cameraMismatch: state.workflowSession.cameraMismatch) ?? "")
+            Text(state.runSummary?.message(checks: state.workflowSession.reportedChecks) ?? "")
         }
         .alert(
             Strings.Errors.commandLineToolsTitle,

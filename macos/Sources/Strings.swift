@@ -28,20 +28,20 @@ enum Strings {
     enum Pipeline {
         static let ingestLabel = String(localized: "pipeline.ingest.label", defaultValue: "Ingest")
         static let tagLabel = String(localized: "pipeline.tag.label", defaultValue: "Tag")
-        static let fixTimestampsLabel = String(localized: "pipeline.fixTimestamps.label", defaultValue: "Fix Timestamps")
+        static let fixTimestampsLabel = String(localized: "pipeline.fixTimestamps.label", defaultValue: "Set Timestamps")
         static let organizeLabel = String(localized: "pipeline.organize.label", defaultValue: "Organize")
         static let gyroflowLabel = String(localized: "pipeline.gyroflow.label", defaultValue: "Gyroflow")
         static let archiveSourceLabel = String(localized: "pipeline.archiveSource.label", defaultValue: "Archive Source")
-        /// Fix Timestamps' name in a results row's status column, where the full
+        /// Set Timestamps' name in a results row's status column, where the full
         /// label does not fit.
-        static let fixTimestampsStageLabel = String(localized: "pipeline.fixTimestamps.stageLabel", defaultValue: "Fix TS")
+        static let fixTimestampsStageLabel = String(localized: "pipeline.fixTimestamps.stageLabel", defaultValue: "Set TS")
 
         static let ingestHelp = String(localized: "pipeline.ingest.help",
             defaultValue: "Copy files from source to working directory for processing")
         static let tagHelp = String(localized: "pipeline.tag.help",
             defaultValue: "Apply Finder tags and EXIF metadata from profile")
         static let fixTimestampsHelp = String(localized: "pipeline.fixTimestamps.help",
-            defaultValue: "Correct timezone labelling and/or camera clock errors")
+            defaultValue: "Stamp every file with the time it was shot, in the zone it was shot in; a file already right is left as it is")
         static let organizeHelp = String(localized: "pipeline.organize.help",
             defaultValue: "Move processed files into date-based folders in ready directory")
         static let gyroflowHelp = String(localized: "pipeline.gyroflow.help",
@@ -127,7 +127,7 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let updateFilenameDatesHelp = String(localized: "workflow.updateFilenameDates.help",
             defaultValue: "Rename files to reflect corrected timestamps after fixing. Only affects files with parseable date patterns in their names.")
 
-        // Fix Timestamps preview
+        // Set Timestamps preview
         static let fixTimestampSourceFilenamesHint = String(localized: "workflow.fixTimestampPreview.sourceFilenames",
             defaultValue: "Use filename dates as timestamp source")
         static let fixTimestampRenameHint = String(localized: "workflow.fixTimestampPreview.rename",
@@ -158,61 +158,6 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
                    defaultValue: "Apply \(city) time, resolved per file")
         }
 
-        // Timezone conflict dialog
-        static let timezoneConflictTitle = String(localized: "workflow.timezoneConflict.title",
-            defaultValue: "Timezone Conflict")
-        static let forceTimezoneButton = String(localized: "workflow.forceTimezone.button",
-            defaultValue: "Override Timezone")
-
-        // Organize conflict dialog
-        static let overwriteConflictTitle = String(localized: "workflow.overwriteConflict.title",
-            defaultValue: "Files Already at Destination")
-        static let overwriteButton = String(localized: "workflow.overwrite.button",
-            defaultValue: "Overwrite")
-
-        static func overwriteConflictMessage(count: Int) -> String {
-            count == 1
-                ? String(localized: "workflow.overwriteConflict.message.one",
-                         defaultValue: "1 file already exists at the destination with different contents. Overwrite it?")
-                : String(localized: "workflow.overwriteConflict.message.many",
-                         defaultValue: "\(count) files already exist at the destination with different contents. Overwrite them?")
-        }
-
-        static let protectedSourcesTitle = String(localized: "workflow.protectedSources.title",
-            defaultValue: "Protected Files")
-        static let unlockProtectedButton = String(localized: "workflow.unlockProtected.button",
-            defaultValue: "Import Unlocked")
-
-        static func protectedSourcesMessage(files: [String]) -> String {
-            let list = files.joined(separator: "\n")
-            return files.count == 1
-                ? String(localized: "workflow.protectedSources.message.one",
-                         defaultValue: "1 source file is protected (locked), usually by the camera's Protect setting:\n\n\(list)\n\nIts imported copy will be unlocked. The file on the source stays locked.")
-                : String(localized: "workflow.protectedSources.message.many",
-                         defaultValue: "\(files.count) source files are protected (locked), usually by the camera's Protect setting:\n\n\(list)\n\nTheir imported copies will be unlocked. The files on the source stay locked.")
-        }
-
-        static let cameraMismatchTitle = String(localized: "workflow.cameraMismatch.title",
-            defaultValue: "Different Camera")
-        static let allowCameraMismatchButton = String(localized: "workflow.allowCameraMismatch.button",
-            defaultValue: "Import Anyway")
-
-        static func cameraMismatchMessage(count: Int, found: String, expected: String) -> String {
-            count == 1
-                ? String(localized: "workflow.cameraMismatch.message.one",
-                         defaultValue: "1 file was shot on \(found), not this profile's \(expected). Check this is the right profile. Importing it leaves its camera fields as the camera wrote them.")
-                : String(localized: "workflow.cameraMismatch.message.many",
-                         defaultValue: "\(count) files were shot on \(found), not this profile's \(expected). Check this is the right profile. Importing them leaves their camera fields as the camera wrote them.")
-        }
-
-        static func runSummaryCameraMismatch(count: Int, found: String, expected: String) -> String {
-            count == 1
-                ? String(localized: "workflow.runSummary.cameraMismatch.one",
-                         defaultValue: "1 file was shot on \(found), not this profile's \(expected). Applying asks first.")
-                : String(localized: "workflow.runSummary.cameraMismatch.many",
-                         defaultValue: "\(count) files were shot on \(found), not this profile's \(expected). Applying asks first.")
-        }
-
         // Run completion popup
         static let runCompleteAppliedTitle = String(localized: "workflow.runComplete.applied.title",
             defaultValue: "Run Complete")
@@ -241,6 +186,16 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let runSummaryDryRun = String(localized: "workflow.runSummary.dryRun",
             defaultValue: "Nothing was written — run again in Apply mode to make these changes.")
 
+        static func runSummaryCheck(_ check: BatchCheck) -> String {
+            let title = BatchChecks.title(check.kind)
+            let count = BatchChecks.fileCount(check.files.count)
+            return check.assentFlag == nil
+                ? String(localized: "workflow.runSummary.check",
+                         defaultValue: "\(title): \(count).")
+                : String(localized: "workflow.runSummary.check.asks",
+                         defaultValue: "\(title): \(count). Applying asks first.")
+        }
+
         static func runSummaryFailed(count: Int, files: [String]) -> String {
             let maxListed = 5
             var listed = files.prefix(maxListed).map { "  \($0)" }.joined(separator: "\n")
@@ -268,27 +223,128 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
             defaultValue: "Dry Run First")
         static let applyAnywayButton = String(localized: "workflow.applyAnyway.button",
             defaultValue: "Apply Anyway")
+    }
 
-        static func mixedTimezoneGroup(zone: String, count: Int) -> String {
+    /// The batch-check alert: the only per-check code in the app, keyed by the
+    /// `batch_check.check` token.
+    enum BatchChecks {
+        static func title(_ kind: BatchCheck.Kind) -> String {
+            switch kind {
+            case .protectedSources:
+                String(localized: "batchCheck.protectedSources.title", defaultValue: "Protected Files")
+            case .cameraMismatch:
+                String(localized: "batchCheck.cameraMismatch.title", defaultValue: "Different Camera")
+            case .mixedTimezones:
+                String(localized: "batchCheck.mixedTimezones.title", defaultValue: "Mixed Timezones")
+            case .zoneRelabel:
+                String(localized: "batchCheck.zoneRelabel.title", defaultValue: "Timezone Conflict")
+            case .filenameUnparseable:
+                String(localized: "batchCheck.filenameUnparseable.title", defaultValue: "No Time in Filenames")
+            case .destinationOccupied:
+                String(localized: "batchCheck.destinationOccupied.title", defaultValue: "Files Already at Destination")
+            }
+        }
+
+        static func confirmButton(_ kind: BatchCheck.Kind) -> String {
+            switch kind {
+            case .protectedSources:
+                String(localized: "batchCheck.protectedSources.button", defaultValue: "Import Unlocked")
+            case .cameraMismatch:
+                String(localized: "batchCheck.cameraMismatch.button", defaultValue: "Import Anyway")
+            case .mixedTimezones:
+                String(localized: "batchCheck.mixedTimezones.button", defaultValue: "Process Together")
+            case .zoneRelabel:
+                String(localized: "batchCheck.zoneRelabel.button", defaultValue: "Override Timezone")
+            case .filenameUnparseable:
+                ""
+            case .destinationOccupied:
+                String(localized: "batchCheck.destinationOccupied.button", defaultValue: "Overwrite")
+            }
+        }
+
+        static func lead(_ kind: BatchCheck.Kind, count: Int) -> String {
+            let one = count == 1
+            return switch kind {
+            case .protectedSources:
+                one ? String(localized: "batchCheck.protectedSources.message.one",
+                             defaultValue: "1 source file is protected (locked), usually by the camera's Protect setting. Its imported copy will be unlocked; the file on the source stays locked.")
+                    : String(localized: "batchCheck.protectedSources.message.many",
+                             defaultValue: "\(count) source files are protected (locked), usually by the camera's Protect setting. Their imported copies will be unlocked; the files on the source stay locked.")
+            case .cameraMismatch:
+                one ? String(localized: "batchCheck.cameraMismatch.message.one",
+                             defaultValue: "1 file was not shot on this profile's camera. Check this is the right profile. Importing it leaves its camera fields as the camera wrote them.")
+                    : String(localized: "batchCheck.cameraMismatch.message.many",
+                             defaultValue: "\(count) files were not shot on this profile's camera. Check this is the right profile. Importing them leaves their camera fields as the camera wrote them.")
+            case .mixedTimezones:
+                String(localized: "batchCheck.mixedTimezones.message",
+                       defaultValue: "The files span more than one timezone. Consider processing each group separately.")
+            case .zoneRelabel:
+                one ? String(localized: "batchCheck.zoneRelabel.message.one",
+                             defaultValue: "1 file already carries a timezone that differs from the one chosen. The embedded timezone is usually correct (set by the camera). Override to use your timezone instead.")
+                    : String(localized: "batchCheck.zoneRelabel.message.many",
+                             defaultValue: "\(count) files already carry a timezone that differs from the one chosen. The embedded timezone is usually correct (set by the camera). Override to use your timezone instead.")
+            case .filenameUnparseable:
+                one ? String(localized: "batchCheck.filenameUnparseable.message.one",
+                             defaultValue: "1 file has no date and time in its name, so filenames cannot be the time source for this batch.")
+                    : String(localized: "batchCheck.filenameUnparseable.message.many",
+                             defaultValue: "\(count) files have no date and time in their names, so filenames cannot be the time source for this batch.")
+            case .destinationOccupied:
+                one ? String(localized: "batchCheck.destinationOccupied.message.one",
+                             defaultValue: "1 file already exists at the destination with different contents. Overwrite it?")
+                    : String(localized: "batchCheck.destinationOccupied.message.many",
+                             defaultValue: "\(count) files already exist at the destination with different contents. Overwrite them?")
+            }
+        }
+
+        static func fileCount(_ count: Int) -> String {
             count == 1
-                ? String(localized: "workflow.mixedTimezones.group.one",
-                         defaultValue: "\(zone): \(count) file")
-                : String(localized: "workflow.mixedTimezones.group.many",
-                         defaultValue: "\(zone): \(count) files")
+                ? String(localized: "batchCheck.fileCount.one", defaultValue: "1 file")
+                : String(localized: "batchCheck.fileCount.many", defaultValue: "\(count) files")
         }
 
-        static func mixedTimezonesMessage(groups: String) -> String {
-            String(localized: "workflow.mixedTimezones.message",
-                   defaultValue: "Files have different embedded timezones. Consider processing each group separately.\n\n\(groups)")
+        static let noZoneGroup = String(localized: "batchCheck.group.noZone", defaultValue: "No timezone")
+        static let severalTitle = String(localized: "batchCheck.several.title", defaultValue: "Before This Run")
+        static let severalButton = String(localized: "batchCheck.several.button", defaultValue: "Go Ahead")
+
+        static func groupLine(label: String, count: Int) -> String {
+            let name = label == BatchCheck.noZoneGroup ? noZoneGroup : label
+            return "\(name): \(fileCount(count))"
         }
 
-        static func providedMismatchMessage(provided: String, existing: String) -> String {
-            String(localized: "workflow.providedMismatch.message",
-                   defaultValue: "You specified \(provided) but files have embedded timezone \(existing). The embedded timezone is usually correct (set by the camera). Override to use your timezone instead.")
+        static func fileList(_ files: [String]) -> String {
+            let maxListed = 5
+            var lines = files.prefix(maxListed).map { $0 }
+            if files.count > maxListed {
+                lines.append(String(localized: "batchCheck.fileList.more",
+                                    defaultValue: "… and \(files.count - maxListed) more"))
+            }
+            return lines.joined(separator: "\n")
+        }
+
+        static func message(_ check: BatchCheck) -> String {
+            let detail = check.groups.isEmpty
+                ? fileList(check.files)
+                : check.groups.keys.sorted()
+                    .map { groupLine(label: $0, count: check.groups[$0]?.count ?? 0) }
+                    .joined(separator: "\n")
+            return "\(lead(check.kind, count: check.files.count))\n\n\(detail)"
+        }
+
+        static func title(_ checks: [BatchCheck]) -> String {
+            checks.count == 1 ? title(checks[0].kind) : severalTitle
+        }
+
+        static func confirmButton(_ checks: [BatchCheck]) -> String {
+            checks.count == 1 ? confirmButton(checks[0].kind) : severalButton
+        }
+
+        static func message(_ checks: [BatchCheck]) -> String {
+            guard checks.count > 1 else { return checks.first.map(message) ?? "" }
+            return checks.map { "\(title($0.kind))\n\(message($0))" }.joined(separator: "\n\n")
         }
     }
 
-    // MARK: - Profiles
+    // MARK: - Profiles    // MARK: - Profiles
 
     enum Gyroflow {
         static let maxZoomLabel = String(localized: "profiles.maxZoom.label", defaultValue: "Max zoom")
@@ -544,6 +600,8 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let fixedStatus = String(localized: "diffTable.fixed.status", defaultValue: "Fixed")
         static let wouldAddStatus = String(localized: "diffTable.wouldAdd.status", defaultValue: "Would add metadata")
         static let addedStatus = String(localized: "diffTable.added.status", defaultValue: "Added metadata")
+        static let metadataSkippedStatus = String(localized: "diffTable.metadataSkipped.status",
+            defaultValue: "File times set")
         static let copiedStatus = String(localized: "diffTable.copied.status", defaultValue: "Copied")
         static let movedStatus = String(localized: "diffTable.moved.status", defaultValue: "Moved")
         static let moveSkippedStatus = String(localized: "diffTable.moveSkipped.status", defaultValue: "Move skipped")
@@ -621,6 +679,10 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
         static let fixedChange = String(localized: "diffTable.fixed.change", defaultValue: "Fixed")
         static let wouldAddChange = String(localized: "diffTable.wouldAdd.change", defaultValue: "Would add metadata")
         static let addedChange = String(localized: "diffTable.added.change", defaultValue: "Added metadata")
+        static let metadataSkippedChange = String(localized: "diffTable.metadataSkipped.change",
+            defaultValue: "File times only")
+        static let metadataSkippedHelp = String(localized: "diffTable.metadataSkipped.help",
+            defaultValue: "The camera wrote this file in a form its metadata cannot be rewritten in (a corrupted Insta360 trailer), so the metadata is left as the camera wrote it. Its birth time, name and date folder were still corrected.")
         static let noChangeChange = String(localized: "diffTable.noChange.change", defaultValue: "No change")
         static let errorChange = String(localized: "diffTable.error.change", defaultValue: "Error")
         static let birthTimeInFutureChange = String(

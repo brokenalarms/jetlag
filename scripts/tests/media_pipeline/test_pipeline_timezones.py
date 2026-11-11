@@ -4,7 +4,7 @@ How the pipeline settles each file's time: --timezone and the embedded zone,
 test_pipeline_preflight.py; these hold the whole run's effect on the files.
 """
 
-
+import json
 
 from helpers.media import create_test_video as _create_video_raw
 from helpers.pipeline import create_test_video, get_exif_field, run_in_process
@@ -82,6 +82,41 @@ class TestTimezoneHandling:
         assert "+12:00" in winter, f"July is NZST, got: {winter}"
         assert "14:00:00" in summer, f"01:00 UTC is 14:00 NZDT, got: {summer}"
         assert "13:00:00" in winter, f"01:00 UTC is 13:00 NZST, got: {winter}"
+
+
+class TestEveryRunSetsTimestamps:
+    """Set Timestamps is always on, so a run cannot start without the zone the
+    footage was shot in: without it there is no correction and no date folder,
+    only a guess. Being able to skip the step is how the Comedy night C0199 was
+    organized uncorrected."""
+
+    def test_a_run_without_a_timezone_is_refused_before_any_file(self, temp_workspace, test_profile):
+        """Actual: the target and the file's fields after a run with no --timezone
+        Expected: nothing copied, nothing written"""
+        source = temp_workspace["source"]
+        video = source / "test.mp4"
+        create_test_video(video)
+        before = get_exif_field(video, "DateTimeOriginal")
+
+        result = run_in_process(["--profile", test_profile, "--source", str(source), "--apply"])
+
+        assert result.returncode != 0
+        assert list(temp_workspace["target"].rglob("*.mp4")) == [], \
+            "Actual: a file reached the target, Expected: the run stops before any file"
+        assert get_exif_field(video, "DateTimeOriginal") == before
+
+    def test_tasks_cannot_turn_the_timestamp_step_off(self, temp_workspace, test_profile):
+        """Actual: the stages a run with only tag asked for completes
+        Expected: fix-timestamp among them"""
+        source = temp_workspace["source"]
+        create_test_video(source / "test.mp4")
+
+        result = run_in_process(["--profile", test_profile, "--source", str(source),
+                                 "--timezone", "+0900", "--tasks", "tag"])
+
+        stages = [json.loads(line).get("stage") for line in result.stdout.splitlines()
+                  if '"stage_complete"' in line]
+        assert "fix-timestamp" in stages, f"Actual: {stages}, Expected: fix-timestamp ran"
 
 
 class TestInferFromFilename:

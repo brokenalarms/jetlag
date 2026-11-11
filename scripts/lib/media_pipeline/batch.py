@@ -13,7 +13,9 @@ from lib.verify_card import cleared_files, verify_card
 from lib.filesystem import find_media_files
 from lib.media_pipeline.events import emit_event
 from lib.media_pipeline.options import ARCHIVE_SOURCE, RunOptions, resolve_options, with_gyroflow_preset
-from lib.media_pipeline.preflight import check_stale_exiftool_tmp, run_preflight
+from lib.media_pipeline.preflight import (
+    DESTINATION_OCCUPIED, Finding, check_stale_exiftool_tmp, report_finding, run_checks,
+)
 from lib.media_pipeline.stages import process_file
 from lib.media_pipeline.working_dir import WorkingDir
 
@@ -82,17 +84,11 @@ def process_files(files: list[Path], opts: RunOptions, working_dir: WorkingDir) 
     return stats
 
 
-def report_organize_conflicts(stats: BatchStats) -> None:
-    """One batch-level report of what --overwrite would unblock, so the app has a
+def report_organize_conflicts(stats: BatchStats, opts: RunOptions) -> None:
+    """One batch-level finding of what --overwrite would unblock, so the app has a
     single thing to ask about instead of re-deriving it from the per-file rows."""
-    if not stats.organize_conflicts:
-        return
-    print(f"⚠️  {len(stats.organize_conflicts)} file(s) already at the destination with "
-          "different contents. Re-run with --overwrite to replace them.", file=sys.stderr)
-    emit_event("organize_conflict",
-        count=len(stats.organize_conflicts),
-        files=stats.organize_conflicts,
-    )
+    if stats.organize_conflicts:
+        report_finding(DESTINATION_OCCUPIED, Finding(stats.organize_conflicts), opts)
 
 
 def act_on_source(opts: RunOptions, stats: BatchStats) -> None:
@@ -207,10 +203,10 @@ def run(args, working_dir: WorkingDir) -> NoReturn:
 
     print_configuration(opts)
     files = discover_files(opts)
-    run_preflight(files, opts)
+    run_checks(files, opts)
 
     stats = process_files(files, with_gyroflow_preset(opts), working_dir)
-    report_organize_conflicts(stats)
+    report_organize_conflicts(stats, opts)
     act_on_source(opts, stats)
     finish_working_dir(opts, stats)
     report_summary(stats, opts.apply)

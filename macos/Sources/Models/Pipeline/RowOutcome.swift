@@ -17,11 +17,14 @@ struct RowOutcome {
 
     /// The `timestamp_result.action` tokens. `added` / `wouldAdd` fill only fields
     /// the file left empty: its time was not wrong, so the row must not say "fix".
+    /// `metadataSkipped`: the file's metadata could not be written at all, so only
+    /// its file times were set.
     enum Correction: String, CaseIterable {
         case fixed
         case wouldFix = "would_fix"
         case added
         case wouldAdd = "would_add"
+        case metadataSkipped = "metadata_skipped"
         case noChange = "no_change"
         case error
     }
@@ -101,6 +104,7 @@ extension RowOutcome.Correction {
         case .wouldFix: return Strings.DiffTable.wouldFixStatus
         case .added: return Strings.DiffTable.addedStatus
         case .wouldAdd: return Strings.DiffTable.wouldAddStatus
+        case .metadataSkipped: return Strings.DiffTable.metadataSkippedStatus
         case .noChange, .error: return nil
         }
     }

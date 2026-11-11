@@ -68,10 +68,7 @@ final class PipelineSchemaContractTests: XCTestCase {
         case .gyroflowResult: return "gyroflow_result"
         case .pipelineResult: return "pipeline_result"
         case .pipelineSummary: return "pipeline_summary"
-        case .timezoneConflict: return "timezone_conflict"
-        case .organizeConflict: return "organize_conflict"
-        case .protectedSources: return "protected_sources"
-        case .cameraMismatch: return "camera_mismatch"
+        case .batchCheck: return "batch_check"
         case .noMediaFiles: return "no_media_files"
         case .pipelineError: return "pipeline_error"
         }
@@ -188,13 +185,18 @@ final class PipelineSchemaContractTests: XCTestCase {
                        "RowOutcome.FileResult and pipeline_result.result have drifted apart")
     }
 
-    /// Which flag answers a refused run depends on the conflict, so every kind the
-    /// pipeline can report has to decode into one the app knows.
-    func testEveryTimezoneConflictTypeIsAKnownKind() throws {
-        let declared = try tokens(schema(), event: "timezone_conflict", field: "conflict_type")
+    /// The alert's title, message and button come from a table keyed by the
+    /// check token, so every check the pipeline can report needs an entry, and one
+    /// with an assent flag needs a button to give it.
+    func testEveryBatchCheckTokenIsAKnownKindWithItsText() throws {
+        let declared = try tokens(schema(), event: "batch_check", field: "check")
 
-        XCTAssertEqual(Set(TimezoneConflictKind.allCases.map(\.rawValue)), declared,
-                       "TimezoneConflictKind and timezone_conflict.conflict_type have drifted apart")
+        XCTAssertEqual(Set(BatchCheck.Kind.allCases.map(\.rawValue)), declared,
+                       "BatchCheck.Kind and batch_check.check have drifted apart")
+        for kind in BatchCheck.Kind.allCases {
+            XCTAssertFalse(Strings.BatchChecks.title(kind).isEmpty, "\(kind) has no title")
+            XCTAssertFalse(Strings.BatchChecks.lead(kind, count: 2).isEmpty, "\(kind) has no message")
+        }
     }
 
     /// The step list is the pipeline's, in its order: a row's progress label picks
@@ -236,11 +238,7 @@ final class PipelineSchemaContractTests: XCTestCase {
         session.inferFromFilenames = true
         session.timeOffsetSeconds = 3600
         session.updateFilenameDates = true
-        session.forceTimezone = true
-        session.allowMixedTimezones = true
-        session.overwriteDestination = true
-        session.unlockProtected = true
-        session.allowCameraMismatch = true
+        session.grantedAssent = Set(try cliList("assent_flags"))
         session.applyMode = true
 
         let declared = try cliList("flags")
@@ -250,13 +248,16 @@ final class PipelineSchemaContractTests: XCTestCase {
                        "The flags the app passes and cli.flags have drifted apart")
     }
 
-    /// The flags dropped from the dry-run comparison are the schema's assent flags:
-    /// an answer for one run never makes a preview look stale.
-    func testAssentFlagsAreTheDeclaredOnes() throws {
-        let declared = try cliList("assent_flags")
+    /// Every assent flag the schema declares is dropped from the dry-run
+    /// comparison once granted: an answer for one run never makes a preview look stale.
+    func testNoAssentFlagMakesAPreviewStale() throws {
+        let session = WorkflowSession(profile: MediaProfile(type: .video), profileName: "p")
+        let before = session.comparableArgs()
 
-        XCTAssertEqual(Set(WorkflowSession.assentFlags), Set(declared),
-                       "WorkflowSession.assentFlags and cli.assent_flags have drifted apart")
+        session.grantedAssent = Set(try cliList("assent_flags"))
+        session.applyMode = true
+
+        XCTAssertEqual(session.comparableArgs(), before)
     }
 
     /// The mapping is 1:1: two tokens sharing a label would mean the app decides an
@@ -376,6 +377,17 @@ final class RowOutcomeTests: XCTestCase {
 
         XCTAssertEqual(planned.outcome.statusLabel, Strings.DiffTable.combinedStatus(
             Strings.DiffTable.wouldFixStatus, Strings.DiffTable.wouldMoveStatusAfterFix))
+    }
+
+    /// An Insta360 clip whose metadata exiftool cannot write still has its file
+    /// times set and is filed: the row says so, rather than "Fixed" or "Error".
+    func testAClipWithItsMetadataSkippedReadsAsFileTimesSet() {
+        let skipped = row(timestamp: "metadata_skipped", organize: "copied",
+                          dest: "/Volumes/T9/Ready/2026/2026-10-06/VID_20261006_152802_00_001.insv",
+                          result: "changed")
+
+        XCTAssertEqual(skipped.outcome.statusLabel, Strings.DiffTable.combinedStatus(
+            Strings.DiffTable.metadataSkippedStatus, Strings.DiffTable.copiedStatusAfterFix))
     }
 
     /// A row that only gains missing fields keeps its own wording when combined with

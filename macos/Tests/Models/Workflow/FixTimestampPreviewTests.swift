@@ -1,7 +1,7 @@
 import XCTest
 @testable import Jetlag
 
-/// The Fix Timestamps step's hint must never claim more (or less) than what the
+/// The Set Timestamps step's hint must never claim more (or less) than what the
 /// pipeline will actually do. In 'From filenames' mode the declared zone still
 /// applies — it labels the naive digits read from the filename — so the hint
 /// must name it exactly as the metadata branch does, not omit it.

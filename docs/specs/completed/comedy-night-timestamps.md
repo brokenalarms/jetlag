@@ -1,6 +1,6 @@
 # Comedy night: Insta360 X6 and Sony A7V timestamps
 
-Read `timestamp-handoff.md` first: its "user's own words" and "principles" sections hold
+Read `../timestamp-handoff.md` first: its "user's own words" and "principles" sections hold
 for everything here. This spec is what a fresh agent needs to pick up the follow-ups from
 the 2026-11-10 investigation of a backup report about the Comedy night footage
 (6 Oct 2026, Perth, UTC+8). The investigation only read the files; the evidence below
@@ -97,7 +97,7 @@ over the UTC `CreateDate` and planned to overwrite the correct UTC fields with a
 15 hours early. The current ranking (`docs/timestamp-fields.md`) still puts the filename
 above a UTC clock the filename does not corroborate.
 
-The user's rule, from `timestamp-handoff.md`: the filename is "first source of truth for
+The user's rule, from `../timestamp-handoff.md`: the filename is "first source of truth for
 wallclock local time, in the absence of disconfirming metadata (UTC)". Here the UTC clock
 disconfirms the filename. #137 already prefers a QuickTime date over a contradicting camera
 filename where the file shows the date to be an instant; find why that did not apply to
@@ -111,23 +111,26 @@ to the Perth time under `--update-filename-dates`, and never rewrite the UTC fie
 
 ## 3. `.insv` from the X6 cannot be written
 
-ExifTool 13.50 and 13.55 refuse every X6 clip: `Corrupted Insta360 trailer`, with or
-without `-m`. The trailer's size and signature are valid, but the record table before them
+ExifTool 13.50 and 13.55 refuse every X6 clip. Without `-m` the refusal is a minor
+error, `Terminator found in Meta with 41 bytes remaining`; with `-m` it is
+`Corrupted Insta360 trailer`. The trailer's size and signature are valid, but the record table before them
 is all zeros; X4 clips (NZ, firmware v1.9.21) write normally. The camera produced the
 table, not jetlag: no write ever succeeded on these files, and exiftool writes to a
 temporary file. The user is reporting it to ExifTool's author.
 
-Since #256 a refused write fails the file, so an X6 import fails outright. Decide with the
-user whether X6 `.insv` skips the metadata write (the birth time, filename and date folder
-are still corrected; `.insv` reaches Final Cut only through an Insta360 Studio export),
-and how that shows in the app.
+Since #256 a refused write fails the file, so an X6 import fails outright. The user's
+decision: a write exiftool refuses as a corrupted Insta360 trailer is skipped with a
+warning. The birth time, filename and date folder are still corrected (`.insv` reaches
+Final Cut only through an Insta360 Studio export), and the row shows its own outcome
+token rather than failing the file.
 
 ## 4. Fix Timestamps can be turned off in the app
 
 The user expects the timestamp step to always run, but only Ingest and Organize are
 always on (`PipelineStep.isAlwaysOn`); the workflow lets Fix Timestamps be tapped off.
-C0199 was organized without a correction on 10 Oct, most likely through this. Confirm the
-intent with the user before changing it.
+C0199 was organized without a correction on 10 Oct, most likely through this. The
+user's decision: the step becomes **Set Timestamps** and is always on. All the batch
+checks move into one sequence with one output: `preflight-checks.md`.
 
 ## 5. Writes that rewrite a file without its birth time
 

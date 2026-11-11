@@ -42,6 +42,17 @@ class MetadataWriteRefused(Exception):
     """exiftool left a file unwritten; the message is exiftool's own reason."""
 
 
+class Insta360TrailerCorrupted(MetadataWriteRefused):
+    """exiftool refused the write because the file's Insta360 trailer does not
+    line up with the atoms before it. The camera wrote it that way (the X6 leaves
+    the trailer's record table empty), so no metadata write can succeed on the
+    file; its file times can still be set."""
+
+
+INSTA360_TRAILER_CORRUPTED = "Corrupted Insta360 trailer"
+MINOR_ERROR = "[minor] "
+
+
 class ExifTool:
     """Manages a persistent ``exiftool -stay_open True`` subprocess.
 
@@ -191,24 +202,41 @@ class ExifTool:
 
         Returns True when exiftool reports files were updated, False when it found
         nothing to change. Raises MetadataWriteRefused when exiftool could not write
-        the file at all, so a refusal can never pass for a write. Either way the
-        file's cached metadata is dropped, since it may no longer describe the file.
+        the file at all, so a refusal can never pass for a write, and
+        Insta360TrailerCorrupted when the reason is the camera's trailer. A refusal
+        made only of minor errors is retried once with -m, which either writes the
+        file or names what else is wrong. Either way the file's cached metadata is
+        dropped, since it may no longer describe the file.
         """
         sets_birth_time = any(arg.startswith("-FileCreateDate=") for arg in tag_args)
         preserve = [] if sets_birth_time else ["-P"]
         args = preserve + ["-overwrite_original"] + tag_args + [str(file_path)]
         try:
-            output, diagnostics = self._run(*args, wait_for_stderr=True)
+            output, errors = self._write(file_path, args)
+            # A minor error stops the write before exiftool reaches anything worse,
+            # so the real reason only shows with -m: the X6's empty meta terminator
+            # hides its corrupted trailer.
+            if errors and all(error.startswith(MINOR_ERROR) for error in errors):
+                output, errors = self._write(file_path, ["-m"] + args)
         finally:
             self.cache.pop(str(file_path), None)
-        if re.search(r"\d+ files? weren't updated due to errors", output):
-            errors = [
-                line.removeprefix("Error: ").removesuffix(f" - {file_path}")
-                for line in diagnostics if line.startswith("Error: ")
-            ]
+        if errors is not None:
+            if any(error.startswith(INSTA360_TRAILER_CORRUPTED) for error in errors):
+                raise Insta360TrailerCorrupted("; ".join(errors))
             raise MetadataWriteRefused("; ".join(errors) or output.strip())
         match = re.search(r"(\d+) image files? updated", output)
         return match is not None and int(match.group(1)) > 0
+
+    def _write(self, file_path: str, args: list[str]) -> tuple[str, list[str] | None]:
+        """One write: exiftool's output, and its errors if it left the file
+        unwritten (None when it did not)."""
+        output, diagnostics = self._run(*args, wait_for_stderr=True)
+        if not re.search(r"\d+ files? weren't updated due to errors", output):
+            return output, None
+        return output, [
+            line.removeprefix("Error: ").removesuffix(f" - {file_path}")
+            for line in diagnostics if line.startswith("Error: ")
+        ]
 
     def close(self):
         """Shut down the persistent process.

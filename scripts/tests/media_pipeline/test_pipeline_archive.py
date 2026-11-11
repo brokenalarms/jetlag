@@ -24,7 +24,7 @@ class TestArchiveSourceIntegration:
             "--source", str(source),
             "--timezone", "+0900",
             "--group", "Test",
-            "--tasks", "tag", "fix-timestamp", "archive-source",
+            "--tasks", "tag", "archive-source",
             "--source-action", "archive",
             "--apply",
         ])
@@ -48,7 +48,7 @@ class TestArchiveSourceIntegration:
             "--source", str(source),
             "--timezone", "+0900",
             "--group", "Test",
-            "--tasks", "tag", "fix-timestamp", "archive-source",
+            "--tasks", "tag", "archive-source",
             "--source-action", "delete",
             "--backup-location", f"Library={temp_workspace['target']}",
             "--apply",
@@ -66,7 +66,7 @@ class TestArchiveSourceIntegration:
 
         run_pipeline([
             "--profile", test_profile, "--source", str(source), "--timezone", "+0900",
-            "--group", "Test", "--tasks", "tag", "fix-timestamp", "archive-source",
+            "--group", "Test", "--tasks", "tag", "archive-source",
             "--source-action", "delete", "--apply",
         ])
 
@@ -81,7 +81,7 @@ class TestArchiveSourceIntegration:
 
         run_pipeline([
             "--profile", test_profile, "--source", str(source), "--timezone", "+0900",
-            "--group", "Test", "--tasks", "tag", "fix-timestamp", "archive-source",
+            "--group", "Test", "--tasks", "tag", "archive-source",
             "--source-action", "delete",
             "--backup-location", f"Library={temp_workspace['target']}",
             "--backup-location", f"NAS={empty_nas}",
@@ -106,7 +106,7 @@ class TestArchiveSourceIntegration:
             "--source", str(source),
             "--timezone", "+0900",
             "--group", "Test",
-            "--tasks", "tag", "fix-timestamp", "archive-source",
+            "--tasks", "tag", "archive-source",
             "--archive-destination", str(elsewhere),
             "--archived-name", "Japan trip",
             "--apply",
@@ -152,7 +152,7 @@ class TestArchiveSourceIntegration:
                 "--source", str(source),
                 "--timezone", "+0900",
                 "--group", "Test",
-                "--tasks", "tag", "fix-timestamp", "archive-source",
+                "--tasks", "tag", "archive-source",
                 "--source-action", "archive",
                 "--apply",
             ])
@@ -184,7 +184,7 @@ class TestArchiveSourceIntegration:
             "--source", str(source),
             "--timezone", "+0900",
             "--group", "Test",
-            "--tasks", "tag", "fix-timestamp", "archive-source",
+            "--tasks", "tag", "archive-source",
             "--source-action", "delete",
             "--backup-location", f"Library={temp_workspace['target']}",
             "--copy-companion-files",

@@ -287,7 +287,7 @@ class TestOutputAlwaysOn:
 
         run_in_process(
             ["--profile", test_profile, "--source", str(source), "--timezone", "+0900",
-             "--group", "Test", "--tasks", "fix-timestamp", "--apply"],
+             "--group", "Test", "--tasks", "--apply"],
         )
 
         output_files = list(target.rglob("*.mp4"))
@@ -309,14 +309,39 @@ class TestOutputAlwaysOn:
         assert len(output_files) == 1, f"File should be in target, found: {output_files}"
 
 
+class TestDateFolderWithoutACorrection:
+    """With the timestamp step off, the date folder still comes from the file's own
+    reading in the run's declared timezone (FileReading.date_folder()), as the
+    Comedy night Sony clip should have: no DateTimeOriginal, no date in its name,
+    a UTC clock, and a modification time from another zone."""
+
+    def test_folder_is_the_date_where_it_was_shot(self, temp_workspace, test_profile):
+        """Actual: the folder the clip lands in, fix-timestamp not run
+        Expected: 2026-10-07 — 17:30 UTC on the 6th is 01:30 on the 7th in +08:00"""
+        source = temp_workspace["source"]
+        clip = source / "C0199.MP4"
+        create_test_video(clip, media_create_date="2026:10:06 17:30:00")
+        stamp = 1791547200  # 2026-10-09, a date neither zone gives the clip
+        os.utime(clip, (stamp, stamp))
+
+        run_in_process(
+            ["--profile", test_profile, "--source", str(source), "--timezone", "+0800",
+             "--tasks", "tag", "--apply"],
+        )
+
+        landed = list(temp_workspace["target"].rglob("C0199.MP4"))
+        assert [p.parent.name for p in landed] == ["2026-10-07"], \
+            f"Actual: {[str(p) for p in landed]}, Expected: one file in a 2026-10-07 folder"
+
+
 class TestOverwriteDestination:
     """A file already sitting at the organize destination blocks the move.
 
     The pipeline reports that as data — every blocked file skips with
-    reason=exists_differs and the batch ends with one organize_conflict event
-    carrying the count — and only replaces those files when --overwrite says so.
-    The app reads the conflict event to ask the user before re-running with the
-    flag, so the count and the file list have to be right.
+    reason=exists_differs and the batch ends with one destination_occupied
+    batch_check naming them — and only replaces those files when --overwrite says so.
+    The app reads the finding to ask the user before re-running with the flag,
+    so the file list has to be right.
     """
 
     def _run(self, workspace, profile, *extra):
@@ -360,7 +385,7 @@ class TestOverwriteDestination:
     def test_blocked_files_are_reported_as_one_batch_conflict(self, temp_workspace, test_profile):
         """Without --overwrite the file stays put and the batch reports the conflict.
 
-        Actual: destination bytes unchanged, organize_conflict names the file
+        Actual: destination bytes unchanged, destination_occupied names the file
         Expected: the app has one event to prompt on, listing every blocked file
         """
         organized = self._seed_differing_destination(temp_workspace, test_profile)
@@ -375,13 +400,10 @@ class TestOverwriteDestination:
         assert organize_event.get("reason") == "exists_differs", \
             f"Actual: organize_result.reason={organize_event.get('reason')!r}, Expected: 'exists_differs'"
 
-        conflicts = [e for e in events if e["event"] == "organize_conflict"]
-        assert len(conflicts) == 1, \
-            f"Actual: {len(conflicts)} organize_conflict events, Expected: exactly 1 for the batch"
-        assert conflicts[0]["count"] == 1, \
-            f"Actual: organize_conflict.count={conflicts[0]['count']}, Expected: 1"
-        assert conflicts[0]["files"] == ["VID_20251005_100000_00_001.mp4"], \
-            f"Actual: organize_conflict.files={conflicts[0]['files']}, Expected: ['VID_20251005_100000_00_001.mp4']"
+        conflicts = [e for e in events if e["event"] == "batch_check"]
+        assert [(c["check"], c["files"], c["assent_flag"], c["refused"]) for c in conflicts] == \
+            [("destination_occupied", ["VID_20251005_100000_00_001.mp4"], "--overwrite", False)], \
+            f"Actual: {conflicts}, Expected: one destination_occupied for the batch, the run finished"
         assert organized.read_bytes() == before, \
             "Actual: the file at the destination changed, Expected: untouched without --overwrite"
 
@@ -401,7 +423,7 @@ class TestOverwriteDestination:
         organize_event = next(e for e in events if e["event"] == "organize_result")
         assert organize_event["action"] == "overwrote", \
             f"Actual: organize_result.action={organize_event['action']!r}, Expected: 'overwrote'"
-        assert not [e for e in events if e["event"] == "organize_conflict"], \
+        assert not [e for e in events if e["event"] == "batch_check"], \
             "Actual: a conflict was reported, Expected: none — --overwrite resolved them"
 
         after = organized.read_bytes()
@@ -465,8 +487,8 @@ class TestOverwriteDestination:
         result = self._run(temp_workspace, test_profile, "--apply")
 
         events = self._events(result.stdout)
-        assert not [e for e in events if e["event"] == "organize_conflict"], \
-            "Actual: organize_conflict emitted for a clean run, Expected: none"
+        assert not [e for e in events if e["event"] == "batch_check"], \
+            "Actual: destination_occupied emitted for a clean run, Expected: none"
 
     def test_identical_copy_is_not_a_conflict(self, temp_workspace, test_profile):
         """An identical file at the destination is not something to ask about.
@@ -487,8 +509,8 @@ class TestOverwriteDestination:
         organize_event = next(e for e in events if e["event"] == "organize_result")
         assert organize_event.get("reason") == "identical", \
             f"Actual: organize_result.reason={organize_event.get('reason')!r}, Expected: 'identical'"
-        assert not [e for e in events if e["event"] == "organize_conflict"], \
-            "Actual: organize_conflict emitted for an identical copy, Expected: none"
+        assert not [e for e in events if e["event"] == "batch_check"], \
+            "Actual: destination_occupied emitted for an identical copy, Expected: none"
 
 
 class TestOrganizeReportsTheUserFacingOutcome:
@@ -530,9 +552,11 @@ class TestOrganizeReportsTheUserFacingOutcome:
         names = ["VID_20251005_100000_00_001.mp4",
                  "VID_20251005_110000_00_002.mp4",
                  "VID_20251005_120000_00_003.mp4"]
-        for name in names:
+        # Each clock is its name's time less nine hours: one camera set to +09:00
+        # throughout, so the batch is not mixed.
+        for name, clock in zip(names, ["01:00:00", "02:00:00", "03:00:00"]):
             create_test_video(workspace["source"] / name,
-                              media_create_date="2025:10:05 01:00:00")
+                              media_create_date=f"2025:10:05 {clock}")
         return names
 
     def test_dry_run_and_apply_report_the_same_copy_token_for_every_file(

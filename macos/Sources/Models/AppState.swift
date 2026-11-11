@@ -262,36 +262,8 @@ final class AppState {
     /// Act on what an event asked of the app beyond the table.
     private func handle(_ notice: RunTranscript.Notice) {
         switch notice {
-        case .timezoneConflict(let kind, let providedTz, let fileTimezones):
-            workflowSession.noteConflict()
-            workflowSession.timezoneConflictType = kind
-            workflowSession.timezoneConflictProvidedTz = providedTz
-            workflowSession.timezoneConflictFileTimezones = fileTimezones
-            // A dry run previews a provided-vs-embedded mismatch instead of
-            // refusing it, so the conflict is recorded as data and the flagged
-            // rows speak for themselves. Only a run the pipeline actually
-            // refuses — an apply, or a mixed-zone batch in either mode — asks
-            // the user to confirm.
-            workflowSession.showTimezoneConflict =
-                kind == .mixedTimezones || workflowSession.applyMode
-
-        case .organizeConflict(let count, let files):
-            workflowSession.organizeConflictCount = count
-            workflowSession.organizeConflictFiles = files
-
-        case .protectedSources(let files):
-            workflowSession.noteConflict()
-            workflowSession.protectedSourceFiles = files
-            // A dry run previews the protected files anyway; only an apply is
-            // refused, so only an apply asks.
-            workflowSession.showProtectedSources = workflowSession.applyMode
-
-        case .cameraMismatch(let mismatch):
-            workflowSession.noteConflict()
-            workflowSession.cameraMismatch = mismatch
-            // A dry run previews files from another camera anyway; only an
-            // apply is refused, so only an apply asks.
-            workflowSession.showCameraMismatch = workflowSession.applyMode
+        case .batchCheck(let check):
+            workflowSession.noteBatchCheck(check)
 
         case .error(let message):
             logOutput.append(LogLine(text: "ERROR: \(message)", stream: .stderr))
@@ -375,11 +347,11 @@ final class AppState {
         workflowSession.chooseSource()
         guard canRunPipeline(check: check) else { return }
 
-        // An apply the user never previewed, and applying over the files the last
-        // run reported blocked, both destroy files: the answers are taken before
-        // anything runs — cancelling runs nothing.
+        // An apply the user never previewed, and an apply over what its preview
+        // found, both change files the user has not agreed to: the answers are
+        // taken before anything runs — cancelling runs nothing.
         if workflowSession.requestDryRunAssentIfNeeded() { return }
-        if workflowSession.requestOverwriteAssentIfNeeded() { return }
+        if workflowSession.requestCheckAssentIfNeeded() { return }
 
         let session = workflowSession
         let launcher = self.launcher

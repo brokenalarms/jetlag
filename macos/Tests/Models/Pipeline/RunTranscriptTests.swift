@@ -56,16 +56,17 @@ final class RunTranscriptTests: XCTestCase {
         var transcript = RunTranscript()
 
         let conflict = transcript.apply(try event("""
-        {"event": "timezone_conflict", "conflict_type": "mixed_timezones", \
-        "file_timezones": {"+0900": ["a.mp4"], "+0200": ["b.mp4"]}}
+        {"event": "batch_check", "check": "mixed_timezones", "files": ["a.mp4", "b.mp4"], \
+        "groups": {"+0900": ["a.mp4"], "+0200": ["b.mp4"]}, \
+        "assent_flag": "--allow-mixed-timezones", "refused": true}
         """))
         let error = transcript.apply(try event(#"{"event": "pipeline_error", "message": "boom"}"#))
 
-        guard case .timezoneConflict(let kind, _, let zones)? = conflict else {
-            return XCTFail("expected a timezone conflict, got \(String(describing: conflict))")
+        guard case .batchCheck(let check)? = conflict else {
+            return XCTFail("expected a batch check, got \(String(describing: conflict))")
         }
-        XCTAssertEqual(kind, .mixedTimezones)
-        XCTAssertEqual(zones["+0900"], ["a.mp4"])
+        XCTAssertEqual(check.kind, .mixedTimezones)
+        XCTAssertEqual(check.groups["+0900"], ["a.mp4"])
         guard case .error(let message)? = error else {
             return XCTFail("expected an error, got \(String(describing: error))")
         }

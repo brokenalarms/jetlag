@@ -83,7 +83,7 @@ class TestScriptsAcceptTheSameTimezones:
         return subprocess.run(
             [sys.executable, str(SCRIPT_DIR / "cli" / "media_pipeline.py"),
              "--source", str(source), "--target", str(tmp_path / "target"),
-             "--extensions", ".mp4", "--tasks", "fix-timestamp", "--timezone", timezone],
+             "--extensions", ".mp4", "--tasks", "--timezone", timezone],
             capture_output=True, text=True, stdin=subprocess.DEVNULL,
         )
 

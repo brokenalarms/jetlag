@@ -599,3 +599,32 @@ class TestTagMediaMachineOutput:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestTaggingKeepsTheBirthTime:
+    """On macOS every exiftool write gives the file a new birth time, and -P then
+    clamps it to the restored modification time. tag-media run on its own over a
+    library file whose birth time a correction set would lose it, so its camera
+    write carries the file's own birth time back (and skips -P, as every write
+    that sets one does)."""
+
+    def test_writing_the_camera_leaves_a_corrected_birth_time_as_it_was(self, tmp_path):
+        """Actual: the birth time after tag-media writes Make and Model
+        Expected: 2025:10:05 10:00:00 local, as the correction left it, not the
+        file's modification time"""
+        video = tmp_path / "clip.mp4"
+        create_test_video(video)
+        subprocess.run(["exiftool", "-overwrite_original", "-FileCreateDate=2025:10:05 10:00:00",
+                        str(video)], capture_output=True, check=True)
+        os.utime(video, (1767225600, 1767225600))  # 2026-01-01: later than the birth time
+
+        result = subprocess.run([
+            sys.executable, str(SCRIPT_DIR / "cli" / "tag_media.py"), str(video),
+            "--make", "TestMake", "--model", "TestModel", "--apply",
+        ], capture_output=True, text=True, cwd=SCRIPT_DIR)
+
+        birth = subprocess.run(["stat", "-f", "%SB", "-t", "%Y:%m:%d %H:%M:%S", str(video)],
+                               capture_output=True, text=True, check=True).stdout.strip()
+        assert result.returncode == 0, f"Actual: {result.stderr}, Expected: a clean run"
+        assert birth == "2025:10:05 10:00:00", \
+            f"Actual: birth time {birth}, Expected: 2025:10:05 10:00:00 unchanged"

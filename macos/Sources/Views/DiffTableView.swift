@@ -269,6 +269,7 @@ struct DiffTableView: View {
                 ? Strings.DiffTable.wouldFixChange : Strings.DiffTable.fixedChange
         case .wouldAdd: return Strings.DiffTable.wouldAddChange
         case .added: return Strings.DiffTable.addedChange
+        case .metadataSkipped: return Strings.DiffTable.metadataSkippedChange
         case .noChange: return Strings.DiffTable.noChangeChange
         case .error: return row.refusalReason?.label ?? row.timestampError ?? Strings.DiffTable.errorChange
         case nil: return "—"
@@ -370,6 +371,11 @@ struct DiffTableView: View {
             Text(text)
                 .font(Theme.Typography.file)
                 .foregroundStyle(Theme.Accent.highlight)
+        case .metadataSkipped:
+            Text(text)
+                .font(Theme.Typography.file)
+                .foregroundStyle(Theme.Status.warning)
+                .help(Strings.DiffTable.metadataSkippedHelp)
         case .noChange:
             Text(text)
                 .font(Theme.Typography.file)

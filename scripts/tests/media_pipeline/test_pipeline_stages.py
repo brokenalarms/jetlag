@@ -7,8 +7,8 @@ failure exit that stops the trip, releases the staged copy without deleting it
 and reports the file failed.
 
 The end-to-end tests below them run whole pipelines through stages with real
-effects: tagging, the provenance record every moved file carries, and a file
-exiftool refuses to write.
+effects: tagging, the provenance record every moved file carries, a file
+exiftool refuses to write, and an Insta360 clip whose metadata it cannot write.
 """
 
 from __future__ import annotations
@@ -22,11 +22,12 @@ import pytest
 
 from lib.media_pipeline import RunOptions, WorkingDir, process_file
 from lib.media_pipeline import stages
-from lib.media_pipeline.stages import Stage, StageOutcome, enabled_stages, fix_writes_fields
+from lib.media_pipeline.stages import Stage, StageOutcome, enabled_stages
 from helpers import SCRIPT_DIR
+from helpers.media import create_insv_with_corrupted_trailer, exiftool_refuses_corrupted_insta360_trailer
 from helpers.pipeline import create_test_video, get_exif_field, has_tag_cmd, run_in_process, run_pipeline
 
-DEFAULT_TASKS = frozenset({"tag", "fix-timestamp", "gyroflow"})
+DEFAULT_TASKS = frozenset({"tag", "gyroflow"})
 CAMERA_PROFILE = {"tags": ["test-camera"], "exif": {"make": "Test", "model": "Camera"}}
 
 
@@ -43,10 +44,11 @@ def _names(opts: RunOptions) -> list[str]:
 
 class TestStageRouting:
 
-    def test_ingest_and_output_always_run(self):
-        """Actual: with no optional task, only ingest and output
-        Expected: the fixed frame of every run"""
-        assert _names(_opts(tasks=frozenset())) == ["ingest", "output"]
+    def test_ingest_fix_timestamp_and_output_always_run(self):
+        """Actual: with no optional task, ingest, fix-timestamp and output
+        Expected: the fixed frame of every run. Set Timestamps is always on: a run
+        that skipped it organized the Comedy night C0199 uncorrected."""
+        assert _names(_opts(tasks=frozenset())) == ["ingest", "fix-timestamp", "output"]
 
     def test_default_tasks_with_a_camera_profile(self):
         assert _names(_opts(profile=CAMERA_PROFILE)) == ["ingest", "tag", "fix-timestamp", "output"]
@@ -68,11 +70,10 @@ class TestStageRouting:
     def test_any_of_tags_make_or_model_enables_tag(self, profile):
         assert "tag" in _names(_opts(profile=profile))
 
-    def test_rename_follows_fix_timestamp_only_with_update_filename_dates(self):
+    def test_rename_follows_fix_timestamp_with_update_filename_dates(self):
         assert "rename" not in _names(_opts())
         assert _names(_opts(update_filename_dates=True)) == \
             ["ingest", "fix-timestamp", "rename", "output"]
-        assert "rename" not in _names(_opts(tasks=frozenset({"tag"}), update_filename_dates=True))
 
     @pytest.mark.parametrize("profile,config,enabled", [
         ({"gyroflow_enabled": True}, {"binary": "gyroflow"}, True),
@@ -87,27 +88,15 @@ class TestStageRouting:
         opts = _opts(profile={**CAMERA_PROFILE, "gyroflow_enabled": True}, gyroflow_config={"a": 1})
         assert _names(opts)[-2:] == ["output", "gyroflow"]
 
-    @pytest.mark.parametrize("apply,tasks,expected", [
-        (True, DEFAULT_TASKS, True),
-        (False, DEFAULT_TASKS, False),
-        (True, frozenset({"tag"}), False),
-    ], ids=["apply", "dry-run", "no-fix-timestamp"])
-    def test_tag_writes_ride_in_fix_timestamps_call_only_when_it_writes(self, apply, tasks, expected):
-        """Tag's camera fields go out in fix-timestamp's exiftool write, so the file
-        is rewritten once; without that write, the provenance stage writes them."""
-        assert fix_writes_fields(_opts(apply=apply, tasks=tasks)) is expected
-
-    @pytest.mark.parametrize("apply,tasks,expected", [
-        (True, frozenset({"tag"}), ["ingest", "tag", "provenance", "output"]),
-        (True, frozenset({"gyroflow"}), ["ingest", "provenance", "output"]),
-        (True, DEFAULT_TASKS, ["ingest", "tag", "fix-timestamp", "output"]),
-        (False, frozenset({"tag"}), ["ingest", "tag", "output"]),
-    ], ids=["tag-only", "no-metadata-step", "fix-timestamp-writes", "dry-run"])
-    def test_provenance_stage_writes_only_when_fix_timestamp_does_not(self, apply, tasks, expected):
-        """Every file an apply moves gets one metadata write carrying its provenance:
-        fix-timestamp's when it runs, the provenance stage's, right after tag, otherwise.
-        A dry run writes nothing."""
-        assert _names(_opts(apply=apply, tasks=tasks, profile=CAMERA_PROFILE)) == expected
+    @pytest.mark.parametrize("apply,tasks", [
+        (True, frozenset({"tag"})), (True, frozenset({"gyroflow"})), (False, frozenset({"tag"})),
+    ], ids=["tag-apply", "no-tag-apply", "dry-run"])
+    def test_every_run_sets_timestamps(self, apply, tasks):
+        """Actual: the stages whatever optional steps are asked for
+        Expected: fix-timestamp always, and no separate provenance stage: the
+        provenance record and tag's camera fields ride in its one write"""
+        names = _names(_opts(apply=apply, tasks=tasks, profile=CAMERA_PROFILE))
+        assert "fix-timestamp" in names and "provenance" not in names
 
 
 class _Recorder:
@@ -269,7 +258,7 @@ class TestEveryMovedFileRecordsItsCardName:
 
         result = run_in_process([
             "--profile", test_profile, "--source", str(source), "--timezone", "+0900",
-            "--tasks", "fix-timestamp", "--apply",
+            "--tasks", "--apply",
         ])
 
         # The clock fields, not the action: on macOS the staged copy never keeps the
@@ -326,16 +315,17 @@ class TestEveryMovedFileRecordsItsCardName:
 class TestFileExiftoolCannotWrite:
     """exiftool reads some files it refuses to rewrite, saying why on stderr and
     "0 image files updated" on stdout. A camera's malformed atoms are one source;
-    trailing bytes past the last atom are the same refusal on any MP4. Such a file
-    must fail with exiftool's reason and stay out of the library: it carries none
-    of the metadata the run says it applied.
+    an atom that claims more than the file holds is the same refusal on any MP4,
+    and not a minor one, which -m would write past. Such a file must fail with
+    exiftool's reason and stay out of the library: it carries none of the
+    metadata the run says it applied.
     """
 
     @staticmethod
     def _create_unwritable_video(path: Path):
         create_test_video(path)
         with open(path, "ab") as f:
-            f.write(b"\0\x0f\x42\x40free" + b"\0" * 16)
+            f.write(b"\0\0\x10\0mdat" + b"\0" * 8)
 
     @staticmethod
     def _events(stdout: str) -> list[dict]:
@@ -355,7 +345,7 @@ class TestFileExiftoolCannotWrite:
         outcome = next(e for e in events if e["event"] == "pipeline_result")
         organized = [p for p in target.rglob("*.mp4")]
         assert timestamp["action"] == "error", f"Actual: {timestamp}, Expected: action=error"
-        assert "garbage at end of file" in timestamp.get("error", ""), \
+        assert "Truncated mdat atom" in timestamp.get("error", ""), \
             f"Actual: error={timestamp.get('error')!r}, Expected: exiftool's own reason"
         assert outcome["result"] == "failed", f"Actual: {outcome}, Expected: failed"
         assert organized == [], f"Actual: {organized} organized, Expected: nothing in the library"
@@ -376,5 +366,60 @@ class TestFileExiftoolCannotWrite:
         organized = [p for p in target.rglob("*.mp4")]
         assert outcome["result"] == "failed", f"Actual: {outcome}, Expected: failed"
         assert organized == [], f"Actual: {organized} organized, Expected: nothing in the library"
-        assert "garbage at end of file" in result.stderr, \
+        assert "Truncated mdat atom" in result.stderr, \
             f"Actual: {result.stderr[-800:]}, Expected: exiftool's own reason"
+
+
+class TestInsta360ClipWhoseMetadataCannotBeWritten:
+    """The Insta360 X6 (firmware 1.1.7) leaves its trailer's record table empty,
+    and exiftool refuses every metadata write on its clips as a corrupted Insta360
+    trailer. The clip still has a correct UTC clock, and .insv reaches an editor
+    only through Insta360 Studio's export, so its metadata is skipped with a
+    warning rather than failing the file: its birth time, its name and its date
+    folder are still corrected, and its row says what happened.
+    """
+
+    CLIP = "VID_20261006_002802_00_001.insv"
+
+    def _run(self, workspace, profile):
+        if not exiftool_refuses_corrupted_insta360_trailer():
+            pytest.skip("this exiftool predates the Insta360 trailer check (CI's 12.76; the app ships 13.50)")
+        create_insv_with_corrupted_trailer(workspace["source"] / self.CLIP,
+                                           CreateDate="2026:10:06 07:28:02",
+                                           MediaCreateDate="2026:10:06 07:28:02")
+        return run_in_process([
+            "--profile", profile, "--source", str(workspace["source"]),
+            "--target", str(workspace["target"]), "--extensions", ".insv",
+            "--timezone", "+0800", "--update-filename-dates", "--tasks", "--apply",
+        ])
+
+    def test_the_clip_is_renamed_and_filed_with_its_metadata_skipped(self, temp_workspace, test_profile):
+        """Actual: the clip's timestamp_result, its verdict and where it landed
+        Expected: metadata_skipped, changed, renamed to Perth time, filed under
+        its Perth date, its metadata as the camera wrote it"""
+        result = self._run(temp_workspace, test_profile)
+
+        events = [json.loads(line) for line in result.stdout.splitlines() if line.startswith("{")]
+        timestamp = next(e for e in events if e["event"] == "timestamp_result")
+        outcome = next(e for e in events if e["event"] == "pipeline_result")
+        organized = list(temp_workspace["target"].rglob("*.insv"))
+        assert (timestamp["action"], timestamp["corrected_time"]) == \
+            ("metadata_skipped", "2026:10:06 15:28:02+08:00"), f"Actual: {timestamp}"
+        assert outcome["result"] == "changed", f"Actual: {outcome}, Expected: changed"
+        assert [(p.parent.name, p.name) for p in organized] == \
+            [("2026-10-06", "VID_20261006_152802_00_001.insv")], \
+            f"Actual: {organized}, Expected: renamed to Perth time under its Perth date"
+        assert get_exif_field(organized[0], "Keys:CreationDate") == "", \
+            "Actual: metadata written, Expected: left as the camera wrote it"
+        assert "Corrupted Insta360 trailer" in result.stderr, \
+            f"Actual: {result.stderr[-800:]}, Expected: the warning names exiftool's reason"
+
+    @pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS — birth time operations")
+    def test_the_clip_gets_its_corrected_birth_time(self, temp_workspace, test_profile):
+        self._run(temp_workspace, test_profile)
+
+        organized = next(temp_workspace["target"].rglob("*.insv"))
+        birth = subprocess.run(["stat", "-f", "%B", str(organized)],
+                               capture_output=True, text=True, check=True).stdout.strip()
+        assert int(birth) == 1791271682, \
+            f"Actual: birth time {birth}, Expected: 1791271682 (2026-10-06 07:28:02 UTC)"

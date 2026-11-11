@@ -1,6 +1,6 @@
 """One file's trip through the pipeline, as a list of stages run by one loop.
 
-INGEST (always) → [tag] → [fix-timestamp | provenance] → OUTPUT (always) → [gyroflow]
+INGEST (always) → [tag] → SET TIMESTAMP (always) → OUTPUT (always) → [gyroflow]
 
 Each stage says whether the run's options enable it and does its work on the
 file's FileContext, returning a StageOutcome. process_file() owns everything
@@ -19,12 +19,11 @@ from pathlib import Path
 from typing import Optional
 
 from lib import fix_media_timestamp, generate_gyroflow, ingest_media, organize_by_date, tag_media
-from lib.exiftool import MetadataWriteRefused, exiftool
+from lib.exiftool import MetadataWriteRefused
 from lib.media_pipeline.events import emit_event
 from lib.media_pipeline.options import FIX_TIMESTAMP, GYROFLOW, TAG, RunOptions
 from lib.media_pipeline.working_dir import WorkingDir
-from lib.timestamps.provenance import provenance_field_args
-from lib.timestamps.sources import build_filename, carry_exif_cache, parse_datetime_original, read_exif_data
+from lib.timestamps.sources import build_filename, carry_exif_cache, parse_datetime_original, read_file
 
 
 @dataclass
@@ -41,11 +40,11 @@ class FileContext:
     active: Path
     companions: list[str] = field(default_factory=list)
     source_files: list[str] = field(default_factory=list)
-    # The DateTimeOriginal organize dates the file by, so it never reads the file
-    # again; a timestamp correction replaces it with the corrected value.
-    organize_datetime: str = ""
-    # tag's camera fields, written in the file's one metadata write: fix-timestamp's
-    # when it runs, the provenance stage's otherwise.
+    # The date folder organize files the file under (FileReading.date_folder()),
+    # so it never reads the file again; a timestamp correction replaces it with
+    # the corrected time's date.
+    organize_date: Optional[str] = None
+    # tag's camera fields, written in the file's one metadata write, fix-timestamp's.
     camera_fields: dict = field(default_factory=dict)
     corrected_time: Optional[str] = None
     # A dry run's --update-filename-dates rename that has not happened: the
@@ -82,13 +81,6 @@ class Stage:
         raise NotImplementedError
 
 
-def fix_writes_fields(opts: RunOptions) -> bool:
-    """Whether every step's field writes, provenance included, go out in
-    fix-timestamp's exiftool call, so the file is rewritten once. Otherwise
-    ProvenanceStage makes that one write."""
-    return opts.apply and FixTimestampStage().enabled(opts)
-
-
 class IngestStage(Stage):
     """Copy the source file (and its companions) into the working directory."""
     name = "ingest"
@@ -121,7 +113,7 @@ class IngestStage(Stage):
         # The file's one metadata read (or the pre-flight's, carried to the copy
         # above). Taken before any step writes, so organize never reads the file
         # again.
-        ctx.organize_datetime = read_exif_data(str(ctx.active)).get("DateTimeOriginal", "")
+        ctx.organize_date = read_file(str(ctx.active)).date_folder(opts.timezone_spec)
 
         if opts.copy_companion_files and companion_dests:
             for ext in opts.companion_extensions or []:
@@ -154,8 +146,8 @@ class TagStage(Stage):
         opts, active = ctx.opts, ctx.active
         make, model = self._camera(opts)
         print("🏷️  Tagging...", file=sys.stderr)
-        # The camera fields ride in the file's one metadata write, fix-timestamp's or
-        # the provenance stage's, so tagging never writes them itself.
+        # The camera fields ride in the file's one metadata write, fix-timestamp's,
+        # so tagging never writes them itself.
         try:
             tag_result = tag_media.tag_media_file(
                 str(active), self._finder_tags(opts), make or None, model or None,
@@ -183,8 +175,6 @@ class FixTimestampStage(Stage):
     """Correct the clock fields and birth time, writing other steps' fields too."""
     name = FIX_TIMESTAMP
 
-    def enabled(self, opts: RunOptions) -> bool:
-        return opts.runs(FIX_TIMESTAMP)
 
     def run(self, ctx: FileContext) -> StageOutcome:
         opts, active = ctx.opts, ctx.active
@@ -235,49 +225,11 @@ class FixTimestampStage(Stage):
             return StageOutcome(error=ts_result.error or "Timestamp fix failed")
 
         ctx.corrected_time = ts_result.corrected_time
-        if ts_result.corrected_time:
-            ctx.organize_datetime = ts_result.corrected_time
+        corrected_dt = parse_datetime_original(ts_result.corrected_time) if ts_result.corrected_time else None
+        if corrected_dt:
+            ctx.organize_date = corrected_dt.strftime("%Y-%m-%d")
         return StageOutcome(
-            changed=ts_result.timestamp_action in ("would_fix", "fixed", "would_add", "added"))
-
-
-class ProvenanceStage(Stage):
-    """The camera fields and provenance in one exiftool call, when fix-timestamp is
-    not running to carry them.
-
-    Every file the pipeline moves gets a provenance record, so verify-card can find
-    a copy by its card name after it has been renamed. Part of the step before it
-    as far as the app is concerned, so it reports no stage_complete of its own.
-    """
-    name = "provenance"
-    reports_completion = False
-
-    def enabled(self, opts: RunOptions) -> bool:
-        return opts.apply and not fix_writes_fields(opts)
-
-    def run(self, ctx: FileContext) -> StageOutcome:
-        file_path = str(ctx.active)
-        exif = read_exif_data(file_path)
-        provenance_args = provenance_field_args(file_path, exif)
-        camera_args = [f"-{tag}={value}" for tag, value in ctx.camera_fields.items()]
-        if not (provenance_args or camera_args):
-            return StageOutcome()
-        try:
-            written = exiftool.write_tags(file_path, provenance_args + camera_args)
-        except MetadataWriteRefused as refusal:
-            written, error = False, str(refusal)
-            print(f"   ❌ exiftool could not write this file: {error}", file=sys.stderr)
-        else:
-            error = None
-        if written:
-            return StageOutcome()
-        # A failed camera write fails the file; a failed provenance-only write is a
-        # warning, as it is in fix-timestamp.
-        if camera_args:
-            print(f"   ❌ Failed to write {', '.join(ctx.camera_fields)}", file=sys.stderr)
-            return StageOutcome(error=error or f"Failed to write {', '.join(ctx.camera_fields)}")
-        print("   ⚠️  Failed to record original filename and timestamps", file=sys.stderr)
-        return StageOutcome()
+            changed=ts_result.timestamp_action in ("would_fix", "fixed", "would_add", "added", "metadata_skipped"))
 
 
 class RenameStage(Stage):
@@ -290,7 +242,7 @@ class RenameStage(Stage):
     reports_completion = False
 
     def enabled(self, opts: RunOptions) -> bool:
-        return FixTimestampStage().enabled(opts) and opts.update_filename_dates
+        return opts.update_filename_dates
 
     def run(self, ctx: FileContext) -> StageOutcome:
         corrected_dt = parse_datetime_original(ctx.corrected_time) if ctx.corrected_time else None
@@ -372,7 +324,8 @@ class OutputStage(Stage):
         org_result = organize_by_date.process_file(
             str(active), opts.target_dir, folder_template or None, group=opts.group,
             copy_mode=False, overwrite=opts.overwrite, apply=opts.apply, verbose=opts.verbose,
-            dest_name=ctx.pending_rename, datetime_original=ctx.organize_datetime,
+            dest_name=ctx.pending_rename, file_date=ctx.organize_date,
+            timezone_spec=opts.timezone_spec,
         )
         staged_action = staged_organize_action(org_result.action)
         emit_event("organize_result",
@@ -449,7 +402,7 @@ class GyroflowStage(Stage):
 
 
 STAGES: list[Stage] = [
-    IngestStage(), TagStage(), ProvenanceStage(), FixTimestampStage(), RenameStage(), OutputStage(),
+    IngestStage(), TagStage(), FixTimestampStage(), RenameStage(), OutputStage(),
     GyroflowStage(),
 ]
 

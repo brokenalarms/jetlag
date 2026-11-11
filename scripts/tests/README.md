@@ -52,6 +52,7 @@ Hold an interface or a cost fixed.
 
 - `media_pipeline/test_pipeline_schema.py` — the pipeline's JSONL output and its parser's tasks and flags match `scripts/lib/media_pipeline/pipeline-schema.yaml`
 - `media_pipeline/test_metadata_call_contract.py` — exact exiftool call counts per file (see `docs/testing.md`)
+- `timestamps/test_one_derivation.py` — no module outside `lib/timestamps/` derives a file's time, zone, filename time or date for itself
 - `shared/test_metadata_stderr.py`, `shared/test_process_hygiene.py`, `timestamps/test_xmp_namespace.py` — the long-lived exiftool client and the XMP namespace
 - `test_command_wrappers.py`, `test_requirements.py`, `test_python_compatibility.py` — every command's wrapper, runtime dependencies and the Python version macOS ships
 
