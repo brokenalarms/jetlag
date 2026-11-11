@@ -54,7 +54,7 @@ struct VerifyTableView: View {
     let locations: [String]
     let source: String
 
-    @State private var measurements = ColumnMeasurements()
+    @State private var measurements = ColumnMeasurements<VerifyRow>()
 
     private static let iconWidth: CGFloat = 18
     private static let monoFont = Theme.Typography.nsFileMono

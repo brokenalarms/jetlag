@@ -1,6 +1,6 @@
 import Foundation
 
-struct DiffTableRow: Identifiable {
+struct DiffTableRow: Identifiable, Equatable {
     let id = UUID()
     let file: String
 

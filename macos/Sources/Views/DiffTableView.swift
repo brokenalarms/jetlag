@@ -395,7 +395,7 @@ struct DiffTableView: View {
 
 /// The column-width cache plus what only the pipeline's table needs: the timeline's
 /// range, the extent of every row's epochs, folded as rows arrive.
-final class RowMeasurements: ColumnMeasurements {
+final class RowMeasurements: ColumnMeasurements<DiffTableRow> {
     private var epochRange: (lo: Double, hi: Double)?
     private var foldedEpochs: [DiffTableRow.ID: (Double?, Double?)] = [:]
 

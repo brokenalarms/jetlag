@@ -170,9 +170,30 @@ final class StreamingPerformanceTests: XCTestCase {
         var rows: [DiffTableRow] = []
         for i in 0..<160 {
             rows.append(row(i))
-            _ = cache.columnWidths(for: rows, texts: texts)
+            _ = cache.columnWidths(for: rows, titles: titles, texts: texts)
         }
         XCTAssertEqual(cache.measurementCount, rows.count)
+    }
+
+    /// Each update builds cell text only for the rows that changed. The text is the
+    /// expensive part to build (a status is a localized string), and building it for
+    /// every row on every update made a long run cost more with each file: the app
+    /// fell minutes behind a pipeline that had already finished. A file arrives sparse,
+    /// is filled in, then is finalised unchanged, so its text is built twice.
+    func testAnUpdateBuildsTextOnlyForRowsThatChanged() {
+        let cache = RowMeasurements()
+        var built = 0
+        let counting: (DiffTableRow) -> [CellText] = { built += 1; return self.texts($0) }
+        var finished: [DiffTableRow] = []
+        for i in 0..<160 {
+            var live = DiffTableRow(file: "file\(i).mp4")
+            _ = cache.columnWidths(for: finished + [live], titles: titles, texts: counting)
+            live.correctedTime = "2025:08:15 17:38:54+09:00"
+            _ = cache.columnWidths(for: finished + [live], titles: titles, texts: counting)
+            finished.append(live)
+            _ = cache.columnWidths(for: finished, titles: titles, texts: counting)
+        }
+        XCTAssertEqual(built, 2 * finished.count)
     }
 
     // MARK: - Incremental log rendering
@@ -263,6 +284,22 @@ final class StreamingPerformanceTests: XCTestCase {
         return [CellText([(row.file, mono)]), CellText([(row.correctedTime ?? "", mono)])]
     }
 
+    private let titles = ["File", "Corrected"]
+
+    /// A row's text is built for the columns shown, so a different set of columns
+    /// (a Verify check against other locations) measures every row again.
+    func testDifferentColumnsMeasureEveryRowAgain() {
+        let cache = RowMeasurements()
+        let rows = [DiffTableRow(file: "a.mp4"), DiffTableRow(file: "b.mp4")]
+        _ = cache.columnWidths(for: rows, titles: titles, texts: texts)
+        _ = cache.columnWidths(for: rows, titles: titles, texts: texts)
+        XCTAssertEqual(cache.measurementCount, 2)
+
+        let fileOnly = cache.columnWidths(for: rows, titles: ["File"]) { [self.texts($0)[0]] }
+        XCTAssertEqual(cache.measurementCount, 4)
+        XCTAssertEqual(fileOnly.fitted.count, 1, "no width is kept for a column no longer shown")
+    }
+
     /// A run's live row is appended sparse and filled in as its events arrive, then
     /// replaced by the finalised row at the same index. Measuring a row once by
     /// position left the columns sized to the empty row; the cache must re-measure a
@@ -270,19 +307,19 @@ final class StreamingPerformanceTests: XCTestCase {
     func testRowFilledInAfterAppendIsReMeasuredAndUnchangedRowsAreNot() {
         let cache = RowMeasurements()
         var sparse = DiffTableRow(file: "a.mp4")
-        let narrow = cache.columnWidths(for: [sparse], texts: texts)
+        let narrow = cache.columnWidths(for: [sparse], titles: titles, texts: texts)
         XCTAssertEqual(cache.measurementCount, 1)
 
         sparse.correctedTime = "2025:08:15 17:38:54+09:00"
-        let filled = cache.columnWidths(for: [sparse], texts: texts)
+        let filled = cache.columnWidths(for: [sparse], titles: titles, texts: texts)
         XCTAssertEqual(cache.measurementCount, 2, "a row whose text changed is measured again")
         XCTAssertGreaterThan(filled.fitted[1], narrow.fitted[1], "the column grows to the filled row")
 
-        let untouched = cache.columnWidths(for: [sparse, DiffTableRow(file: "b.mp4")], texts: texts)
+        let untouched = cache.columnWidths(for: [sparse, DiffTableRow(file: "b.mp4")], titles: titles, texts: texts)
         XCTAssertEqual(cache.measurementCount, 3, "only the new row is measured; the unchanged one is not")
         XCTAssertEqual(untouched.fitted[1], filled.fitted[1])
 
-        _ = cache.columnWidths(for: [sparse, DiffTableRow(file: "b.mp4")], texts: texts)
+        _ = cache.columnWidths(for: [sparse, DiffTableRow(file: "b.mp4")], titles: titles, texts: texts)
     }
 
     /// Clearing the table (fewer rows than measured) drops the stale maxima.
@@ -290,8 +327,8 @@ final class StreamingPerformanceTests: XCTestCase {
         let cache = RowMeasurements()
         var wide = DiffTableRow(file: "a-very-long-file-name-that-widens-the-column.mp4")
         wide.correctedTime = "2025:08:15 17:38:54+09:00"
-        let before = cache.columnWidths(for: [wide], texts: texts)
-        let after = cache.columnWidths(for: [DiffTableRow(file: "b.mp4")], texts: texts)
+        let before = cache.columnWidths(for: [wide], titles: titles, texts: texts)
+        let after = cache.columnWidths(for: [DiffTableRow(file: "b.mp4")], titles: titles, texts: texts)
         XCTAssertLessThan(after.fitted[0], before.fitted[0])
     }
 }
