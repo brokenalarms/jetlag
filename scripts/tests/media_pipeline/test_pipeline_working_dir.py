@@ -5,6 +5,7 @@ in it past the file it was staged for.
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -12,7 +13,9 @@ from pathlib import Path
 import pytest
 
 from lib import media_pipeline, organize_by_date
-from helpers.pipeline import SCRIPT_DIR, PipelineResult, create_test_video, run_pipeline
+from helpers.pipeline import (
+    SCRIPT_DIR, PipelineResult, create_test_video, run_in_process, run_pipeline,
+)
 
 
 # The pipeline stages every file through a working directory before organize
@@ -24,6 +27,7 @@ from helpers.pipeline import SCRIPT_DIR, PipelineResult, create_test_video, run_
 _PIPELINE_SPY_RUNNER = '''
 import json
 import os
+import shutil
 import sys
 
 import cli.media_pipeline
@@ -423,3 +427,80 @@ class TestWorkingDirIsTransient:
             f"Actual: working dir survives holding {self._leftovers(working_dir)}, Expected: removed"
         assert "left in the working dir" not in result.output, \
             f"Actual: a clean run warned about leftovers\n{result.output}"
+
+
+class TestARunThatNeverReachedItsCleanup:
+    """A run cut off without its cancel handler — the destination drive dropped
+    off USB mid-write — leaves exiftool's scratch file beside the staged copy,
+    and exiftool refuses to write that file again while the scratch file exists:
+    C0312.MP4 failed every later run with "Temporary file already exists"."""
+
+    def _args(self, workspace, profile, working_dir, *extra):
+        return ["--profile", profile, "--source", str(workspace["source"]),
+                "--target", str(workspace["target"]), "--timezone", "+0900",
+                "--group", "Test", "--working-dir", str(working_dir), *extra]
+
+    def test_an_earlier_runs_exiftool_scratch_file_is_cleared_before_the_apply(
+            self, temp_workspace, test_profile):
+        name = "VID_20251005_100000_00_001.mp4"
+        create_test_video(temp_workspace["source"] / name)
+        working_dir = temp_workspace["root"] / "working"
+        working_dir.mkdir()
+        scratch = working_dir / f"{name}_exiftool_tmp"
+        scratch.write_bytes(b"half-written")
+
+        result = run_pipeline(self._args(temp_workspace, test_profile, working_dir, "--apply"))
+
+        assert result.returncode == 0, f"Actual: {result.output}, Expected: a clean run"
+        assert not scratch.exists()
+        assert len(list(temp_workspace["target"].rglob(name))) == 1
+
+    def test_a_dry_run_leaves_the_working_dir_alone(self, temp_workspace, test_profile):
+        create_test_video(temp_workspace["source"] / "VID_20251005_100000_00_001.mp4")
+        working_dir = temp_workspace["root"] / "working"
+        working_dir.mkdir()
+        scratch = working_dir / "VID_20251005_100000_00_001.mp4_exiftool_tmp"
+        scratch.write_bytes(b"half-written")
+
+        run_pipeline(self._args(temp_workspace, test_profile, working_dir))
+
+        assert scratch.exists(), "a preview writes nothing, the working dir included"
+
+
+class TestTheDestinationDisconnectingStopsTheRun:
+    """When the destination volume goes, its working directory goes with it, and
+    every later file failed with "Permission denied: '/Volumes/T9'". The apply
+    stops at the next file instead, names what it never reached, and does not
+    archive a source whose files are not all through."""
+
+    def test_the_apply_stops_and_reports_the_files_it_never_reached(
+            self, temp_workspace, test_profile, monkeypatch):
+        names = [f"VID_20251005_1{i}0000_00_00{i}.mp4" for i in range(3)]
+        for i, name in enumerate(names):
+            create_test_video(temp_workspace["source"] / name,
+                              media_create_date=f"2025:10:05 0{i + 1}:00:00")
+        working_dir = temp_workspace["root"] / "working"
+
+        from lib.media_pipeline import batch
+        real_process_file = batch.process_file
+
+        def process_then_disconnect(file_path, opts, wd):
+            result = real_process_file(file_path, opts, wd)
+            shutil.rmtree(wd.path, ignore_errors=True)
+            return result
+
+        monkeypatch.setattr(batch, "process_file", process_then_disconnect)
+
+        result = run_in_process([
+            "--profile", test_profile, "--source", str(temp_workspace["source"]),
+            "--target", str(temp_workspace["target"]), "--timezone", "+0900",
+            "--group", "Test", "--working-dir", str(working_dir),
+            "--tasks", "archive-source", "--apply"])
+
+        events = [json.loads(line) for line in result.stdout.strip().split("\n") if line.strip()]
+        summary = next(e for e in events if e["event"] == "pipeline_summary")
+        assert summary["processed"] == 1
+        assert summary["unprocessed_files"] == sorted(names)[1:]
+        assert result.returncode != 0
+        assert temp_workspace["source"].exists(), "Actual: archived, Expected: source left in place"
+        assert "disconnected" in result.stderr

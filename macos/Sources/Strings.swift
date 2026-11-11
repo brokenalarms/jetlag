@@ -211,6 +211,11 @@ Runs once, after the whole batch: if the run is cancelled or a file fails, the s
                           defaultValue: "\(count) failed:\n\(listed)")
         }
 
+        static func runSummaryDestinationLost(count: Int) -> String {
+            String(localized: "workflow.runSummary.destinationLost",
+                   defaultValue: "The destination disconnected: \(count) file\(count == 1 ? "" : "s") not processed and the source not archived. Reconnect it and run again.")
+        }
+
         static let runSummarySourceActionFailed = String(localized: "workflow.runSummary.sourceActionFailed",
             defaultValue: "Archive Source failed: the source was left where it was. Show Output says why.")
 

@@ -302,6 +302,13 @@ events:
       failed_files:
         type: "list[string]"
         description: "Basenames of the files that failed, empty when failed is 0"
+      unprocessed_files:
+        type: "list[string]"
+        description: >-
+          Basenames of the files an apply never reached because its destination
+          disconnected (its working directory disappeared). Empty for a run that
+          went through every file. The run exits non-zero and archive-source is
+          skipped.
       source_action_failed:
         type: boolean
         description: >-
@@ -318,6 +325,7 @@ events:
       changed: 1
       failed: 1
       failed_files: [DJI_20250815_101112_0001.MP4]
+      unprocessed_files: []
       source_action_failed: false
       mode: applied
 
