@@ -1,6 +1,6 @@
 # Comedy night: Insta360 X6 and Sony A7V timestamps
 
-Read `timestamp-handoff.md` first: its "user's own words" and "principles" sections hold
+Read `../timestamp-handoff.md` first: its "user's own words" and "principles" sections hold
 for everything here. This spec is what a fresh agent needs to pick up the follow-ups from
 the 2026-11-10 investigation of a backup report about the Comedy night footage
 (6 Oct 2026, Perth, UTC+8). The investigation only read the files; the evidence below
@@ -97,7 +97,7 @@ over the UTC `CreateDate` and planned to overwrite the correct UTC fields with a
 15 hours early. The current ranking (`docs/timestamp-fields.md`) still puts the filename
 above a UTC clock the filename does not corroborate.
 
-The user's rule, from `timestamp-handoff.md`: the filename is "first source of truth for
+The user's rule, from `../timestamp-handoff.md`: the filename is "first source of truth for
 wallclock local time, in the absence of disconfirming metadata (UTC)". Here the UTC clock
 disconfirms the filename. #137 already prefers a QuickTime date over a contradicting camera
 filename where the file shows the date to be an instant; find why that did not apply to
@@ -130,7 +130,7 @@ The user expects the timestamp step to always run, but only Ingest and Organize 
 always on (`PipelineStep.isAlwaysOn`); the workflow lets Fix Timestamps be tapped off.
 C0199 was organized without a correction on 10 Oct, most likely through this. The
 user's decision: the step becomes **Set Timestamps** and is always on. All the batch
-checks move into one sequence with one output: `completed/preflight-checks.md`.
+checks move into one sequence with one output: `preflight-checks.md`.
 
 ## 5. Writes that rewrite a file without its birth time
 
