@@ -31,7 +31,7 @@ targets:
     settings:
       base:
         # Empty in the main checkout and the Xcode IDE, so those builds carry the
-        # installed app's identity as before. Builds under .ralph/ pass their own
+        # installed app's identity as before. Builds in a git worktree pass their own
         # values on the xcodebuild command line — see the pre-build guard below.
         JETLAG_BUNDLE_SUFFIX: ""
         JETLAG_PRODUCT_SUFFIX: ""

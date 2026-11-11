@@ -51,10 +51,13 @@ DMG_PATH        := $(DIST_DIR)/$(APP_NAME).dmg
 # A build outside the main checkout must never be able to pass itself off as the
 # installed Jetlag — same bundle id, product name and Application Support folder
 # would mean shared UserDefaults, a shared Launch Services registration and a
-# shared profiles file. Worktrees under .ralph/ therefore build "Jetlag Dev" with
-# bundle id com.daniellawrence.Jetlag.dev; the pre-build guard in
-# macos/BuildScripts/guard-worktree-identity.sh rejects one that does not.
-ifneq (,$(findstring /.ralph/,$(CURDIR)/))
+# shared profiles file. Every linked worktree (.ralph/, .claude/worktrees/, any
+# other) therefore builds "Jetlag Dev" with bundle id com.daniellawrence.Jetlag.dev;
+# the pre-build guard in macos/BuildScripts/guard-worktree-identity.sh rejects one
+# that does not. A linked worktree's git dir differs from the repository's.
+GIT_DIR        := $(shell git rev-parse --path-format=absolute --git-dir 2>/dev/null)
+GIT_COMMON_DIR := $(shell git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+ifneq ($(GIT_DIR),$(GIT_COMMON_DIR))
 DEV_IDENTITY := JETLAG_BUNDLE_SUFFIX=.dev JETLAG_PRODUCT_SUFFIX=" Dev"
 endif
 
