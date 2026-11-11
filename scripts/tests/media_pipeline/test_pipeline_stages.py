@@ -24,7 +24,7 @@ from lib.media_pipeline import RunOptions, WorkingDir, process_file
 from lib.media_pipeline import stages
 from lib.media_pipeline.stages import Stage, StageOutcome, enabled_stages
 from helpers import SCRIPT_DIR
-from helpers.media import create_insv_with_corrupted_trailer
+from helpers.media import create_insv_with_corrupted_trailer, exiftool_refuses_corrupted_insta360_trailer
 from helpers.pipeline import create_test_video, get_exif_field, has_tag_cmd, run_in_process, run_pipeline
 
 DEFAULT_TASKS = frozenset({"tag", "gyroflow"})
@@ -382,6 +382,8 @@ class TestInsta360ClipWhoseMetadataCannotBeWritten:
     CLIP = "VID_20261006_002802_00_001.insv"
 
     def _run(self, workspace, profile):
+        if not exiftool_refuses_corrupted_insta360_trailer():
+            pytest.skip("this exiftool predates the Insta360 trailer check (CI's 12.76; the app ships 13.50)")
         create_insv_with_corrupted_trailer(workspace["source"] / self.CLIP,
                                            CreateDate="2026:10:06 07:28:02",
                                            MediaCreateDate="2026:10:06 07:28:02")

@@ -14,7 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from helpers.media import create_insv_with_corrupted_trailer, create_test_video
+from helpers.media import (
+    create_insv_with_corrupted_trailer, create_test_video, exiftool_refuses_corrupted_insta360_trailer,
+)
 from lib.exiftool import ExifTool, Insta360TrailerCorrupted, MetadataWriteRefused, exiftool
 from lib.timestamps.sources import read_exif_data
 
@@ -151,6 +153,8 @@ class TestAMinorRefusalIsRetriedWithM:
     def test_real_exiftool_refuses_a_corrupted_trailer_as_such(self, tmp_path):
         """The real binary on a clip whose trailer overlaps its last atom, with an
         empty record table as the X6 writes it."""
+        if not exiftool_refuses_corrupted_insta360_trailer():
+            pytest.skip("this exiftool predates the Insta360 trailer check (CI's 12.76; the app ships 13.50)")
         clip = tmp_path / "clip.insv"
         create_insv_with_corrupted_trailer(clip)
 
