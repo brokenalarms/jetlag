@@ -14,6 +14,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      EXIFTOOL_VERSION: "13.55"
+      FFMPEG_SERIES: "9.0"
     steps:
       - uses: actions/checkout@v4
 
@@ -25,14 +28,37 @@ jobs:
             scripts/requirements.txt
             scripts/requirements-dev.txt
 
-      - name: Install system tools
+      # The tools come from GitHub, not apt: the runners often cannot resolve
+      # Ubuntu's archive mirrors, and apt then retries until the job times out.
+      # rsync and perl are already on the runner image.
+      - name: Cache system tools
+        id: tools-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/tools
+          key: tools-exiftool-${{ env.EXIFTOOL_VERSION }}-ffmpeg-${{ env.FFMPEG_SERIES }}
+
+      - name: Download system tools
+        if: steps.tools-cache.outputs.cache-hit != 'true'
         timeout-minutes: 5
         run: |
-          # azure.archive.ubuntu.com is flaky and apt retries it until the step
-          # times out; drop it so apt goes straight to archive.ubuntu.com
-          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
-          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15
-          sudo apt-get install -y ffmpeg libimage-exiftool-perl rsync
+          mkdir -p ~/tools/exiftool ~/tools/ffmpeg
+          curl -fsSL --retry 3 "https://github.com/exiftool/exiftool/archive/refs/tags/${EXIFTOOL_VERSION}.tar.gz" \
+            | tar -xz -C ~/tools/exiftool --strip-components=1
+          curl -fsSL --retry 3 "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n${FFMPEG_SERIES}-latest-linux64-gpl-${FFMPEG_SERIES}.tar.xz" \
+            | tar -xJ -C ~/tools/ffmpeg --strip-components=1
+
+      - name: Put system tools on PATH
+        run: |
+          echo ~/tools/exiftool >> "$GITHUB_PATH"
+          echo ~/tools/ffmpeg/bin >> "$GITHUB_PATH"
+
+      - name: Check system tools
+        run: |
+          exiftool -ver
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+          rsync --version | head -1
 
       # make builds scripts/.venv from both requirements files and runs the
       # suite in parallel, the same way it runs locally
