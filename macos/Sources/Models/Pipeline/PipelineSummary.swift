@@ -18,6 +18,8 @@ struct PipelineSummary: Equatable {
     let changed: Int
     let failed: Int
     let failedFiles: [String]
+    /// Files an apply never reached because its destination disconnected.
+    let unprocessedFiles: [String]
     /// Archive Source ran and could not archive or delete the source.
     let sourceActionFailed: Bool
     let mode: Mode
@@ -25,7 +27,7 @@ struct PipelineSummary: Equatable {
     var unchanged: Int { succeeded - changed }
 
     /// Whether something went wrong that only the log explains.
-    var hasFailures: Bool { failed > 0 || sourceActionFailed }
+    var hasFailures: Bool { failed > 0 || !unprocessedFiles.isEmpty || sourceActionFailed }
 
     /// The completion popup's text. A dry run says what its batch checks found,
     /// since an apply of the same batch will stop to ask about them.
@@ -37,6 +39,9 @@ struct PipelineSummary: Equatable {
                      : Strings.Workflow.runSummaryDryRun)
         if failed > 0 {
             lines.append(Strings.Workflow.runSummaryFailed(count: failed, files: failedFiles))
+        }
+        if !unprocessedFiles.isEmpty {
+            lines.append(Strings.Workflow.runSummaryDestinationLost(count: unprocessedFiles.count))
         }
         if sourceActionFailed {
             lines.append(Strings.Workflow.runSummarySourceActionFailed)
