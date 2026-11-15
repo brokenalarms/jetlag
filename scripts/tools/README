@@ -2,7 +2,8 @@ Vendored tools — bundled into the macOS app alongside scripts/.
 
 exiftool   Perl script + lib/ from Image-ExifTool distribution (exiftool.org).
            Currently v13.50. To update: download a new tar.gz, replace
-           exiftool and lib/.
+           exiftool and lib/. Insta360 X6 clips need 13.64+ — see
+           docs/specs/exiftool-13.64.md.
 
 tag        macOS Finder tag CLI (github.com/jdberry/tag), MIT licensed.
            Source vendored at tag-src/. Build on macOS:
