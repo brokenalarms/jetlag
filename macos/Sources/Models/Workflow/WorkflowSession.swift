@@ -83,7 +83,8 @@ final class WorkflowSession {
         didSet {
             if !gyroflowAvailable {
                 enabledSteps.remove(.gyroflow)
-            } else if !oldValue, availableSteps.contains(.gyroflow), Self.isOnByDefault(.gyroflow) {
+            } else if !oldValue, availableSteps.contains(.gyroflow),
+                      Self.isOnByDefault(.gyroflow, profile: workingProfile) {
                 enabledSteps.insert(.gyroflow)
             }
         }
@@ -101,13 +102,14 @@ final class WorkflowSession {
         let availableSteps = Self.computeAvailableSteps(
             profile: profile, gyroflowAvailable: gyroflowAvailable
         )
-        self.enabledSteps = Set(availableSteps.filter(Self.isOnByDefault))
+        self.enabledSteps = Set(availableSteps.filter { Self.isOnByDefault($0, profile: profile) })
     }
 
-    /// Whether a step the session offers starts switched on. Archiving moves the
-    /// user's source folder, so it is only ever opted into.
-    private static func isOnByDefault(_ step: PipelineStep) -> Bool {
-        step != .archiveSource
+    /// Whether a step the session offers starts switched on: every one, except
+    /// Tag for a profile with no tags to write.
+    private static func isOnByDefault(_ step: PipelineStep, profile: MediaProfile?) -> Bool {
+        guard step == .tag else { return true }
+        return !(profile?.tags ?? []).allSatisfy(\.isEmpty)
     }
 
     var availableSteps: [PipelineStep] {
