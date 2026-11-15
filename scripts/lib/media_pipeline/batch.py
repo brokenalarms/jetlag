@@ -27,6 +27,7 @@ class BatchStats:
     succeeded: int = 0
     changed: int = 0
     failed_files: list[str] = field(default_factory=list)
+    unprocessed_files: list[str] = field(default_factory=list)
     source_files: list[str] = field(default_factory=list)
     organize_conflicts: list[str] = field(default_factory=list)
 
@@ -63,9 +64,19 @@ def discover_files(opts: RunOptions) -> list[Path]:
 
 def process_files(files: list[Path], opts: RunOptions, working_dir: WorkingDir) -> BatchStats:
     """Every file through its stages, one at a time, so an interrupted run
-    resumes from the next unprocessed file."""
+    resumes from the next unprocessed file.
+
+    An apply stops once its working directory is gone: the destination volume
+    disconnected, and every file after it would fail the same way.
+    """
     stats = BatchStats()
     for i, file_path in enumerate(files, 1):
+        if opts.apply and not working_dir.exists():
+            stats.unprocessed_files = [f.name for f in files[i - 1:]]
+            print(f"❌ The destination is gone ({opts.target_dir}): was the drive disconnected? "
+                  f"Stopping with {len(stats.unprocessed_files)} file(s) not processed.",
+                  file=sys.stderr)
+            break
         stats.processed += 1
         print(f"[{i}/{len(files)}] Processing: {file_path.name}", file=sys.stderr)
 
@@ -102,6 +113,10 @@ def act_on_source(opts: RunOptions, stats: BatchStats) -> bool:
         return False
     if stats.failed > 0:
         print(f"📦 Skipping archive source: {stats.failed} file(s) failed.", file=sys.stderr)
+        return False
+    if stats.unprocessed_files:
+        print(f"📦 Skipping archive source: {len(stats.unprocessed_files)} file(s) not processed.",
+              file=sys.stderr)
         return False
     print("📦 Archive source...", file=sys.stderr)
     if opts.source_action == "delete":
@@ -167,10 +182,17 @@ def print_summary(stats: BatchStats, apply: bool, source_action_failed: bool) ->
         for f in stats.failed_files:
             print(f"  - {f}", file=sys.stderr)
 
+    if stats.unprocessed_files:
+        print(f"Not processed, the destination is gone: {len(stats.unprocessed_files)}",
+              file=sys.stderr)
+
     if source_action_failed:
         print("❌ Archive source failed: see the archive-source lines above.", file=sys.stderr)
 
-    if apply and stats.failed > 0:
+    if stats.unprocessed_files:
+        print("❌ Media pipeline stopped - the destination disconnected. Reconnect it and run again.",
+              file=sys.stderr)
+    elif apply and stats.failed > 0:
         print(f"❌ Media pipeline complete - {stats.failed} file(s) failed and were left in the working directory.", file=sys.stderr)
     elif apply:
         print("✅ Media pipeline complete - changes applied.", file=sys.stderr)
@@ -188,6 +210,7 @@ def report_summary(stats: BatchStats, apply: bool, source_action_failed: bool) -
         changed=stats.changed,
         failed=stats.failed,
         failed_files=stats.failed_files,
+        unprocessed_files=stats.unprocessed_files,
         source_action_failed=source_action_failed,
         mode="applied" if apply else "dry_run",
     )
@@ -216,4 +239,4 @@ def run(args, working_dir: WorkingDir) -> NoReturn:
     source_action_failed = act_on_source(opts, stats)
     finish_working_dir(opts, stats)
     report_summary(stats, opts.apply, source_action_failed)
-    sys.exit(1 if stats.failed > 0 or source_action_failed else 0)
+    sys.exit(1 if stats.failed > 0 or stats.unprocessed_files or source_action_failed else 0)

@@ -158,7 +158,7 @@ final class BatchCheckTests: XCTestCase {
                                  assentFlag: "--force-timezone", refused: false)
         func summary(_ mode: PipelineSummary.Mode) -> PipelineSummary {
             PipelineSummary(processed: 3, succeeded: 3, changed: 3, failed: 0, failedFiles: [],
-                            sourceActionFailed: false, mode: mode)
+                            unprocessedFiles: [], sourceActionFailed: false, mode: mode)
         }
 
         let dryRun = summary(.dryRun).message(checks: [camera, relabel])

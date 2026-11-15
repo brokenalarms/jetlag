@@ -30,9 +30,27 @@ class WorkingDir:
         self.staged: list[Path] = []
 
     def create(self) -> None:
-        """Create the directory an apply stages into; a cancel now clears it."""
+        """Create the directory an apply stages into; a cancel now clears it.
+
+        exiftool's scratch files left by a run that never reached its cancel
+        handler (a crash, a destination that disconnected mid-write) are cleared
+        too: exiftool refuses to write a file whose scratch file exists, and no
+        exiftool is running for this run yet.
+        """
         os.makedirs(self.path, exist_ok=True)
         self.created = True
+        for leftover in self._exiftool_leftovers():
+            print(f"🧹 Removing exiftool scratch file left by an earlier run: {leftover.name}",
+                  file=sys.stderr)
+            leftover.unlink()
+
+    def _exiftool_leftovers(self) -> list[Path]:
+        return sorted(Path(self.path).glob(EXIFTOOL_TMP_GLOB))
+
+    def exists(self) -> bool:
+        """Whether the directory is still there: it lives on the destination
+        volume, so it goes when that volume disconnects."""
+        return os.path.isdir(self.path)
 
     def stage(self, paths: list[Path]) -> None:
         """Record the working-dir copies this file's iteration owns."""
@@ -67,16 +85,15 @@ class WorkingDir:
         self.discard()
         if not self.created:
             return
-        working = Path(self.path)
-        if not working.is_dir():
+        if not self.exists():
             return
-        for leftover in working.glob(EXIFTOOL_TMP_GLOB):
+        for leftover in self._exiftool_leftovers():
             try:
                 leftover.unlink()
             except OSError:
                 pass
         try:
-            os.rmdir(working)
+            os.rmdir(self.path)
         except OSError:
             pass
 
